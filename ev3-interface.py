@@ -1,5 +1,6 @@
 import paho.mqtt.client as mqtt
 import time
+import sys
 import os
 import random
 import json
@@ -33,7 +34,7 @@ class Sensor:
         self.name = name
 
     def read(self):
-        return random.randint(0, 100)  # fake sensor data
+        return random.randint(50, 60)  # fake sensor data
 
 # ---- Setup motors and sensors ----
 motors = {
@@ -80,20 +81,6 @@ client.on_message = on_message
 broker_address = "localhost"  # or broker IP if remote
 client.connect(broker_address, 1883, 60)
 
-# ---- Auto-generate available I/O manifest ----
-available_io = {
-    "control": { f"motor/{name}": "int: set desired goal speed (-100 to 100)" for name in motors.keys() }
-}
-available_io["control"]["stop"] = "signal: stop all motors"
-available_io["status"] = {}
-for name in motors.keys():
-    available_io["status"][f"motor/{name}/goal"] = "int: current goal speed"
-    available_io["status"][f"motor/{name}/actual"] = "int: current measured speed"
-for name in sensors.keys():
-    available_io["status"][f"sensor/{name}"] = "int: sensor reading"
-
-client.publish("system/available_io", json.dumps(available_io), retain=True)
-
 # ---- Publish initial goal speed (retained) ----
 for motor_name, motor in motors.items():
     client.publish(f"status/motor/{motor_name}/goal", motor.get_goal_speed(), retain=True)
@@ -109,28 +96,43 @@ client.loop_start()
 def clear_console():
     os.system('clear' if os.name == 'posix' else 'cls')
 
+def move_cursor_up(lines=1):
+    sys.stdout.write(f"\x1b[{lines}A")
+    sys.stdout.flush()
+
 try:
+    # print once outside loop
+    print("== Raspberry Pi 2 Control Panel ==")
+    print()
+
+    lines_to_move_up = 0
+
     while True:
-        clear_console()
-        print("== Raspberry Pi 2 Control Panel ==")
+        # update all motors
+        for motor in motors.values():
+            motor.update()
 
-        print("\nMotors:")
-        for name, motor in motors.items():
-            motor.update()  # update actual speed toward goal
-            actual_speed = motor.get_speed()
-            goal_speed = motor.get_goal_speed()
-            print(f"  {name}: actual = {actual_speed}, goal = {goal_speed}")
-            client.publish(f"status/motor/{name}/actual", actual_speed, retain=True)
+        # move cursor back to top ONCE
+        sys.stdout.write(f"\x1b[{lines_to_move_up}F")
+        sys.stdout.flush()
 
-        print("\nSensors:")
-        for name, sensor in sensors.items():
+        sys.stdout.write("Motors:\x1b[K\n")
+        for mname, m in motors.items():
+            actual = m.get_speed()
+            goal = m.get_goal_speed()
+            sys.stdout.write(f"  {mname}: actual = {actual}, goal = {goal}\x1b[K\n")
+
+        sys.stdout.write("\nSensors:\x1b[K\n")
+        for sname, sensor in sensors.items():
             value = sensor.read()
-            print(f"  {name}: value = {value}")
-            client.publish(f"status/sensor/{name}", value, retain=True)
+            sys.stdout.write(f"  {sname}: value = {value}\x1b[K\n")
+            client.publish(f"status/sensor/{sname}", value, retain=True)
 
-        print("\nAvailable topics listed in 'system/available_io'")
+        sys.stdout.flush()
+        time.sleep(0.1)
+        
+        lines_to_move_up = 3 + len(motors) + len(sensors)
 
-        time.sleep(1)
 
 except KeyboardInterrupt:
     print("\nExiting...")
