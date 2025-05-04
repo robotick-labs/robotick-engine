@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RC Controller</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body { margin: 0; background: #222; color: #fff; display: flex; justify-content: space-around; align-items: center; height: 100vh; }
+        .stick-area {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            background: #555;
+            border-radius: 10px;
+            touch-action: none;
+        }
+        .knob {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: silver;
+            border-radius: 50%;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+    <div id="left-area" class="stick-area">
+        <div id="left-knob" class="knob"></div>
+    </div>
+    <div id="right-area" class="stick-area">
+        <div id="right-knob" class="knob"></div>
+    </div>
+
+    <script>
+        const client = mqtt.connect('ws://' + location.hostname + ':9001');
+        client.on('connect', () => console.log('MQTT connected'));
+        client.on('error', err => console.error('MQTT error:', err));
+
+        function setupStick(areaId, knobId, topic, autoCenterX, autoCenterY) {
+            const area = document.getElementById(areaId);
+            const knob = document.getElementById(knobId);
+            const areaRect = area.getBoundingClientRect();
+            let dragging = false;
+            let originX = areaRect.width / 2;
+            let originY = areaRect.height / 2;
+
+            function setKnob(x, y) {
+                knob.style.left = `${x}px`;
+                knob.style.top = `${y}px`;
+            }
+
+            function sendMQTT(normX, normY) {
+                const payload = JSON.stringify({x: normX, y: normY});
+                client.publish(topic, payload);
+            }
+
+            function movePointer(x, y) {
+                const rect = area.getBoundingClientRect();
+                let dx = x - rect.left - originX;
+                let dy = y - rect.top - originY;
+
+                // constrain to area
+                const maxRange = (areaRect.width / 2) - (knob.offsetWidth / 2);
+                dx = Math.max(-maxRange, Math.min(maxRange, dx));
+                dy = Math.max(-maxRange, Math.min(maxRange, dy));
+
+                setKnob(originX + dx, originY + dy);
+
+                const normX = dx / maxRange;
+                const normY = -dy / maxRange;  // invert Y so up=+1
+                sendMQTT(normX, normY);
+            }
+
+            function resetKnob() {
+                const x = autoCenterX ? originX : knob.offsetLeft;
+                const y = autoCenterY ? originY : knob.offsetTop;
+                setKnob(x, y);
+
+                const normX = autoCenterX ? 0 : (x - originX) / ((areaRect.width / 2) - (knob.offsetWidth / 2));
+                const normY = autoCenterY ? 0 : -(y - originY) / ((areaRect.height / 2) - (knob.offsetHeight / 2));
+                sendMQTT(normX, normY);
+            }
+
+            // Touch + mouse unified
+            function getPos(e) {
+                if (e.touches) return {x: e.touches[0].clientX, y: e.touches[0].clientY};
+                return {x: e.clientX, y: e.clientY};
+            }
+
+            area.addEventListener('mousedown', e => { dragging = true; movePointer(e.clientX, e.clientY); });
+            area.addEventListener('mousemove', e => { if (dragging) movePointer(e.clientX, e.clientY); });
+            area.addEventListener('mouseup', () => { dragging = false; resetKnob(); });
+            area.addEventListener('mouseleave', () => { if (dragging) { dragging = false; resetKnob(); } });
+
+            area.addEventListener('touchstart', e => { dragging = true; movePointer(e.touches[0].clientX, e.touches[0].clientY); });
+            area.addEventListener('touchmove', e => { if (dragging) movePointer(e.touches[0].clientX, e.touches[0].clientY); });
+            area.addEventListener('touchend', () => { dragging = false; resetKnob(); });
+        }
+
+        // Left stick: X auto-centers (yaw), Y stays (throttle)
+        const autoCenterXLeft = true; autoCenterYLeft = true;
+        setupStick('left-area', 'left-knob', 'robot/control/left', autoCenterXLeft, autoCenterYLeft);
+
+        // Right stick: both axes auto-center
+        const autoCenterXRight = true; autoCenterYRight = true;
+        setupStick('right-area', 'right-knob', 'robot/control/right', autoCenterXRight, autoCenterYRight);
+    </script>
+</body>
+</html>
