@@ -1,0 +1,29 @@
+{
+    "workloads": [
+        {
+            "type": "MotorDevice",
+            "name": "left",
+            "args": { "tick_rate_hz": 100 }
+        },
+        {
+            "type": "MotorDevice",
+            "name": "right"
+        },
+        {
+            "type": "SensorDevice",
+            "name": "ultrasonic"
+        },
+        {
+            "type": "SensorDevice",
+            "name": "light"
+        },
+        {
+            "type": "MqttUpdate",
+            "args": { "broker_host": "localhost", "broker_port": 1883 }
+        },
+        {
+            "type": "ConsoleUpdate",
+            "args": { "tick_rate_hz": 10 }
+        }
+    ]
+}

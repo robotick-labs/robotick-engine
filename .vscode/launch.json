@@ -4,7 +4,13 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
+        {
+            "name": "Python Debugger: ev3-interface",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/ev3-interface.py",
+            "console": "integratedTerminal"
+        },        
         {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
