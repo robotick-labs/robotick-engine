@@ -1,23 +1,21 @@
 {
     "workloads": [
         {
-            "type": "MotorDevice",
-            "name": "left",
+            "type": "brick_pi_device",
+            "name": "brickpi",
             "args": {
                 "tick_rate_hz": 100
             }
         },
         {
-            "type": "MotorDevice",
-            "name": "right"
-        },
-        {
-            "type": "SensorDevice",
-            "name": "ultrasonic"
-        },
-        {
-            "type": "SensorDevice",
-            "name": "light"
+            "type": "pid_control",
+            "name": "balance_controller",
+            "args": {
+                "tick_parent": "brickpi",
+                "kp": 1.0,
+                "ki": 0.0,
+                "kd": 0.1
+            }
         },
         {
             "type": "MqttUpdate",

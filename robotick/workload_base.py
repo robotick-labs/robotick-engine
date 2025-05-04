@@ -1,62 +1,66 @@
 import threading
 import time
 
-from .registry import register_workload
-
 class WorkloadBase:
-    def __init__(self, tick_rate_hz=100, name=None):
+    def __init__(self, tick_rate_hz=10, tick_parent=None):
+        self._stop_event = threading.Event()
         self._tick_rate_hz = tick_rate_hz
-        self._target_dt = 1.0 / tick_rate_hz
-        self._thread = None
-        self._running = threading.Event()
-        self._lock = threading.Lock()
-        self._readable_states = []
-        self._writable_states = []
-        self.name = name or self.__class__.__name__.lower()
-        register_workload(self)
+        self._tick_interval = 1.0 / tick_rate_hz if tick_rate_hz else None
+        self._tick_parent = tick_parent
 
-    def setup(self):
-        """Optional post-registration setup step. Override in subclasses."""
-        pass
+        self._wake_event = threading.Event()
+        self._done_event = threading.Event()
 
-    def get_readable_states(self):
-        return self._readable_states
+        # parent keeps list of child references
+        if self._tick_parent:
+            if not hasattr(self._tick_parent, '_tick_children'):
+                self._tick_parent._tick_children = []
+            self._tick_parent._tick_children.append(self)
 
-    def get_writable_states(self):
-        return self._writable_states
+        self._thread = threading.Thread(target=self._run_loop)
 
     def start(self):
-        if self._thread is None or not self._thread.is_alive():
-            self._running.set()
-            self._thread = threading.Thread(target=self._run_loop, daemon=True)
-            self._thread.start()
+        self._thread.start()
 
     def stop(self):
-        self._running.clear()
-        if self._thread:
-            self._thread.join()
-
-    def _run_loop(self):
-        last_time = time.perf_counter()
-        while self._running.is_set():
-            now = time.perf_counter()
-            time_delta = now - last_time
-            last_time = now
-
-            self.tick(time_delta)
-
-            elapsed = time.perf_counter() - now
-            sleep_time = max(0, self._target_dt - elapsed)
-            time.sleep(sleep_time)
+        self._stop_event.set()
+        self._thread.join()
 
     def tick(self, time_delta):
-        """Override in subclass to define per-tick behavior."""
+        """Override in subclass"""
         pass
 
-    def safe_get(self, attr):
-        with self._lock:
-            return getattr(self, attr)
+    def _run_loop(self):
+        if self._tick_parent:
+            # child workload: waits for parent signal
+            while not self._stop_event.is_set():
+                self._wake_event.wait()
+                self._wake_event.clear()
 
-    def safe_set(self, attr, value):
-        with self._lock:
-            setattr(self, attr, value)
+                self.tick(None)  # optional: pass actual time_delta if needed
+
+                self._done_event.set()
+        else:
+            # independent workload (parent)
+            last_time = time.perf_counter()
+            while not self._stop_event.is_set():
+                now = time.perf_counter()
+                time_delta = now - last_time
+                last_time = now
+
+                self.tick(time_delta)
+
+                # wait for children to finish (if any)
+                if hasattr(self, '_tick_children'):
+                    for child in self._tick_children:
+                        child._wake_event.set()
+                    for child in self._tick_children:
+                        child._done_event.wait()
+                        child._done_event.clear()
+
+                # keep tick rate
+                if self._tick_interval:
+                    elapsed = time.perf_counter() - now
+                    sleep_time = self._tick_interval - elapsed
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
