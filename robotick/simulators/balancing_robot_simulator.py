@@ -19,7 +19,7 @@ class BalancingRobotSimulator(WorkloadBase):
         self.x = 0.0      # world-pos-x in meters
         self.y = 0.0      # world-pos-y in meters
         self.yaw = 0.0    # radians
-        self.legs_height = 0.3      # leg-height in meters
+        self.legs_height = 0.3      # average leg-height (or mid-hips height) in meters
         self.pitch = 0.0  # radians (tilt)
         self.roll = 0.0   # radians
 
