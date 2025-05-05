@@ -1,12 +1,17 @@
 import threading
 import time
+from .registry import register_workload
 
 class WorkloadBase:
-    def __init__(self, tick_rate_hz=10, tick_parent=None):
+    def __init__(self):
         self._stop_event = threading.Event()
-        self._tick_rate_hz = tick_rate_hz
-        self._tick_interval = 1.0 / tick_rate_hz if tick_rate_hz else None
-        self._tick_parent = tick_parent
+        self._tick_rate_hz = 10
+        self._tick_parent = None
+        self._lock = threading.Lock() # TODO - see if we need still
+        self._readable_states = []
+        self._writable_states = []
+
+        register_workload(self)
 
         self._wake_event = threading.Event()
         self._done_event = threading.Event()
@@ -19,12 +24,37 @@ class WorkloadBase:
 
         self._thread = threading.Thread(target=self._run_loop)
 
+    def get_tick_interval(self):
+        return 1.0 / self._tick_rate_hz
+    
+    def get_readable_states(self):
+        return self._readable_states
+
+    def get_writable_states(self):
+        return self._writable_states
+    
+    def safe_get(self, attr):
+        with self._lock:
+            return getattr(self, attr)
+
+    def safe_set(self, attr, value):
+        with self._lock:
+            setattr(self, attr, value)
+
+    def setup(self):
+        """Override in subclass"""
+        pass
+
     def start(self):
         self._thread.start()
 
     def stop(self):
         self._stop_event.set()
         self._thread.join()
+
+    def pre_tick(self, time_delta):
+        """Override in subclass"""
+        pass
 
     def tick(self, time_delta):
         """Override in subclass"""
@@ -48,19 +78,25 @@ class WorkloadBase:
                 time_delta = now - last_time
                 last_time = now
 
+                self.pre_tick(time_delta)
+                
+                # start children ticking alongside us (if any)
+                if hasattr(self, '_tick_children'):
+                    for child in self._tick_children:
+                        child._wake_event.set()
+
                 self.tick(time_delta)
 
                 # wait for children to finish (if any)
                 if hasattr(self, '_tick_children'):
                     for child in self._tick_children:
-                        child._wake_event.set()
-                    for child in self._tick_children:
                         child._done_event.wait()
                         child._done_event.clear()
 
                 # keep tick rate
-                if self._tick_interval:
-                    elapsed = time.perf_counter() - now
-                    sleep_time = self._tick_interval - elapsed
-                    if sleep_time > 0:
-                        time.sleep(sleep_time)
+                tick_interval = self.get_tick_interval()
+            
+                elapsed = time.perf_counter() - now
+                sleep_time = tick_interval - elapsed
+                if sleep_time > 0:
+                    time.sleep(sleep_time)

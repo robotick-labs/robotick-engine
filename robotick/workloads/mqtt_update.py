@@ -1,12 +1,13 @@
 import paho.mqtt.client as mqtt
-from .workload_base import WorkloadBase
-from .registry import get_all
+from ..framework.workload_base import WorkloadBase
+from ..framework.registry import get_all
 
 class MqttUpdate(WorkloadBase):
-    def __init__(self, broker_host="localhost", broker_port=1883, tick_rate_hz=30):
-        super().__init__(tick_rate_hz)
-        self.broker_host = broker_host
-        self.broker_port = broker_port
+    def __init__(self):
+        super().__init__()
+        self.tick_rate_hz=30
+        self.broker_host = "localhost"
+        self.broker_port = 1883
         self.client = mqtt.Client()
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message

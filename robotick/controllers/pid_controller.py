@@ -1,13 +1,12 @@
-from .workload_base import WorkloadBase
-from .registry import register_workload
+from ..framework.workload_base import WorkloadBase
+from ..framework.registry import register_workload
 
 class PIDControl(WorkloadBase):
-    def __init__(self, name="pid", tick_parent=None, kp=1.0, ki=0.0, kd=0.0):
-        super().__init__(tick_rate_hz=None, tick_parent=tick_parent)
-        self.name = name
-        self.kp = kp
-        self.ki = ki
-        self.kd = kd
+    def __init__(self):
+        super().__init__()
+        self.kp = 1.0
+        self.ki = 0.0
+        self.kd = 0.0
         self.integral = 0
         self.prev_error = 0
 

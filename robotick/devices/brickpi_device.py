@@ -1,11 +1,11 @@
 import brickpi3
-from .workload_base import WorkloadBase
-from .registry import register_workload
+from ..framework.workload_base import WorkloadBase
+from ..framework.registry import register_workload
 
 class BrickPiDevice(WorkloadBase):
-    def __init__(self, name="brickpi", tick_rate_hz=100):
-        super().__init__(tick_rate_hz=tick_rate_hz)
-        self.name = name
+    def __init__(self):
+        super().__init__()
+        self._tick_rate_hz=100
         self.bp = brickpi3.BrickPi3()
 
         self._buffer_a = {}
@@ -17,6 +17,9 @@ class BrickPiDevice(WorkloadBase):
 
     def get_current_state(self):
         return self._current_buffer
+
+    def pre_tick(self, time_delta):
+        self._current_buffer, self._next_buffer = self._next_buffer, self._current_buffer
 
     def tick(self, time_delta):
         try:
@@ -31,4 +34,3 @@ class BrickPiDevice(WorkloadBase):
             next_buf = {}
 
         self._next_buffer.update(next_buf)
-        self._current_buffer, self._next_buffer = self._next_buffer, self._current_buffer

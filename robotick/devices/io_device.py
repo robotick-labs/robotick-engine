@@ -1,9 +1,9 @@
-from .workload_base import WorkloadBase
+from ..framework.workload_base import WorkloadBase
 
 class IODevice(WorkloadBase):
-    def __init__(self, name, tick_rate_hz=100):
-        super().__init__(tick_rate_hz)
-        self.name = name
+    def __init__(self):
+        super().__init__()
+        self._tick_rate_hz=100
         self.state = 0
 
     def tick(self, time_delta):

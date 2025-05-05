@@ -2,8 +2,9 @@ from .io_device import IODevice
 import random
 
 class SensorDevice(IODevice):
-    def __init__(self, name, tick_rate_hz=10):
-        super().__init__(name, tick_rate_hz)
+    def __init__(self):
+        super().__init__()
+        self._tick_rate_hz=10
         self.state = random.randint(50, 60)
         self._readable_states = ['state']
 

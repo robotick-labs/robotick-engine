@@ -1,8 +1,8 @@
 from .io_device import IODevice
 
 class MotorDevice(IODevice):
-    def __init__(self, name, tick_rate_hz=100):
-        super().__init__(name, tick_rate_hz)
+    def __init__(self):
+        super().__init__()
         self.speed = 0
         self.goal_speed = 0
         self._readable_states = ['speed', 'goal_speed']

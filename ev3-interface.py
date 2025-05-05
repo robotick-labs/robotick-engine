@@ -1,4 +1,4 @@
-from robotick.composer import load
+from robotick.framework.composer import load
 import time
 
 def main():

@@ -1,9 +1,10 @@
 import json
-import importlib
+
+from robotick.devices import motor_device, sensor_device
+from robotick.workloads import console_update, mqtt_update
 
 def load(config_file):
     """Load workloads from JSON config and start them."""
-    from robotick import motor_device, sensor_device, mqtt_update, console_update
 
     module_lookup = {
         'MotorDevice': motor_device,
@@ -28,7 +29,13 @@ def load(config_file):
 
         cls = getattr(module, type_name)
 
-        instance = cls(name_arg, **args) if name_arg else cls(**args)
+        instance = cls()
+
+        setattr(instance, "name", name_arg)
+        
+        for key, value in args.items():
+            setattr(instance, key, value)
+
         instances.append(instance)
     
      # ALL workloads are now registered at this point

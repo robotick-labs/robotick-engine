@@ -3,7 +3,7 @@
         {
             "type": "MotorDevice",
             "name": "left",
-            "args": {
+            "attributes": {
                 "tick_rate_hz": 100
             }
         },
@@ -21,14 +21,14 @@
         },
         {
             "type": "MqttUpdate",
-            "args": {
+            "attributes": {
                 "broker_host": "localhost",
                 "broker_port": 1883
             }
         },
         {
             "type": "ConsoleUpdate",
-            "args": {
+            "attributes": {
                 "tick_rate_hz": 10
             }
         }

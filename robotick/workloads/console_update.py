@@ -1,12 +1,13 @@
-from .workload_base import WorkloadBase
-from .registry import get_all
+from ..framework.workload_base import WorkloadBase
+from ..framework.registry import get_all
 from rich.live import Live
 from rich.table import Table
 
 class ConsoleUpdate(WorkloadBase):
-    def __init__(self, tick_rate_hz=10):
-        super().__init__(tick_rate_hz)
-        self._live = Live(refresh_per_second=tick_rate_hz)
+    def __init__(self):
+        super().__init__()
+        self._tick_rate_hz=10
+        self._live = Live(refresh_per_second=self._tick_rate_hz)
         self._live.start()
 
     def tick(self, time_delta):
@@ -24,7 +25,7 @@ class ConsoleUpdate(WorkloadBase):
                     value = inst.safe_get(state)
                     states.append(f"{state}={value}")
                 state_str = ", ".join(states)
-                table.add_row(type_name, getattr(inst, 'name', repr(inst)), state_str)
+                table.add_row(type_name, getattr(inst, 'name', repr(inst)) or "-", state_str)
 
         self._live.update(table)
 
