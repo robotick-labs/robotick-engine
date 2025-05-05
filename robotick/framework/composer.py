@@ -2,6 +2,7 @@ import json
 
 from robotick.devices import motor_device, sensor_device
 from robotick.workloads import console_update, mqtt_update
+from robotick.simulators import balancing_robot_simulator
 
 def load(config_file):
     """Load workloads from JSON config and start them."""
@@ -10,7 +11,8 @@ def load(config_file):
         'MotorDevice': motor_device,
         'SensorDevice': sensor_device,
         'MqttUpdate': mqtt_update,
-        'ConsoleUpdate': console_update
+        'ConsoleUpdate': console_update,
+        'BalancingRobotSimulator': balancing_robot_simulator
     }
 
     with open(config_file) as f:

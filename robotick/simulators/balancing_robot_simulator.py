@@ -5,7 +5,7 @@ class BalancingRobotSimulator(WorkloadBase):
     def __init__(self):
         super().__init__()
 
-        self._tick_rate_hz = 100
+        self._tick_rate_hz = 500
 
         # Robot parameters (can be overridden after init)
         self.mass = 10.0               # kg
@@ -19,35 +19,35 @@ class BalancingRobotSimulator(WorkloadBase):
         self.x = 0.0      # world-pos-x in meters
         self.y = 0.0      # world-pos-y in meters
         self.yaw = 0.0    # radians
-        self.h = 0.3      # leg-height in meters
+        self.legs_height = 0.3      # leg-height in meters
         self.pitch = 0.0  # radians (tilt)
         self.roll = 0.0   # radians
 
         self.dx = 0.0
         self.dy = 0.0
-        self.dphi = 0.0
-        self.dtheta = 0.0
+        self.dyaw = 0.0
+        self.dpitch = 0.0
         self.dh = 0.0  # not used dynamically, but included
-        self.dpsi = 0.0  # treated kinematically
+        self.droll = 0.0  # treated kinematically
 
         # Control inputs (external should set these!)
-        self.tau_L = 0.0
-        self.tau_R = 0.0
-        self.h_L = self.h
-        self.h_R = self.h
+        self.wheel_torque_L = 0.0
+        self.wheel_torque_R = 0.0
+        self.leg_height_L = self.legs_height
+        self.leg_height_R = self.legs_height
 
         # Optionally add readable states here for external inspection
         self._readable_states = [
-            'x', 'y', 'phi', 'h', 'theta', 'psi',
-            'dx', 'dy', 'dphi', 'dtheta'
+            'x', 'y', 'yaw', 'pitch', 'roll', 'legs_height',
+            'dx', 'dy', 'dyaw', 'dpitch'
         ]
 
     def tick(self, time_delta):
         dt = time_delta if time_delta is not None else self.get_tick_interval()
 
         # Forces from wheel torques
-        F_L = self.tau_L / self.wheel_radius
-        F_R = self.tau_R / self.wheel_radius
+        F_L = self.wheel_torque_L / self.wheel_radius
+        F_R = self.wheel_torque_R / self.wheel_radius
         F_total = F_L + F_R
 
         a_x_robot = F_total / self.mass
@@ -66,36 +66,36 @@ class BalancingRobotSimulator(WorkloadBase):
 
         # Yaw dynamics
         yaw_moment = (F_R - F_L) * self.track_width / 2  # torque = force * half-track
-        self.dphi += yaw_moment / (self.mass * self.track_width) * dt
-        self.yaw += self.dphi * dt
+        self.dyaw += yaw_moment / (self.mass * self.track_width) * dt
+        self.yaw += self.dyaw * dt
 
         # Height and roll (kinematic)
-        self.h = (self.h_L + self.h_R) / 2
+        self.legs_height = (self.leg_height_L + self.leg_height_R) / 2
         if self.track_width != 0:
-            self.roll = math.atan((self.h_L - self.h_R) / self.track_width)
+            self.roll = math.atan((self.leg_height_L - self.leg_height_R) / self.track_width)
         else:
             self.roll = 0.0
 
         # Pitch inertia
-        I_theta = self.mass * self.h ** 2
+        I_theta = self.mass * self.legs_height ** 2
 
         # Tilt dynamics
         try:
             theta_accel = (
-                self.mass * self.g * self.h * math.sin(self.pitch) +
-                self.mass * self.h * a_x_robot * math.cos(self.pitch)
+                self.mass * self.g * self.legs_height * math.sin(self.pitch) +
+                self.mass * self.legs_height * a_x_robot * math.cos(self.pitch)
             ) / I_theta
         except ZeroDivisionError:
             theta_accel = 0.0
 
-        self.dtheta += theta_accel * dt
-        self.pitch += self.dtheta * dt
+        self.dpitch += theta_accel * dt
+        self.pitch += self.dpitch * dt
 
         # Clamp tilt to ±90 degrees
         max_tilt = math.pi / 2
         if self.pitch > max_tilt:
             self.pitch = max_tilt
-            self.dtheta = 0.0
+            self.dpitch = 0.0
         elif self.pitch < -max_tilt:
             self.pitch = -max_tilt
-            self.dtheta = 0.0
+            self.dpitch = 0.0

@@ -20,6 +20,10 @@
             "name": "light"
         },
         {
+            "type": "BalancingRobotSimulator",
+            "name": "magg-e"
+        },
+        {
             "type": "MqttUpdate",
             "attributes": {
                 "broker_host": "localhost",
