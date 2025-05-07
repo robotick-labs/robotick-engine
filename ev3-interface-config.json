@@ -10,6 +10,12 @@
             }
         },
         {
+            "type": "RemoteControlDevice",
+            "args": {
+                "tick_rate_hz": 30
+            }
+        },
+        {
             "type": "MqttUpdate",
             "name": "comms",
             "args": {

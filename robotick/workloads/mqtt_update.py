@@ -1,3 +1,4 @@
+import json
 import paho.mqtt.client as mqtt
 from ..framework.workload_base import WorkloadBase
 from ..framework.registry import get_all
@@ -5,13 +6,13 @@ from ..framework.registry import get_all
 class MqttUpdate(WorkloadBase):
     def __init__(self):
         super().__init__()
-        self.tick_rate_hz=30
+        self.tick_rate_hz = 30
         self.broker_host = "localhost"
         self.broker_port = 1883
         self.client = mqtt.Client()
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
-        self._last_published_value = {}  # to track last known published values
+        self._last_published_value = {}
 
     def setup(self):
         self.client.connect(self.broker_host, self.broker_port, 60)
@@ -20,56 +21,85 @@ class MqttUpdate(WorkloadBase):
     def _on_connect(self, client, userdata, flags, rc):
         print("Connected to MQTT broker")
 
-        # subscribe to all writable states
         for type_name, instances in get_all().items():
             for inst in instances:
+                name = getattr(inst, 'name', '') or ''
                 for state in inst.get_writable_states():
-                    topic = f"control/{type_name}/{getattr(inst, 'name', repr(inst))}/{state}"
-
-                    # public current state of this item
+                    topic = f"control/{type_name}/" + (f"{name}/" if name else "") + f"{state}"
                     value = inst.safe_get(state)
-                    client.publish(topic, str(value), retain=True)
-
-                    # subscribe to be notified of changes to this item
+                    payload = self._format_payload(value)
+                    client.publish(topic, payload, retain=True)
                     client.subscribe(topic)
 
-        # publish initial readable states
         for type_name, instances in get_all().items():
             for inst in instances:
+                name = getattr(inst, 'name', '') or ''
                 for state in inst.get_readable_states():
+                    topic = f"state/{type_name}/" + (f"{name}/" if name else "") + f"{state}"
                     value = inst.safe_get(state)
-                    topic = f"state/{type_name}/{getattr(inst, 'name', repr(inst))}/{state}"
-                    client.publish(topic, str(value), retain=True)
+                    payload = self._format_payload(value)
+                    client.publish(topic, payload, retain=True)
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
         payload = msg.payload.decode()
-
-        # parse topic to find instance + state
         parts = topic.split('/')
-        if len(parts) >= 4 and parts[0] == 'control':
-            _, type_name, name, state = parts[:4]
-            instances = [i for i in get_all().get(type_name, []) if getattr(i, 'name', None) == name]
+
+        if parts[0] == 'control' and len(parts) >= 3:
+            type_name = parts[1]
+            if len(parts) == 4:
+                name, state = parts[2], parts[3]
+            elif len(parts) == 3:
+                name, state = None, parts[2]
+            else:
+                return
+
+            all_instances = get_all().get(type_name) or []
+            if name:
+                instances = [i for i in all_instances if getattr(i, 'name', None) == name]
+            else:
+                instances = all_instances[:1]
+
             if instances:
                 inst = instances[0]
                 if state in inst.get_writable_states():
                     try:
-                        inst.safe_set(state, int(payload))
-                    except ValueError:
-                        print(f"Invalid value for {state}: {payload}")
+                        parsed_value = self._parse_payload(payload)
+                        inst.safe_set(state, parsed_value)
+                    except Exception as e:
+                        print(f"Warning: failed to set value for {state}: {payload} ({e})")
 
     def tick(self, time_delta):
-        """Poll all readable states and publish any changes."""
         for type_name, instances in get_all().items():
             for inst in instances:
+                name = getattr(inst, 'name', '') or ''
+                inst_last = self._last_published_value.setdefault(type_name, {}) \
+                                                       .setdefault(name, {})
                 for state in inst.get_readable_states():
                     current_value = inst.safe_get(state)
-                    last_value = self._last_published_value \
-                        .setdefault(type_name, {}) \
-                        .setdefault(inst.name, {}) \
-                        .get(state)
+                    last_value = inst_last.get(state)
 
                     if current_value != last_value:
-                        topic = f"state/{type_name}/{getattr(inst, 'name', repr(inst))}/{state}"
-                        self.client.publish(topic, str(current_value), retain=True)
-                        self._last_published_value[type_name][inst.name][state] = current_value
+                        topic = f"state/{type_name}/" + (f"{name}/" if name else "") + f"{state}"
+                        payload = self._format_payload(current_value)
+                        self.client.publish(topic, payload, retain=True)
+                        inst_last[state] = current_value
+
+    def _parse_payload(self, payload):
+        """Parse payload into int or Python object."""
+        try:
+            return int(payload)
+        except ValueError:
+            try:
+                return json.loads(payload)
+            except json.JSONDecodeError:
+                raise ValueError("Invalid payload format")
+
+    def _format_payload(self, value):
+        """Format Python value into a string or JSON string for MQTT."""
+        if isinstance(value, int):
+            return str(value)
+        try:
+            return json.dumps(value)
+        except TypeError:
+            return str(value)  # fallback: dump as string

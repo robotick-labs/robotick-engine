@@ -1,6 +1,6 @@
 import json
 
-from robotick.devices import motor_device, sensor_device, brickpi3_device
+from robotick.devices import motor_device, sensor_device, brickpi3_device, remote_control_device
 from robotick.workloads import console_update, mqtt_update
 from robotick.simulators import balancing_robot_simulator
 
@@ -11,6 +11,7 @@ def load(config_file):
         'MotorDevice': motor_device,
         'SensorDevice': sensor_device,
         'BrickPi3Device': brickpi3_device,
+        'RemoteControlDevice': remote_control_device,
         'MqttUpdate': mqtt_update,
         'ConsoleUpdate': console_update,
         'BalancingRobotSimulator': balancing_robot_simulator
