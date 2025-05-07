@@ -21,17 +21,21 @@ function createStick(areaId, knobId, topic, autoCenterX, autoCenterY) {
 
     function movePointer(globalX, globalY) {
         const rect = area.getBoundingClientRect();
+        const originX = rect.width / 2;
+        const originY = rect.height / 2;
         let dx = globalX - rect.left - originX;
         let dy = globalY - rect.top - originY;
-
-        const maxRange = (areaRect.width / 2) - (knob.offsetWidth / 2);
-        dx = Math.max(-maxRange, Math.min(maxRange, dx));
-        dy = Math.max(-maxRange, Math.min(maxRange, dy));
+   
+        const maxRangeX = rect.width / 2 - knob.offsetWidth / 2;
+        const maxRangeY = rect.height / 2 - knob.offsetHeight / 2;
+        dx = Math.max(-maxRangeX, Math.min(maxRangeX, dx));
+        dy = Math.max(-maxRangeY, Math.min(maxRangeY, dy));       
 
         setKnob(originX + dx, originY + dy);
 
-        const normX = dx / maxRange;
-        const normY = -dy / maxRange; // invert Y so up=+1
+        const normX = dx / maxRangeX;
+        const normY = -dy / maxRangeY; // invert Y so up=+1
+        
         sendMQTT(normX, normY);
     }
 
@@ -48,10 +52,10 @@ function createStick(areaId, knobId, topic, autoCenterX, autoCenterY) {
     return { movePointer, resetKnob, area };
 }
 
-const leftStick = createStick('left-area', 'left-knob', 'control/rc/left-stick', true, true);
-const rightStick = createStick('right-area', 'right-knob', 'control/rc/right-stick', true, false);
+const leftStick = createStick('left-area', 'left-knob', 'control/remote_control_device/left_stick', true, true);
+const rightStick = createStick('right-area', 'right-knob', 'control/remote_control_device/right_stick', true, false);
 
-const activeTouches = {}; // touchId → {side: 'left'|'right'}
+const activeTouches = {}; // touchId → { side: 'left'|'right', startX, startY }
 
 function touchStartedInArea(touch, area) {
     const rect = area.getBoundingClientRect();
@@ -66,36 +70,42 @@ function touchStartedInArea(touch, area) {
 function handleTouchStart(e) {
     for (const touch of e.changedTouches) {
         if (touchStartedInArea(touch, leftStick.area)) {
-            activeTouches[touch.identifier] = 'left';
-            leftStick.movePointer(touch.clientX, touch.clientY);
+            activeTouches[touch.identifier] = { side: 'left', startX: touch.clientX, startY: touch.clientY };
         } else if (touchStartedInArea(touch, rightStick.area)) {
-            activeTouches[touch.identifier] = 'right';
-            rightStick.movePointer(touch.clientX, touch.clientY);
+            activeTouches[touch.identifier] = { side: 'right', startX: touch.clientX, startY: touch.clientY };
         }
-        // else: ignore touches starting outside both areas
     }
 }
 
 function handleTouchMove(e) {
     for (const touch of e.changedTouches) {
-        const side = activeTouches[touch.identifier];
-        if (side === 'left') {
-            leftStick.movePointer(touch.clientX, touch.clientY);
-        } else if (side === 'right') {
-            rightStick.movePointer(touch.clientX, touch.clientY);
+        const touchData = activeTouches[touch.identifier];
+        if (touchData) {
+            const dx = touch.clientX - touchData.startX;
+            const dy = touch.clientY - touchData.startY;
+
+            const area = touchData.side === 'left' ? leftStick.area : rightStick.area;
+            const stick = touchData.side === 'left' ? leftStick : rightStick;
+            const rect = area.getBoundingClientRect();
+            const centerX = rect.left + area.clientWidth / 2;
+            const centerY = rect.top + area.clientHeight / 2;
+
+            stick.movePointer(centerX + dx, centerY + dy);
         }
     }
 }
 
 function handleTouchEnd(e) {
     for (const touch of e.changedTouches) {
-        const side = activeTouches[touch.identifier];
-        if (side === 'left') {
-            leftStick.resetKnob();
-        } else if (side === 'right') {
-            rightStick.resetKnob();
+        const touchData = activeTouches[touch.identifier];
+        if (touchData) {
+            if (touchData.side === 'left') {
+                leftStick.resetKnob();
+            } else if (touchData.side === 'right') {
+                rightStick.resetKnob();
+            }
+            delete activeTouches[touch.identifier];
         }
-        delete activeTouches[touch.identifier];
     }
 }
 
@@ -105,28 +115,46 @@ document.addEventListener('touchend', handleTouchEnd);
 document.addEventListener('touchcancel', handleTouchEnd);
 
 // Mouse support for testing
-let mouseActiveSide = null;
+let mouseActive = null;
+let mouseStartX = 0;
+let mouseStartY = 0;
+
 document.addEventListener('mousedown', e => {
     if (leftStick.area.contains(e.target)) {
-        mouseActiveSide = 'left';
-        leftStick.movePointer(e.clientX, e.clientY);
+        mouseActive = 'left';
+        mouseStartX = e.clientX;
+        mouseStartY = e.clientY;
+        leftStick.movePointer(leftStick.area.getBoundingClientRect().left + leftStick.area.clientWidth / 2,
+                              leftStick.area.getBoundingClientRect().top + leftStick.area.clientHeight / 2);
     } else if (rightStick.area.contains(e.target)) {
-        mouseActiveSide = 'right';
-        rightStick.movePointer(e.clientX, e.clientY);
+        mouseActive = 'right';
+        mouseStartX = e.clientX;
+        mouseStartY = e.clientY;
+        rightStick.movePointer(rightStick.area.getBoundingClientRect().left + rightStick.area.clientWidth / 2,
+                               rightStick.area.getBoundingClientRect().top + rightStick.area.clientHeight / 2);
     }
 });
+
 document.addEventListener('mousemove', e => {
-    if (mouseActiveSide === 'left') {
-        leftStick.movePointer(e.clientX, e.clientY);
-    } else if (mouseActiveSide === 'right') {
-        rightStick.movePointer(e.clientX, e.clientY);
+    if (mouseActive) {
+        const dx = e.clientX - mouseStartX;
+        const dy = e.clientY - mouseStartY;
+
+        const area = mouseActive === 'left' ? leftStick.area : rightStick.area;
+        const stick = mouseActive === 'left' ? leftStick : rightStick;
+        const rect = area.getBoundingClientRect();
+        const centerX = rect.left + area.clientWidth / 2;
+        const centerY = rect.top + area.clientHeight / 2;
+
+        stick.movePointer(centerX + dx, centerY + dy);
     }
 });
+
 document.addEventListener('mouseup', () => {
-    if (mouseActiveSide === 'left') {
+    if (mouseActive === 'left') {
         leftStick.resetKnob();
-    } else if (mouseActiveSide === 'right') {
+    } else if (mouseActive === 'right') {
         rightStick.resetKnob();
     }
-    mouseActiveSide = null;
+    mouseActive = null;
 });
