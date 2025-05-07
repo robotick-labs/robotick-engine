@@ -48,8 +48,8 @@ function createStick(areaId, knobId, topic, autoCenterX, autoCenterY) {
     return { movePointer, resetKnob, area };
 }
 
-const leftStick = createStick('left-area', 'left-knob', 'robot/control/left', true, true);
-const rightStick = createStick('right-area', 'right-knob', 'robot/control/right', true, false);
+const leftStick = createStick('left-area', 'left-knob', 'control/rc/left-stick', true, true);
+const rightStick = createStick('right-area', 'right-knob', 'control/rc/right-stick', true, false);
 
 const activeTouches = {}; // touchId → {side: 'left'|'right'}
 
