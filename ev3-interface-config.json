@@ -1,38 +1,26 @@
 {
     "workloads": [
         {
-            "type": "MotorDevice",
-            "name": "left",
-            "attributes": {
-                "tick_rate_hz": 100
+            "type": "BrickPi3Device",
+            "name": "brickpi",
+            "args": {
+                "tick_rate_hz": 100,
+                "sensor_1_type": "EV3_GYRO_ABS_DPS",
+                "motor_a_enabled": 1
             }
         },
         {
-            "type": "MotorDevice",
-            "name": "right"
-        },
-        {
-            "type": "SensorDevice",
-            "name": "ultrasonic"
-        },
-        {
-            "type": "SensorDevice",
-            "name": "light"
-        },
-        {
-            "type": "BalancingRobotSimulator",
-            "name": "magg-e"
-        },
-        {
             "type": "MqttUpdate",
-            "attributes": {
+            "name": "comms",
+            "args": {
                 "broker_host": "localhost",
                 "broker_port": 1883
             }
         },
         {
             "type": "ConsoleUpdate",
-            "attributes": {
+            "name": "console",
+            "args": {
                 "tick_rate_hz": 10
             }
         }
