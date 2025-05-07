@@ -3,6 +3,7 @@ import json
 from robotick.devices import motor_device, sensor_device, brickpi3_device, remote_control_device
 from robotick.workloads import console_update, mqtt_update
 from robotick.simulators import balancing_robot_simulator
+from robotick.examples import brickpi3_simple_rc
 
 def load(config_file):
     """Load workloads from JSON config and start them."""
@@ -12,6 +13,7 @@ def load(config_file):
         'SensorDevice': sensor_device,
         'BrickPi3Device': brickpi3_device,
         'RemoteControlDevice': remote_control_device,
+        'BrickPi3SimpleRc': brickpi3_simple_rc, # TODO - move this example to non-framework code - should be perhaps registered by user-code, or auto-discovered
         'MqttUpdate': mqtt_update,
         'ConsoleUpdate': console_update,
         'BalancingRobotSimulator': balancing_robot_simulator

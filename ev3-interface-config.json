@@ -6,13 +6,21 @@
             "args": {
                 "tick_rate_hz": 100,
                 "sensor_1_type": "EV3_GYRO_ABS_DPS",
-                "motor_a_enabled": 1
+                "motor_a_enabled": 1,
+                "motor_d_enabled": 1
+            }
+        },
+        {
+            "type": "BrickPi3SimpleRc",
+            "args": {
+                "tick_rate_hz": 30
             }
         },
         {
             "type": "RemoteControlDevice",
             "args": {
-                "tick_rate_hz": 30
+                "tick_rate_hz": 30,
+                "stick_dead_zone": 0.2
             }
         },
         {

@@ -24,7 +24,7 @@ class BrickPi3Device(WorkloadBase):
         self.motor_power_states = {}
         self.sensor_types = {}
 
-        # Add motor_A_enabled, motor_B_enabled, etc.
+        # Add motor_a_enabled, motor_b_enabled, etc.
         for p in ['a', 'b', 'c', 'd']:
             setattr(self, f"motor_{p}_enabled", 0)
 
