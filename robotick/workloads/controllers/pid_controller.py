@@ -1,5 +1,5 @@
-from ..framework.workload_base import WorkloadBase
-from ..framework.registry import register_workload
+from ...framework.workload_base import WorkloadBase
+from ...framework.registry import *
 
 class PIDControl(WorkloadBase):
     def __init__(self):
@@ -26,3 +26,6 @@ class PIDControl(WorkloadBase):
         self.prev_error = error
 
         state['motor_command'] = output
+
+# Register class on import
+register_workload_type(PIDControl)

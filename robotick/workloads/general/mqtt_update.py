@@ -1,7 +1,7 @@
 import json
 import paho.mqtt.client as mqtt
-from ..framework.workload_base import WorkloadBase
-from ..framework.registry import get_all
+from ...framework.workload_base import WorkloadBase
+from ...framework.registry import *
 
 class MqttUpdate(WorkloadBase):
     def __init__(self):
@@ -21,7 +21,7 @@ class MqttUpdate(WorkloadBase):
     def _on_connect(self, client, userdata, flags, rc):
         print("Connected to MQTT broker")
 
-        for type_name, instances in get_all().items():
+        for type_name, instances in get_all_workload_instances().items():
             for inst in instances:
                 name = getattr(inst, 'name', '') or ''
                 for state in inst.get_writable_states():
@@ -31,7 +31,7 @@ class MqttUpdate(WorkloadBase):
                     client.publish(topic, payload, retain=True)
                     client.subscribe(topic)
 
-        for type_name, instances in get_all().items():
+        for type_name, instances in get_all_workload_instances().items():
             for inst in instances:
                 name = getattr(inst, 'name', '') or ''
                 for state in inst.get_readable_states():
@@ -54,7 +54,7 @@ class MqttUpdate(WorkloadBase):
             else:
                 return
 
-            all_instances = get_all().get(type_name) or []
+            all_instances = get_all_workload_instances().get(type_name) or []
             if name:
                 instances = [i for i in all_instances if getattr(i, 'name', None) == name]
             else:
@@ -70,7 +70,7 @@ class MqttUpdate(WorkloadBase):
                         print(f"Warning: failed to set value for {state}: {payload} ({e})")
 
     def tick(self, time_delta):
-        for type_name, instances in get_all().items():
+        for type_name, instances in get_all_workload_instances().items():
             for inst in instances:
                 name = getattr(inst, 'name', '') or ''
                 inst_last = self._last_published_value.setdefault(type_name, {}) \
@@ -103,3 +103,6 @@ class MqttUpdate(WorkloadBase):
             return json.dumps(value)
         except TypeError:
             return str(value)  # fallback: dump as string
+
+# Register class on import
+register_workload_type(MqttUpdate)

@@ -2,7 +2,7 @@ from robotick.framework.composer import load
 import time
 
 def main():
-    system = load('ev3-interface-config.json')
+    system = load('brickpi3_simple_rc.yaml')
     try:
         while True:
             time.sleep(1)

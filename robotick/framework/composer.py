@@ -1,26 +1,28 @@
-import json
+import importlib
+import pkgutil
+import yaml
 
-from robotick.devices import motor_device, sensor_device, brickpi3_device, remote_control_device
-from robotick.workloads import console_update, mqtt_update
-from robotick.simulators import balancing_robot_simulator
-from robotick.examples import brickpi3_simple_rc
+import robotick.workloads 
+
+from .registry import get_workload_type
+
+def auto_import_workloads(package):
+    """Recursively import all modules and subpackages in a package."""
+    for loader, module_name, is_pkg in pkgutil.iter_modules(package.__path__):
+        full_module_name = f"{package.__name__}.{module_name}"
+        importlib.import_module(full_module_name)
+
+        if is_pkg:
+            subpackage = importlib.import_module(full_module_name)
+            auto_import_workloads(subpackage)
 
 def load(config_file):
-    """Load workloads from JSON config and start them."""
+    """Load workloads from YAML config and start them."""
 
-    module_lookup = {
-        'MotorDevice': motor_device,
-        'SensorDevice': sensor_device,
-        'BrickPi3Device': brickpi3_device,
-        'RemoteControlDevice': remote_control_device,
-        'BrickPi3SimpleRc': brickpi3_simple_rc, # TODO - move this example to non-framework code - should be perhaps registered by user-code, or auto-discovered
-        'MqttUpdate': mqtt_update,
-        'ConsoleUpdate': console_update,
-        'BalancingRobotSimulator': balancing_robot_simulator
-    }
+    auto_import_workloads(robotick.workloads)
 
     with open(config_file) as f:
-        config = json.load(f)
+        config = yaml.safe_load(f)  # ← use safe_load for security
 
     instances = []
 
@@ -29,11 +31,9 @@ def load(config_file):
         name_arg = workload_cfg.get('name')
         args = workload_cfg.get('args', {})
 
-        module = module_lookup.get(type_name)
-        if not module:
+        cls = get_workload_type(type_name)
+        if not cls:
             raise ValueError(f"Unknown workload type: {type_name}")
-
-        cls = getattr(module, type_name)
 
         instance = cls()
 
@@ -44,7 +44,7 @@ def load(config_file):
 
         instances.append(instance)
     
-     # ALL workloads are now registered at this point
+    # ALL workloads are now registered at this point
 
     for inst in instances:
         inst.setup()

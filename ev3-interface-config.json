@@ -35,7 +35,7 @@
             "type": "ConsoleUpdate",
             "name": "console",
             "args": {
-                "tick_rate_hz": 10
+                "tick_rate_hz": 2
             }
         }
     ]

@@ -1,10 +1,11 @@
 from .io_device import IODevice
+from ...framework.registry import *
 import random
 
 class SensorDevice(IODevice):
     def __init__(self):
         super().__init__()
-        self._tick_rate_hz=10
+        self.tick_rate_hz=10
         self.state = random.randint(50, 60)
         self._readable_states = ['state']
 
@@ -15,3 +16,6 @@ class SensorDevice(IODevice):
 
     def read(self):
         return self.safe_get('state')
+
+# Register class on import
+register_workload_type(SensorDevice)

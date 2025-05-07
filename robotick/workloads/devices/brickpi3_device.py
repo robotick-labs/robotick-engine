@@ -1,11 +1,11 @@
 import brickpi3
-from ..framework.registry import register_workload
-from ..framework.workload_base import WorkloadBase
+from ...framework.registry import *
+from ...framework.workload_base import WorkloadBase
 
 class BrickPi3Device(WorkloadBase):
     def __init__(self):
         super().__init__()
-        self._tick_rate_hz = 100
+        self.tick_rate_hz = 100
         self.bp = brickpi3.BrickPi3()
 
         self._buffer_a = {}
@@ -69,42 +69,40 @@ class BrickPi3Device(WorkloadBase):
         self._current_buffer, self._next_buffer = self._next_buffer, self._current_buffer
 
     def tick(self, time_delta):
-        # === Update motors ===
-        motor_changed = False
-        desired_powers = {}
+        # Note - we read and write every tick - our most performance-sensitive use-case so far is
+        # a self-balancing (inverted pendulum) robot, which needs motor-control and gyro-state
+        # as rapidly as possible - which forces us to read both every frame anyway.
+        # (we could always have sensor-read frequencies specified, in case any don't need to be as
+        # regular, as a feature request)
+
+        # === Write motors every tick ===
         for p, port in self.motor_ports.items():
             if port in self.motor_power_states:
                 attr = f"motor_{p}_power"
                 desired_power = getattr(self, attr, 0)
-                if desired_power != self.motor_power_states[port]:
-                    desired_powers[port] = desired_power
-                    motor_changed = True
-
-        if motor_changed:
-            for port, power in desired_powers.items():
                 try:
-                    self.bp.set_motor_power(port, power)
-                    self.motor_power_states[port] = power
+                    self.bp.set_motor_power(port, desired_power)
+                    self.motor_power_states[port] = desired_power
                 except Exception as e:
                     print(f"[BrickPi3Device] Motor set error on port {port}: {e}")
 
-        # Write motor power to back-buffer
-        for p, port in self.motor_ports.items():
-            if port in self.motor_power_states:
-                attr = f"motor_{p}_power"
-                value = getattr(self, attr, 0)
-                self._next_buffer[attr] = value
+                # Write to back-buffer
+                self._next_buffer[attr] = desired_power
 
-        # === Read sensors ===
+        # === Read sensors every tick ===
         for i, port in enumerate(self.sensor_ports):
             if port in self.sensor_types and self.sensor_types[port] != brickpi3.BrickPi3.SENSOR_TYPE.NONE:
-                sensor_attr = f"sensor_{i+1}_state"
+                sensor_attr = f"sensor_{i + 1}_state"
                 try:
                     value = self.bp.get_sensor(port)
                     if self.sensor_types[port] == brickpi3.BrickPi3.SENSOR_TYPE.EV3_GYRO_ABS_DPS and isinstance(value, list):
                         value = {'abs': value[0], 'dps': value[1]}
                 except Exception as e:
                     value = 'Error'
+
                 setattr(self, sensor_attr, value)
                 self._next_buffer[sensor_attr] = value
+
+# Register class on import
+register_workload_type(BrickPi3Device)
 

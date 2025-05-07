@@ -1,11 +1,12 @@
 import math
-from ..framework.workload_base import WorkloadBase
+from ...framework.workload_base import WorkloadBase
+from ...framework.registry import *
 
 class BalancingRobotSimulator(WorkloadBase):
     def __init__(self):
         super().__init__()
 
-        self._tick_rate_hz = 500
+        self.tick_rate_hz = 500
 
         # Robot parameters (can be overridden after init)
         self.mass = 10.0               # kg
@@ -99,3 +100,6 @@ class BalancingRobotSimulator(WorkloadBase):
         elif self.pitch < -max_tilt:
             self.pitch = -max_tilt
             self.dpitch = 0.0
+
+# Register class on import
+register_workload_type(BalancingRobotSimulator)

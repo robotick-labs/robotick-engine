@@ -5,8 +5,9 @@ from .registry import register_workload
 class WorkloadBase:
     def __init__(self):
         self._stop_event = threading.Event()
-        self._tick_rate_hz = 10
+        self.tick_rate_hz = 10
         self._tick_parent = None
+        self._last_tick_duration_self = 0  
         self._lock = threading.Lock() # TODO - see if we need still
         self._readable_states = []
         self._writable_states = []
@@ -24,8 +25,11 @@ class WorkloadBase:
 
         self._thread = threading.Thread(target=self._run_loop)
 
+    def get_last_tick_duration_self(self):
+        return self._last_tick_duration_self
+    
     def get_tick_interval(self):
-        return 1.0 / self._tick_rate_hz
+        return 1.0 / self.tick_rate_hz
     
     def get_readable_states(self):
         return self._readable_states
@@ -97,6 +101,9 @@ class WorkloadBase:
                 tick_interval = self.get_tick_interval()
             
                 elapsed = time.perf_counter() - now
-                sleep_time = tick_interval - elapsed
+                sleep_time = max(0, tick_interval - elapsed)
+
+                self._last_tick_duration_self = elapsed
+
                 if sleep_time > 0:
                     time.sleep(sleep_time)

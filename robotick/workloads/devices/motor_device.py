@@ -1,4 +1,5 @@
 from .io_device import IODevice
+from ...framework.registry import *
 
 class MotorDevice(IODevice):
     def __init__(self):
@@ -20,3 +21,6 @@ class MotorDevice(IODevice):
 
     def get_speed(self):
         return self.safe_get('speed')
+
+# Register class on import
+register_workload_type(MotorDevice)

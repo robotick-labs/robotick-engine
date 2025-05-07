@@ -1,9 +1,10 @@
-from ..framework.workload_base import WorkloadBase
+from ...framework.workload_base import WorkloadBase
+from ...framework.registry import *
 
 class IODevice(WorkloadBase):
     def __init__(self):
         super().__init__()
-        self._tick_rate_hz=100
+        self.tick_rate_hz=100
         self.state = 0
 
     def tick(self, time_delta):
@@ -16,3 +17,6 @@ class IODevice(WorkloadBase):
 
     def write_state(self, value):
         self.safe_set('state', value)
+
+# Register class on import
+register_workload_type(IODevice)

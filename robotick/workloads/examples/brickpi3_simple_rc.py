@@ -1,6 +1,6 @@
 from ..devices.remote_control_device import RemoteControlDevice
-from ..framework.workload_base import WorkloadBase
-from ..framework.registry import get_by_type
+from ...framework.workload_base import WorkloadBase
+from ...framework.registry import *
 
 def apply_dead_zone(value, dead_zone):
     if abs(value) < dead_zone:
@@ -11,13 +11,13 @@ def apply_dead_zone(value, dead_zone):
 class BrickPi3SimpleRc(WorkloadBase):
     def __init__(self):
         super().__init__()
-        self._tick_rate_hz = 20  # control loop rate (adjust as needed)
+        self.tick_rate_hz = 20  # control loop rate (adjust as needed)
 
         self.stick_dead_zone = 0.2
 
     def setup(self):
-        self.brickpi3_device = get_by_type("brick_pi3_device")[0]
-        self.remote_control_device = get_by_type("remote_control_device")[0]
+        self.brickpi3_device = get_all_workload_instances_of_type("brick_pi3_device")[0]
+        self.remote_control_device = get_all_workload_instances_of_type("remote_control_device")[0]
     
     def tick(self, time_delta):
         left_stick = self.remote_control_device.get_left_stick() if self.remote_control_device else {'x': 0, 'y': 0}
@@ -52,3 +52,6 @@ class BrickPi3SimpleRc(WorkloadBase):
         if self.brickpi3_device:
             self.brickpi3_device.safe_set('motor_a_power', int(left_power))
             self.brickpi3_device.safe_set('motor_d_power', int(right_power))
+
+# Register class on import
+register_workload_type(BrickPi3SimpleRc)

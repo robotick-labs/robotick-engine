@@ -1,4 +1,5 @@
 from .io_device import IODevice
+from ...framework.registry import *
 
 class RemoteControlDevice(IODevice):
     def __init__(self):
@@ -17,3 +18,6 @@ class RemoteControlDevice(IODevice):
 
     def get_right_stick(self):
         return self.safe_get('right_stick')
+
+# Register class on import
+register_workload_type(RemoteControlDevice)
