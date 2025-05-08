@@ -13,7 +13,6 @@ workloads:
 
   - type: RemoteControlDevice
     args:
-      tick_rate_hz: 30
       stick_dead_zone: 0.2
 
   - type: MqttUpdate

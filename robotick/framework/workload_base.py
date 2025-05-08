@@ -29,7 +29,7 @@ class WorkloadBase:
         return self._last_tick_duration_self
     
     def get_tick_interval(self):
-        return 1.0 / self.tick_rate_hz
+        return 1.0 / self.tick_rate_hz if self.tick_rate_hz > 0 else 0
     
     def get_readable_states(self):
         return self._readable_states
@@ -50,11 +50,13 @@ class WorkloadBase:
         pass
 
     def start(self):
-        self._thread.start()
+        if(self.tick_rate_hz>0):
+            self._thread.start()
 
     def stop(self):
-        self._stop_event.set()
-        self._thread.join()
+        if(self.tick_rate_hz>0):
+            self._stop_event.set()
+            self._thread.join()
 
     def pre_tick(self, time_delta):
         """Override in subclass"""

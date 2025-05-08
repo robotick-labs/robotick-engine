@@ -32,12 +32,17 @@ class ConsoleUpdate(WorkloadBase):
                     states.append(f"{state}={value}")
                 state_str = ", ".join(states)
 
-                duration_self = inst.get_last_tick_duration_self() * 1000.0
-                duration_goal = inst.get_tick_interval() * 1000.0
-                duration_percent = 100.0 * duration_self / duration_goal
-                duration_str = f"{duration_self:.1f}"
-                duration_goal_str = f"{duration_goal:.1f}"
-                duration_percent_str = f"{duration_percent:.1f}%"
+                duration_str = "-"
+                duration_goal_str = "-"
+                duration_percent_str = "-"
+
+                if(inst.tick_rate_hz > 0):
+                    duration_self = inst.get_last_tick_duration_self() * 1000.0
+                    duration_goal = inst.get_tick_interval() * 1000.0
+                    duration_percent = 100.0 * duration_self / duration_goal if duration_goal > 0 else 0
+                    duration_str = f"{duration_self:.1f}"
+                    duration_goal_str = f"{duration_goal:.1f}"
+                    duration_percent_str = f"{duration_percent:.1f}%"
 
                 table.add_row(type_name, getattr(inst, 'name', repr(inst)) or "-", state_str, duration_str, duration_goal_str, duration_percent_str)
 
