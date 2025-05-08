@@ -1,0 +1,29 @@
+body {
+    margin: 0;
+    background: #222;
+    color: #fff;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    height: 100vh;
+    touch-action: none;
+}
+
+.stick-area {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    background: #555;
+    border-radius: 10px;
+}
+
+.knob {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    background: silver;
+    border-radius: 50%;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}

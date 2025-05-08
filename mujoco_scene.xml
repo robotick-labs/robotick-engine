@@ -3,7 +3,7 @@
 
 <mujoco model="robot scene">
   <compiler angle="radian"/>
-  <option timestep="0.000025"/>
+  <option timestep="0.001"/>
 
   <include file="mujoco_balancing_robot.xml"/>
 
@@ -28,11 +28,13 @@
   <worldbody>
     <light pos="0 0 1.5" dir="-0.5 -0.5 -1" directional="true"/>
     <geom name="floor" size="0 0 0.05" pos="0 0 -0.1" type="plane" material="groundplane"/>
+    <camera name="follow_cam" mode="track" target="robot_body" pos="0 -3 1" />
   </worldbody>
 
   <contact>
-    <pair geom1="floor" geom2="l_wheel_geom" friction="0.4 0.4 0.07 0.001 0.001"/>
-    <pair geom1="floor" geom2="r_wheel_geom" friction="0.4 0.4 0.07 0.001 0.001"/>
+    <!--  friction="sliding torsional rolling spinning1 spinning2" -->
+    <pair geom1="floor" geom2="l_wheel_geom" friction="1.0 0.2 0.1 0.001 0.001"/>
+    <pair geom1="floor" geom2="r_wheel_geom" friction="1.0 0.2 0.1 0.001 0.001"/>
   </contact>
 
 </mujoco>

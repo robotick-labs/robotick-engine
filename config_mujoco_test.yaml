@@ -4,6 +4,10 @@ workloads:
       xml_path: "mujoco_scene.xml"
       display_enabled: True
 
+  - type: MujocoSimpleRc
+    args:
+      tick_rate_hz: 30
+
   - type: RemoteControlDevice
     args:
       stick_dead_zone: 0.2

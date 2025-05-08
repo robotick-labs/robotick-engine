@@ -1,17 +1,37 @@
-from .io_device import IODevice
+import os
+import threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from ....framework.workload_base import WorkloadBase
 from ....framework.registry import *
 
-class RemoteControlDevice(IODevice):
+class RemoteControlDevice(WorkloadBase):
     def __init__(self):
         super().__init__()
-        
-        self.tick_rate_hz = 0 # no need to tick
+        self.tick_rate_hz = 0
 
-        self.left_stick = {'x': 0, 'y': 0}
-        self.right_stick = {'x': 0, 'y': 0}
+        self.state.writable['left_stick'] = {'x': 0, 'y': 0}
+        self.state.writable['right_stick'] = {'x': 0, 'y': 0}
 
-        self._readable_states = ['left_stick', 'right_stick']
-        self._writable_states = ['left_stick', 'right_stick']
+        self._server_thread = None
+        self._httpd = None
+
+    def setup(self):
+        # Set directory to serve (relative to script location)
+        web_dir = os.path.join(os.path.dirname(__file__), 'remote_control_device_web')
+        os.chdir(web_dir)
+
+        handler = SimpleHTTPRequestHandler
+        self._httpd = ThreadingHTTPServer(('0.0.0.0', 8080), handler)
+        self._server_thread = threading.Thread(target=self._httpd.serve_forever, daemon=True)
+        self._server_thread.start()
+        print("Web server running on port 8080, serving:", web_dir)
+
+    def stop(self):
+        if self._httpd:
+            self._httpd.shutdown()
+            self._httpd.server_close()
+            print("Web server on port 8080 stopped")
+        super().stop()
 
     def get_left_stick(self):
         return self.safe_get('left_stick')
@@ -19,5 +39,4 @@ class RemoteControlDevice(IODevice):
     def get_right_stick(self):
         return self.safe_get('right_stick')
 
-# Register class on import
 register_workload_type(RemoteControlDevice)

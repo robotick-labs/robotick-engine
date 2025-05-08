@@ -20,7 +20,6 @@ class MqttUpdate(WorkloadBase):
 
     def _on_connect(self, client, userdata, flags, rc):
         print("Connected to MQTT broker")
-
         for type_name, instances in get_all_workload_instances().items():
             for inst in instances:
                 name = getattr(inst, 'name', '') or ''
@@ -31,9 +30,6 @@ class MqttUpdate(WorkloadBase):
                     client.publish(topic, payload, retain=True)
                     client.subscribe(topic)
 
-        for type_name, instances in get_all_workload_instances().items():
-            for inst in instances:
-                name = getattr(inst, 'name', '') or ''
                 for state in inst.get_readable_states():
                     topic = f"state/{type_name}/" + (f"{name}/" if name else "") + f"{state}"
                     value = inst.safe_get(state)
@@ -47,18 +43,9 @@ class MqttUpdate(WorkloadBase):
 
         if parts[0] == 'control' and len(parts) >= 3:
             type_name = parts[1]
-            if len(parts) == 4:
-                name, state = parts[2], parts[3]
-            elif len(parts) == 3:
-                name, state = None, parts[2]
-            else:
-                return
-
+            name, state = (parts[2], parts[3]) if len(parts) == 4 else (None, parts[2])
             all_instances = get_all_workload_instances().get(type_name) or []
-            if name:
-                instances = [i for i in all_instances if getattr(i, 'name', None) == name]
-            else:
-                instances = all_instances[:1]
+            instances = [i for i in all_instances if getattr(i, 'name', None) == name] if name else all_instances[:1]
 
             if instances:
                 inst = instances[0]
@@ -73,12 +60,10 @@ class MqttUpdate(WorkloadBase):
         for type_name, instances in get_all_workload_instances().items():
             for inst in instances:
                 name = getattr(inst, 'name', '') or ''
-                inst_last = self._last_published_value.setdefault(type_name, {}) \
-                                                       .setdefault(name, {})
+                inst_last = self._last_published_value.setdefault(type_name, {}).setdefault(name, {})
                 for state in inst.get_readable_states():
                     current_value = inst.safe_get(state)
                     last_value = inst_last.get(state)
-
                     if current_value != last_value:
                         topic = f"state/{type_name}/" + (f"{name}/" if name else "") + f"{state}"
                         payload = self._format_payload(current_value)
@@ -86,7 +71,6 @@ class MqttUpdate(WorkloadBase):
                         inst_last[state] = current_value
 
     def _parse_payload(self, payload):
-        """Parse payload into int or Python object."""
         try:
             return int(payload)
         except ValueError:
@@ -96,13 +80,11 @@ class MqttUpdate(WorkloadBase):
                 raise ValueError("Invalid payload format")
 
     def _format_payload(self, value):
-        """Format Python value into a string or JSON string for MQTT."""
         if isinstance(value, int):
             return str(value)
         try:
             return json.dumps(value)
         except TypeError:
-            return str(value)  # fallback: dump as string
+            return str(value)
 
-# Register class on import
 register_workload_type(MqttUpdate)

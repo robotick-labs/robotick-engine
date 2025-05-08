@@ -10,12 +10,14 @@ class PIDControl(WorkloadBase):
         self.integral = 0
         self.prev_error = 0
 
+        # Example writable + readable
+        self.state.writable['motor_command'] = 0.0
+        self.state.readable['sensor_gyro'] = 0.0
+
         register_workload(self)
 
     def tick(self, time_delta):
-        state = self._tick_parent.get_current_state()
-
-        gyro = state.get('sensor_gyro', 0)  # update key as needed
+        gyro = self.safe_get('sensor_gyro') or 0.0
         target_angle = 0
 
         error = target_angle - gyro
@@ -25,7 +27,6 @@ class PIDControl(WorkloadBase):
         output = (self.kp * error) + (self.ki * self.integral) + (self.kd * derivative)
         self.prev_error = error
 
-        state['motor_command'] = output
+        self.safe_set('motor_command', output)
 
-# Register class on import
 register_workload_type(PIDControl)

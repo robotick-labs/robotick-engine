@@ -5,101 +5,77 @@ from ....framework.registry import *
 class BalancingRobotSimulator(WorkloadBase):
     def __init__(self):
         super().__init__()
-
         self.tick_rate_hz = 500
 
-        # Robot parameters (can be overridden after init)
-        self.mass = 10.0               # kg
-        self.wheel_radius = 0.025      # meters
-        self.track_width = 0.2         # meters
-        self.body_width = 0.15         # meters
-        self.body_depth = 0.10         # meters
-        self.g = 9.81                  # m/s^2
+        self.mass = 10.0
+        self.wheel_radius = 0.025
+        self.track_width = 0.2
+        self.body_width = 0.15
+        self.body_depth = 0.10
+        self.g = 9.81
 
-        # Initial state variables
-        self.x = 0.0      # world-pos-x in meters
-        self.y = 0.0      # world-pos-y in meters
-        self.yaw = 0.0    # radians
-        self.legs_height = 0.3      # average leg-height (or mid-hips height) in meters
-        self.pitch = 0.0  # radians (tilt)
-        self.roll = 0.0   # radians
-
-        self.dx = 0.0
-        self.dy = 0.0
-        self.dyaw = 0.0
-        self.dpitch = 0.0
-        self.dh = 0.0  # not used dynamically, but included
-        self.droll = 0.0  # treated kinematically
-
-        # Control inputs (external should set these!)
-        self.wheel_torque_L = 0.0
-        self.wheel_torque_R = 0.0
-        self.leg_height_L = self.legs_height
-        self.leg_height_R = self.legs_height
-
-        # Optionally add readable states here for external inspection
-        self._readable_states = [
+        variables = [
             'x', 'y', 'yaw', 'pitch', 'roll', 'legs_height',
             'dx', 'dy', 'dyaw', 'dpitch'
         ]
 
+        for var in variables:
+            self.state.readable[var] = 0.0
+
+        self.state.writable['wheel_torque_L'] = 0.0
+        self.state.writable['wheel_torque_R'] = 0.0
+        self.state.writable['leg_height_L'] = 0.3
+        self.state.writable['leg_height_R'] = 0.3
+
     def tick(self, time_delta):
         dt = time_delta if time_delta is not None else self.get_tick_interval()
 
-        # Forces from wheel torques
-        F_L = self.wheel_torque_L / self.wheel_radius
-        F_R = self.wheel_torque_R / self.wheel_radius
+        F_L = self.safe_get('wheel_torque_L') / self.wheel_radius
+        F_R = self.safe_get('wheel_torque_R') / self.wheel_radius
         F_total = F_L + F_R
 
         a_x_robot = F_total / self.mass
 
-        # Acceleration in world frame
-        a_x_world = a_x_robot * math.cos(self.yaw)
-        a_y_world = a_x_robot * math.sin(self.yaw)
+        a_x_world = a_x_robot * math.cos(self.state.readable['yaw'])
+        a_y_world = a_x_robot * math.sin(self.state.readable['yaw'])
 
-        # Update velocities
-        self.dx += a_x_world * dt
-        self.dy += a_y_world * dt
+        self.state.readable['dx'] += a_x_world * dt
+        self.state.readable['dy'] += a_y_world * dt
 
-        # Update positions
-        self.x += self.dx * dt
-        self.y += self.dy * dt
+        self.state.readable['x'] += self.state.readable['dx'] * dt
+        self.state.readable['y'] += self.state.readable['dy'] * dt
 
-        # Yaw dynamics
-        yaw_moment = (F_R - F_L) * self.track_width / 2  # torque = force * half-track
-        self.dyaw += yaw_moment / (self.mass * self.track_width) * dt
-        self.yaw += self.dyaw * dt
+        yaw_moment = (F_R - F_L) * self.track_width / 2
+        self.state.readable['dyaw'] += yaw_moment / (self.mass * self.track_width) * dt
+        self.state.readable['yaw'] += self.state.readable['dyaw'] * dt
 
-        # Height and roll (kinematic)
-        self.legs_height = (self.leg_height_L + self.leg_height_R) / 2
+        legs_height = (self.safe_get('leg_height_L') + self.safe_get('leg_height_R')) / 2
+        self.state.readable['legs_height'] = legs_height
+
         if self.track_width != 0:
-            self.roll = math.atan((self.leg_height_L - self.leg_height_R) / self.track_width)
+            self.state.readable['roll'] = math.atan(
+                (self.safe_get('leg_height_L') - self.safe_get('leg_height_R')) / self.track_width)
         else:
-            self.roll = 0.0
+            self.state.readable['roll'] = 0.0
 
-        # Pitch inertia
-        I_theta = self.mass * self.legs_height ** 2
-
-        # Tilt dynamics
+        I_theta = self.mass * legs_height ** 2
         try:
             theta_accel = (
-                self.mass * self.g * self.legs_height * math.sin(self.pitch) +
-                self.mass * self.legs_height * a_x_robot * math.cos(self.pitch)
+                self.mass * self.g * legs_height * math.sin(self.state.readable['pitch']) +
+                self.mass * legs_height * a_x_robot * math.cos(self.state.readable['pitch'])
             ) / I_theta
         except ZeroDivisionError:
             theta_accel = 0.0
 
-        self.dpitch += theta_accel * dt
-        self.pitch += self.dpitch * dt
+        self.state.readable['dpitch'] += theta_accel * dt
+        self.state.readable['pitch'] += self.state.readable['dpitch'] * dt
 
-        # Clamp tilt to ±90 degrees
         max_tilt = math.pi / 2
-        if self.pitch > max_tilt:
-            self.pitch = max_tilt
-            self.dpitch = 0.0
-        elif self.pitch < -max_tilt:
-            self.pitch = -max_tilt
-            self.dpitch = 0.0
+        if self.state.readable['pitch'] > max_tilt:
+            self.state.readable['pitch'] = max_tilt
+            self.state.readable['dpitch'] = 0.0
+        elif self.state.readable['pitch'] < -max_tilt:
+            self.state.readable['pitch'] = -max_tilt
+            self.state.readable['dpitch'] = 0.0
 
-# Register class on import
 register_workload_type(BalancingRobotSimulator)
