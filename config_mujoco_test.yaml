@@ -1,0 +1,20 @@
+workloads:
+  - type: MujocoSimulator
+    args:
+      xml_path: "mujoco_scene.xml"
+      display_enabled: True
+
+  - type: RemoteControlDevice
+    args:
+      stick_dead_zone: 0.2
+
+  - type: MqttUpdate
+    name: comms
+    args:
+      broker_host: localhost
+      broker_port: 1883
+
+  - type: ConsoleUpdate
+    name: console
+    args:
+      tick_rate_hz: 2

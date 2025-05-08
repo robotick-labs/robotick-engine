@@ -1,7 +1,7 @@
 import json
 import paho.mqtt.client as mqtt
-from ...framework.workload_base import WorkloadBase
-from ...framework.registry import *
+from ....framework.workload_base import WorkloadBase
+from ....framework.registry import *
 
 class MqttUpdate(WorkloadBase):
     def __init__(self):

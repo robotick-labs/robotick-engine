@@ -1,5 +1,5 @@
-from ...framework.workload_base import WorkloadBase
-from ...framework.registry import *
+from ....framework.workload_base import WorkloadBase
+from ....framework.registry import *
 
 from rich.live import Live
 from rich.table import Table
@@ -29,7 +29,10 @@ class ConsoleUpdate(WorkloadBase):
                 states = []
                 for state in inst.get_readable_states():
                     value = inst.safe_get(state)
-                    states.append(f"{state}={value}")
+                    if isinstance(value, float):
+                        states.append(f"{state}={value:.2f}")
+                    else:
+                        states.append(f"{state}={value}")
                 state_str = ", ".join(states)
 
                 duration_str = "-"

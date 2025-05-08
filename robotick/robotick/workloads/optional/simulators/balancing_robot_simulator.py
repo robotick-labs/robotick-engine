@@ -1,6 +1,6 @@
 import math
-from ...framework.workload_base import WorkloadBase
-from ...framework.registry import *
+from ....framework.workload_base import WorkloadBase
+from ....framework.registry import *
 
 class BalancingRobotSimulator(WorkloadBase):
     def __init__(self):

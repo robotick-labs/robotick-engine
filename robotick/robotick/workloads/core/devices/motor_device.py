@@ -1,5 +1,5 @@
 from .io_device import IODevice
-from ...framework.registry import *
+from ....framework.registry import *
 
 class MotorDevice(IODevice):
     def __init__(self):

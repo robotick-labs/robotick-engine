@@ -1,6 +1,11 @@
-import brickpi3
-from ...framework.registry import *
-from ...framework.workload_base import WorkloadBase
+from ....framework.registry import *
+from ....framework.workload_base import WorkloadBase
+
+try:
+    import brickpi3
+except ImportError:
+    print("[WARNING] brickpi3 module not found, using mock implementation")
+    from . import brickpi3_mock as brickpi3
 
 class BrickPi3Device(WorkloadBase):
     def __init__(self):

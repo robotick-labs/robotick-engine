@@ -1,8 +1,18 @@
-from robotick.framework.composer import load
 import time
 
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "robotick")))
+
+from robotick.framework import composer
+
+# optional workloads - we need to explicitly import in order for them to get registered
+from robotick.workloads.optional.devices import brickpi3_device 
+from robotick.workloads.optional.simulators import mujoco_simulator 
+
 def main():
-    system = load('brickpi3_simple_rc.yaml')
+    # system = composer.load('config_brickpi3_simple_rc.yaml')
+    system = composer.load('config_mujoco_test.yaml')
     try:
         while True:
             time.sleep(1)

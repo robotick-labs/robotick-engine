@@ -47,6 +47,9 @@ def load(config_file):
     # ALL workloads are now registered at this point
 
     for inst in instances:
+        inst.load()
+
+    for inst in instances:
         inst.setup()
 
     for inst in instances:

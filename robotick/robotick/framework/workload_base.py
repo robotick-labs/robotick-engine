@@ -45,6 +45,10 @@ class WorkloadBase:
         with self._lock:
             setattr(self, attr, value)
 
+    def load(self):
+        """Override in subclass"""
+        pass
+
     def setup(self):
         """Override in subclass"""
         pass

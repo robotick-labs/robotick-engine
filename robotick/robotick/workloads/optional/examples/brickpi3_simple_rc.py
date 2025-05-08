@@ -1,6 +1,6 @@
-from ..devices.remote_control_device import RemoteControlDevice
-from ...framework.workload_base import WorkloadBase
-from ...framework.registry import *
+from ...core.devices.remote_control_device import RemoteControlDevice
+from ....framework.workload_base import WorkloadBase
+from ....framework.registry import *
 
 def apply_dead_zone(value, dead_zone):
     if abs(value) < dead_zone:
