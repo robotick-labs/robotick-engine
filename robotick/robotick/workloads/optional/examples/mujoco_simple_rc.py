@@ -8,13 +8,15 @@ def apply_dead_zone(value, dead_zone):
     else:
         return (abs(value) - dead_zone) / (1 - dead_zone) * (1 if value > 0 else -1)
 
-# TODO - we no longer need this to access Mujoco at all - rename and move it to core location, as its handy (deadzone etc)
+# TODO - we no longer need this to access Mujoco at all - rename and move it to core location, as its handy (deadzone etc); and make it a non-ticking transformer
 
 class MujocoSimpleRc(WorkloadBase):
     def __init__(self):
         super().__init__()
         self.tick_rate_hz = 20
         self.stick_dead_zone = 0.2
+        self.stick_scale_x = 1.0
+        self.stick_scale_y = 1.0
 
         self.state.readable['linear_speed'] = 0
         self.state.readable['yaw_speed'] = 0
@@ -27,8 +29,8 @@ class MujocoSimpleRc(WorkloadBase):
         x = apply_dead_zone(left_stick.get('x', 0), self.stick_dead_zone)
         y = apply_dead_zone(left_stick.get('y', 0), self.stick_dead_zone)
 
-        x *= -0.15
-        y *= -0.3
+        x *= self.stick_scale_x
+        y *= self.stick_scale_y
 
         self.safe_set('linear_speed', y)
         self.safe_set('yaw_speed', x)
