@@ -8,7 +8,7 @@ workloads:
     args:
       tick_rate_hz: 30
       stick_scale_x: -0.15
-      stick_scale_y: -0.4
+      stick_scale_y: 0.4
       data_bindings:
         - linear_speed -> speed_to_lean_control.desired_speed
         - yaw_speed -> steering_mixer.turn_input
@@ -16,7 +16,7 @@ workloads:
   - type: MujocoSpeedToLeanControl
     name: speed_to_lean_control
     args:
-      tick_rate_hz: 200
+      tick_parent_name: mujoco_device
       max_acceleration: 0.05
       max_lean_angle: 0.4
       data_bindings:
@@ -28,12 +28,12 @@ workloads:
     args:
       axis_name: z
       data_bindings:
-        - input_vector <- mujoco_sim.body_axis_sensor
+        - input_vector <- mujoco_device.body_axis_sensor
 
   - type: PidControl
     name: balance_pid
     args:
-      tick_rate_hz: 200
+      tick_parent_name: mujoco_device
       kp: 1.2
       ki: 0.0
       kd: 0.005
@@ -44,15 +44,15 @@ workloads:
   - type: SteeringMixer
     name: steering_mixer
     args:
-      tick_rate_hz: 100
+      tick_parent_name: mujoco_device
       data_bindings:
-        - left_motor -> mujoco_sim.motor_left_wheel
-        - right_motor -> mujoco_sim.motor_right_wheel
+        - left_motor -> mujoco_device.motor_left_wheel
+        - right_motor -> mujoco_device.motor_right_wheel
 
   - type: MujocoDeviceSimulator
-    name: mujoco_sim
+    name: mujoco_device
     args:
-      tick_rate_hz: 100 # note - the mujoco world its self honours the (generally much higher for sim-stability) tick-rate specified in the below xml file
+      tick_rate_hz: 200 # note - the mujoco world its self honours the (generally much higher for sim-stability) tick-rate specified in the below xml file
       xml_path: "mujoco_scene.xml"
       display_enabled: True
 

@@ -4,11 +4,11 @@
 <mujoco model="balance">
 
 	<worldbody>
-		<body name="robot_body" quat="0.7071 0 0 0.7071">
+		<body name="robot_body" pos="0 0 -0.1" quat="0.7071 0 0 0.7071">
 			<joint name="robot_body_joint" type="free"/>
 			<geom size="0.05 0.0185 0.0855" pos="0 0 0.0995" type="box"/>
 			<inertial pos="0 0.0 0.057" quat="0.707107 0 0 0.707107" mass="2.0" diaginertia="0.001311 0.0012568 0.000487"/>
-			<site name="imu_site" pos="0 0 0.2" size="0.01" rgba="1 0 0 1"/>
+			<site name="red_nose" pos="0.0 0.025 0.1" size="0.02" rgba="1 0 0 1"/>
 			<body name="l_wheel" pos="-0.074 0 0.034">
 				<inertial pos="0 0 0" quat="0.5 0.5 -0.5 0.5" mass="0.032" diaginertia="2.3e-05 1.3e-05 1.3e-05"/>
 				<joint name="torso_l_wheel" type="hinge" pos="0 0 0" axis="-1 0 0" actuatorfrcrange="-1000 1000" damping="0.1"/>
@@ -23,15 +23,11 @@
 	</worldbody>
 
 	<actuator>
-		<motor name="motor_left_wheel" joint="torso_l_wheel" gear="1" ctrlrange="-100 100"/>
-		<motor name="motor_right_wheel" joint="torso_r_wheel" gear="1" ctrlrange="-100 100"/>
+		<motor name="motor_left_wheel" joint="torso_l_wheel" gear="0.3" ctrlrange="-100 100"/>
+		<motor name="motor_right_wheel" joint="torso_r_wheel" gear="0.3" ctrlrange="-100 100"/>
 	</actuator>
 
 	<sensor>
-		<!-- Gyroscope (angular velocity) on body -->
-		
-		<!-- Accelerometer -->
-		<accelerometer name="imu_accel" site="imu_site"/>
 		<!-- Pitch Sensor (since gyro doesn't include integration natively) -->
     	<framexaxis name="body_axis_sensor" objtype="body" objname="robot_body"/>
 	</sensor>

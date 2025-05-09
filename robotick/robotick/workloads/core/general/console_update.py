@@ -25,35 +25,55 @@ class ConsoleUpdate(WorkloadBase):
 
         for type_name, instances in workloads.items():
             for inst in instances:
-                states = []
-
-                for state in inst.get_readable_states():
-                    value = inst.safe_get(state)
-                    value_str = self._format_payload(value)
-                    states.append(f"{state}={value_str}")
-
-                for state in inst.get_writable_states():
-                    if state not in inst.get_readable_states():
-                        value = inst.safe_get(state)
-                        value_str = self._format_payload(value)
-                        states.append(f"{state}={value_str}")
-                state_str = ", ".join(states)
-
-                duration_str = "-"
-                duration_goal_str = "-"
-                duration_percent_str = "-"
-
-                if inst.tick_rate_hz > 0:
-                    duration_self = inst.get_last_tick_duration_self() * 1000.0
-                    duration_goal = inst.get_tick_interval() * 1000.0
-                    duration_percent = 100.0 * duration_self / duration_goal if duration_goal > 0 else 0
-                    duration_str = f"{duration_self:.2f}"
-                    duration_goal_str = f"{duration_goal:.2f}"
-                    duration_percent_str = f"{duration_percent:.1f}%"
-
-                table.add_row(type_name, getattr(inst, 'name', repr(inst)) or "-", state_str, duration_str, duration_goal_str, duration_percent_str)
+                if inst._tick_parent is None:
+                    self.add_instance_to_table(table, inst)
 
         self._live.update(table)
+    
+    def add_instance_to_table(self, table, inst, prefix=""):
+
+        if inst._tick_children is not None:
+            prefix = "^ "
+            table.add_row()  # adds a fully blank row
+
+            first_child = True
+            for child in inst._tick_children:
+                self.add_instance_to_table(table, child, " > " if first_child else " > " )
+                first_child = False
+
+        states = []
+
+        for state in inst.get_readable_states():
+            value = inst.safe_get(state)
+            value_str = self._format_payload(value)
+            states.append(f"{state}={value_str}")
+
+        for state in inst.get_writable_states():
+            if state not in inst.get_readable_states():
+                value = inst.safe_get(state)
+                value_str = self._format_payload(value)
+                states.append(f"{state}={value_str}")
+        state_str = ", ".join(states)
+
+        duration_str = "-"
+        duration_goal_str = "-"
+        duration_percent_str = "-"
+
+        if inst.tick_rate_hz > 0:
+            duration_self = inst.get_last_tick_duration_self() * 1000.0
+            duration_goal = inst.get_tick_interval() * 1000.0
+            duration_percent = 100.0 * duration_self / duration_goal if duration_goal > 0 else 0
+            duration_str = f"{duration_self:.2f}"
+            duration_goal_str = f"{duration_goal:.2f}"
+            duration_percent_str = f"{duration_percent:.1f}%"
+        elif inst._tick_parent is not None:
+            duration_self = inst.get_last_tick_duration_self() * 1000.0
+            duration_str = f"{duration_self:.2f}"
+
+        table.add_row(prefix + inst._type_name, getattr(inst, 'name', repr(inst)) or "-", state_str, duration_str, duration_goal_str, duration_percent_str)
+
+        if inst._tick_children is not None:
+            table.add_row()  # adds a fully blank row
 
     def stop(self):
         super().stop()

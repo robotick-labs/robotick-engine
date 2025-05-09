@@ -18,6 +18,8 @@ def register_workload(instance):
     snake_case = ''.join(['_' + c.lower() if c.isupper() else c for c in cls_name]).lstrip('_')
     if snake_case not in _registered_workload_instances:
         _registered_workload_instances[snake_case] = []
+
+    instance._type_name = snake_case;
     _registered_workload_instances[snake_case].append(instance)
 
 def get_all_workload_instances():

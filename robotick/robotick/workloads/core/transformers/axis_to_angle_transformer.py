@@ -6,6 +6,8 @@ class AxisToAngleTransformer(WorkloadBase):
     def __init__(self):
         super().__init__()
 
+        self.tick_rate_hz = 0
+
         # Input vector (from framexaxis, frameyaxis, framezaxis)
         self.state.writable['input_vector'] = [1, 0, 0]
 
