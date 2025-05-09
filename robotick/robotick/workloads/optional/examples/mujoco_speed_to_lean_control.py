@@ -26,7 +26,7 @@ class MujocoSpeedToLeanControl(WorkloadBase):
         desired_accel = min(max(desired_accel, -self.max_acceleration), self.max_acceleration)
 
         k_speed = 1.0
-        k_accel = 1.5
+        k_accel = -1.0
 
         goal_lean = k_speed * desired_speed + k_accel * desired_accel
 
