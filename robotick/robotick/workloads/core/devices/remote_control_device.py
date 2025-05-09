@@ -24,7 +24,7 @@ class RemoteControlDevice(WorkloadBase):
         self._httpd = ThreadingHTTPServer(('0.0.0.0', 8080), handler)
         self._server_thread = threading.Thread(target=self._httpd.serve_forever, daemon=True)
         self._server_thread.start()
-        print("Web server running on port 8080, serving:", web_dir)
+        print("RemoteControlDevice - web server running at http://localhost:8080")
 
     def stop(self):
         if self._httpd:

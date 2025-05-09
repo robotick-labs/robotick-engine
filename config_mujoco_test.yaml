@@ -8,8 +8,21 @@ workloads:
     args:
       tick_rate_hz: 30
       data_bindings:
-        - linear_speed -> balance_pid.setpoint
+        - linear_speed -> speed_to_lean_pid.setpoint
         - yaw_speed -> steering_mixer.turn_input
+
+  - type: PidControl
+    name: speed_to_lean_pid
+    args:
+      tick_rate_hz: 200
+      kp: 0.1
+      ki: 0.00
+      kd: 0.0005
+      clamp_output: 0.4
+      scale_output: -2.0 # lean back to slow down
+      data_bindings:      
+        - measured <- balance_pid.control_output # since our actual speed is ~proportional to motor-torque, assuming no slipping
+        - control_output -> balance_pid.setpoint
 
   - type: AxisToAngleTransformer
     name: pitch_transformer
@@ -21,9 +34,9 @@ workloads:
   - type: PidControl
     name: balance_pid
     args:
-      tick_rate_hz: 100
+      tick_rate_hz: 200
       kp: 1.2
-      ki: 0.005
+      ki: 0.0
       kd: 0.005
       data_bindings:      
         - measured <- pitch_transformer.output_value

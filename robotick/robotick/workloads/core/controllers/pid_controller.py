@@ -10,6 +10,8 @@ class PidControl(WorkloadBase):
         self.kd = 0.0
         self.integral = 0.0
         self.prev_error = 0.0
+        self.clamp_output = -1.0 # no clamping if negative
+        self.scale_output = 1.0
 
         # Writable inputs
         self.state.writable['setpoint'] = 0.0
@@ -35,6 +37,11 @@ class PidControl(WorkloadBase):
         d_term = (self.kd * derivative)
 
         output = p_term + i_term + d_term
+
+        output *= self.scale_output
+
+        if self.clamp_output >= 0:
+            output = min(max(output, -self.clamp_output), self.clamp_output)
 
         self.prev_error = error
 
