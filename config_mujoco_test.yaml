@@ -50,9 +50,10 @@ workloads:
         - left_motor -> mujoco_sim.motor_left_wheel
         - right_motor -> mujoco_sim.motor_right_wheel
 
-  - type: MujocoSimulator
+  - type: MujocoDeviceSimulator
     name: mujoco_sim
     args:
+      tick_rate_hz: 100 # note - the mujoco world its self honours the (generally much higher for sim-stability) tick-rate specified in the below xml file
       xml_path: "mujoco_scene.xml"
       display_enabled: True
 

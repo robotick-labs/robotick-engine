@@ -81,6 +81,9 @@ class WorkloadBase:
             for target_workload, target_attr in self._outgoing_bindings[attr]:
                 target_workload.safe_set(target_attr, value)
 
+    def pre_load(self):
+        pass
+
     def load(self):
         pass
 

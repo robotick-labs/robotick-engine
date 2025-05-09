@@ -25,8 +25,6 @@ def load(config_file):
     with open(config_file) as f:
         config = yaml.safe_load(f)  # ← use safe_load for security
 
-    instances = []
-
     for workload_cfg in config.get('workloads', []):
         type_name = workload_cfg['type']
         name_arg = workload_cfg.get('name')
@@ -48,30 +46,33 @@ def load(config_file):
             instance.data_bindings = args['data_bindings']
         else:
             instance.data_bindings = []
-
-        instances.append(instance)
     
     # ALL workloads are now registered at this point
 
+    all_workloads = get_all_workload_instances() 
+    all_instances = [instance for instances in all_workloads.values() for instance in instances]
+
+    for inst in all_instances:
+        inst.pre_load()
+
     # allow each instance to do independent time-consuming loading - multithreaded
     with ThreadPoolExecutor() as executor:
-        executor.map(lambda inst: inst.load(), instances)
+        executor.map(lambda inst: inst.load(), all_instances)
 
     # allow instances to do fixup (e.g. to each other) - single-threaded
-    for inst in instances:
-        workloads = get_all_workload_instances()
+    for inst in all_instances:
         if hasattr(inst, 'data_bindings'):
-            inst.parse_bindings(inst.data_bindings, workloads)
+            inst.parse_bindings(inst.data_bindings, all_workloads)
         inst.setup()
 
-    for inst in instances:
+    for inst in all_instances:
         inst.start()
 
     def stop_all():
-        for inst in instances:
+        for inst in all_instances:
             inst.stop()
 
     return {
-        'instances': instances,
+        'instances': all_instances,
         'stop_all': stop_all
     }
