@@ -17,9 +17,12 @@
 
   <asset>
     <texture type="skybox" builtin="gradient" rgb1="0.8 0.8 0.8" rgb2="0 0 0" width="512" height="3072"/>
-    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
-      markrgb="0.8 0.8 0.8" width="300" height="300"/>
-    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+
+    <texture type="2d" name="wood_floor" builtin="checker"
+            rgb1="0.6 0.4 0.2" rgb2="0.55 0.35 0.15"
+            markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="wood_floor" texuniform="true" texrepeat="5 5" reflectance="0.01"/>
+
     <texture type="2d" name="wheel_texture" builtin="checker" mark="edge" rgb1="0.0 0.0 0.0" rgb2="0.2 0.2 0.2"
       markrgb="0.3 0.3 0.3" width="300" height="300"/>
     <material name="wheel_material" texture="wheel_texture" texuniform="true" texrepeat="5 5"/>
@@ -32,8 +35,8 @@
 
   <contact>
     <!--  friction="sliding torsional rolling spinning1 spinning2" -->
-    <pair geom1="floor" geom2="l_wheel_geom" friction="1.0 0.2 0.1 0.001 0.001"/>
-    <pair geom1="floor" geom2="r_wheel_geom" friction="1.0 0.2 0.1 0.001 0.001"/>
+    <pair geom1="floor" geom2="l_wheel_geom" friction="2.0 1.0 0.2 0.001 0.001"/>
+    <pair geom1="floor" geom2="r_wheel_geom" friction="2.0 1.0 0.2 0.001 0.001"/>
   </contact>
 
 </mujoco>

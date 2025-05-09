@@ -27,7 +27,7 @@ class MujocoSimpleRc(WorkloadBase):
         x = apply_dead_zone(left_stick.get('x', 0), self.stick_dead_zone)
         y = apply_dead_zone(left_stick.get('y', 0), self.stick_dead_zone)
 
-        x *= -0.2
+        x *= -0.15
         y *= 0.3
 
         self.safe_set('linear_speed', y)

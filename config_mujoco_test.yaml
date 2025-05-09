@@ -21,7 +21,7 @@ workloads:
   - type: PidControl
     name: balance_pid
     args:
-      tick_rate_hz: 500
+      tick_rate_hz: 100
       kp: 1.2
       ki: 0.005
       kd: 0.005
@@ -32,7 +32,7 @@ workloads:
   - type: SteeringMixer
     name: steering_mixer
     args:
-      tick_rate_hz: 500
+      tick_rate_hz: 100
       data_bindings:
         - left_motor -> mujoco_sim.motor_left_wheel
         - right_motor -> mujoco_sim.motor_right_wheel
