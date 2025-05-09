@@ -43,6 +43,7 @@ class MujocoSimulator(WorkloadBase):
         else:
             self.tick_rate_hz = int(1.0 / self.model.opt.timestep)
 
+    def setup(self):
         if self.display_enabled:
             self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
 

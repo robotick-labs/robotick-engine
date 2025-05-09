@@ -1,6 +1,7 @@
 import importlib
 import pkgutil
 import yaml
+from concurrent.futures import ThreadPoolExecutor
 
 import robotick.workloads 
 
@@ -52,9 +53,11 @@ def load(config_file):
     
     # ALL workloads are now registered at this point
 
-    for inst in instances:
-        inst.load()
+    # allow each instance to do independent time-consuming loading - multithreaded
+    with ThreadPoolExecutor() as executor:
+        executor.map(lambda inst: inst.load(), instances)
 
+    # allow instances to do fixup (e.g. to each other) - single-threaded
     for inst in instances:
         workloads = get_all_workload_instances()
         if hasattr(inst, 'data_bindings'):

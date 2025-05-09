@@ -2,6 +2,7 @@ import json
 import paho.mqtt.client as mqtt
 from ....framework.workload_base import WorkloadBase
 from ....framework.registry import *
+from .mqtt_broker import MqttBroker
 
 class MqttUpdate(WorkloadBase):
     def __init__(self):
@@ -13,10 +14,17 @@ class MqttUpdate(WorkloadBase):
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self._last_published_value = {}
+        self._mqtt_broker = MqttBroker(mqtt_port=1883, websocket_port=9001)
 
-    def setup(self):
+    def load(self):
+        print("MqttUpdate.setup - setting up broker...")
+        self._mqtt_broker.start()
+
+        print("MqttUpdate.setup - connecting to broker...")
         self.client.connect(self.broker_host, self.broker_port, 60)
         self.client.loop_start()
+
+        print("MqttUpdate.setup - complete")
 
     def _on_connect(self, client, userdata, flags, rc):
         print("Connected to MQTT broker")
