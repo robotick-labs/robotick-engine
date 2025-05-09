@@ -17,6 +17,9 @@ class PidControl(WorkloadBase):
 
         # Readable outputs
         self.state.readable['error'] = 0.0
+        self.state.readable['p_term'] = 0.0
+        self.state.readable['i_term'] = 0.0
+        self.state.readable['d_term'] = 0.0
         self.state.readable['control_output'] = 0.0
 
     def tick(self, time_delta):
@@ -27,11 +30,19 @@ class PidControl(WorkloadBase):
         self.integral += error * time_delta if time_delta else error
         derivative = (error - self.prev_error) / time_delta if time_delta else 0.0
 
-        output = (self.kp * error) + (self.ki * self.integral) + (self.kd * derivative)
+        p_term = (self.kp * error)
+        i_term = (self.ki * self.integral)
+        d_term = (self.kd * derivative)
+
+        output = p_term + i_term + d_term
+
         self.prev_error = error
 
         # Write to local readable states (auto-propagated by bindings)
         self.safe_set('error', error)
+        self.safe_set('p_term', p_term)
+        self.safe_set('i_term', i_term)
+        self.safe_set('d_term', d_term)
         self.safe_set('control_output', output)
 
 register_workload_type(PidControl)

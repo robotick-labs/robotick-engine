@@ -4,7 +4,7 @@ from ....framework.registry import *
 class SteeringMixer(WorkloadBase):
     def __init__(self):
         super().__init__()
-        self.tick_rate_hz = 20
+        self.tick_rate_hz = 100
 
         # Inputs
         self.state.readable['balance_input'] = 0.0
