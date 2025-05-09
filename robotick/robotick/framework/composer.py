@@ -4,7 +4,7 @@ import yaml
 
 import robotick.workloads 
 
-from .registry import get_workload_type
+from .registry import *
 
 def auto_import_workloads(package):
     """Recursively import all modules and subpackages in a package."""
@@ -42,6 +42,12 @@ def load(config_file):
         for key, value in args.items():
             setattr(instance, key, value)
 
+        # store raw bindings if present
+        if 'data_bindings' in args:
+            instance.data_bindings = args['data_bindings']
+        else:
+            instance.data_bindings = []
+
         instances.append(instance)
     
     # ALL workloads are now registered at this point
@@ -50,6 +56,9 @@ def load(config_file):
         inst.load()
 
     for inst in instances:
+        workloads = get_all_workload_instances()
+        if hasattr(inst, 'data_bindings'):
+            inst.parse_bindings(inst.data_bindings, workloads)
         inst.setup()
 
     for inst in instances:

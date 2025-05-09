@@ -3,7 +3,7 @@
 
 <mujoco model="robot scene">
   <compiler angle="radian"/>
-  <option timestep="0.001"/>
+  <option timestep="0.00005"/>
 
   <include file="mujoco_balancing_robot.xml"/>
 
@@ -28,7 +28,6 @@
   <worldbody>
     <light pos="0 0 1.5" dir="-0.5 -0.5 -1" directional="true"/>
     <geom name="floor" size="0 0 0.05" pos="0 0 -0.1" type="plane" material="groundplane"/>
-    <camera name="follow_cam" mode="track" target="robot_body" pos="0 -3 1" />
   </worldbody>
 
   <contact>

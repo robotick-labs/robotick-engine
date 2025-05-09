@@ -23,8 +23,8 @@
 	</worldbody>
 
 	<actuator>
-		<motor name="motor_l_wheel" joint="torso_l_wheel" gear="0.25" ctrlrange="-100 100"/>
-		<motor name="motor_r_wheel" joint="torso_r_wheel" gear="0.25" ctrlrange="-100 100"/>
+		<motor name="motor_left_wheel" joint="torso_l_wheel" gear="0.25" ctrlrange="-100 100"/>
+		<motor name="motor_right_wheel" joint="torso_r_wheel" gear="0.25" ctrlrange="-100 100"/>
 	</actuator>
 
 	<sensor>
@@ -32,6 +32,8 @@
 		<gyro name="imu_gyro" site="imu_site"/>
 		<!-- Accelerometer -->
 		<accelerometer name="imu_accel" site="imu_site"/>
+		<!-- Pitch Sensor (since gyro doesn't include integration natively) -->
+    	<framexaxis name="body_axis_sensor" objtype="body" objname="robot_body"/>
 	</sensor>
 
 </mujoco>

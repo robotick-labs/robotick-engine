@@ -37,6 +37,9 @@ class WorkloadBase:
         self._lock = threading.Lock()
         self.state = StateContainer()
 
+        self._outgoing_bindings = {}  # local_state -> list of (target_workload, target_state)
+        self._incoming_bindings = {}  # local_state -> (source_workload, source_state)
+
         register_workload(self)
 
         self._wake_event = threading.Event()
@@ -62,10 +65,21 @@ class WorkloadBase:
         return self.state.get_writable_states()
 
     def safe_get(self, attr):
+        # Check incoming pull bindings first
+        if attr in self._incoming_bindings:
+            source_workload, source_attr = self._incoming_bindings[attr]
+            return source_workload.safe_get(source_attr)
+
+        # Otherwise get local value
         return self.state.safe_get(attr, self._lock)
 
     def safe_set(self, attr, value):
         self.state.safe_set(attr, value, self._lock)
+
+        # Propagate to bound targets
+        if attr in self._outgoing_bindings:
+            for target_workload, target_attr in self._outgoing_bindings[attr]:
+                target_workload.safe_set(target_attr, value)
 
     def load(self):
         pass
@@ -122,3 +136,34 @@ class WorkloadBase:
 
                 if sleep_time > 0:
                     time.sleep(sleep_time)
+
+    def parse_bindings(self, bindings_list, workloads):
+        """Parse arrow bindings like 'local -> target.workload' or 'local <- source.workload'."""
+        for binding_str in bindings_list:
+            if '->' in binding_str:
+                key, _, rest = binding_str.partition('->')
+                direction = 'out'
+            elif '<-' in binding_str:
+                key, _, rest = binding_str.partition('<-')
+                direction = 'in'
+            else:
+                continue  # skip invalid
+
+            local_state = key.strip()
+            workload_dot_state = rest.strip()
+            workload_name, _, other_state = workload_dot_state.partition('.')
+
+            # Find workload instance
+            other_instance = None
+            for _, instances in workloads.items():
+                for inst in instances:
+                    if getattr(inst, 'name', None) == workload_name:
+                        other_instance = inst
+                        break
+            if not other_instance:
+                raise ValueError(f"Cannot find workload '{workload_name}'")
+
+            if direction == 'out':
+                self._outgoing_bindings.setdefault(local_state, []).append((other_instance, other_state))
+            else:
+                self._incoming_bindings[local_state] = (other_instance, other_state)

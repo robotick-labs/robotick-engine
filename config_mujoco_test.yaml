@@ -1,16 +1,46 @@
 workloads:
-  - type: MujocoSimulator
-    args:
-      xml_path: "mujoco_scene.xml"
-      display_enabled: True
-
-  - type: MujocoSimpleRc
-    args:
-      tick_rate_hz: 30
-
   - type: RemoteControlDevice
     args:
       stick_dead_zone: 0.2
+
+  - type: MujocoSimpleRc
+    name: simple_rc
+    args:
+      tick_rate_hz: 30
+      data_bindings:
+        - linear_speed -> balance_pid.setpoint
+        - angular_speed -> steering_mixer.turn_input
+
+  - type: AxisToAngleTransformer
+    name: pitch_transformer
+    args:
+      axis_name: z
+      data_bindings:
+        - input_vector <- mujoco_sim.body_axis_sensor
+
+  - type: PidControl
+    name: balance_pid
+    args:
+      tick_rate_hz: 200
+      kp: 0.35
+      ki: 0.1
+      kd: 0.001
+      data_bindings:      
+        - measured <- pitch_transformer.output_value
+        - control_output -> steering_mixer.balance_input
+
+  - type: SteeringMixer
+    name: steering_mixer
+    args:
+      data_bindings:
+        - left_motor -> mujoco_sim.motor_left_wheel
+        - right_motor -> mujoco_sim.motor_right_wheel
+
+  - type: MujocoSimulator
+    name: mujoco_sim
+    args:
+      xml_path: "mujoco_scene.xml"
+      display_enabled: True
 
   - type: MqttUpdate
     name: comms
