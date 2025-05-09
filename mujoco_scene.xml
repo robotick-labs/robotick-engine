@@ -35,8 +35,8 @@
 
   <contact>
     <!--  friction="sliding torsional rolling spinning1 spinning2" -->
-    <pair geom1="floor" geom2="l_wheel_geom" friction="2.0 1.0 0.2 0.001 0.001"/>
-    <pair geom1="floor" geom2="r_wheel_geom" friction="2.0 1.0 0.2 0.001 0.001"/>
+    <pair geom1="floor" geom2="l_wheel_geom" friction="1.5 1.0 0.2 0.001 0.001"/>
+    <pair geom1="floor" geom2="r_wheel_geom" friction="1.5 1.0 0.2 0.001 0.001"/>
   </contact>
 
 </mujoco>
