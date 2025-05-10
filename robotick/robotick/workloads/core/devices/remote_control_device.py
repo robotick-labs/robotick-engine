@@ -9,8 +9,8 @@ class RemoteControlDevice(WorkloadBase):
         super().__init__()
         self.tick_rate_hz = 0 # no need to tick - we're just somewhere to store data and serve our static web page from
 
-        self.state.writable['left_stick'] = {'x': 0, 'y': 0}
-        self.state.writable['right_stick'] = {'x': 0, 'y': 0}
+        self.state.writable['left_stick'] = [0, 0]
+        self.state.writable['right_stick'] = [0, 0]
 
         self._server_thread = None
         self._httpd = None

@@ -1,19 +1,19 @@
 workloads:
   - type: RemoteControlDevice
-    args:
-      stick_dead_zone: 0.2
+    name: remote_control_device
 
-  - type: MujocoSimpleRc
-    name: simple_rc
+  - type: DeadZoneScaleAndSplitTransformer
+    name: deadzone_transformer
     args:
-      tick_rate_hz: 30
-      stick_scale_x: -0.15
-      stick_scale_y: 0.4
+      dead_zone: 0.2
+      scale_x: -0.15
+      scale_y: 0.4
       data_bindings:
-        - linear_speed -> speed_to_lean_control.desired_speed
-        - yaw_speed -> steering_mixer.turn_input
+        - input_vector <- remote_control_device.left_stick
+        - output_y -> speed_to_lean_control.desired_speed
+        - output_x -> steering_mixer.input_turn_rate
 
-  - type: MujocoSpeedToLeanControl
+  - type: BalanceRobotSpeedToLeanControl
     name: speed_to_lean_control
     args:
       tick_parent_name: mujoco_device
@@ -23,7 +23,7 @@ workloads:
         - current_speed <- balance_pid.control_output # since our actual speed is ~proportional to motor-torque, assuming no slipping
         - goal_lean -> balance_pid.setpoint
 
-  - type: AxisToAngleTransformer
+  - type: AxisToAngleFromVerticalTransformer
     name: pitch_transformer
     args:
       axis_name: z
@@ -38,16 +38,16 @@ workloads:
       ki: 0.0
       kd: 0.005
       data_bindings:      
-        - measured <- pitch_transformer.output_value
-        - control_output -> steering_mixer.balance_input
+        - measured <- pitch_transformer.output_angle
+        - control_output -> steering_mixer.input_speed
 
-  - type: SteeringMixer
+  - type: SteeringMixerTransformer
     name: steering_mixer
     args:
-      tick_parent_name: mujoco_device
+      power_scale: 100.0
       data_bindings:
-        - left_motor -> mujoco_device.motor_left_wheel
-        - right_motor -> mujoco_device.motor_right_wheel
+        - output_left_motor -> mujoco_device.motor_left_wheel
+        - output_right_motor -> mujoco_device.motor_right_wheel
 
   - type: MujocoDeviceSimulator
     name: mujoco_device

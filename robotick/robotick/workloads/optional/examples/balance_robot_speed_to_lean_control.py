@@ -1,7 +1,7 @@
 from ....framework.workload_base import WorkloadBase
 from ....framework.registry import *
 
-class MujocoSpeedToLeanControl(WorkloadBase):
+class BalanceRobotSpeedToLeanControl(WorkloadBase):
     def __init__(self):
         super().__init__()
         self.tick_rate_hz = 100
@@ -54,4 +54,4 @@ class MujocoSpeedToLeanControl(WorkloadBase):
 
         self.safe_set('debug_vis', debug_str)
 
-register_workload_type(MujocoSpeedToLeanControl)
+register_workload_type(BalanceRobotSpeedToLeanControl)

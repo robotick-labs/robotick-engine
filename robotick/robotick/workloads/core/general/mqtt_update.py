@@ -32,14 +32,14 @@ class MqttUpdate(WorkloadBase):
             for inst in instances:
                 name = getattr(inst, 'name', '') or ''
                 for state in inst.get_writable_states():
-                    topic = f"control/{type_name}/" + (f"{name}/" if name else "") + f"{state}"
+                    topic = f"control/{name}/{state}"
                     value = inst.safe_get(state)
                     payload = self._format_payload(value)
                     client.publish(topic, payload, retain=True)
                     client.subscribe(topic)
 
                 for state in inst.get_readable_states():
-                    topic = f"state/{type_name}/" + (f"{name}/" if name else "") + f"{state}"
+                    topic = f"state/{name}/{state}"
                     value = inst.safe_get(state)
                     payload = self._format_payload(value)
                     client.publish(topic, payload, retain=True)
@@ -73,7 +73,7 @@ class MqttUpdate(WorkloadBase):
                     current_value = inst.safe_get(state)
                     last_value = inst_last.get(state)
                     if current_value != last_value:
-                        topic = f"state/{type_name}/" + (f"{name}/" if name else "") + f"{state}"
+                        topic = f"state/{name}/{state}"
                         payload = self._format_payload(current_value)
                         self.client.publish(topic, payload, retain=True)
                         inst_last[state] = current_value

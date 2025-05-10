@@ -2,11 +2,13 @@ import concurrent.futures
 import threading
 import time
 from .registry import *
+import re
 
 class StateContainer:
     def __init__(self):
         self.readable = {}
         self.writable = {}
+        self.name = re.sub(r'(?<!^)(?=[A-Z])', '_', self.__class__.__name__).lower()
 
     def get_readable_states(self):
         return list(self.readable.keys()) + list(self.writable.keys())

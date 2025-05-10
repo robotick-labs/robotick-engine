@@ -15,7 +15,7 @@ function createStick(areaId, knobId, topic, autoCenterX, autoCenterY) {
     }
 
     function sendMQTT(normX, normY) {
-        const payload = JSON.stringify({ x: normX, y: normY });
+        const payload = JSON.stringify([normX, normY]);
         client.publish(topic, payload);
     }
 

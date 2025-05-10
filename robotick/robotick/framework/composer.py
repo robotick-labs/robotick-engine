@@ -61,7 +61,7 @@ def load(config_file):
 
     # allow instances to do fixup (e.g. to each other) - single-threaded
     for inst in all_instances:
-        if hasattr(inst, 'data_bindings'):
+        if hasattr(inst, 'data_bindings') and inst.data_bindings is not None:
             inst.parse_bindings(inst.data_bindings, all_workloads)
         inst.setup()
 

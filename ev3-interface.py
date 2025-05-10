@@ -9,7 +9,6 @@ from robotick.framework import composer
 # optional workloads - we need to explicitly import in order for them to get registered
 from robotick.workloads.optional.devices import brickpi3_device 
 from robotick.workloads.optional.simulators import mujoco_simulator 
-from robotick.workloads.optional.examples import mujoco_simple_rc
 
 def main():
     # system = composer.load('config_brickpi3_simple_rc.yaml')
