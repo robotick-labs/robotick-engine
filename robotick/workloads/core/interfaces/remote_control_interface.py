@@ -5,7 +5,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from ....framework.workload_base import WorkloadBase
 from ....framework.registry import *
 
-class RemoteControlDevice(WorkloadBase):
+class RemoteControlInterface(WorkloadBase):
     def __init__(self):
         super().__init__()
         self.tick_rate_hz = 0 # no need to tick - we're just somewhere to store data and serve our static web page from
@@ -30,7 +30,7 @@ class RemoteControlDevice(WorkloadBase):
         
     def setup(self):
         # Set directory to serve (relative to script location)
-        web_dir = os.path.join(os.path.dirname(__file__), 'remote_control_device_web')
+        web_dir = os.path.join(os.path.dirname(__file__), 'remote_control_interface_web')
         os.chdir(web_dir)
 
         handler = SimpleHTTPRequestHandler
@@ -40,7 +40,7 @@ class RemoteControlDevice(WorkloadBase):
 
         ip = self.get_local_ip()
 
-        print(f"RemoteControlDevice - web server running at http://{ip}:8080")
+        print(f"RemoteControlInterface - web server running at http://{ip}:8080")
 
     def stop(self):
         if self._httpd:
@@ -55,4 +55,4 @@ class RemoteControlDevice(WorkloadBase):
     def get_right_stick(self):
         return self.safe_get('right_stick')
 
-register_workload_type(RemoteControlDevice)
+register_workload_type(RemoteControlInterface)

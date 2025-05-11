@@ -4,7 +4,7 @@ import json
 from ....framework.workload_base import WorkloadBase
 from ....framework.registry import *
 
-class MujocoDeviceSimulator(WorkloadBase):
+class MujocoInterface(WorkloadBase):
     def __init__(self):
         super().__init__()
         self.tick_rate_hz = 0
@@ -108,4 +108,4 @@ class MujocoWorldSimulator(WorkloadBase):
         super().stop()
 
 register_workload_type(MujocoWorldSimulator)
-register_workload_type(MujocoDeviceSimulator)
+register_workload_type(MujocoInterface)

@@ -8,20 +8,20 @@ class MqttUpdate(WorkloadBase):
     def __init__(self):
         super().__init__()
         self.tick_rate_hz = 30
-        self.broker_host = "localhost"
-        self.broker_port = 1883
+        self.mqtt_port=7080
+        self.websocket_port=7081
         self.client = mqtt.Client()
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self._last_published_value = {}
-        self._mqtt_broker = MqttBroker(mqtt_port=1883, websocket_port=9001)
+        self._mqtt_broker = MqttBroker(mqtt_port=self.mqtt_port, websocket_port=self.websocket_port)
 
     def load(self):
         print("MqttUpdate.setup - setting up broker...")
         self._mqtt_broker.start()
 
         print("MqttUpdate.setup - connecting to broker...")
-        self.client.connect(self.broker_host, self.broker_port, 60)
+        self.client.connect("localhost", self.mqtt_port, 60)
         self.client.loop_start()
 
         print("MqttUpdate.setup - complete")

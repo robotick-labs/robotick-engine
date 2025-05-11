@@ -1,4 +1,4 @@
-const client = mqtt.connect('ws://' + location.hostname + ':9001');
+const client = mqtt.connect('ws://' + location.hostname + ':7081');
 client.on('connect', () => console.log('MQTT connected'));
 client.on('error', err => console.error('MQTT error:', err));
 
@@ -52,8 +52,8 @@ function createStick(areaId, knobId, topic, autoCenterX, autoCenterY) {
     return { movePointer, resetKnob, area };
 }
 
-const leftStick = createStick('left-area', 'left-knob', 'control/remote_control_device/left_stick', true, true);
-const rightStick = createStick('right-area', 'right-knob', 'control/remote_control_device/right_stick', true, false);
+const leftStick = createStick('left-area', 'left-knob', 'control/remote_control_interface/left_stick', true, true);
+const rightStick = createStick('right-area', 'right-knob', 'control/remote_control_interface/right_stick', true, false);
 
 const activeTouches = {}; // touchId → { side: 'left'|'right', startX, startY }
 

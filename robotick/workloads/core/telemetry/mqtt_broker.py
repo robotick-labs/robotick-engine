@@ -5,7 +5,7 @@ import tempfile
 import os
 
 class MqttBroker:
-    def __init__(self, mqtt_port=1883, websocket_port=9001):
+    def __init__(self, mqtt_port, websocket_port):
         self.mqtt_port = mqtt_port
         self.websocket_port = websocket_port
         self._process = None

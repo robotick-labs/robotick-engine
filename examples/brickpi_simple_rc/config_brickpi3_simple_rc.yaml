@@ -1,6 +1,6 @@
 workloads:
 
-  - type: RemoteControlDevice
+  - type: RemoteControlInterface
 
   - type: DeadZoneScaleAndSplitTransformer
     name: deadzone_transformer
@@ -9,7 +9,7 @@ workloads:
       # scale_x: -0.15
       # scale_y: 0.4
       data_bindings:
-        - input_vector <- remote_control_device.left_stick
+        - input_vector <- remote_control_interface.left_stick
         - output_y -> steering_mixer.input_speed
         - output_x -> steering_mixer.input_turn_rate
 
@@ -18,11 +18,11 @@ workloads:
     args:
       power_scale_both: 100.0
       data_bindings:
-        - output_left_motor -> brickpi3_device.motor_a_power
-        - output_right_motor -> brickpi3_device.motor_d_power
+        - output_left_motor -> brickpi3_interface.motor_a_power
+        - output_right_motor -> brickpi3_interface.motor_d_power
 
-  - type: BrickPi3Device
-    name: brickpi3_device
+  - type: BrickPi3Interface
+    name: brickpi3_interface
     args:
       tick_rate_hz: 100
       sensor_1_type: EV3_GYRO_ABS_DPS
@@ -31,9 +31,6 @@ workloads:
 
   - type: MqttUpdate
     name: comms
-    args:
-      broker_host: localhost
-      broker_port: 1883
 
   - type: ConsoleUpdate
     name: console

@@ -8,7 +8,7 @@ except ImportError:
     print("[WARNING] brickpi3 module not found, using mock implementation")
     from . import brickpi3_mock as brickpi3
 
-class BrickPi3Device(WorkloadBase):
+class BrickPi3Interface(WorkloadBase):
     def __init__(self):
         super().__init__()
         self.tick_rate_hz = 100
@@ -61,9 +61,9 @@ class BrickPi3Device(WorkloadBase):
                     self.sensor_types[port] = sensor_type_enum
                     self.state.readable[attr] = None
                 except AttributeError:
-                    print(f"[BrickPi3Device] Invalid sensor type: {sensor_type_str}")
+                    print(f"[BrickPi3Interface] Invalid sensor type: {sensor_type_str}")
                 except Exception as e:
-                    print(f"[BrickPi3Device] Error setting sensor on port {port}: {e}")
+                    print(f"[BrickPi3Interface] Error setting sensor on port {port}: {e}")
         
         self._state_internal_copy = copy.deepcopy(self.state)
 
@@ -85,7 +85,7 @@ class BrickPi3Device(WorkloadBase):
                     self.bp.set_motor_power(port, desired_power)
                     self.motor_power_states[port] = desired_power
                 except Exception as e:
-                    print(f"[BrickPi3Device] Motor set error on port {port}: {e}")
+                    print(f"[BrickPi3Interface] Motor set error on port {port}: {e}")
 
         # Read sensors last (see note above)
         for i, port in enumerate(self.sensor_ports):
@@ -105,4 +105,4 @@ class BrickPi3Device(WorkloadBase):
 
         self.state.readable = copy.deepcopy(self._state_internal_copy.readable)
 
-register_workload_type(BrickPi3Device)
+register_workload_type(BrickPi3Interface)

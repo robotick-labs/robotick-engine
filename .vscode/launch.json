@@ -5,17 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: ev3-interface",
+            "name": "Example: mujoco_balancing_robot",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/ev3-interface.py",
+            "program": "${workspaceFolder}/examples/mujoco_balancing_robot/main.py",
+            "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
-        },        
+        },
         {
-            "name": "Python Debugger: Current File",
+            "name": "Example: brickpi_simple_rc",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/examples/brickpi_simple_rc/main.py",
+            "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
         }
     ]
