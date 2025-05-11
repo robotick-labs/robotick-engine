@@ -123,6 +123,9 @@ class WorkloadBase:
     def tick(self, time_delta):
         pass
 
+    def post_tick(self, time_delta):
+        pass
+
     def _run_loop(self):
         last_time = time.perf_counter()
 
@@ -146,6 +149,7 @@ class WorkloadBase:
                         child_start = time.perf_counter()
                         child.pre_tick(time_delta)
                         child.tick(time_delta)
+                        child.post_tick(time_delta)
                         child._last_tick_duration_self = time.perf_counter() - child_start
 
                 child_future = executor.submit(child_task)
@@ -158,6 +162,8 @@ class WorkloadBase:
             # Wait for child task to finish before next cycle
             if child_future:
                 child_future.result()
+
+            self.post_tick(time_delta)
 
             # Calculate cycle timing
             tick_interval = self.get_tick_interval()

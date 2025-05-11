@@ -18,7 +18,8 @@ class ConsoleUpdate(WorkloadBase):
         table = Table(title="== Robotick Console ==")
         table.add_column("Workload Type")
         table.add_column("Workload Name")
-        table.add_column("State(s)")
+        table.add_column("Input(s)")
+        table.add_column("Output(s)")
         table.add_column("Tick / ms")
         table.add_column("Goal / ms")
         table.add_column("%")
@@ -41,19 +42,22 @@ class ConsoleUpdate(WorkloadBase):
                 self.add_instance_to_table(table, child, " > " if first_child else " > " )
                 first_child = False
 
-        states = []
-
-        for state in inst.get_readable_states():
+        state_inputs = []
+        for state in inst.get_writable_states():
             value = inst.safe_get(state)
             value_str = self._format_payload(value)
-            states.append(f"{state}={value_str}")
+            state_inputs.append(f"{state}={value_str}")
+        state_inputs_str = ", ".join(state_inputs)
 
-        for state in inst.get_writable_states():
-            if state not in inst.get_readable_states():
+        state_outputs = []
+        for state in inst.get_readable_states():
+            if state not in inst.get_writable_states():
+                # ^- strictly speaking, writable states are readable too, but neater not to indicate this
+                #    on console - just show each once only
                 value = inst.safe_get(state)
                 value_str = self._format_payload(value)
-                states.append(f"{state}={value_str}")
-        state_str = ", ".join(states)
+                state_outputs.append(f"{state}={value_str}")
+        state_outputs_str = ", ".join(state_outputs)
 
         duration_str = "-"
         duration_goal_str = "-"
@@ -70,7 +74,7 @@ class ConsoleUpdate(WorkloadBase):
             duration_self = inst.get_last_tick_duration_self() * 1000.0
             duration_str = f"{duration_self:.2f}"
 
-        table.add_row(prefix + inst._type_name, getattr(inst, 'name', repr(inst)) or "-", state_str, duration_str, duration_goal_str, duration_percent_str)
+        table.add_row(prefix + inst._type_name, getattr(inst, 'name', repr(inst)) or "-", state_inputs_str, state_outputs_str, duration_str, duration_goal_str, duration_percent_str)
 
         if inst._tick_children is not None:
             table.add_row()  # adds a fully blank row

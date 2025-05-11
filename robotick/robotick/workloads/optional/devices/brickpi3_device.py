@@ -1,5 +1,6 @@
 from ....framework.registry import *
 from ....framework.workload_base import WorkloadBase
+import copy
 
 try:
     import brickpi3
@@ -12,13 +13,11 @@ class BrickPi3Device(WorkloadBase):
         super().__init__()
         self.tick_rate_hz = 100
 
-        self._buffer_a = {}
-        self._buffer_b = {}
-        self._current_buffer = self._buffer_a
-        self._next_buffer = self._buffer_b
-
+        self._state_internal_copy = None
+    
+    def pre_load(self):
         self.bp = brickpi3.BrickPi3()
-        
+
         self.motor_ports = {
             'a': self.bp.PORT_A,
             'b': self.bp.PORT_B,
@@ -30,11 +29,16 @@ class BrickPi3Device(WorkloadBase):
         self.motor_power_states = {}
         self.sensor_types = {}
 
+        # copy motor and sensor settings to writable states (they are state-values too since it might be useful)
+        # to be able to change them dynamically at runtime)
+
         for p in ['a', 'b', 'c', 'd']:
-            self.state.writable[f"motor_{p}_enabled"] = 0
+            attr = f"motor_{p}_enabled"
+            self.state.writable[attr] = getattr(self, attr, 0)
 
         for i in range(4):
-            self.state.writable[f"sensor_{i+1}_type"] = "NONE"
+            attr = f"sensor_{i+1}_type"
+            self.state.writable[attr] = getattr(self, attr, "NONE")
 
     def load(self):
         self.bp.reset_all()
@@ -47,7 +51,8 @@ class BrickPi3Device(WorkloadBase):
                 self.motor_power_states[port] = 0
 
         for i, port in enumerate(self.sensor_ports):
-            sensor_type_str = self.safe_get(f"sensor_{i+1}_type")
+            attr_sensor_type = f"sensor_{i+1}_type"
+            sensor_type_str = getattr(self, attr_sensor_type, "NONE")
             attr = f"sensor_{i+1}_state"
             if sensor_type_str != "NONE":
                 try:
@@ -59,22 +64,30 @@ class BrickPi3Device(WorkloadBase):
                     print(f"[BrickPi3Device] Invalid sensor type: {sensor_type_str}")
                 except Exception as e:
                     print(f"[BrickPi3Device] Error setting sensor on port {port}: {e}")
+        
+        self._state_internal_copy = copy.deepcopy(self.state)
 
     def pre_tick(self, time_delta):
-        self._current_buffer, self._next_buffer = self._next_buffer, self._current_buffer
+        # Copy current writable state so that this tick can safely apply the last tick’s control inputs,
+        # and prepare next tick’s outputs — without interfering with any child-workloads using previous sensor data
+        # or setting controls for next tick
+
+        self._state_internal_copy.writable = copy.deepcopy(self.state.writable)
 
     def tick(self, time_delta):
+        # Apply motor commands first, allowing time for hardware to react,
+        # so subsequent sensor reads reflect the new control state.
         for p, port in self.motor_ports.items():
             if port in self.motor_power_states:
                 attr = f"motor_{p}_power"
-                desired_power = self.safe_get(attr)
+                desired_power = self._state_internal_copy.writable[attr] or 0
                 try:
                     self.bp.set_motor_power(port, desired_power)
                     self.motor_power_states[port] = desired_power
                 except Exception as e:
                     print(f"[BrickPi3Device] Motor set error on port {port}: {e}")
-                self._next_buffer[attr] = desired_power
 
+        # Read sensors last (see note above)
         for i, port in enumerate(self.sensor_ports):
             if port in self.sensor_types and self.sensor_types[port] != brickpi3.BrickPi3.SENSOR_TYPE.NONE:
                 attr = f"sensor_{i+1}_state"
@@ -84,7 +97,12 @@ class BrickPi3Device(WorkloadBase):
                         value = {'abs': value[0], 'dps': value[1]}
                 except Exception as e:
                     value = 'Error'
-                self.safe_set(attr, value)
-                self._next_buffer[attr] = value
+                self._state_internal_copy.readable[attr] = value
+
+    def post_tick(self, time_delta):
+        # Publish updated sensor readings from internal state to shared readable state,
+        # making them visible to other child-workloads next tick
+
+        self.state.readable = copy.deepcopy(self._state_internal_copy.readable)
 
 register_workload_type(BrickPi3Device)
