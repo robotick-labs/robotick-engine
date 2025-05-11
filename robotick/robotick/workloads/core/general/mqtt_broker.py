@@ -32,6 +32,17 @@ class MqttBroker:
         self._config_file = temp.name
         print(f"MqttBroker - created temp config at {self._config_file}")
 
+    def wait_for_ports_open(self, timeout=5.0, interval=0.1):
+        """Wait until both MQTT and WebSocket ports are open or timeout occurs."""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            mqtt_ok = self.is_port_open(self.mqtt_port)
+            ws_ok = self.is_port_open(self.websocket_port)
+            if mqtt_ok and ws_ok:
+                return True
+            time.sleep(interval)
+        return False
+
     def start(self):
         if self.is_port_open(self.mqtt_port) or self.is_port_open(self.websocket_port):
             print(f"MqttBroker - using existing broker on ports {self.mqtt_port}/{self.websocket_port}")
@@ -46,15 +57,14 @@ class MqttBroker:
 
         try:
             self._process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            time.sleep(0.5)  # Give it time to start
 
-            mqtt_ok = self.is_port_open(self.mqtt_port)
-            ws_ok = self.is_port_open(self.websocket_port)
-
-            if mqtt_ok and ws_ok:
+            if self.wait_for_ports_open():
                 print(f"MqttBroker - started new broker on ports {self.mqtt_port} (MQTT) and {self.websocket_port} (WebSocket)")
             else:
-                print("MqttBroker - failed to start broker on one or both ports")
+                print(f"MqttBroker - failed to start broker on port(s): "
+                    f"{'[mqtt]' if not self.is_port_open(self.mqtt_port) else ''} "
+                    f"{'[websocket]' if not self.is_port_open(self.websocket_port) else ''}")
+
         except FileNotFoundError:
             print("Mosquitto is not installed or not in PATH. Please install it (e.g., `sudo apt install mosquitto`).")
 

@@ -3,7 +3,7 @@ import pkgutil
 import yaml
 from concurrent.futures import ThreadPoolExecutor
 
-import robotick.workloads 
+import robotick.workloads.core 
 
 from .registry import *
 
@@ -20,8 +20,10 @@ def auto_import_workloads(package):
 def load(config_file):
     """Load workloads from YAML config and start them."""
 
-    auto_import_workloads(robotick.workloads)
+    print("*** Composer - importing workload modules... ***")
+    auto_import_workloads(robotick.workloads.core)
 
+    print(f"*** Composer - loading config '{config_file}'... ***")
     with open(config_file) as f:
         config = yaml.safe_load(f)  # ← use safe_load for security
 
@@ -36,7 +38,8 @@ def load(config_file):
 
         instance = cls()
 
-        setattr(instance, "name", name_arg)
+        if name_arg:
+            setattr(instance, "name", name_arg)
         
         for key, value in args.items():
             setattr(instance, key, value)
@@ -52,23 +55,28 @@ def load(config_file):
     all_workloads = get_all_workload_instances() 
     all_instances = [instance for instances in all_workloads.values() for instance in instances]
 
+    print("*** Composer - pre-load... ***")
     for inst in all_instances:
         inst.pre_load()
 
     # allow each instance to do independent time-consuming loading - multithreaded
+    print("*** Composer - load... ***")
     with ThreadPoolExecutor() as executor:
         executor.map(lambda inst: inst.load(), all_instances)
 
     # allow instances to do fixup (e.g. to each other) - single-threaded
+    print("*** Composer - setup... ***")
     for inst in all_instances:
         if hasattr(inst, 'data_bindings') and inst.data_bindings is not None:
             inst.parse_bindings(inst.data_bindings, all_workloads)
         inst.setup()
 
+    print("*** Composer - start... ***")
     for inst in all_instances:
         inst.start()
 
     def stop_all():
+        print("*** Composer - stop... ***")
         for inst in all_instances:
             inst.stop()
 

@@ -1,4 +1,5 @@
 import os
+import socket
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from ....framework.workload_base import WorkloadBase
@@ -15,6 +16,18 @@ class RemoteControlDevice(WorkloadBase):
         self._server_thread = None
         self._httpd = None
 
+    def get_local_ip(self):
+        """Gets the IP address that remote machines can use to connect to this host."""
+        try:
+            # Connect to a dummy address to determine the preferred outbound interface
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 80))  # Doesn't actually send packets
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return '127.0.0.1'
+        
     def setup(self):
         # Set directory to serve (relative to script location)
         web_dir = os.path.join(os.path.dirname(__file__), 'remote_control_device_web')
@@ -24,7 +37,10 @@ class RemoteControlDevice(WorkloadBase):
         self._httpd = ThreadingHTTPServer(('0.0.0.0', 8080), handler)
         self._server_thread = threading.Thread(target=self._httpd.serve_forever, daemon=True)
         self._server_thread.start()
-        print("RemoteControlDevice - web server running at http://localhost:8080")
+
+        ip = self.get_local_ip()
+
+        print(f"RemoteControlDevice - web server running at http://{ip}:8080")
 
     def stop(self):
         if self._httpd:

@@ -11,13 +11,14 @@ class BrickPi3Device(WorkloadBase):
     def __init__(self):
         super().__init__()
         self.tick_rate_hz = 100
-        self.bp = brickpi3.BrickPi3()
 
         self._buffer_a = {}
         self._buffer_b = {}
         self._current_buffer = self._buffer_a
         self._next_buffer = self._buffer_b
 
+        self.bp = brickpi3.BrickPi3()
+        
         self.motor_ports = {
             'a': self.bp.PORT_A,
             'b': self.bp.PORT_B,
@@ -35,12 +36,12 @@ class BrickPi3Device(WorkloadBase):
         for i in range(4):
             self.state.writable[f"sensor_{i+1}_type"] = "NONE"
 
-        register_workload(self)
-
-    def setup(self):
+    def load(self):
         self.bp.reset_all()
+
         for p, port in self.motor_ports.items():
-            if self.safe_get(f"motor_{p}_enabled"):
+            attr_enabled = f"motor_{p}_enabled"
+            if getattr(self, attr_enabled, False):
                 attr = f"motor_{p}_power"
                 self.state.writable[attr] = 0
                 self.motor_power_states[port] = 0

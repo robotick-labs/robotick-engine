@@ -41,7 +41,7 @@ class TransformerBase(WorkloadBase):
         return super().safe_get(attr)
 
     def _trigger_transform(self):
-        args = [super().safe_get(name) for name in self._input_arg_names]
+        args = [super(TransformerBase, self).safe_get(name) for name in self._input_arg_names]
         result = self.transform(*args)
 
         if isinstance(result, tuple):

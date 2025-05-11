@@ -8,7 +8,6 @@ class StateContainer:
     def __init__(self):
         self.readable = {}
         self.writable = {}
-        self.name = re.sub(r'(?<!^)(?=[A-Z])', '_', self.__class__.__name__).lower()
 
     def get_readable_states(self):
         return list(self.readable.keys()) + list(self.writable.keys())
@@ -33,6 +32,7 @@ class StateContainer:
 
 class WorkloadBase:
     def __init__(self):
+        self.name = re.sub(r'(?<!^)(?=[A-Z])', '_', self.__class__.__name__).lower()
         self._stop_event = threading.Event()
         self.tick_rate_hz = 10
         self.tick_parent_name = None

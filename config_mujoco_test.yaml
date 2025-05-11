@@ -44,7 +44,8 @@ workloads:
   - type: SteeringMixerTransformer
     name: steering_mixer
     args:
-      power_scale: 100.0
+      power_scale_both: 100.0
+      power_scale_left: -1.0
       data_bindings:
         - output_left_motor -> mujoco_device.motor_left_wheel
         - output_right_motor -> mujoco_device.motor_right_wheel
@@ -64,5 +65,3 @@ workloads:
 
   - type: ConsoleUpdate
     name: console
-    args:
-      tick_rate_hz: 2
