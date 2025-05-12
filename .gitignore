@@ -2,4 +2,4 @@ robotick/__pycache__/*
 *.pyc
 robotick.egg-info
 */MUJOCO_LOG.TXT
-
+.obsidian/*
