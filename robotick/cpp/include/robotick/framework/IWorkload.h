@@ -1,6 +1,8 @@
 #pragma once
 
-#include "robotick/framework/api.hpp"
+#include "robotick/framework/api.h"
+
+#include <string>
 
 namespace robotick
 {
@@ -20,11 +22,16 @@ namespace robotick
     {
     public:
         virtual ~IWorkload() = default;
+
+        virtual double get_tick_rate_hz() = 0;
+        virtual std::string get_name() = 0;
+        
         virtual void pre_load() {}
         virtual void load() {}
         virtual void setup() {}
         virtual void pre_tick() {}
         virtual void tick(const InputBlock &in, OutputBlock &out) = 0;
         virtual void post_tick() {}
+        virtual void stop() {}  // optional override for workloads with threads
     };
 }

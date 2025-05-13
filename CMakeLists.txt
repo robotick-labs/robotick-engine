@@ -10,7 +10,7 @@ include_directories(${CMAKE_SOURCE_DIR}/robotick/cpp/include)
 # Core source files
 file(GLOB_RECURSE CORE_SOURCES
     ${CMAKE_SOURCE_DIR}/robotick/cpp/src/framework/*.cpp
-    ${CMAKE_SOURCE_DIR}/robotick/cpp/include/robotick/framework/*.hpp
+    ${CMAKE_SOURCE_DIR}/robotick/cpp/include/robotick/framework/*.h
 )
 
 # Build the shared library for Python and plugin use
