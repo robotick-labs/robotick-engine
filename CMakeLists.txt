@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(robotick_core)
+project(robotick_framework)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -9,19 +9,19 @@ include_directories(${CMAKE_SOURCE_DIR}/robotick/cpp/include)
 
 # Core source files
 file(GLOB_RECURSE CORE_SOURCES
-    ${CMAKE_SOURCE_DIR}/robotick/cpp/src/core/*.cpp
-    ${CMAKE_SOURCE_DIR}/robotick/cpp/include/robotick/core/*.hpp
+    ${CMAKE_SOURCE_DIR}/robotick/cpp/src/framework/*.cpp
+    ${CMAKE_SOURCE_DIR}/robotick/cpp/include/robotick/framework/*.hpp
 )
 
 # Build the shared library for Python and plugin use
-add_library(robotick_core SHARED ${CORE_SOURCES})
-set_target_properties(robotick_core PROPERTIES OUTPUT_NAME robotick_core)
+add_library(robotick_framework SHARED ${CORE_SOURCES})
+set_target_properties(robotick_framework PROPERTIES OUTPUT_NAME robotick_framework)
 
 # Optional: Build a test app
 add_executable(robotick_main ${CMAKE_SOURCE_DIR}/examples/cpp/robotick_main.cpp)
-target_link_libraries(robotick_main PRIVATE robotick_core)
+target_link_libraries(robotick_main PRIVATE robotick_framework)
 
-target_compile_definitions(robotick_core PRIVATE ROBOTICK_EXPORTS)
+target_compile_definitions(robotick_framework PRIVATE ROBOTICK_EXPORTS)
 
 # Plugins (if any)
 file(GLOB_RECURSE PLUGIN_SOURCES src/plugins/*.cpp)

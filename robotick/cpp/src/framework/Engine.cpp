@@ -1,12 +1,12 @@
-#include "robotick/core/core.hpp"
-#include "robotick/core/WorkloadGroup.hpp"
+#include "robotick/framework/Engine.hpp"
+#include "robotick/framework/WorkloadGroup.hpp"
 #include <thread>
 #include <chrono>
 #include <iostream>
 
 namespace robotick
 {
-    void run_ticker(WorkloadGroup& group, int rate_hz) {
+    void Engine::start(WorkloadGroup& group, int rate_hz) {
         InputBlock input{ 1.0, 2.0 }; // dummy values
         group.setup_all();
     

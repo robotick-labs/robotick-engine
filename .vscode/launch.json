@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Example: mujoco_balancing_robot",
+            "name": "Example: Python - mujoco_balancing_robot",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/examples/mujoco_balancing_robot/main.py",
@@ -13,12 +13,24 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Example: brickpi_simple_rc",
+            "name": "Example: Python - brickpi_simple_rc",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/examples/brickpi_simple_rc/main.py",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
+        },
+        {
+          "name": "Example: C++ - robotick_main",
+          "type": "cppvsdbg",
+          "request": "launch",
+          "program": "${workspaceFolder}/build/Debug/robotick_main.exe",  // or just robotick_main on Linux
+          "preLaunchTask": "Build Example: C++ - robotick_main",
+          "args": [],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [],
+          "console": "integratedTerminal"
         }
     ]
 }
