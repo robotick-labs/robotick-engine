@@ -2,20 +2,19 @@
 
 #include "robotick/framework/api.h"
 
+#include <unordered_map>
 #include <string>
 
 namespace robotick
-{
+{    
     struct InputBlock
     {
-        double x = 0.0;
-        double y = 0.0;
+        std::unordered_map<std::string, double> writable;
     };
-
+    
     struct OutputBlock
     {
-        double result = 0.0;
-        double state = 0.0;
+        std::unordered_map<std::string, double> readable;
     };
 
     class ROBOTICK_API IWorkload
@@ -30,7 +29,7 @@ namespace robotick
         virtual void load() {}
         virtual void setup() {}
         virtual void pre_tick() {}
-        virtual void tick(const InputBlock &in, OutputBlock &out) = 0;
+        virtual void tick(const InputBlock &in, OutputBlock &out, double time_delta) = 0;
         virtual void post_tick() {}
         virtual void stop() {}  // optional override for workloads with threads
     };

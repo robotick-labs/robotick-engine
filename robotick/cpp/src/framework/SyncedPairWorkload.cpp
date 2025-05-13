@@ -25,6 +25,8 @@ namespace robotick
         std::atomic<bool> stop = false;
         std::atomic<int> active_slot = 0;
 
+        double time_delta = 0.0;
+
         std::condition_variable cv;
         std::mutex mutex;
         bool ready = false;
@@ -74,22 +76,23 @@ namespace robotick
                 InputBlock in = m_impl->buffers[inactive_slot].in;
                 OutputBlock out;
 
-                m_impl->secondary->tick(in, out);
+                m_impl->secondary->tick(in, out, m_impl->time_delta);
                 m_impl->buffers[inactive_slot].out = out;
             } });
     }
 
-    void SyncedPairWorkload::tick(const InputBlock &in, OutputBlock &out)
+    void SyncedPairWorkload::tick(const InputBlock &in, OutputBlock &out, double time_delta)
     {
         m_impl->buffers[m_impl->active_slot].in = in;
 
         {
             std::lock_guard<std::mutex> lock(m_impl->mutex);
+            m_impl->time_delta = time_delta;
             m_impl->ready = true;
         }
         m_impl->cv.notify_one();
 
-        m_impl->primary->tick(in, out);
+        m_impl->primary->tick(in, out, time_delta);
         m_impl->active_slot = 1 - m_impl->active_slot;
     }
 

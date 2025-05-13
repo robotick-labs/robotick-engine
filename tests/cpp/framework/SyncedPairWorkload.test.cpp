@@ -13,7 +13,7 @@ public:
     FastSecondaryWorkload(std::string name)
         : WorkloadBase(std::move(name), 0) {}
 
-    void tick(const InputBlock&, OutputBlock&) override {
+    void tick(const InputBlock&, OutputBlock&, double) override {
         ++tick_count;
     }
 };
@@ -25,7 +25,7 @@ public:
     PrimaryTriggerWorkload(std::string name)
         : WorkloadBase(std::move(name), 50.0) {}
 
-    void tick(const InputBlock&, OutputBlock&) override {
+    void tick(const InputBlock&, OutputBlock&, double) override {
         ++trigger_count;
     }
 };

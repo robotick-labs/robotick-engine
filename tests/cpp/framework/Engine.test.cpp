@@ -12,7 +12,7 @@ public:
     CountingWorkload(std::string name, double hz)
         : WorkloadBase(std::move(name), hz) {}
 
-    void tick(const InputBlock&, OutputBlock&) override {
+    void tick(const InputBlock&, OutputBlock&, double) override {
         ++tick_count;
     }
 };

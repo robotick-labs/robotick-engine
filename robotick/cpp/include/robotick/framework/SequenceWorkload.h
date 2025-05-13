@@ -17,7 +17,7 @@ namespace robotick
 
         void add(std::shared_ptr<IWorkload> workload);
         double get_tick_rate_hz() override;
-        void tick(const InputBlock &in, OutputBlock &out) override;
+        void tick(const InputBlock &in, OutputBlock &out, double time_delta) override;
 
     private:
         ROBOTICK_DECLARE_PIMPL();

@@ -27,11 +27,11 @@ namespace robotick
         return m_impl->sequence.empty() ? 0.0 : m_impl->sequence.front()->get_tick_rate_hz();
     }
 
-    void SequenceWorkload::tick(const InputBlock &in, OutputBlock &out)
+    void SequenceWorkload::tick(const InputBlock &in, OutputBlock &out, double time_delta)
     {
         for (auto &w : m_impl->sequence)
         {
-            w->tick(in, out);
+            w->tick(in, out, time_delta);
         }
     }
 

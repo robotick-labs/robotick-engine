@@ -33,6 +33,22 @@ foreach(plugin_file ${PLUGIN_SOURCES})
     target_include_directories(${plugin_name} PRIVATE include)
 endforeach()
 
+# Dependencies:
+
+include(FetchContent)
+
+FetchContent_Declare(
+  pybind11
+  GIT_REPOSITORY https://github.com/pybind/pybind11.git
+  GIT_TAG        v2.11.1  # or whatever version you want
+)
+
+FetchContent_MakeAvailable(pybind11)
+
+target_link_libraries(robotick_framework PRIVATE pybind11::embed)
+
+# Test-framework:
+
 option(ROBOTICK_BUILD_TESTS "Build Robotick tests" ON)
 
 if(ROBOTICK_BUILD_TESTS)

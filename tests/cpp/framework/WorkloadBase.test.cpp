@@ -7,7 +7,7 @@ using namespace robotick;
 class DummyWorkload : public WorkloadBase {
 public:
     DummyWorkload(std::string name, double rate) : WorkloadBase(std::move(name), rate) {}
-    void tick(const InputBlock&, OutputBlock&) override {}
+    void tick(const InputBlock&, OutputBlock&, double) override {}
 };
 
 TEST_CASE("WorkloadBase stores name and tick rate") {

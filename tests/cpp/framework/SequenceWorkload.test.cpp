@@ -11,7 +11,7 @@ public:
     OrderTrackingWorkload(std::string name, int& r, int expected)
         : WorkloadBase(std::move(name), 0), ref(r), expected(expected) {}
 
-    void tick(const InputBlock&, OutputBlock&) override {
+    void tick(const InputBlock&, OutputBlock&, double) override {
         REQUIRE(ref == expected - 1);
         ref = expected;
     }
@@ -31,7 +31,7 @@ TEST_CASE("SequenceWorkload ticks children in order") {
 
     InputBlock in;
     OutputBlock out;
-    seq.tick(in, out);
+    seq.tick(in, out, 0.0);
 
     REQUIRE(progress == 3);
 }

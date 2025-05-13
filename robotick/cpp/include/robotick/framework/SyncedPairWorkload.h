@@ -20,7 +20,7 @@ namespace robotick
         double get_tick_rate_hz() override;
         void load() override;
         void setup() override;
-        void tick(const InputBlock &in, OutputBlock &out) override;
+        void tick(const InputBlock &in, OutputBlock &out, double time_delta) override;
         void stop() override;
 
     private:

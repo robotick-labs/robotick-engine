@@ -21,16 +21,40 @@
             "console": "integratedTerminal"
         },
         {
-          "name": "Example: C++ - robotick_main",
-          "type": "cppvsdbg",
-          "request": "launch",
-          "program": "${workspaceFolder}/build/Debug/robotick_main.exe",  // or just robotick_main on Linux
-          "preLaunchTask": "Build Example: C++ - robotick_main",
-          "args": [],
-          "stopAtEntry": false,
-          "cwd": "${workspaceFolder}",
-          "environment": [],
-          "console": "integratedTerminal"
+            "name": "Example: C++ - robotick_main",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/robotick_main.exe", // or just robotick_main on Linux
+            "preLaunchTask": "Build Example: C++ - robotick_main",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug PythonWorkload Tests",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/cpp/Debug/robotick_tests.exe", // or your actual test binary
+            "args": [], // optional: pass specific test names/tags here
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb", // for Linux or WSL
+            // "MIMode": "lldb",       // for macOS
+            // "miDebuggerPath": "/usr/bin/gdb", // customize if needed
+            // For Windows with MSVC:
+            "type": "cppvsdbg", // use this instead of cppdbg
+            "preLaunchTask": "build", // optional: hook up to a CMake or build task
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
         }
     ]
 }

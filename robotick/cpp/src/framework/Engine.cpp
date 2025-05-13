@@ -88,11 +88,15 @@ namespace robotick
                 InputBlock in;
                 OutputBlock out;
 
+                auto last_time = steady_clock::now();
+
                 while (!m_impl->stop_flag) {
                     auto start_time = steady_clock::now();
+                    double time_delta = duration<double>(start_time - last_time).count();
+                    last_time = start_time;
 
                     w->pre_tick();
-                    w->tick(in, out);
+                    w->tick(in, out, time_delta);
                     w->post_tick();
 
                     std::this_thread::sleep_until(start_time + tick_interval);
