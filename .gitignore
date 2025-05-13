@@ -3,3 +3,5 @@ robotick/__pycache__/*
 robotick.egg-info
 */MUJOCO_LOG.TXT
 .obsidian/*
+build/*
+robotick/cpp/build/*
