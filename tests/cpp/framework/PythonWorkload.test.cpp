@@ -6,13 +6,13 @@
 using namespace robotick;
 
 TEST_CASE("PythonWorkload - Constructs with valid Python class") {
-    CHECK_NOTHROW(PythonWorkload("hello", "tests.python.hello_workload", "HelloWorkload", 10.0));
+    CHECK_NOTHROW(PythonWorkload("hello", "robotick.workloads.optional.test.hello_workload", "HelloWorkload", 10.0));
 }
 
 TEST_CASE("PythonWorkload - Fails gracefully with invalid module or class") {
     CHECK_NOTHROW(PythonWorkload("invalid", "nonexistent_module", "BogusClass", 10.0));
 
-    PythonWorkload wl("fail_class", "tests.python.hello_workload", "NoSuchClass", 10.0);
+    PythonWorkload wl("fail_class", "robotick.workloads.optional.test.hello_workload", "NoSuchClass", 10.0);
 
     InputBlock in;
     OutputBlock out;
@@ -20,7 +20,7 @@ TEST_CASE("PythonWorkload - Fails gracefully with invalid module or class") {
 }
 
 TEST_CASE("PythonWorkload - tick() calls Python and receives output") {
-    PythonWorkload wl("hello", "tests.python.hello_workload", "HelloWorkload", 10.0);
+    PythonWorkload wl("hello", "robotick.workloads.optional.test.hello_workload", "HelloWorkload", 10.0);
 
     InputBlock in;
     in.writable["dummy"] = 123.0;
@@ -33,7 +33,7 @@ TEST_CASE("PythonWorkload - tick() calls Python and receives output") {
 }
 
 TEST_CASE("PythonWorkload - tick() handles missing output gracefully") {
-    PythonWorkload wl("hello", "tests.python.hello_workload", "HelloWorkload", 10.0);
+    PythonWorkload wl("hello", "robotick.workloads.optional.test.hello_workload", "HelloWorkload", 10.0);
 
     InputBlock in;
     in.writable["no_output"] = 1.0;
@@ -46,7 +46,7 @@ TEST_CASE("PythonWorkload - tick() handles missing output gracefully") {
 }
 
 TEST_CASE("PythonWorkload - tick() handles Python error gracefully") {
-    PythonWorkload wl("hello", "tests.python.hello_workload", "HelloWorkload", 10.0);
+    PythonWorkload wl("hello", "robotick.workloads.optional.test.hello_workload", "HelloWorkload", 10.0);
 
     InputBlock in;
     in.writable["force_error"] = 1.0;
@@ -59,7 +59,7 @@ TEST_CASE("PythonWorkload - tick() handles Python error gracefully") {
 }
 
 TEST_CASE("PythonWorkload - tick() works with empty input and no crash") {
-    PythonWorkload wl("hello", "tests.python.hello_workload", "HelloWorkload", 10.0);
+    PythonWorkload wl("hello", "robotick.workloads.optional.test.hello_workload", "HelloWorkload", 10.0);
 
     InputBlock in;
     OutputBlock out;
@@ -69,7 +69,7 @@ TEST_CASE("PythonWorkload - tick() works with empty input and no crash") {
 }
 
 TEST_CASE("PythonWorkload - tick() propagates multiple float outputs correctly") {
-    PythonWorkload wl("hello", "tests.python.hello_workload", "HelloWorkload", 10.0);
+    PythonWorkload wl("hello", "robotick.workloads.optional.test.hello_workload", "HelloWorkload", 10.0);
 
     InputBlock in;
     in.writable["output_all"] = 1.0;

@@ -1,6 +1,7 @@
 {
     "cmake.sourceDirectory": "${workspaceFolder}",
     "cmake.generator": "Visual Studio 17 2022",
+    "cmake.testArgs": ["--cwd", "${workspaceFolder}"],
     "cmake.configureArgs": [
       "-A",
       "x64"
