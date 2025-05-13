@@ -3,6 +3,7 @@
 // ===============================
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
+#include "robotick/framework/ThreadUtils.h"
 #include <chrono>
 #include <windows.h>
 #include <processthreadsapi.h>
@@ -63,13 +64,6 @@ namespace robotick
         {
             w->setup();
         }
-    }
-
-    void set_thread_name(const std::string &name)
-    {
-        auto hThread = GetCurrentThread();
-        std::wstring wname(name.begin(), name.end());
-        SetThreadDescription(hThread, wname.c_str());
     }
 
     void Engine::start()
