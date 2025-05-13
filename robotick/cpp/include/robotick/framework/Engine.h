@@ -17,16 +17,13 @@ namespace robotick
         Engine();
         ~Engine();
 
-        void load(const Model &model);  // multi-threaded workload load()
-        void setup(const Model &model); // single-threaded workload setup()
-        void start(const Model &model); // main tick loop
-        void stop();
+        void load(const Model &model); // multi-threaded workload load()
+        void setup();                  // single-threaded workload setup()
+        void start();                  // main tick loop
+        void stop();                   // single-thread stop() - cleanly terminates all threads
 
     private:
-        const Model *m_model = nullptr;
-
-        std::vector<std::thread> m_threads;
-        std::atomic<bool> m_stop_flag = false;
+        ROBOTICK_DECLARE_PIMPL();
     };
 
 }

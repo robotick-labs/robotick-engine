@@ -2,7 +2,7 @@
 
 #include "robotick/framework/api.h"
 #include "robotick/framework/WorkloadBase.h"
-#include <string>
+#include <memory>
 
 namespace robotick
 {
@@ -11,13 +11,12 @@ namespace robotick
     {
     public:
         PythonWorkload(std::string name, std::string module, std::string cls, double tick_rate_hz);
-        virtual ~PythonWorkload();
+        ~PythonWorkload() override;
 
         void tick(const InputBlock &in, OutputBlock &out) override;
 
     private:
-        std::string m_module;
-        std::string m_class;
+        ROBOTICK_DECLARE_PIMPL();
     };
 
 }

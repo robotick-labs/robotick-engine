@@ -49,9 +49,9 @@ int main() {
     Model model = build_model();
 
     Engine engine;
-    engine.load(model);    // multithreaded loading
-    engine.setup(model);   // setup (single-threaded)
-    engine.start(model);   // tick loop
+    engine.load(model); // multithreaded loading
+    engine.setup();     // setup (single-threaded)
+    engine.start();     // tick loop
 
     while (!g_exit_requested) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));

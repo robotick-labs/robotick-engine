@@ -1,32 +1,26 @@
+// ===============================
+// SequenceWorkload.h
+// ===============================
 #pragma once
 
 #include "robotick/framework/WorkloadBase.h"
-#include <vector>
 #include <memory>
 
-namespace robotick {
+namespace robotick
+{
 
-    class SequenceWorkload : public WorkloadBase {
+    class ROBOTICK_API SequenceWorkload : public WorkloadBase
+    {
     public:
-        SequenceWorkload(std::string name)
-        : WorkloadBase(std::move(name)) {}
+        SequenceWorkload(std::string name);
+        ~SequenceWorkload() override;
 
-        void add(std::shared_ptr<IWorkload> workload) {
-            m_sequence.push_back(std::move(workload));
-        }
-
-        double get_tick_rate_hz() override {
-            return m_sequence.empty() ? 0.0 : m_sequence.front()->get_tick_rate_hz();
-        }
-
-        void tick(const InputBlock& in, OutputBlock& out) override {
-            for (auto& workload : m_sequence) {
-                workload->tick(in, out);
-            }
-        }
+        void add(std::shared_ptr<IWorkload> workload);
+        double get_tick_rate_hz() override;
+        void tick(const InputBlock &in, OutputBlock &out) override;
 
     private:
-        std::vector<std::shared_ptr<IWorkload>> m_sequence;
+        ROBOTICK_DECLARE_PIMPL();
     };
 
 }

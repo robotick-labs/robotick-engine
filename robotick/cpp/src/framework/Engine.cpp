@@ -1,97 +1,132 @@
+// ===============================
+// Engine.cpp
+// ===============================
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
-
 #include <chrono>
 #include <windows.h>
-#include <processthreadsapi.h>  // Needed for SetThreadDescription
+#include <processthreadsapi.h>
+#include <thread>
+#include <atomic>
+#include <vector>
 
-using namespace robotick;
+namespace robotick
+{
 
-Engine::Engine() = default;
+    struct Engine::Impl
+    {
+        std::vector<std::thread> threads;
+        std::atomic<bool> stop_flag = false;
+        const Model *model = nullptr;
+    };
 
-Engine::~Engine() {
-    m_stop_flag = true;
-    for (auto& t : m_threads) {
-        if (t.joinable())
-            t.join();
-    }
-}
+    Engine::Engine() : m_impl(std::make_unique<Impl>()) {}
 
-void Engine::load(const Model& model) {
-    // Multithreaded load() for each workload
-    const auto& workloads = model.get_workloads();
-    m_threads.clear();
-
-    for (auto& w : workloads) {
-        m_threads.emplace_back([w]() {
-            w->pre_load();
-            w->load();
-        });
-    }
-
-    for (auto& t : m_threads) {
-        if (t.joinable())
-            t.join();
-    }
-    m_threads.clear();
-}
-
-void Engine::setup(const Model& model) {
-    for (auto& w : model.get_workloads()) {
-        w->setup();
-    }
-}
-
-void set_thread_name(const std::string& name) {
-    auto hThread = GetCurrentThread();
-    std::wstring wname(name.begin(), name.end());
-    SetThreadDescription(hThread, wname.c_str());
-}
-
-void Engine::start(const Model& model) {
-    m_model = &model;
-
-    const auto& workloads = model.get_workloads();
-    m_stop_flag = false;
-
-    for (auto& w : workloads) {
-        m_threads.emplace_back([w, this]() {
-            
-            set_thread_name("robotick_" + w->get_name());
-
-            double hz = w->get_tick_rate_hz();
-            if (hz <= 0) return;
-
-            using namespace std::chrono;
-            auto tick_interval = duration<double>(1.0 / hz);
-            InputBlock in;
-            OutputBlock out;
-
-            while (!m_stop_flag) {
-                auto start_time = steady_clock::now();
-
-                w->pre_tick();
-                w->tick(in, out);
-                w->post_tick();
-
-                std::this_thread::sleep_until(start_time + tick_interval);
-            }
-        });
-    }
-}
-
-void Engine::stop() {
-    m_stop_flag = true;
-
-    for (auto& workload : m_model->get_workloads()) {
-        workload->stop();  // stop any internal threads like in SyncedPair
-    }
-
-    for (auto& t : m_threads) {
-        if (t.joinable()) {
-            t.join();
+    Engine::~Engine()
+    {
+        m_impl->stop_flag = true;
+        for (auto &t : m_impl->threads)
+        {
+            if (t.joinable())
+                t.join();
         }
     }
 
-    m_threads.clear();
-}    
+    void Engine::load(const Model &model)
+    {
+        const auto &workloads = model.get_workloads();
+        m_impl->threads.clear();
+        m_impl->model = &model;
+
+        for (auto &w : workloads)
+        {
+            m_impl->threads.emplace_back([w]()
+                                         {
+                w->pre_load();
+                w->load(); });
+        }
+
+        for (auto &t : m_impl->threads)
+        {
+            if (t.joinable())
+                t.join();
+        }
+        m_impl->threads.clear();
+    }
+
+    void Engine::setup()
+    {
+        if (!m_impl->model)
+            throw std::runtime_error("Engine::setup called before load()");
+
+        for (auto &w : m_impl->model->get_workloads())
+        {
+            w->setup();
+        }
+    }
+
+    void set_thread_name(const std::string &name)
+    {
+        auto hThread = GetCurrentThread();
+        std::wstring wname(name.begin(), name.end());
+        SetThreadDescription(hThread, wname.c_str());
+    }
+
+    void Engine::start()
+    {
+        if (!m_impl->model)
+            throw std::runtime_error("Engine::start called before load()");
+
+        const auto &workloads = m_impl->model->get_workloads();
+        m_impl->stop_flag = false;
+
+        for (auto &w : workloads)
+        {
+            m_impl->threads.emplace_back([w, this]()
+                                         {
+                set_thread_name("robotick_" + w->get_name());
+
+                double hz = w->get_tick_rate_hz();
+                if (hz <= 0) return;
+
+                using namespace std::chrono;
+                auto tick_interval = duration<double>(1.0 / hz);
+                InputBlock in;
+                OutputBlock out;
+
+                while (!m_impl->stop_flag) {
+                    auto start_time = steady_clock::now();
+
+                    w->pre_tick();
+                    w->tick(in, out);
+                    w->post_tick();
+
+                    std::this_thread::sleep_until(start_time + tick_interval);
+                } });
+        }
+    }
+
+    void Engine::stop()
+    {
+        if (!m_impl->model)
+            throw std::runtime_error("Engine::stop called before load()");
+
+        m_impl->stop_flag = true;
+
+        for (auto &workload : m_impl->model->get_workloads())
+        {
+            workload->stop();
+        }
+
+        for (auto &t : m_impl->threads)
+        {
+            if (t.joinable())
+            {
+                t.join();
+            }
+        }
+
+        m_impl->threads.clear();
+    }
+
+}
