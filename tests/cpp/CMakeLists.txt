@@ -8,9 +8,15 @@ enable_testing()
 set(Catch2_DIR "C:/Users/paulw_3retm4i/libs/catch2/lib/cmake/Catch2")
 find_package(Catch2 REQUIRED CONFIG)
 
+# Find executables
+file(GLOB_RECURSE ROBOTICK_TEST_SOURCES
+  CONFIGURE_DEPENDS
+  ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
+)
+
 # Add your test executable
 add_executable(robotick_tests
-  engine_tests.cpp
+  ${ROBOTICK_TEST_SOURCES}
 )
 
 target_link_libraries(robotick_tests
@@ -23,3 +29,13 @@ target_link_libraries(robotick_tests
 # Enable Catch2 auto test registration
 include(Catch)
 catch_discover_tests(robotick_tests)
+
+add_dependencies(robotick_tests robotick_framework)
+
+add_custom_command(TARGET robotick_tests POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    $<TARGET_FILE:robotick_framework>
+    $<TARGET_FILE_DIR:robotick_tests>
+)
+
+

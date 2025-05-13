@@ -38,5 +38,20 @@ option(ROBOTICK_BUILD_TESTS "Build Robotick tests" ON)
 if(ROBOTICK_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests/cpp)
+
+  # Copy framework DLL next to robotick_tests *at CMake config time*
+  add_custom_command(TARGET robotick_framework POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      $<TARGET_FILE:robotick_framework>
+      ${CMAKE_BINARY_DIR}/tests/cpp/$<CONFIG>
+  )
+
+  # Also copy it to top-level Debug dir for VS Code ctest
+  add_custom_command(TARGET robotick_framework POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      $<TARGET_FILE:robotick_framework>
+      ${CMAKE_BINARY_DIR}/Debug
+  )
 endif()
+
 
