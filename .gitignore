@@ -5,3 +5,5 @@ robotick.egg-info
 .obsidian/*
 build/*
 robotick/cpp/build/*
+*.log
+Testing/*

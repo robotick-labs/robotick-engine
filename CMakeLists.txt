@@ -1,5 +1,7 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.16)
 project(robotick_framework)
+
+include(FetchContent)  # ← This is the missing piece
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -30,3 +32,11 @@ foreach(plugin_file ${PLUGIN_SOURCES})
     add_library(${plugin_name} SHARED ${plugin_file})
     target_include_directories(${plugin_name} PRIVATE include)
 endforeach()
+
+option(ROBOTICK_BUILD_TESTS "Build Robotick tests" ON)
+
+if(ROBOTICK_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests/cpp)
+endif()
+

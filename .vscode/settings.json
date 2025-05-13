@@ -1,5 +1,11 @@
 {
     "cmake.sourceDirectory": "${workspaceFolder}",
+    "cmake.generator": "Visual Studio 17 2022",
+    "cmake.configureArgs": [
+      "-A",
+      "x64"
+    ],
+    "cmake.buildDirectory": "${workspaceFolder}/build"
     "files.associations": {
         "thread": "cpp",
         "atomic": "cpp",
