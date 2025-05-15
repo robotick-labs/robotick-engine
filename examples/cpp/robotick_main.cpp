@@ -24,24 +24,24 @@ void populate_model(Model &model)
     model.add_by_type("PythonWorkload", "py",
                       {{"script_name", "robotick.workloads.optional.test.hello_workload"},
                        {"class_name", "HelloWorkload"},
-                       {"tick_rate", 5.0}});
+                       {"tick_rate_hz", 5.0}});
 }
 #else
 void populate_model(Model &model)
 {
     // === Add top-level standalone workloads ===
-    model.add_by_type("PythonWorkload", "comms", {{"script_name", "mqtt_update"}, {"class_name", "MqttUpdate"}, {"tick_rate", 30.0}});
+    model.add_by_type("PythonWorkload", "comms", {{"script_name", "mqtt_update"}, {"class_name", "MqttUpdate"}, {"tick_rate_hz", 30.0}});
 
-    model.add_by_type("PythonWorkload", "console", {{"script_name", "console_update"}, {"class_name", "ConsoleUpdate"}, {"tick_rate", 2.0}});
+    model.add_by_type("PythonWorkload", "console", {{"script_name", "console_update"}, {"class_name", "ConsoleUpdate"}, {"tick_rate_hz", 2.0}});
 
     // === Subcomponents for synced pair ===
-    auto brickpi = model.add_by_type("PythonWorkload", "brickpi3_interface", {{"script_name", "brickpi"}, {"class_name", "BrickPi3Interface"}, {"tick_rate", 100.0}});
+    auto brickpi = model.add_by_type("PythonWorkload", "brickpi3_interface", {{"script_name", "brickpi"}, {"class_name", "BrickPi3Interface"}, {"tick_rate_hz", 100.0}});
 
-    auto remote = model.add_by_type("PythonWorkload", "remote_control", {{"script_name", "remote"}, {"class_name", "RemoteControlInterface"}, {"tick_rate", 30.0}});
+    auto remote = model.add_by_type("PythonWorkload", "remote_control", {{"script_name", "remote"}, {"class_name", "RemoteControlInterface"}, {"tick_rate_hz", 30.0}});
 
-    auto deadzone = model.add_by_type("PythonWorkload", "deadzone_transformer", {{"script_name", "transform"}, {"class_name", "DeadZoneScaleAndSplitTransformer"}, {"tick_rate", 30.0}});
+    auto deadzone = model.add_by_type("PythonWorkload", "deadzone_transformer", {{"script_name", "transform"}, {"class_name", "DeadZoneScaleAndSplitTransformer"}, {"tick_rate_hz", 30.0}});
 
-    auto mixer = model.add_by_type("PythonWorkload", "steering_mixer", {{"script_name", "steering"}, {"class_name", "SteeringMixerTransformer"}, {"tick_rate", 30.0}});
+    auto mixer = model.add_by_type("PythonWorkload", "steering_mixer", {{"script_name", "steering"}, {"class_name", "SteeringMixerTransformer"}, {"tick_rate_hz", 30.0}});
 
     // === Sequence and Pair ===
     auto sequence = model.add_by_type("SequenceWorkload", "control_sequence", {{"children", std::vector<WorkloadHandle>{remote, deadzone, mixer}}});

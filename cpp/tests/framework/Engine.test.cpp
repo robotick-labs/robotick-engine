@@ -8,10 +8,10 @@ using namespace robotick;
 
 struct CountConfig
 {
-    double tick_rate = 10.0;
+    double tick_rate_hz = 10.0;
     ROBOTICK_DECLARE_FIELDS();
 };
-ROBOTICK_DEFINE_FIELDS(CountConfig, ROBOTICK_FIELD(CountConfig, tick_rate))
+ROBOTICK_DEFINE_FIELDS(CountConfig, ROBOTICK_FIELD(CountConfig, tick_rate_hz))
 
 class CountingWorkload
 {
@@ -19,7 +19,7 @@ public:
     CountConfig config;
     int tick_count = 0;
 
-    double get_tick_rate_hz() const { return config.tick_rate; }
+    double get_tick_rate_hz() const { return config.tick_rate_hz; }
     void tick(double) { tick_count++; }
 };
 

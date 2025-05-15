@@ -10,12 +10,12 @@ using namespace robotick;
 struct SequenceConfig
 {
     std::vector<WorkloadHandle> children;
-    double tick_rate = 30.0;
+    double tick_rate_hz = 30.0;
     ROBOTICK_DECLARE_FIELDS();
 };
 ROBOTICK_DEFINE_FIELDS(SequenceConfig,
                        ROBOTICK_FIELD(SequenceConfig, children),
-                       ROBOTICK_FIELD(SequenceConfig, tick_rate))
+                       ROBOTICK_FIELD(SequenceConfig, tick_rate_hz))
 
 class SequenceWorkload
 {
@@ -44,7 +44,7 @@ public:
 
     double get_tick_rate_hz() const
     {
-        return config.tick_rate;
+        return config.tick_rate_hz;
     }
 };
 

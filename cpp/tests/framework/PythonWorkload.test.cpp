@@ -11,7 +11,7 @@ TEST_CASE("PythonWorkload can tick without crash")
     auto h = model.add_by_type("PythonWorkload", "py",
                                {{"script_name", "robotick.workloads.optional.test.hello_workload"},
                                 {"class_name", "HelloWorkload"},
-                                {"tick_rate", 5.0}});
+                                {"tick_rate_hz", 5.0}});
     model.finalise();
 
     auto *ptr = model.factory().get_raw_ptr(h);

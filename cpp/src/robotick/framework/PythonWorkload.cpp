@@ -20,13 +20,13 @@ struct PythonConfig
 {
     FixedString128 script_name;
     FixedString64 class_name;
-    double tick_rate = 30.0;
+    double tick_rate_hz = 30.0;
     ROBOTICK_DECLARE_FIELDS();
 };
 ROBOTICK_DEFINE_FIELDS(PythonConfig,
                        ROBOTICK_FIELD(PythonConfig, script_name),
                        ROBOTICK_FIELD(PythonConfig, class_name),
-                       ROBOTICK_FIELD(PythonConfig, tick_rate))
+                       ROBOTICK_FIELD(PythonConfig, tick_rate_hz))
 
 struct PythonInputs
 {
@@ -56,32 +56,37 @@ public:
 public:
     void load()
     {
-        // Initialize interpreter once (with thread support), then drop GIL
         static std::once_flag init_flag;
         std::call_once(init_flag, []()
                        {
-                           py::initialize_interpreter(/*start_embedded*/);
+                           py::initialize_interpreter();
                            PyEval_SaveThread(); // release the GIL
                        });
 
-        // Acquire GIL for imports and object creation
-        py::gil_scoped_acquire gil;
+        try
+        {
+            py::gil_scoped_acquire gil;
 
-        // Build configuration dict
-        py::dict py_cfg;
-        marshal_struct_to_dict(&config, *config.get_struct_reflection(), py_cfg);
+            py::dict py_cfg;
+            marshal_struct_to_dict(&config, *config.get_struct_reflection(), py_cfg);
 
-        // Import module, get class, and instantiate Python object
-        py_module = py::module_::import(config.script_name.c_str());
-        py_class = py_module.attr(config.class_name.c_str());
-        py_instance = py_class(py_cfg);
-
-        std::cout << "[Python] Loaded "
-                  << config.script_name.c_str()
-                  << "." << config.class_name.c_str() << std::endl;
+            py_module = py::module_::import(config.script_name.c_str());
+            py_class = py_module.attr(config.class_name.c_str());
+            py_instance = py_class(py_cfg);
+        }
+        catch (const py::error_already_set &e)
+        {
+            std::cerr << "[Python ERROR] Failed to load workload: "
+                      << e.what() << std::endl;
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "[ERROR] Exception during Python workload load(): "
+                      << e.what() << std::endl;
+        }
     }
 
-    void tick(double dt)
+    void tick(double time_delta)
     {
         if (!py_instance)
             return;
@@ -97,7 +102,7 @@ public:
         try
         {
             // Call the Python 'tick' method
-            py_instance.attr("tick")(dt, py_in, py_out);
+            py_instance.attr("tick")(time_delta, py_in, py_out);
             // Marshal outputs back into C++ struct
             marshal_dict_to_struct(py_out, *outputs.get_struct_reflection(), &outputs);
         }
@@ -109,7 +114,7 @@ public:
 
     double get_tick_rate_hz() const
     {
-        return config.tick_rate;
+        return config.tick_rate_hz;
     }
 
 private:

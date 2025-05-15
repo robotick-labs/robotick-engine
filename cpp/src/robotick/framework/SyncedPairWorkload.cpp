@@ -8,13 +8,13 @@ struct SyncedPairConfig
 {
     WorkloadHandle primary;
     WorkloadHandle secondary;
-    double tick_rate = 30.0;
+    double tick_rate_hz = 30.0;
     ROBOTICK_DECLARE_FIELDS();
 };
 ROBOTICK_DEFINE_FIELDS(SyncedPairConfig,
                        ROBOTICK_FIELD(SyncedPairConfig, primary),
                        ROBOTICK_FIELD(SyncedPairConfig, secondary),
-                       ROBOTICK_FIELD(SyncedPairConfig, tick_rate))
+                       ROBOTICK_FIELD(SyncedPairConfig, tick_rate_hz))
 
 class SyncedPairWorkload
 {
@@ -43,7 +43,7 @@ public:
 
     double get_tick_rate_hz() const
     {
-        return config.tick_rate;
+        return config.tick_rate_hz;
     }
 };
 

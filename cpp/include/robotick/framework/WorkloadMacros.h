@@ -116,8 +116,8 @@ namespace robotick
             { new (ptr) Type(); },
             ConfigType::get_struct_reflection(),
             offsetof(Type, config),
-            [](void *ptr, double dt)
-            { static_cast<Type *>(ptr)->tick(dt); },
+            [](void *ptr, double time_delta)
+            { static_cast<Type *>(ptr)->tick(time_delta); },
             pre_load_fn,
             load_fn,
             setup_fn,
