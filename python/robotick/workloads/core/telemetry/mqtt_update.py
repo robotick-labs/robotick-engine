@@ -1,13 +1,15 @@
 import json
 import paho.mqtt.client as mqtt
-from ....framework.workload_base import WorkloadBase
-from ....framework.registry import *
 from .mqtt_broker import MqttBroker
 
-class MqttUpdate(WorkloadBase):
-    def __init__(self):
+def get_all_workload_instances():
+    return {}
+
+class MqttUpdate:
+    def __init__(self, config):
         super().__init__()
-        self.tick_rate_hz = 30
+
+        self.config = config
         self.mqtt_port=7080
         self.websocket_port=7081
         self.client = mqtt.Client()
@@ -64,7 +66,7 @@ class MqttUpdate(WorkloadBase):
                     except Exception as e:
                         print(f"Warning: failed to set value for {state}: {payload} ({e})")
 
-    def tick(self, time_delta):
+    def tick(self, time_delta, input, output):
         for type_name, instances in get_all_workload_instances().items():
             for inst in instances:
                 name = getattr(inst, 'name', '') or ''
@@ -95,4 +97,3 @@ class MqttUpdate(WorkloadBase):
         except TypeError:
             return str(value)
 
-register_workload_type(MqttUpdate)

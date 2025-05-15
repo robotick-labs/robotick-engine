@@ -1,0 +1,9 @@
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterFunctionDefinition: true
+  AfterLambda: false
+UseTab: Always
+IndentWidth: 4
+TabWidth: 4
+NamespaceIndentation: All

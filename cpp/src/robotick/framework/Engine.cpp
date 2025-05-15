@@ -2,133 +2,170 @@
 #include "robotick/framework/Model.h"
 #include "robotick/framework/utils_thread.h"
 
-#include <chrono>
-#include <thread>
 #include <atomic>
-#include <vector>
+#include <chrono>
+#include <mmsystem.h> // for timeBeginPeriod
 #include <stdexcept>
+#include <thread>
+#include <vector>
+#include <windows.h>
 
-namespace robotick
-{
+namespace robotick {
 
-    struct Engine::Impl
-    {
-        std::vector<std::thread> threads;
-        std::atomic<bool> stop_flag = false;
-        const Model *model = nullptr;
-    };
+	struct Engine::Impl {
+		std::vector<std::thread> threads;
+		std::atomic<bool> stop_flag = false;
+		const Model *model = nullptr;
+	};
 
-    Engine::Engine() : m_impl(std::make_unique<Impl>()) {}
+	Engine::Engine() : m_impl(std::make_unique<Impl>()) {}
 
-    Engine::~Engine()
-    {
-        m_impl->stop_flag = true;
-        for (auto &t : m_impl->threads)
-        {
-            if (t.joinable())
-                t.join();
-        }
-    }
+	Engine::~Engine()
+	{
+		m_impl->stop_flag = true;
+		for (auto &t : m_impl->threads) {
+			if (t.joinable())
+				t.join();
+		}
+	}
 
-    void Engine::load(const Model &model)
-    {
-        m_impl->threads.clear();
-        m_impl->model = &model;
+	void Engine::load(const Model &model)
+	{
+		m_impl->threads.clear();
+		m_impl->model = &model;
 
-        const auto &handles = model.get_workloads();
-        const auto &instances = model.factory().get_all();
+		const auto &handles = model.get_workloads();
+		const auto &instances = model.factory().get_all();
 
-        // Preload + load in parallel
-        for (auto &h : handles)
-        {
-            const auto &instance = instances[h.index];
-            m_impl->threads.emplace_back([&]()
-                                         {
-            if (instance.type->pre_load) instance.type->pre_load(instance.ptr);
-            if (instance.type->load)     instance.type->load(instance.ptr); });
-        }
+		// Preload + load in parallel
+		for (auto &h : handles) {
+			const auto &instance = instances[h.index];
+			m_impl->threads.emplace_back([&]() {
+				if (instance.type->pre_load)
+					instance.type->pre_load(instance.ptr);
+				if (instance.type->load)
+					instance.type->load(instance.ptr);
+			});
+		}
 
-        for (auto &t : m_impl->threads)
-        {
-            if (t.joinable())
-                t.join();
-        }
+		for (auto &t : m_impl->threads) {
+			if (t.joinable())
+				t.join();
+		}
 
-        m_impl->threads.clear();
-    }
+		m_impl->threads.clear();
+	}
 
-    void Engine::setup()
-    {
-        if (!m_impl->model)
-            throw std::runtime_error("Engine::setup called before load()");
+	void Engine::setup()
+	{
+		if (!m_impl->model)
+			throw std::runtime_error("Engine::setup called before load()");
 
-        const auto &factory = m_impl->model->factory();
-        for (auto &h : m_impl->model->get_workloads())
-        {
-            const auto &instance = factory.get_all()[h.index];
-            if (instance.type->setup)
-                instance.type->setup(instance.ptr);
-        }
-    }
+		const auto &factory = m_impl->model->factory();
+		for (auto &h : m_impl->model->get_workloads()) {
+			const auto &instance = factory.get_all()[h.index];
+			if (instance.type->setup)
+				instance.type->setup(instance.ptr);
+		}
 
-    void Engine::start()
-    {
-        if (!m_impl->model)
-            throw std::runtime_error("Engine::start called before load()");
+		timeBeginPeriod(1); // request 1ms resolution for thread-sleeps
+	}
 
-        const auto &handles = m_impl->model->get_workloads();
-        const auto &instances = m_impl->model->factory().get_all();
+	// Sleeps coarsely, then spins finely to match target wake time
+	void hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
+	{
+		using namespace std::chrono;
+		constexpr auto coarse_margin = 500us;
+		constexpr auto coarse_step = 100us;
 
-        m_impl->stop_flag = false;
+		auto now = steady_clock::now();
+		while (now < target_time - coarse_margin) {
+			std::this_thread::sleep_for(coarse_step);
+			now = steady_clock::now();
+		}
 
-        for (auto &h : handles)
-        {
-            const auto &instance = instances[h.index];
+		while (steady_clock::now() < target_time) {
+			// spin
+		}
+	}
 
-            m_impl->threads.emplace_back([this, &instance]()
-                                         {
-            set_thread_name("robotick_" + std::string(instance.type->name));
+	void Engine::start()
+	{
+		if (!m_impl->model)
+			throw std::runtime_error("Engine::start called before load()");
 
-            double hz = instance.tick_rate_hz;
-            if (hz <= 0 || !instance.type->tick) return;
+		const auto &handles = m_impl->model->get_workloads();
+		const auto &instances = m_impl->model->factory().get_all();
 
-            using namespace std::chrono;
-            const auto tick_interval = duration<double>(1.0 / hz);
-            auto last_time = steady_clock::now();
+		m_impl->stop_flag = false;
 
-            while (!m_impl->stop_flag) {
-                auto start_time = steady_clock::now();
-                double time_delta = duration<double>(start_time - last_time).count();
-                last_time = start_time;
+		for (auto &h : handles) {
+			const auto &instance = instances[h.index];
 
-                instance.type->tick(instance.ptr, time_delta);
-                std::this_thread::sleep_until(start_time + tick_interval);
-            } });
-        }
-    }
+			m_impl->threads.emplace_back([this, &instance]() {
+				DWORD_PTR mask = 1 << 2; // core 2, zero-based
+				SetThreadAffinityMask(
+					GetCurrentThread(),
+					mask); // prevent thread bouncing between cores
+				SetThreadPriority(
+					GetCurrentThread(),
+					THREAD_PRIORITY_TIME_CRITICAL); // nothing is more important
+													// than us being on time
+				set_thread_name(
+					"robotick_" +
+					std::string(instance.type->name)); // give our thread a nice
+													   // debug-name
 
-    void Engine::stop()
-    {
-        if (!m_impl->model)
-            throw std::runtime_error("Engine::stop called before load()");
+				double hz = instance.tick_rate_hz;
+				if (hz <= 0 || !instance.type->tick)
+					return;
 
-        m_impl->stop_flag = true;
+				using namespace std::chrono;
+				const auto tick_interval = duration<double>(1.0 / hz);
+				auto next_tick_time = steady_clock::now() + tick_interval;
+				auto last_time = steady_clock::now();
 
-        const auto &factory = m_impl->model->factory();
-        for (auto &h : m_impl->model->get_workloads())
-        {
-            const auto &instance = factory.get_all()[h.index];
-            if (instance.type->stop)
-                instance.type->stop(instance.ptr);
-        }
+				while (!m_impl->stop_flag) {
+					auto now = steady_clock::now();
+					double time_delta =
+						duration<double>(now - last_time).count();
+					last_time = now;
 
-        for (auto &t : m_impl->threads)
-        {
-            if (t.joinable())
-                t.join();
-        }
+					instance.type->tick(instance.ptr, time_delta);
 
-        m_impl->threads.clear();
-    }
+					next_tick_time += tick_interval;
+
+					using namespace std::chrono;
+					hybrid_sleep_until(time_point_cast<steady_clock::duration>(
+						next_tick_time));
+				}
+			});
+		}
+	}
+
+	void Engine::stop()
+	{
+		if (!m_impl->model)
+			throw std::runtime_error("Engine::stop called before load()");
+
+		m_impl->stop_flag = true;
+
+		const auto &factory = m_impl->model->factory();
+		for (auto &h : m_impl->model->get_workloads()) {
+			const auto &instance = factory.get_all()[h.index];
+			if (instance.type->stop)
+				instance.type->stop(instance.ptr);
+		}
+
+		for (auto &t : m_impl->threads) {
+			if (t.joinable())
+				t.join();
+		}
+
+		m_impl->threads.clear();
+
+		timeEndPeriod(1); // cancel 1ms resolution for thread-sleeps (back to
+						  // Windows' 60Hz max)
+	}
 
 } // namespace robotick

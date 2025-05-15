@@ -45,6 +45,10 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(pybind11)
 
+if (WIN32)
+    target_link_libraries(robotick_framework PRIVATE winmm)
+endif()
+
 target_link_libraries(robotick_framework PRIVATE pybind11::embed)
 
 # Test-framework: 

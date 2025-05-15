@@ -1,24 +1,21 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 
-#include <csignal>
-#include <atomic>
-#include <iostream>
-#include <thread>
-#include <map>
 #include <any>
+#include <atomic>
+#include <csignal>
+#include <iostream>
+#include <map>
+#include <thread>
 #include <vector>
 
 using namespace robotick;
 
 std::atomic<bool> g_exit_requested = false;
 
-void signal_handler(int)
-{
-    g_exit_requested = true;
-}
+void signal_handler(int) { g_exit_requested = true; }
 
-#if 1
+#if 0
 void populate_model(Model &model)
 {
     model.add_by_type("PythonWorkload", "py",
@@ -29,24 +26,54 @@ void populate_model(Model &model)
 #else
 void populate_model(Model &model)
 {
-    // === Add top-level standalone workloads ===
-    model.add_by_type("PythonWorkload", "comms", {{"script_name", "mqtt_update"}, {"class_name", "MqttUpdate"}, {"tick_rate_hz", 30.0}});
+    model.add_by_type("TimingDiagnosticsWorkload", "timing_diagnostics",
+                      {{"tick_rate_hz", 1000.0}, {"report_every", 1000}});
 
-    model.add_by_type("PythonWorkload", "console", {{"script_name", "console_update"}, {"class_name", "ConsoleUpdate"}, {"tick_rate_hz", 2.0}});
+    if (true)
+        return;
+
+    // === Add top-level standalone workloads ===
+    model.add_by_type(
+        "PythonWorkload", "comms",
+        {{"script_name", "robotick.workloads.core.telemetry.mqtt_update"},
+         {"class_name", "MqttUpdate"},
+         {"tick_rate_hz", 30.0}});
+
+    model.add_by_type("PythonWorkload", "console",
+                      {{"script_name", "console_update"},
+                       {"class_name", "ConsoleUpdate"},
+                       {"tick_rate_hz", 2.0}});
 
     // === Subcomponents for synced pair ===
-    auto brickpi = model.add_by_type("PythonWorkload", "brickpi3_interface", {{"script_name", "brickpi"}, {"class_name", "BrickPi3Interface"}, {"tick_rate_hz", 100.0}});
+    auto brickpi = model.add_by_type("PythonWorkload", "brickpi3_interface",
+                                     {{"script_name", "brickpi"},
+                                      {"class_name", "BrickPi3Interface"},
+                                      {"tick_rate_hz", 100.0}});
 
-    auto remote = model.add_by_type("PythonWorkload", "remote_control", {{"script_name", "remote"}, {"class_name", "RemoteControlInterface"}, {"tick_rate_hz", 30.0}});
+    auto remote = model.add_by_type("PythonWorkload", "remote_control",
+                                    {{"script_name", "remote"},
+                                     {"class_name", "RemoteControlInterface"},
+                                     {"tick_rate_hz", 30.0}});
 
-    auto deadzone = model.add_by_type("PythonWorkload", "deadzone_transformer", {{"script_name", "transform"}, {"class_name", "DeadZoneScaleAndSplitTransformer"}, {"tick_rate_hz", 30.0}});
+    auto deadzone =
+        model.add_by_type("PythonWorkload", "deadzone_transformer",
+                          {{"script_name", "transform"},
+                           {"class_name", "DeadZoneScaleAndSplitTransformer"},
+                           {"tick_rate_hz", 30.0}});
 
-    auto mixer = model.add_by_type("PythonWorkload", "steering_mixer", {{"script_name", "steering"}, {"class_name", "SteeringMixerTransformer"}, {"tick_rate_hz", 30.0}});
+    auto mixer = model.add_by_type("PythonWorkload", "steering_mixer",
+                                   {{"script_name", "steering"},
+                                    {"class_name", "SteeringMixerTransformer"},
+                                    {"tick_rate_hz", 30.0}});
 
     // === Sequence and Pair ===
-    auto sequence = model.add_by_type("SequenceWorkload", "control_sequence", {{"children", std::vector<WorkloadHandle>{remote, deadzone, mixer}}});
+    auto sequence = model.add_by_type(
+        "SequenceWorkload", "control_sequence",
+        {{"children", std::vector<WorkloadHandle>{remote, deadzone, mixer}}});
 
-    auto pair = model.add_by_type("SyncedPairWorkload", "control_pair", {{"primary", brickpi}, {"secondary", sequence}});
+    auto pair =
+        model.add_by_type("SyncedPairWorkload", "control_pair",
+                          {{"primary", brickpi}, {"secondary", sequence}});
 }
 #endif // #if 1
 
@@ -57,7 +84,8 @@ int main()
 
     Model model;
     populate_model(model);
-    model.finalise(); // finalise memory - creating actual workloads in a single large buffer
+    model.finalise(); // finalise memory - creating actual workloads in a single
+                      // large buffer
 
     Engine engine;
     engine.load(model);
