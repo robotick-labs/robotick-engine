@@ -12,7 +12,8 @@ setup(
     author='Paul Connor',
     author_email='paulwconnor-ai@outlook.com',
     url='https://github.com/paulwconnor-ai/robotick',
-    packages=find_packages(),
+    packages=find_packages(where="python"),
+    package_dir={"": "python"},
     install_requires=[
         'numpy',
         'paho-mqtt',

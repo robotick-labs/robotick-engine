@@ -7,12 +7,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Public include path
-include_directories(${CMAKE_SOURCE_DIR}/robotick/cpp/include)
+include_directories(${CMAKE_SOURCE_DIR}/cpp/include)
 
 # Core source files
 file(GLOB_RECURSE CORE_SOURCES
-    ${CMAKE_SOURCE_DIR}/robotick/cpp/src/framework/*.cpp
-    ${CMAKE_SOURCE_DIR}/robotick/cpp/include/robotick/framework/*.h
+    ${CMAKE_SOURCE_DIR}/cpp/src/robotick/*.cpp
+    ${CMAKE_SOURCE_DIR}/cpp/include/robotick/*.h
 )
 
 # Build the shared library for Python and plugin use
@@ -47,19 +47,19 @@ FetchContent_MakeAvailable(pybind11)
 
 target_link_libraries(robotick_framework PRIVATE pybind11::embed)
 
-# Test-framework:
+# Test-framework: 
 
 option(ROBOTICK_BUILD_TESTS "Build Robotick tests" ON)
 
 if(ROBOTICK_BUILD_TESTS)
   enable_testing()
-  add_subdirectory(tests/cpp)
+  add_subdirectory(cpp/tests)
 
   # Copy framework DLL next to robotick_tests *at CMake config time*
   add_custom_command(TARGET robotick_framework POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       $<TARGET_FILE:robotick_framework>
-      ${CMAKE_BINARY_DIR}/tests/cpp/$<CONFIG>
+      ${CMAKE_BINARY_DIR}/cpp/tests/$<CONFIG>
   )
 
   # Also copy it to top-level Debug dir for VS Code ctest

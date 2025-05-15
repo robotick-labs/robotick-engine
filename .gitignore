@@ -7,3 +7,5 @@ build/*
 robotick/cpp/build/*
 *.log
 Testing/*
+cpp/build/*
+*_LOG.TXT

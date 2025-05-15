@@ -1,12 +1,7 @@
 {
     "cmake.sourceDirectory": "${workspaceFolder}",
     "cmake.generator": "Visual Studio 17 2022",
-    "cmake.testArgs": ["--cwd", "${workspaceFolder}"],
-    "cmake.configureArgs": [
-      "-A",
-      "x64"
-    ],
-    "cmake.buildDirectory": "${workspaceFolder}/build"
+    "cmake.buildDirectory": "${workspaceFolder}/build",
     "files.associations": {
         "thread": "cpp",
         "atomic": "cpp",
@@ -68,6 +63,29 @@
         "xutility": "cpp",
         "condition_variable": "cpp",
         "mutex": "cpp",
-        "csignal": "cpp"
+        "csignal": "cpp",
+        "algorithm": "cpp",
+        "array": "cpp",
+        "complex": "cpp",
+        "deque": "cpp",
+        "filesystem": "cpp",
+        "fstream": "cpp",
+        "functional": "cpp",
+        "future": "cpp",
+        "list": "cpp",
+        "map": "cpp",
+        "numeric": "cpp",
+        "random": "cpp",
+        "regex": "cpp",
+        "set": "cpp",
+        "stack": "cpp",
+        "typeindex": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp",
+        "valarray": "cpp",
+        "variant": "cpp",
+        "xhash": "cpp",
+        "xtree": "cpp",
+        "any": "cpp"
     }, // Top-level CMakeLists.txt
 }
