@@ -1,9 +1,8 @@
-BreakBeforeBraces: Custom
-BraceWrapping:
-  AfterFunction: true
-  AfterFunctionDefinition: true
-  AfterLambda: false
-UseTab: Always
+BasedOnStyle: Microsoft
 IndentWidth: 4
 TabWidth: 4
+UseTab: Never
+AllowShortFunctionsOnASingleLine: InlineOnly
+BreakBeforeBraces: Allman
+ColumnLimit: 120
 NamespaceIndentation: All

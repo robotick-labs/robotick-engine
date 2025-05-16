@@ -1,20 +1,26 @@
 cmake_minimum_required(VERSION 3.16)
 project(robotick_tests)
 
-# Required to enable testing features
 enable_testing()
 
-# Find installed Catch2 (you must have used `cmake --install`)
-set(Catch2_DIR "C:/Users/paulw_3retm4i/libs/catch2/lib/cmake/Catch2")
-find_package(Catch2 REQUIRED CONFIG)
+include(FetchContent)
 
-# Find executables
+# ✅ Download Catch2 automatically if not found
+FetchContent_Declare(
+  Catch2
+  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+  GIT_TAG v3.4.0
+)
+
+FetchContent_MakeAvailable(Catch2)
+
+# 🔍 Find test files
 file(GLOB_RECURSE ROBOTICK_TEST_SOURCES
   CONFIGURE_DEPENDS
   ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
 )
 
-# Add your test executable
+# 🛠️ Build test executable
 add_executable(robotick_tests
   ${ROBOTICK_TEST_SOURCES}
 )
@@ -22,20 +28,19 @@ add_executable(robotick_tests
 target_link_libraries(robotick_tests
   PRIVATE
     robotick_framework
-    Catch2::Catch2
     Catch2::Catch2WithMain
 )
 
-# Enable Catch2 auto test registration
+# 🔁 Enable automatic Catch2 test discovery
 include(Catch)
 catch_discover_tests(robotick_tests)
 
+# 📦 Ensure framework is built before tests
 add_dependencies(robotick_tests robotick_framework)
 
+# ✅ (Optional) Copy shared libs to test output dir
 add_custom_command(TARGET robotick_tests POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:robotick_framework>
     $<TARGET_FILE_DIR:robotick_tests>
 )
-
-

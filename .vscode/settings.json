@@ -1,7 +1,10 @@
 {
     "cmake.sourceDirectory": "${workspaceFolder}",
-    "cmake.generator": "Visual Studio 17 2022",
+    "cmake.generator": "Unix Makefiles",
     "cmake.buildDirectory": "${workspaceFolder}/build",
+    "[cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools"
+    },
     "files.associations": {
         "thread": "cpp",
         "atomic": "cpp",

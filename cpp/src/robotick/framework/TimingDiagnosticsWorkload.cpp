@@ -1,14 +1,13 @@
-#pragma once
 
 #include "robotick/framework/FieldMacros.h"
 #include "robotick/framework/FieldUtils.h"
 #include "robotick/framework/FixedString.h"
-#include "robotick/framework/utils_pybind.h"
 #include "robotick/framework/WorkloadMacros.h"
+#include "robotick/framework/utils_pybind.h"
 
 #include <chrono>
-#include <iostream>
 #include <cmath>
+#include <iostream>
 
 using namespace robotick;
 
@@ -18,8 +17,7 @@ struct TimingDiagnosticsConfig
     int report_every = 100;      // Number of ticks per report
     ROBOTICK_DECLARE_FIELDS();
 };
-ROBOTICK_DEFINE_FIELDS(TimingDiagnosticsConfig,
-                       ROBOTICK_FIELD(TimingDiagnosticsConfig, tick_rate_hz),
+ROBOTICK_DEFINE_FIELDS(TimingDiagnosticsConfig, ROBOTICK_FIELD(TimingDiagnosticsConfig, tick_rate_hz),
                        ROBOTICK_FIELD(TimingDiagnosticsConfig, report_every))
 
 struct TimingDiagnosticsInputs
@@ -35,14 +33,13 @@ struct TimingDiagnosticsOutputs
     double tick_stddev = 0.0;
     ROBOTICK_DECLARE_FIELDS();
 };
-ROBOTICK_DEFINE_FIELDS(TimingDiagnosticsOutputs,
-                       ROBOTICK_FIELD(TimingDiagnosticsOutputs, last_tick_rate),
+ROBOTICK_DEFINE_FIELDS(TimingDiagnosticsOutputs, ROBOTICK_FIELD(TimingDiagnosticsOutputs, last_tick_rate),
                        ROBOTICK_FIELD(TimingDiagnosticsOutputs, avg_tick_rate),
                        ROBOTICK_FIELD(TimingDiagnosticsOutputs, tick_stddev))
 
 class TimingDiagnosticsWorkload
 {
-public:
+  public:
     TimingDiagnosticsConfig config;
     TimingDiagnosticsInputs inputs;
     TimingDiagnosticsOutputs outputs;
@@ -90,16 +87,14 @@ public:
         last_time = now;
     }
 
-    double get_tick_rate_hz() const
-    {
-        return config.tick_rate_hz;
-    }
+    double get_tick_rate_hz() const { return config.tick_rate_hz; }
 
-private:
+  private:
     std::chrono::steady_clock::time_point last_time;
     int count = 0;
     double sum_dt = 0.0;
     double sum_dt2 = 0.0;
 };
 
-ROBOTICK_REGISTER_WORKLOAD(TimingDiagnosticsWorkload, TimingDiagnosticsConfig, TimingDiagnosticsInputs, TimingDiagnosticsOutputs);
+ROBOTICK_REGISTER_WORKLOAD(TimingDiagnosticsWorkload, TimingDiagnosticsConfig, TimingDiagnosticsInputs,
+                           TimingDiagnosticsOutputs);

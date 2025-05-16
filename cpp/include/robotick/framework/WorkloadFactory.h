@@ -1,11 +1,11 @@
 #pragma once
 
-#include "robotick/framework/api.h"
 #include "robotick/framework/WorkloadRegistry.h"
-#include <vector>
+#include "robotick/framework/api.h"
+#include <any>
 #include <cstdint>
 #include <map>
-#include <any>
+#include <vector>
 
 namespace robotick
 {
@@ -24,21 +24,22 @@ namespace robotick
 
     class ROBOTICK_API WorkloadFactory
     {
-    public:
+      public:
         WorkloadFactory();
         ~WorkloadFactory();
 
-        WorkloadHandle add_by_type(const std::string &type_name, const std::string &name, const std::map<std::string, std::any> &config);
+        WorkloadHandle add_by_type(const std::string &type_name, const std::string &name,
+                                   const std::map<std::string, std::any> &config);
         void finalise();
         bool is_finalised() const { return m_finalised; }
 
         void *get_raw_ptr(WorkloadHandle h) const;
 
-        const char *WorkloadFactory::get_type_name(WorkloadHandle h) const;
+        const char *get_type_name(WorkloadHandle h) const;
 
         const std::vector<WorkloadInstance> &get_all() const;
 
-    private:
+      private:
         struct Pending
         {
             const WorkloadRegistryEntry *type;

@@ -1,15 +1,14 @@
-#pragma once
 
 #include "robotick/framework/FieldMacros.h"
 #include "robotick/framework/FieldUtils.h"
 #include "robotick/framework/FixedString.h"
-#include "robotick/framework/utils_pybind.h"
 #include "robotick/framework/WorkloadMacros.h"
+#include "robotick/framework/utils_pybind.h"
 
+#include <iostream>
+#include <mutex>
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
-#include <mutex>
-#include <iostream>
 
 namespace py = pybind11;
 using namespace robotick;
@@ -23,41 +22,38 @@ struct PythonConfig
     double tick_rate_hz = 30.0;
     ROBOTICK_DECLARE_FIELDS();
 };
-ROBOTICK_DEFINE_FIELDS(PythonConfig,
-                       ROBOTICK_FIELD(PythonConfig, script_name),
-                       ROBOTICK_FIELD(PythonConfig, class_name),
-                       ROBOTICK_FIELD(PythonConfig, tick_rate_hz))
+ROBOTICK_DEFINE_FIELDS(PythonConfig, ROBOTICK_FIELD(PythonConfig, script_name),
+                       ROBOTICK_FIELD(PythonConfig, class_name), ROBOTICK_FIELD(PythonConfig, tick_rate_hz))
 
 struct PythonInputs
 {
     double example_in = 0.0;
     ROBOTICK_DECLARE_FIELDS();
 };
-ROBOTICK_DEFINE_FIELDS(PythonInputs,
-                       ROBOTICK_FIELD(PythonInputs, example_in))
+ROBOTICK_DEFINE_FIELDS(PythonInputs, ROBOTICK_FIELD(PythonInputs, example_in))
 
 struct PythonOutputs
 {
     double example_out = 0.0;
     ROBOTICK_DECLARE_FIELDS();
 };
-ROBOTICK_DEFINE_FIELDS(PythonOutputs,
-                       ROBOTICK_FIELD(PythonOutputs, example_out))
+ROBOTICK_DEFINE_FIELDS(PythonOutputs, ROBOTICK_FIELD(PythonOutputs, example_out))
 
 // === Workload ===
 
 class PythonWorkload
 {
-public:
+  public:
     PythonConfig config;
     PythonInputs inputs;
     PythonOutputs outputs;
 
-public:
+  public:
     void load()
     {
         static std::once_flag init_flag;
-        std::call_once(init_flag, []()
+        std::call_once(init_flag,
+                       []()
                        {
                            py::initialize_interpreter();
                            PyEval_SaveThread(); // release the GIL
@@ -76,13 +72,11 @@ public:
         }
         catch (const py::error_already_set &e)
         {
-            std::cerr << "[Python ERROR] Failed to load workload: "
-                      << e.what() << std::endl;
+            std::cerr << "[Python ERROR] Failed to load workload: " << e.what() << std::endl;
         }
         catch (const std::exception &e)
         {
-            std::cerr << "[ERROR] Exception during Python workload load(): "
-                      << e.what() << std::endl;
+            std::cerr << "[ERROR] Exception during Python workload load(): " << e.what() << std::endl;
         }
     }
 
@@ -112,12 +106,9 @@ public:
         }
     }
 
-    double get_tick_rate_hz() const
-    {
-        return config.tick_rate_hz;
-    }
+    double get_tick_rate_hz() const { return config.tick_rate_hz; }
 
-private:
+  private:
     // Python embedding members
     py::object py_module;
     py::object py_class;

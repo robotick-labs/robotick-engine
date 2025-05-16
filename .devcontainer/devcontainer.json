@@ -1,0 +1,15 @@
+{
+    "name": "Robotick Native Dev",
+    "build": {
+        "dockerfile": "Dockerfile.native"
+    },
+    "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+    },
+    "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "mate-test-runner.cplusplus-testmate"
+    ],
+    "postCreateCommand": "cmake -S . -B build"
+}
