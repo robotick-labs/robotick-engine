@@ -27,7 +27,7 @@ class DummyWorkload
 
 ROBOTICK_REGISTER_WORKLOAD(DummyWorkload, DummyConfig, robotick::EmptyInputs, robotick::EmptyOutputs);
 
-TEST_CASE("DummyWorkload stores tick rate")
+TEST_CASE("Unit|Framework|Engine|DummyWorkload stores tick rate")
 {
 	Model model;
 	auto h = model.add_by_type("DummyWorkload", "dummy", {{"tick_rate_hz", 123.0}});

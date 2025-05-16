@@ -31,7 +31,7 @@ class CountingWorkload
 
 ROBOTICK_REGISTER_WORKLOAD(CountingWorkload, CountConfig, robotick::EmptyInputs, robotick::EmptyOutputs);
 
-TEST_CASE("Engine runs tick() loop for registered workload")
+TEST_CASE("Unit|Framework|Engine|Engine runs tick() loop for registered workload")
 {
 	Model model;
 	auto h = model.add_by_type("CountingWorkload", "counter", {});
