@@ -1,9 +1,9 @@
 #if 0
-#include <catch2/catch_test_macros.hpp>
-#include "robotick/framework/Model.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/FieldMacros.h"
-#include "robotick/framework/WorkloadMacros.h"
+#include "robotick/framework/Model.h"
+#include "robotick/framework/WorkloadRegistry.h"
+#include <catch2/catch_test_macros.hpp>
 
 using namespace robotick;
 

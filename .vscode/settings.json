@@ -89,6 +89,16 @@
         "variant": "cpp",
         "xhash": "cpp",
         "xtree": "cpp",
-        "any": "cpp"
+        "any": "cpp",
+        "bitset": "cpp",
+        "codecvt": "cpp",
+        "cstdarg": "cpp",
+        "cwctype": "cpp",
+        "memory_resource": "cpp",
+        "string_view": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp",
+        "span": "cpp",
+        "cinttypes": "cpp"
     }, // Top-level CMakeLists.txt
 }
