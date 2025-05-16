@@ -1,7 +1,7 @@
 #pragma once
 
-#include "robotick/framework/FieldRegistry.h"
-#include "robotick/framework/utils_typename.h"
+#include "robotick/framework/registry/FieldRegistry.h"
+#include "robotick/framework/utils/Typename.h"
 
 #include <any>
 #include <cstddef>

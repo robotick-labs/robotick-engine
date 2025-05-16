@@ -1,6 +1,6 @@
-#include "robotick/framework/WorkloadFactory.h"
-#include "robotick/framework/FieldUtils.h"
-#include "robotick/framework/WorkloadRegistry.h"
+#include "robotick/framework/registry/WorkloadFactory.h"
+#include "robotick/framework/registry/FieldUtils.h"
+#include "robotick/framework/registry/WorkloadRegistry.h"
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>

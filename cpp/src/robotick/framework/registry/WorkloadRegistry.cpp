@@ -1,4 +1,4 @@
-#include "robotick/framework/WorkloadRegistry.h"
+#include "robotick/framework/registry/WorkloadRegistry.h"
 
 namespace robotick
 {

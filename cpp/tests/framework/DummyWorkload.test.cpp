@@ -1,6 +1,6 @@
-#include "robotick/framework/FieldMacros.h"
 #include "robotick/framework/Model.h"
-#include "robotick/framework/WorkloadRegistry.h"
+#include "robotick/framework/registry/FieldMacros.h"
+#include "robotick/framework/registry/WorkloadRegistry.h"
 #include <catch2/catch_test_macros.hpp>
 
 using namespace robotick;

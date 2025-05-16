@@ -1,9 +1,9 @@
 
-#include "robotick/framework/FieldMacros.h"
-#include "robotick/framework/FieldUtils.h"
 #include "robotick/framework/FixedString.h"
-#include "robotick/framework/WorkloadRegistry.h"
-#include "robotick/framework/utils_pybind.h"
+#include "robotick/framework/registry/FieldMacros.h"
+#include "robotick/framework/registry/FieldUtils.h"
+#include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/framework/utils/PyBind.h"
 
 #include <iostream>
 #include <mutex>
