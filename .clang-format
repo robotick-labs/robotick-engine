@@ -10,4 +10,6 @@ SortIncludes: true
 SpacesInAngles: false
 SpaceBeforeParens: ControlStatements
 AlignConsecutiveDeclarations: true
-BreakBeforeBraces: Allman
+AlignAfterOpenBracket: DontAlign
+AllowShortLambdasOnASingleLine: Empty
+BreakBeforeBraces: Attach

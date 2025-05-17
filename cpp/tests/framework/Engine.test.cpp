@@ -72,7 +72,6 @@ TEST_CASE("Unit|Framework|Engine|DummyWorkload workload stores tick rate correct
 
 	Engine engine;
 	engine.load(model);
-	engine.setup();
 
 	const double tick_rate_hz = EngineInspector::get_instance_info(engine, 0).tick_rate_hz;
 	REQUIRE(tick_rate_hz == 123.0);
@@ -87,7 +86,6 @@ TEST_CASE("Unit|Framework|Engine|DummyWorkload workload stores config correctly"
 
 	Engine engine;
 	engine.load(model);
-	engine.setup();
 
 	const DummyWorkload* ptr = EngineInspector::get_instance<DummyWorkload>(engine, 0);
 	REQUIRE(ptr->loaded_value == 42);
@@ -112,7 +110,6 @@ TEST_CASE("Unit|Framework|Engine|Multiple workloads allowed")
 
 	Engine engine;
 	engine.load(model);
-	engine.setup();
 
 	const DummyWorkload* one = EngineInspector::get_instance<DummyWorkload>(engine, 0);
 	const DummyWorkload* two = EngineInspector::get_instance<DummyWorkload>(engine, 1);
@@ -155,7 +152,6 @@ TEST_CASE("Unit|Framework|Engine|Workloads are ticked")
 
 	Engine engine;
 	engine.load(model);
-	engine.setup();
 	engine.start();
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(10));

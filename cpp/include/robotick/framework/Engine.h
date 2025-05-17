@@ -33,7 +33,6 @@ namespace robotick
 		~Engine();
 
 		void load(const Model& model);
-		void setup();
 		void start();
 		void stop();
 
