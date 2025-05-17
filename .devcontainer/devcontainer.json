@@ -13,5 +13,8 @@
         "ms-vscode.cmake-tools",
         "matepek.vscode-catch2-test-adapter"
     ],
-    "postCreateCommand": "pwd && ls && pip install --break-system-packages -e . && cmake -S . -B build"
+    "postCreateCommand": "pwd && ls && pip install --break-system-packages -e . && cmake -S . -B build",
+    "mounts": [
+        "source=${env:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
+    ]
 }
