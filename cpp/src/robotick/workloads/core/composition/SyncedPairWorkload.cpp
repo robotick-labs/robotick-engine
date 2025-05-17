@@ -1,6 +1,5 @@
 
 #include "robotick/framework/Model.h"
-#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 
@@ -15,7 +14,7 @@ struct SyncedPairConfig
 ROBOTICK_DEFINE_FIELDS(SyncedPairConfig, ROBOTICK_FIELD(SyncedPairConfig, primary),
 					   ROBOTICK_FIELD(SyncedPairConfig, secondary))
 
-struct SyncedPairWorkload : public WorkloadBase
+struct SyncedPairWorkload
 {
 	SyncedPairConfig config;
 

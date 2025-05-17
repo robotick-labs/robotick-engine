@@ -1,5 +1,4 @@
 #include "robotick/framework/Model.h"
-#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 
@@ -15,7 +14,7 @@ struct SequenceConfig
 };
 ROBOTICK_DEFINE_FIELDS(SequenceConfig, ROBOTICK_FIELD(SequenceConfig, children))
 
-struct SequenceWorkload : public WorkloadBase
+struct SequenceWorkload
 {
 	SequenceConfig config;
 	std::vector<void *> child_ptrs;

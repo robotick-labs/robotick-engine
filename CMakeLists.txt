@@ -6,8 +6,8 @@ include(FetchContent)  # ← This is the missing piece
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Promote offsetof warning to error
-add_compile_options(-Werror=invalid-offsetof)
+# warnings as errors throughout - to ensure quality code at all times
+add_compile_options(-Wall -Wextra -Werror)
 
 # Public include path
 include_directories(${CMAKE_SOURCE_DIR}/cpp/include)

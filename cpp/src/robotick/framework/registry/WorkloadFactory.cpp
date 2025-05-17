@@ -1,5 +1,4 @@
 #include "robotick/framework/registry/WorkloadFactory.h"
-#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include <cstdlib>
@@ -69,10 +68,7 @@ namespace robotick
 				apply_struct_fields(static_cast<uint8_t *>(ptr) + p.type->config_offset, *p.type->config_struct,
 									p.config);
 
-			WorkloadBase *workload_base = reinterpret_cast<WorkloadBase *>(&m_buffer[offsets[i]]);
-			workload_base->unique_name = p.name.c_str();
-			workload_base->tick_rate_hz = p.tick_rate_hz;
-			m_instances.push_back({ptr, p.type});
+			m_instances.push_back({ptr, p.type, p.name, p.tick_rate_hz});
 		}
 
 		m_pending.clear();

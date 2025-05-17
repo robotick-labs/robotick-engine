@@ -40,6 +40,11 @@ namespace robotick
 			return m_factory;
 		}
 
+		const WorkloadInstance &get_instance(WorkloadHandle h) const
+		{
+			return m_factory.get_all().at(h.index);
+		}
+
 		template <typename T> T *get(WorkloadHandle h)
 		{
 			return static_cast<T *>(m_factory.get_all().at(h.index).ptr);

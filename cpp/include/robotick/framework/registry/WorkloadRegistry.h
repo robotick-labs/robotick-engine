@@ -1,6 +1,5 @@
 #pragma once
 
-#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/utils/Typename.h"
@@ -168,7 +167,6 @@ namespace robotick
 	{
 		WorkloadAutoRegister()
 		{
-			static_assert(std::is_base_of_v<WorkloadBase, T>, "Must derive from WorkloadBase");
 			// no more standard-layout assert
 			static const auto &e = register_workload<T, Config, Inputs, Outputs>();
 			static WorkloadRegistration<T> reg{e};

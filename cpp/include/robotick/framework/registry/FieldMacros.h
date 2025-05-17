@@ -8,18 +8,13 @@
 
 #define ROBOTICK_DECLARE_FIELDS(...)                                                                                   \
 	static const ::robotick::StructRegistryEntry *get_struct_reflection();                                             \
-	static std::vector<::robotick::FieldInfo> get_fields();                                                            \
-	static const char *get_struct_name();
+	static std::vector<::robotick::FieldInfo> get_fields();
 
 #define ROBOTICK_DEFINE_FIELDS(Type, ...)                                                                              \
 	const ::robotick::StructRegistryEntry *Type::get_struct_reflection()                                               \
 	{                                                                                                                  \
 		static const auto *entry = ::robotick::register_struct(#Type, sizeof(Type), Type::get_fields());               \
 		return entry;                                                                                                  \
-	}                                                                                                                  \
-	const char *Type::get_struct_name()                                                                                \
-	{                                                                                                                  \
-		return #Type;                                                                                                  \
 	}                                                                                                                  \
 	std::vector<::robotick::FieldInfo> Type::get_fields()                                                              \
 	{                                                                                                                  \

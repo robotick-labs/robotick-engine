@@ -5,6 +5,9 @@ enable_testing()
 
 include(FetchContent)
 
+# warnings as errors throughout - to ensure quality code at all times
+add_compile_options(-Wall -Wextra -Werror)
+
 # ✅ Download Catch2 automatically if not found
 FetchContent_Declare(
   Catch2

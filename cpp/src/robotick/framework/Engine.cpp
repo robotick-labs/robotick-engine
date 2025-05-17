@@ -1,6 +1,5 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
-#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/utils/Thread.h"
 
 #include <atomic>
@@ -49,7 +48,8 @@ namespace robotick
 			DWORD_PTR mask = 1 << core;
 			SetThreadAffinityMask(GetCurrentThread(), mask);
 #else
-			// Optional: use pthread_setaffinity_np
+			(void)core; // suppress unused parameter warning
+						// Optional: use pthread_setaffinity_np
 #endif
 		}
 	} // namespace
@@ -152,35 +152,42 @@ namespace robotick
 		{
 			const auto &instance = instances[h.index];
 
-			WorkloadBase *workload_base = reinterpret_cast<WorkloadBase *>(instance.ptr);
+			void *instance_ptr = instance.ptr;
+			const std::string &instance_unique_name = instance.unique_name;
+			const double instance_tick_rate_hz = instance.tick_rate_hz;
 
-			m_impl->threads.emplace_back([this, &instance, &workload_base]() {
-				set_thread_affinity(2);
-				set_thread_priority_high();
-				set_thread_name("robotick_" + std::string(instance.type->name) + "_" +
-								std::string(workload_base->unique_name));
+			if (instance_tick_rate_hz <= 0 || !instance.type->tick_fn)
+			{
+				continue; // no point in spawning a thread if we don't intend to tick
+			}
 
-				double hz = workload_base->tick_rate_hz;
-				if (hz <= 0 || !instance.type->tick_fn)
-					return;
+			m_impl->threads.emplace_back(
+				[this, &instance, &instance_ptr, &instance_unique_name, &instance_tick_rate_hz]() {
+					set_thread_affinity(2);
+					set_thread_priority_high();
+					set_thread_name("robotick_" + std::string(instance.type->name) + "_" +
+									std::string(instance_unique_name));
 
-				using namespace std::chrono;
-				const auto tick_interval = duration<double>(1.0 / hz);
-				auto next_tick_time = steady_clock::now() + tick_interval;
-				auto last_time = steady_clock::now();
+					if (instance_tick_rate_hz <= 0 || !instance.type->tick_fn)
+						return;
 
-				while (!m_impl->stop_flag)
-				{
-					auto now = steady_clock::now();
-					double time_delta = duration<double>(now - last_time).count();
-					last_time = now;
+					using namespace std::chrono;
+					const auto tick_interval = duration<double>(1.0 / instance_tick_rate_hz);
+					auto next_tick_time = steady_clock::now() + tick_interval;
+					auto last_time = steady_clock::now();
 
-					instance.type->tick_fn(instance.ptr, time_delta);
-					next_tick_time += tick_interval;
+					while (!m_impl->stop_flag)
+					{
+						auto now = steady_clock::now();
+						double time_delta = duration<double>(now - last_time).count();
+						last_time = now;
 
-					hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
-				}
-			});
+						instance.type->tick_fn(instance.ptr, time_delta);
+						next_tick_time += tick_interval;
+
+						hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
+					}
+				});
 		}
 	}
 

@@ -1,6 +1,5 @@
 
 #include "robotick/framework/FixedString.h"
-#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -44,7 +43,7 @@ struct TimingDiagnosticsInternalState
 	double sum_dt2 = 0.0;
 };
 
-struct TimingDiagnosticsWorkload : public WorkloadBase
+struct TimingDiagnosticsWorkload
 {
 	TimingDiagnosticsConfig config;
 	TimingDiagnosticsInputs inputs;

@@ -1,13 +1,12 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
-#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include <catch2/catch_test_macros.hpp>
 
 using namespace robotick;
 
-struct CountingWorkload : public WorkloadBase
+struct CountingWorkload
 {
 	int tick_count = 0;
 

@@ -59,8 +59,7 @@ void populate_model(Model &model)
 	auto sequence = model.add_by_type("SequenceWorkload", "control_sequence", 0.0,
 									  {{"children", std::vector<WorkloadHandle>{remote, deadzone, mixer}}});
 
-	auto pair =
-		model.add_by_type("SyncedPairWorkload", "control_pair", 100.0, {{"primary", brickpi}, {"secondary", sequence}});
+	model.add_by_type("SyncedPairWorkload", "control_pair", 100.0, {{"primary", brickpi}, {"secondary", sequence}});
 }
 #endif // #if 1
 

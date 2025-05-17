@@ -19,6 +19,8 @@ namespace robotick
 	{
 		void *ptr;
 		const WorkloadRegistryEntry *type;
+		std::string unique_name;
+		double tick_rate_hz = 0.0;
 	};
 
 	class ROBOTICK_API WorkloadFactory

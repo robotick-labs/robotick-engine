@@ -1,5 +1,4 @@
 #include "robotick/framework/FixedString.h"
-#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -43,13 +42,13 @@ struct HelloOutputs
 ROBOTICK_DEFINE_FIELDS(HelloOutputs, ROBOTICK_FIELD(HelloOutputs, sum), ROBOTICK_FIELD(HelloOutputs, message))
 
 // === Workload ===
-struct HelloWorkload : public WorkloadBase
+struct HelloWorkload
 {
 	HelloInputs inputs;
 	HelloOutputs outputs;
 	HelloConfig config;
 
-	void tick(double time_delta)
+	void tick(double)
 	{
 		outputs.sum = (inputs.a + inputs.b) * config.multiplier;
 

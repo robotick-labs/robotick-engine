@@ -1,12 +1,11 @@
 #include "robotick/framework/Model.h"
-#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include <catch2/catch_test_macros.hpp>
 
 using namespace robotick;
 
-struct DummyWorkload : public WorkloadBase
+struct DummyWorkload
 {
 	void tick(double)
 	{
@@ -21,6 +20,6 @@ TEST_CASE("Unit|Framework|Engine|DummyWorkload stores tick rate")
 	auto h = model.add_by_type("DummyWorkload", "dummy", 123.0, {});
 	model.finalise();
 
-	auto *inst = model.get<DummyWorkload>(h);
-	REQUIRE(inst->tick_rate_hz == 123.0);
+	auto &inst = model.get_instance(h);
+	REQUIRE(inst.tick_rate_hz == 123.0);
 }
