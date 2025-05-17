@@ -1,6 +1,8 @@
 #include "robotick/framework/registry/WorkloadFactory.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include <algorithm> // For std::any_of
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
@@ -62,13 +64,34 @@ namespace robotick
 		for (size_t i = 0; i < m_pending.size(); ++i)
 		{
 			const auto &p = m_pending[i];
+
+			// Check for duplicate names before adding
+			bool name_exists =
+				std::any_of(m_instances.begin(), m_instances.end(),
+							[&](const WorkloadInstance &existing) { return existing.unique_name == p.name; });
+
+			if (name_exists)
+			{
+				std::cerr << "Error: Duplicate unique_name '" << p.name << "' — skipping additional workload."
+						  << std::endl;
+				continue; // Skip this one and move on
+			}
+
 			void *ptr = &m_buffer[offsets[i]];
 			p.type->construct(ptr);
+
 			if (p.type->config_struct)
 				apply_struct_fields(static_cast<uint8_t *>(ptr) + p.type->config_offset, *p.type->config_struct,
 									p.config);
 
-			m_instances.push_back({ptr, p.type, p.name, p.tick_rate_hz});
+			// Explicitly init the instance
+			WorkloadInstance inst;
+			inst.ptr = ptr;
+			inst.type = p.type;
+			inst.unique_name = p.name;
+			inst.tick_rate_hz = p.tick_rate_hz;
+
+			m_instances.push_back(inst);
 		}
 
 		m_pending.clear();

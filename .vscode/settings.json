@@ -99,6 +99,7 @@
         "numbers": "cpp",
         "semaphore": "cpp",
         "span": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "cassert": "cpp"
     }, // Top-level CMakeLists.txt
 }

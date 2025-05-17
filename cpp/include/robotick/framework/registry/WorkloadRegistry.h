@@ -104,7 +104,7 @@ namespace robotick
 
 		// 2) Compute struct‐reflection pointers and offsets:
 		const StructRegistryEntry *cfg_struct = nullptr;
-		size_t cfg_offset = std::numeric_limits<size_t>::max();
+		size_t cfg_offset = 0;
 		if constexpr (!is_void_v<ConfigType>)
 		{
 			cfg_struct = ConfigType::get_struct_reflection();
@@ -112,7 +112,7 @@ namespace robotick
 		}
 
 		const StructRegistryEntry *in_struct = nullptr;
-		size_t in_offset = std::numeric_limits<size_t>::max();
+		size_t in_offset = 0;
 		if constexpr (!is_void_v<InputType>)
 		{
 			in_struct = InputType::get_struct_reflection();
@@ -120,7 +120,7 @@ namespace robotick
 		}
 
 		const StructRegistryEntry *out_struct = nullptr;
-		size_t out_offset = std::numeric_limits<size_t>::max();
+		size_t out_offset = 0;
 		if constexpr (!is_void_v<OutputType>)
 		{
 			out_struct = OutputType::get_struct_reflection();
