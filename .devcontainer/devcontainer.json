@@ -1,15 +1,17 @@
 {
     "name": "Robotick Native Dev",
     "build": {
-        "dockerfile": "Dockerfile.native"
+        "dockerfile": "Dockerfile.native",
+        "context": ".."
     },
+    "workspaceFolder": "/workspaces/robotick",
     "settings": {
         "terminal.integrated.defaultProfile.linux": "bash"
     },
     "extensions": [
         "ms-vscode.cpptools",
         "ms-vscode.cmake-tools",
-        "mate-test-runner.cplusplus-testmate"
+        "matepek.vscode-catch2-test-adapter"
     ],
-    "postCreateCommand": "cmake -S . -B build"
+    "postCreateCommand": "pwd && ls && pip install --break-system-packages -e . && cmake -S . -B build"
 }

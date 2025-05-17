@@ -152,42 +152,36 @@ namespace robotick
 		{
 			const auto &instance = instances[h.index];
 
-			void *instance_ptr = instance.ptr;
-			const std::string &instance_unique_name = instance.unique_name;
-			const double instance_tick_rate_hz = instance.tick_rate_hz;
-
-			if (instance_tick_rate_hz <= 0 || !instance.type->tick_fn)
+			if (instance.tick_rate_hz <= 0 || !instance.type->tick_fn || !instance.ptr)
 			{
 				continue; // no point in spawning a thread if we don't intend to tick
 			}
 
-			m_impl->threads.emplace_back(
-				[this, &instance, &instance_ptr, &instance_unique_name, &instance_tick_rate_hz]() {
-					set_thread_affinity(2);
-					set_thread_priority_high();
-					set_thread_name("robotick_" + std::string(instance.type->name) + "_" +
-									std::string(instance_unique_name));
+			m_impl->threads.emplace_back([this, &instance]() {
+				// one-time setup of this workload's tick-thread:
+				set_thread_affinity(2);
+				set_thread_priority_high();
+				set_thread_name("robotick_" + std::string(instance.type->name) + "_" +
+								std::string(instance.unique_name));
 
-					if (instance_tick_rate_hz <= 0 || !instance.type->tick_fn)
-						return;
+				using namespace std::chrono;
+				const auto tick_interval = duration<double>(1.0 / instance.tick_rate_hz);
+				auto next_tick_time = steady_clock::now() + tick_interval;
+				auto last_time = steady_clock::now();
 
-					using namespace std::chrono;
-					const auto tick_interval = duration<double>(1.0 / instance_tick_rate_hz);
-					auto next_tick_time = steady_clock::now() + tick_interval;
-					auto last_time = steady_clock::now();
+				// this workload's main tick-thread loop:
+				while (!m_impl->stop_flag)
+				{
+					auto now = steady_clock::now();
+					double time_delta = duration<double>(now - last_time).count();
+					last_time = now;
 
-					while (!m_impl->stop_flag)
-					{
-						auto now = steady_clock::now();
-						double time_delta = duration<double>(now - last_time).count();
-						last_time = now;
+					instance.type->tick_fn(instance.ptr, time_delta);
+					next_tick_time += tick_interval;
 
-						instance.type->tick_fn(instance.ptr, time_delta);
-						next_tick_time += tick_interval;
-
-						hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
-					}
-				});
+					hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
+				}
+			});
 		}
 	}
 

@@ -22,9 +22,16 @@ std::string get_clean_typename(const std::type_index &t)
 		name = demangled.get();
 #endif
 
+	// Strip leading namespace, e.g. "robotick::" or "std::"
+	const size_t ns_pos = name.rfind("::");
+	if (ns_pos != std::string::npos)
+		name = name.substr(ns_pos + 2);
+
 	if (name.rfind("class ", 0) == 0)
 		return name.substr(6);
+
 	if (name.rfind("struct ", 0) == 0)
 		return name.substr(7);
+
 	return name;
 }

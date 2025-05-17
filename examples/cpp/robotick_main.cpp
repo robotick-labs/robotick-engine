@@ -23,8 +23,7 @@ void populate_model(Model &model)
 {
     model.add_by_type("PythonWorkload", "py",
                       {{"script_name", "robotick.workloads.optional.test.hello_workload"},
-                       {"class_name", "HelloWorkload"},
-                       {"tick_rate_hz", 5.0}});
+                       {"class_name", "HelloWorkload"}});
 }
 #else
 void populate_model(Model &model)

@@ -92,10 +92,12 @@ namespace robotick
 			catch (const py::error_already_set &e)
 			{
 				std::cerr << "[Python ERROR] Failed to load workload: " << e.what() << std::endl;
+				throw; // rethrow same exception
 			}
 			catch (const std::exception &e)
 			{
 				std::cerr << "[ERROR] Exception during Python workload load(): " << e.what() << std::endl;
+				throw; // rethrow same exception
 			}
 		}
 

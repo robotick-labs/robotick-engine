@@ -32,7 +32,7 @@ TEST_CASE("Unit|Framework|Engine|Engine runs tick() loop for registered workload
 	engine.start();
 
 	auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
-	while (w->tick_count == 0 && (std::chrono::steady_clock::now() < deadline || true))
+	while (w->tick_count == 0 && std::chrono::steady_clock::now() < deadline)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}

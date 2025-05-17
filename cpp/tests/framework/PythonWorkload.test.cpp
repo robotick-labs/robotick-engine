@@ -2,6 +2,9 @@
 #include "robotick/framework/Model.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include <catch2/catch_test_macros.hpp>
+#include <iostream>
+#include <sstream>
+#include <streambuf>
 
 using namespace robotick;
 

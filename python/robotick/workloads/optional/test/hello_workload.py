@@ -1,6 +1,6 @@
 class HelloWorkload:
     def __init__(self, config):
-        print(f"[Python] HelloWorkload init! {config["tick_rate_hz"]}Hz")
+        print(f"[Python] HelloWorkload init!")
 
     def tick(self, time_delta, input, output):
         if input.get("force_error"):
