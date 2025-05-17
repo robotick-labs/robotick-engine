@@ -21,7 +21,7 @@ namespace robotick
 		struct PythonConfig
 		{
 			FixedString128 script_name;
-			FixedString64 class_name;
+			FixedString64  class_name;
 			ROBOTICK_DECLARE_FIELDS();
 		};
 		ROBOTICK_DEFINE_FIELDS(PythonConfig, ROBOTICK_FIELD(PythonConfig, script_name),
@@ -54,29 +54,29 @@ namespace robotick
 
 	struct PythonWorkload
 	{
-		PythonConfig config;
-		PythonInputs inputs;
+		PythonConfig  config;
+		PythonInputs  inputs;
 		PythonOutputs outputs;
 
-		PythonInternalState *internal_state = nullptr;
+		PythonInternalState* internal_state = nullptr;
 
-		PythonWorkload()
-		{
-			internal_state = new PythonInternalState();
-		}
+		PythonWorkload() { internal_state = new PythonInternalState(); }
 
 		~PythonWorkload()
 		{
+			py::gil_scoped_acquire gil;
 			delete internal_state;
 		}
 
 		void load()
 		{
 			static std::once_flag init_flag;
-			std::call_once(init_flag, []() {
-				py::initialize_interpreter();
-				PyEval_SaveThread(); // release the GIL
-			});
+			std::call_once(init_flag,
+						   []()
+						   {
+							   py::initialize_interpreter();
+							   PyEval_SaveThread(); // release the GIL
+						   });
 
 			try
 			{
@@ -89,12 +89,12 @@ namespace robotick
 				internal_state->py_class = internal_state->py_module.attr(config.class_name.c_str());
 				internal_state->py_instance = internal_state->py_class(py_cfg);
 			}
-			catch (const py::error_already_set &e)
+			catch (const py::error_already_set& e)
 			{
 				std::cerr << "[Python ERROR] Failed to load workload: " << e.what() << std::endl;
 				throw; // rethrow same exception
 			}
-			catch (const std::exception &e)
+			catch (const std::exception& e)
 			{
 				std::cerr << "[ERROR] Exception during Python workload load(): " << e.what() << std::endl;
 				throw; // rethrow same exception
@@ -121,7 +121,7 @@ namespace robotick
 				// Marshal outputs back into C++ struct
 				marshal_dict_to_struct(py_out, *outputs.get_struct_reflection(), &outputs);
 			}
-			catch (const py::error_already_set &e)
+			catch (const py::error_already_set& e)
 			{
 				std::cerr << "[Python ERROR] " << e.what() << std::endl;
 			}

@@ -4,23 +4,43 @@
 #include "robotick/framework/api.h"
 
 #include <memory>
+#include <string>
 
 namespace robotick
 {
-    class Model;
+	class Model;
+	struct WorkloadRegistryEntry;
 
-    class ROBOTICK_API Engine
-    {
-       public:
-        Engine();
-        ~Engine();
+	struct WorkloadInstanceInfo
+	{
+		void*						 ptr;
+		const WorkloadRegistryEntry* type;
+		std::string					 unique_name;
+		double						 tick_rate_hz;
+	};
 
-        void load(const Model& model);
-        void setup();
-        void start();
-        void stop();
+	namespace test_access
+	{
+		struct EngineInspector;
+	}
 
-       private:
-        ROBOTICK_DECLARE_PIMPL();
-    };
-}  // namespace robotick
+	class ROBOTICK_API Engine
+	{
+		friend struct robotick::test_access::EngineInspector;
+
+	  public:
+		Engine();
+		~Engine();
+
+		void load(const Model& model);
+		void setup();
+		void start();
+		void stop();
+
+	  protected:
+		const WorkloadInstanceInfo& get_instance_info(size_t index) const;
+
+	  private:
+		ROBOTICK_DECLARE_PIMPL();
+	};
+} // namespace robotick

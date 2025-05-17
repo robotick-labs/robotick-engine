@@ -5,24 +5,20 @@
 
 namespace robotick
 {
-
-    std::map<std::string, const WorkloadRegistryEntry*>& get_mutable_registry()
+    std::map<std::string, const WorkloadRegistryEntry*>& WorkloadRegistry::registry()
     {
-        static std::map<std::string, const WorkloadRegistryEntry*> registry;
-        return registry;
+        static std::map<std::string, const WorkloadRegistryEntry*> instance;
+        return instance;
     }
 
-    void register_workload_entry(const WorkloadRegistryEntry& entry)
+    void WorkloadRegistry::register_entry(const WorkloadRegistryEntry& entry)
     {
-        get_mutable_registry()[entry.name] = &entry;
+        registry()[entry.name] = &entry;
     }
 
-    const WorkloadRegistryEntry* get_workload_registry_entry(
-        const std::string& name)
+    const WorkloadRegistryEntry* WorkloadRegistry::find(const std::string& name) const
     {
-        auto& map = get_mutable_registry();
-        auto  it = map.find(name);
-        return it != map.end() ? it->second : nullptr;
+        auto it = registry().find(name);
+        return it != registry().end() ? it->second : nullptr;
     }
-
 }  // namespace robotick

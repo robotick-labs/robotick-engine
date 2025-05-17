@@ -1,13 +1,12 @@
-BasedOnStyle: Google
-ColumnLimit: 132
+BasedOnStyle: Microsoft
 AllowShortFunctionsOnASingleLine: InlineOnly
 IndentWidth: 4
 TabWidth: 4
-UseTab: Never
+UseTab: Always
 DerivePointerAlignment: false
 PointerAlignment: Left
 NamespaceIndentation: All
-SortIncludes: false
+SortIncludes: true
 SpacesInAngles: false
 SpaceBeforeParens: ControlStatements
 AlignConsecutiveDeclarations: true

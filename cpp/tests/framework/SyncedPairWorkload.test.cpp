@@ -8,7 +8,7 @@
 
 using namespace robotick;
 
-class TickCounter
+class TickCounterWorkload
 {
 public:
     int count = 0;
@@ -16,20 +16,20 @@ public:
     void tick(double) { ++count; }
 };
 
-static robotick::WorkloadAutoRegister<TickCounter> s_auto_register;
+static robotick::WorkloadAutoRegister<TickCounterWorkload> s_auto_register;
 
 TEST_CASE("SyncedPairWorkload ticks both children")
 {
     Model model;
 
-    auto p = model.add("TickCounter", "p", {});
-    auto s = model.add("TickCounter", "s", {});
+    auto p = model.add("TickCounterWorkload", "p", {});
+    auto s = model.add("TickCounterWorkload", "s", {});
     auto pair = model.add("SyncedPairWorkload", "pair", {{"primary", p}, {"secondary", s}});
 
     model.finalise();
 
-    auto *pInst = model.get<TickCounter>(p);
-    auto *sInst = model.get<TickCounter>(s);
+    auto *pInst = model.get<TickCounterWorkload>(p);
+    auto *sInst = model.get<TickCounterWorkload>(s);
 
     Engine engine;
     engine.load(model);
@@ -43,4 +43,4 @@ TEST_CASE("SyncedPairWorkload ticks both children")
     REQUIRE(sInst->count >= 1);
 }
 
-#endif  // #if 0
+#endif // #if 0
