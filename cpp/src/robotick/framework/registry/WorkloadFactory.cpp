@@ -1,4 +1,5 @@
 #include "robotick/framework/registry/WorkloadFactory.h"
+#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include <cstdlib>
@@ -7,13 +8,6 @@
 
 namespace robotick
 {
-	static double resolve_tick_rate(const WorkloadRegistryEntry *type, void *ptr)
-	{
-		if (type->get_tick_rate_fn)
-			return type->get_tick_rate_fn(ptr);
-		return 0.0;
-	}
-
 	WorkloadFactory::WorkloadFactory() = default;
 
 	WorkloadFactory::~WorkloadFactory()
@@ -23,6 +17,7 @@ namespace robotick
 	}
 
 	WorkloadHandle WorkloadFactory::add_by_type(const std::string &type_name, const std::string &name,
+												const double tick_rate_hz,
 												const std::map<std::string, std::any> &config)
 	{
 		if (m_finalised)
@@ -30,7 +25,7 @@ namespace robotick
 		const auto *entry = get_workload_registry_entry(type_name);
 		if (!entry)
 			throw std::runtime_error("Unknown workload type: " + type_name);
-		m_pending.push_back({entry, config});
+		m_pending.push_back({entry, name, tick_rate_hz, config});
 		return {static_cast<uint32_t>(m_pending.size() - 1)};
 	}
 
@@ -71,10 +66,13 @@ namespace robotick
 			void *ptr = &m_buffer[offsets[i]];
 			p.type->construct(ptr);
 			if (p.type->config_struct)
-				apply_struct_fields(static_cast<uint8_t *>(ptr) + p.type->config_struct_offset, *p.type->config_struct,
+				apply_struct_fields(static_cast<uint8_t *>(ptr) + p.type->config_offset, *p.type->config_struct,
 									p.config);
 
-			m_instances.push_back({ptr, p.type, resolve_tick_rate(p.type, ptr)});
+			WorkloadBase *workload_base = reinterpret_cast<WorkloadBase *>(&m_buffer[offsets[i]]);
+			workload_base->unique_name = p.name.c_str();
+			workload_base->tick_rate_hz = p.tick_rate_hz;
+			m_instances.push_back({ptr, p.type});
 		}
 
 		m_pending.clear();

@@ -1,4 +1,6 @@
+
 #include "robotick/framework/Model.h"
+#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 
@@ -8,15 +10,13 @@ struct SyncedPairConfig
 {
 	WorkloadHandle primary;
 	WorkloadHandle secondary;
-	double tick_rate_hz = 30.0;
 	ROBOTICK_DECLARE_FIELDS();
 };
 ROBOTICK_DEFINE_FIELDS(SyncedPairConfig, ROBOTICK_FIELD(SyncedPairConfig, primary),
-					   ROBOTICK_FIELD(SyncedPairConfig, secondary), ROBOTICK_FIELD(SyncedPairConfig, tick_rate_hz))
+					   ROBOTICK_FIELD(SyncedPairConfig, secondary))
 
-class SyncedPairWorkload
+struct SyncedPairWorkload : public WorkloadBase
 {
-  public:
 	SyncedPairConfig config;
 
 	void *primary_ptr = nullptr;
@@ -28,9 +28,9 @@ class SyncedPairWorkload
 	{
 		const auto &inst = model.factory().get_all();
 		primary_ptr = inst[config.primary.index].ptr;
-		primary_tick = inst[config.primary.index].type->tick;
+		primary_tick = inst[config.primary.index].type->tick_fn;
 		secondary_ptr = inst[config.secondary.index].ptr;
-		secondary_tick = inst[config.secondary.index].type->tick;
+		secondary_tick = inst[config.secondary.index].type->tick_fn;
 	}
 
 	void tick(double time_delta)
@@ -38,11 +38,6 @@ class SyncedPairWorkload
 		primary_tick(primary_ptr, time_delta);
 		secondary_tick(secondary_ptr, time_delta);
 	}
-
-	double get_tick_rate_hz() const
-	{
-		return config.tick_rate_hz;
-	}
 };
 
-ROBOTICK_REGISTER_WORKLOAD(SyncedPairWorkload, SyncedPairConfig, robotick::EmptyInputs, robotick::EmptyOutputs);
+static WorkloadAutoRegister<SyncedPairWorkload, SyncedPairConfig> s_auto_register;

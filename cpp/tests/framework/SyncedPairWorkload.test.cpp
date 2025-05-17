@@ -12,11 +12,11 @@ class TickCounter
 {
 public:
     int count = 0;
-    double get_tick_rate_hz() const { return 50.0; }
+    double get_tiXck_rate_hz() const { return 50.0; }
     void tick(double) { ++count; }
 };
 
-ROBOTICK_REGISTER_WORKLOAD(TickCounter, robotick::EmptyConfig, robotick::EmptyInputs, robotick::EmptyOutputs);
+static robotick::WorkloadAutoRegister<TickCounter> s_auto_register;
 
 TEST_CASE("SyncedPairWorkload ticks both children")
 {

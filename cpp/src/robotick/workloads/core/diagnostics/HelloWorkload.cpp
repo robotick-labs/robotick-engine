@@ -1,4 +1,5 @@
 #include "robotick/framework/FixedString.h"
+#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -26,23 +27,24 @@ struct HelloInputs
 };
 ROBOTICK_DEFINE_FIELDS(HelloInputs, ROBOTICK_FIELD(HelloInputs, a), ROBOTICK_FIELD(HelloInputs, b))
 
+enum class HelloStatus
+{
+	NORMAL,
+	MAGIC
+};
+
 struct HelloOutputs
 {
 	double sum = 0.0;
 	FixedString32 message = "Waiting...";
-	enum Status
-	{
-		NORMAL,
-		MAGIC
-	} status = NORMAL;
+	HelloStatus status = HelloStatus::NORMAL;
 	ROBOTICK_DECLARE_FIELDS();
 };
 ROBOTICK_DEFINE_FIELDS(HelloOutputs, ROBOTICK_FIELD(HelloOutputs, sum), ROBOTICK_FIELD(HelloOutputs, message))
 
 // === Workload ===
-class HelloWorkload
+struct HelloWorkload : public WorkloadBase
 {
-  public:
 	HelloInputs inputs;
 	HelloOutputs outputs;
 	HelloConfig config;
@@ -54,22 +56,17 @@ class HelloWorkload
 		if (outputs.sum == 42.0)
 		{
 			outputs.message = "The Answer!";
-			outputs.status = HelloOutputs::MAGIC;
+			outputs.status = HelloStatus::MAGIC;
 		}
 		else
 		{
 			char buf[32];
 			std::snprintf(buf, sizeof(buf), "Sum = %.2f", outputs.sum);
 			outputs.message = buf;
-			outputs.status = HelloOutputs::NORMAL;
+			outputs.status = HelloStatus::NORMAL;
 		}
 	}
-
-	double get_tick_rate_hz() const
-	{
-		return 30.0;
-	} // dummy value
 };
 
 // === Workload Auto-Registration ===
-ROBOTICK_REGISTER_WORKLOAD(HelloWorkload, HelloConfig, HelloInputs, HelloOutputs);
+static WorkloadAutoRegister<HelloWorkload, HelloConfig, HelloInputs, HelloOutputs> s_auto_register;

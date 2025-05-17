@@ -19,7 +19,6 @@ namespace robotick
 	{
 		void *ptr;
 		const WorkloadRegistryEntry *type;
-		double tick_rate_hz;
 	};
 
 	class ROBOTICK_API WorkloadFactory
@@ -28,7 +27,7 @@ namespace robotick
 		WorkloadFactory();
 		~WorkloadFactory();
 
-		WorkloadHandle add_by_type(const std::string &type_name, const std::string &name,
+		WorkloadHandle add_by_type(const std::string &type_name, const std::string &name, const double tick_rate_hz,
 								   const std::map<std::string, std::any> &config);
 		void finalise();
 		bool is_finalised() const
@@ -46,6 +45,8 @@ namespace robotick
 		struct Pending
 		{
 			const WorkloadRegistryEntry *type;
+			std::string name;
+			double tick_rate_hz = 0.0;
 			std::map<std::string, std::any> config;
 		};
 

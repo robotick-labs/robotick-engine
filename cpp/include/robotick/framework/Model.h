@@ -13,10 +13,10 @@ namespace robotick
 	class Model
 	{
 	  public:
-		WorkloadHandle add_by_type(const std::string &type, const std::string &name,
+		WorkloadHandle add_by_type(const std::string &type, const std::string &name, const double tick_rate_hz,
 								   const std::map<std::string, std::any> &config)
 		{
-			auto handle = m_factory.add_by_type(type, name, config);
+			auto handle = m_factory.add_by_type(type, name, tick_rate_hz, config);
 			m_handles.push_back(handle);
 			return handle;
 		}

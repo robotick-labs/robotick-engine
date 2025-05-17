@@ -13,7 +13,6 @@ public:
     TickOrder() {}
     int &ref;
     int expect;
-    double get_tick_rate_hz() const { return 0; }
     void tick(double)
     {
         REQUIRE(ref == expect - 1);
@@ -21,7 +20,7 @@ public:
     }
 };
 
-ROBOTICK_REGISTER_WORKLOAD(TickOrder, robotick::EmptyConfig, robotick::EmptyInputs, robotick::EmptyOutputs);
+static robotick::WorkloadAutoRegister<TickOrder> s_auto_register;
 
 TEST_CASE("SequenceWorkload ticks children in order")
 {
@@ -39,7 +38,7 @@ TEST_CASE("SequenceWorkload ticks children in order")
     auto *entry = get_workload_registry_entry(model.factory().get_type_name(s));
     REQUIRE(entry);
     entry->setup(ptr);
-    entry->tick(ptr, 0.01);
+    entry->tick_fn(ptr, 0.01);
 
     REQUIRE(state == 3);
 }

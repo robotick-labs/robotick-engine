@@ -1,7 +1,11 @@
 #include "robotick/framework/registry/WorkloadRegistry.h"
 
+#include <map>	  // for std::map
+#include <string> // for std::string
+
 namespace robotick
 {
+
 	std::map<std::string, const WorkloadRegistryEntry *> &get_mutable_registry()
 	{
 		static std::map<std::string, const WorkloadRegistryEntry *> registry;
@@ -19,4 +23,5 @@ namespace robotick
 		auto it = map.find(name);
 		return it != map.end() ? it->second : nullptr;
 	}
+
 } // namespace robotick

@@ -8,10 +8,9 @@ using namespace robotick;
 TEST_CASE("Unit|Workloads|PythonWorkload|PythonWorkload can tick without crash")
 {
 	Model model;
-	auto h = model.add_by_type("PythonWorkload", "py",
-							   {{"script_name", "robotick.workloads.optional.test.hello_workload"},
-								{"class_name", "HelloWorkload"},
-								{"tick_rate_hz", 5.0}});
+	auto h = model.add_by_type(
+		"PythonWorkload", "py", 5.0,
+		{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
 	model.finalise();
 
 	auto *ptr = model.factory().get_raw_ptr(h);
@@ -19,6 +18,6 @@ TEST_CASE("Unit|Workloads|PythonWorkload|PythonWorkload can tick without crash")
 
 	REQUIRE(entry); // fail early if unregistered
 
-	REQUIRE_NOTHROW(entry->load(ptr));
-	REQUIRE_NOTHROW(entry->tick(ptr, 0.01));
+	REQUIRE_NOTHROW(entry->load_fn(ptr));
+	REQUIRE_NOTHROW(entry->tick_fn(ptr, 0.01));
 }

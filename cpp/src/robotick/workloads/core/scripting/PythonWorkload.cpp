@@ -1,5 +1,6 @@
 
 #include "robotick/framework/FixedString.h"
+#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -19,11 +20,10 @@ struct PythonConfig
 {
 	FixedString128 script_name;
 	FixedString64 class_name;
-	double tick_rate_hz = 30.0;
 	ROBOTICK_DECLARE_FIELDS();
 };
 ROBOTICK_DEFINE_FIELDS(PythonConfig, ROBOTICK_FIELD(PythonConfig, script_name),
-					   ROBOTICK_FIELD(PythonConfig, class_name), ROBOTICK_FIELD(PythonConfig, tick_rate_hz))
+					   ROBOTICK_FIELD(PythonConfig, class_name))
 
 struct PythonInputs
 {
@@ -39,16 +39,30 @@ struct PythonOutputs
 };
 ROBOTICK_DEFINE_FIELDS(PythonOutputs, ROBOTICK_FIELD(PythonOutputs, example_out))
 
+struct PythonInternalState
+{
+	// Python embedding members
+	py::object py_module;
+	py::object py_class;
+	py::object py_instance;
+};
+
 // === Workload ===
 
-class PythonWorkload
+struct PythonWorkload : public WorkloadBase
 {
-  public:
 	PythonConfig config;
 	PythonInputs inputs;
 	PythonOutputs outputs;
 
-  public:
+	PythonInternalState *internal_state = nullptr;
+
+	PythonWorkload() { internal_state = new PythonInternalState() };
+	~PythonWorkload()
+	{
+		delete internal_state;
+	};
+
 	void load()
 	{
 		static std::once_flag init_flag;
@@ -64,9 +78,9 @@ class PythonWorkload
 			py::dict py_cfg;
 			marshal_struct_to_dict(&config, *config.get_struct_reflection(), py_cfg);
 
-			py_module = py::module_::import(config.script_name.c_str());
-			py_class = py_module.attr(config.class_name.c_str());
-			py_instance = py_class(py_cfg);
+			internal_state->py_module = py::module_::import(config.script_name.c_str());
+			internal_state->py_class = internal_state->py_module.attr(config.class_name.c_str());
+			internal_state->py_instance = internal_state->py_class(py_cfg);
 		}
 		catch (const py::error_already_set &e)
 		{
@@ -80,7 +94,7 @@ class PythonWorkload
 
 	void tick(double time_delta)
 	{
-		if (!py_instance)
+		if (!internal_state->py_instance)
 			return;
 
 		// Acquire GIL for calling into Python
@@ -94,7 +108,7 @@ class PythonWorkload
 		try
 		{
 			// Call the Python 'tick' method
-			py_instance.attr("tick")(time_delta, py_in, py_out);
+			internal_state->py_instance.attr("tick")(time_delta, py_in, py_out);
 			// Marshal outputs back into C++ struct
 			marshal_dict_to_struct(py_out, *outputs.get_struct_reflection(), &outputs);
 		}
@@ -103,17 +117,6 @@ class PythonWorkload
 			std::cerr << "[Python ERROR] " << e.what() << std::endl;
 		}
 	}
-
-	double get_tick_rate_hz() const
-	{
-		return config.tick_rate_hz;
-	}
-
-  private:
-	// Python embedding members
-	py::object py_module;
-	py::object py_class;
-	py::object py_instance;
 };
 
-ROBOTICK_REGISTER_WORKLOAD(PythonWorkload, PythonConfig, PythonInputs, PythonOutputs);
+static robotick::WorkloadAutoRegister<PythonWorkload, PythonConfig, PythonInputs, PythonOutputs> s_auto_register;

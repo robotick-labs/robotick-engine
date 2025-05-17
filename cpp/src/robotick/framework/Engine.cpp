@@ -1,5 +1,6 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
+#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/utils/Thread.h"
 
 #include <atomic>
@@ -86,10 +87,10 @@ namespace robotick
 		{
 			const auto &instance = instances[h.index];
 			m_impl->threads.emplace_back([&]() {
-				if (instance.type->pre_load)
-					instance.type->pre_load(instance.ptr);
-				if (instance.type->load)
-					instance.type->load(instance.ptr);
+				if (instance.type->pre_load_fn)
+					instance.type->pre_load_fn(instance.ptr);
+				if (instance.type->load_fn)
+					instance.type->load_fn(instance.ptr);
 			});
 		}
 
@@ -111,8 +112,8 @@ namespace robotick
 		for (auto &h : m_impl->model->get_workloads())
 		{
 			const auto &instance = factory.get_all()[h.index];
-			if (instance.type->setup)
-				instance.type->setup(instance.ptr);
+			if (instance.type->setup_fn)
+				instance.type->setup_fn(instance.ptr);
 		}
 
 		enable_high_resolution_timing();
@@ -151,13 +152,16 @@ namespace robotick
 		{
 			const auto &instance = instances[h.index];
 
-			m_impl->threads.emplace_back([this, &instance]() {
+			WorkloadBase *workload_base = reinterpret_cast<WorkloadBase *>(instance.ptr);
+
+			m_impl->threads.emplace_back([this, &instance, &workload_base]() {
 				set_thread_affinity(2);
 				set_thread_priority_high();
-				set_thread_name("robotick_" + std::string(instance.type->name));
+				set_thread_name("robotick_" + std::string(instance.type->name) + "_" +
+								std::string(workload_base->unique_name));
 
-				double hz = instance.tick_rate_hz;
-				if (hz <= 0 || !instance.type->tick)
+				double hz = workload_base->tick_rate_hz;
+				if (hz <= 0 || !instance.type->tick_fn)
 					return;
 
 				using namespace std::chrono;
@@ -171,7 +175,7 @@ namespace robotick
 					double time_delta = duration<double>(now - last_time).count();
 					last_time = now;
 
-					instance.type->tick(instance.ptr, time_delta);
+					instance.type->tick_fn(instance.ptr, time_delta);
 					next_tick_time += tick_interval;
 
 					hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
@@ -191,8 +195,8 @@ namespace robotick
 		for (auto &h : m_impl->model->get_workloads())
 		{
 			const auto &instance = factory.get_all()[h.index];
-			if (instance.type->stop)
-				instance.type->stop(instance.ptr);
+			if (instance.type->stop_fn)
+				instance.type->stop_fn(instance.ptr);
 		}
 
 		for (auto &t : m_impl->threads)

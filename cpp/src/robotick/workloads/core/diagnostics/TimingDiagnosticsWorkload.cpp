@@ -1,5 +1,6 @@
 
 #include "robotick/framework/FixedString.h"
+#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -13,12 +14,10 @@ using namespace robotick;
 
 struct TimingDiagnosticsConfig
 {
-	double tick_rate_hz = 100.0; // Hz
-	int report_every = 100;		 // Number of ticks per report
+	int report_every = 100; // Number of ticks per report
 	ROBOTICK_DECLARE_FIELDS();
 };
-ROBOTICK_DEFINE_FIELDS(TimingDiagnosticsConfig, ROBOTICK_FIELD(TimingDiagnosticsConfig, tick_rate_hz),
-					   ROBOTICK_FIELD(TimingDiagnosticsConfig, report_every))
+ROBOTICK_DEFINE_FIELDS(TimingDiagnosticsConfig, ROBOTICK_FIELD(TimingDiagnosticsConfig, report_every))
 
 struct TimingDiagnosticsInputs
 {
@@ -37,19 +36,28 @@ ROBOTICK_DEFINE_FIELDS(TimingDiagnosticsOutputs, ROBOTICK_FIELD(TimingDiagnostic
 					   ROBOTICK_FIELD(TimingDiagnosticsOutputs, avg_tick_rate),
 					   ROBOTICK_FIELD(TimingDiagnosticsOutputs, tick_stddev))
 
-class TimingDiagnosticsWorkload
+struct TimingDiagnosticsInternalState
 {
-  public:
+	std::chrono::steady_clock::time_point last_time;
+	int count = 0;
+	double sum_dt = 0.0;
+	double sum_dt2 = 0.0;
+};
+
+struct TimingDiagnosticsWorkload : public WorkloadBase
+{
 	TimingDiagnosticsConfig config;
 	TimingDiagnosticsInputs inputs;
 	TimingDiagnosticsOutputs outputs;
 
+	TimingDiagnosticsInternalState internal_state;
+
 	void load()
 	{
-		count = 0;
-		sum_dt = 0.0;
-		sum_dt2 = 0.0;
-		last_time = std::chrono::steady_clock::now();
+		internal_state.count = 0;
+		internal_state.sum_dt = 0.0;
+		internal_state.sum_dt2 = 0.0;
+		internal_state.last_time = std::chrono::steady_clock::now();
 	}
 
 	void tick(double dt)
@@ -62,14 +70,14 @@ class TimingDiagnosticsWorkload
 
 		outputs.last_tick_rate = tick_rate;
 
-		count++;
-		sum_dt += actual_dt;
-		sum_dt2 += actual_dt * actual_dt;
+		internal_state.count++;
+		internal_state.sum_dt += actual_dt;
+		internal_state.sum_dt2 += actual_dt * actual_dt;
 
-		if (count >= config.report_every)
+		if (internal_state.count >= config.report_every)
 		{
-			double mean_dt = sum_dt / count;
-			double mean_dt2 = sum_dt2 / count;
+			double mean_dt = internal_state.sum_dt / internal_state.count;
+			double mean_dt2 = internal_state.sum_dt2 / internal_state.count;
 			double stddev = sqrt(mean_dt2 - mean_dt * mean_dt);
 
 			outputs.avg_tick_rate = 1.0 / mean_dt;
@@ -79,25 +87,15 @@ class TimingDiagnosticsWorkload
 			cerr << "[TimingDiagnostics] avg: " << outputs.avg_tick_rate
 				 << " Hz, stddev: " << outputs.tick_stddev * 1000.0 * 1000.0 << " µs\n";
 
-			count = 0;
-			sum_dt = 0.0;
-			sum_dt2 = 0.0;
+			internal_state.count = 0;
+			internal_state.sum_dt = 0.0;
+			internal_state.sum_dt2 = 0.0;
 		}
 
-		last_time = now;
+		internal_state.last_time = now;
 	}
-
-	double get_tick_rate_hz() const
-	{
-		return config.tick_rate_hz;
-	}
-
-  private:
-	std::chrono::steady_clock::time_point last_time;
-	int count = 0;
-	double sum_dt = 0.0;
-	double sum_dt2 = 0.0;
 };
 
-ROBOTICK_REGISTER_WORKLOAD(TimingDiagnosticsWorkload, TimingDiagnosticsConfig, TimingDiagnosticsInputs,
-						   TimingDiagnosticsOutputs);
+static WorkloadAutoRegister<TimingDiagnosticsWorkload, TimingDiagnosticsConfig, TimingDiagnosticsInputs,
+							TimingDiagnosticsOutputs>
+	s_auto_register;

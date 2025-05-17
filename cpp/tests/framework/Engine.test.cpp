@@ -1,40 +1,28 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
+#include "robotick/framework/WorkloadBase.h"
 #include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include <catch2/catch_test_macros.hpp>
 
 using namespace robotick;
 
-struct CountConfig
+struct CountingWorkload : public WorkloadBase
 {
-	double tick_rate_hz = 10.0;
-	ROBOTICK_DECLARE_FIELDS();
-};
-ROBOTICK_DEFINE_FIELDS(CountConfig, ROBOTICK_FIELD(CountConfig, tick_rate_hz))
-
-class CountingWorkload
-{
-  public:
-	CountConfig config;
 	int tick_count = 0;
 
-	double get_tick_rate_hz() const
-	{
-		return config.tick_rate_hz;
-	}
 	void tick(double)
 	{
 		tick_count++;
 	}
 };
 
-ROBOTICK_REGISTER_WORKLOAD(CountingWorkload, CountConfig, robotick::EmptyInputs, robotick::EmptyOutputs);
+static robotick::WorkloadAutoRegister<CountingWorkload> s_auto_register;
 
 TEST_CASE("Unit|Framework|Engine|Engine runs tick() loop for registered workload")
 {
 	Model model;
-	auto h = model.add_by_type("CountingWorkload", "counter", {});
+	auto h = model.add_by_type("CountingWorkload", "counter", 100.0, {});
 	model.finalise();
 
 	auto *w = model.get<CountingWorkload>(h);
@@ -44,8 +32,14 @@ TEST_CASE("Unit|Framework|Engine|Engine runs tick() loop for registered workload
 	engine.setup();
 	engine.start();
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+	while (w->tick_count == 0 && (std::chrono::steady_clock::now() < deadline || true))
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+
 	engine.stop();
 
+	INFO("Tick count should have incremented within 1s of engine start");
 	REQUIRE(w->tick_count >= 1);
 }

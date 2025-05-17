@@ -1,154 +1,178 @@
 #pragma once
 
+#include "robotick/framework/WorkloadBase.h"
+#include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/utils/Typename.h"
 
-#include <any>
 #include <cstddef>
-#include <map>
+#include <limits>
 #include <string>
 #include <type_traits>
 
 namespace robotick
 {
-	// === Core registry entry ===
 
-	struct WorkloadRegistryEntry
-	{
-		std::string name;
-		size_t size;
-		size_t alignment;
+	template <typename T> constexpr bool is_void_v = std::is_same_v<T, void>;
 
-		void (*construct)(void *ptr);
-
-		const StructRegistryEntry *config_struct = nullptr;
-		size_t config_struct_offset = 0;
-
-		void (*tick)(void *ptr, double time_delta) = nullptr;
-
-		void (*pre_load)(void *ptr) = nullptr;
-		void (*load)(void *ptr) = nullptr;
-		void (*setup)(void *ptr) = nullptr;
-		void (*start)(void *ptr) = nullptr;
-		void (*stop)(void *ptr) = nullptr;
-
-		double (*get_tick_rate_fn)(void *ptr) = nullptr;
-	};
-
-	// === API for registry lookup and population ===
-
-	const WorkloadRegistryEntry *get_workload_registry_entry(const std::string &name);
-	void register_workload_entry(const WorkloadRegistryEntry &entry);
-
-	// === Empty default types ===
-
-	struct EmptyConfig
-	{
-	};
-	struct EmptyInputs
-	{
-	};
-	struct EmptyOutputs
-	{
-	};
-
-	// === Method detection traits ===
-
-#define ROBOTICK_DECLARE_HAS_METHOD_TRAIT(trait_name, method_name)                                                     \
+// Method‐detection traits
+#define ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(trait_name, method_name, signature)                                 \
 	template <typename T> class trait_name                                                                             \
 	{                                                                                                                  \
 	  private:                                                                                                         \
-		template <typename U> static auto test(int) -> decltype(std::declval<U>().method_name(), std::true_type());    \
+		template <typename U> static auto test(int) -> std::is_same<decltype(&U::method_name), signature>;             \
 		template <typename> static std::false_type test(...);                                                          \
                                                                                                                        \
 	  public:                                                                                                          \
 		static constexpr bool value = decltype(test<T>(0))::value;                                                     \
 	};
 
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT(has_pre_load, pre_load)
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT(has_load, load)
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT(has_setup, setup)
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT(has_start, start)
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT(has_stop, stop)
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT(has_get_tick_rate_hz, get_tick_rate_hz)
+	// no args:
+	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_pre_load, pre_load, void (T::*)());
+	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_load, load, void (T::*)());
+	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_setup, setup, void (T::*)());
+	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_start, start, void (T::*)());
+	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_stop, stop, void (T::*)());
+	// single arg:
+	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_tick, tick, void (T::*)(double));
 
-	// === Template-based registration ===
+	struct WorkloadRegistryEntry
+	{
+		std::string name;
+		size_t size, alignment;
+		void (*construct)(void *);
 
-	template <typename Type, typename ConfigType, typename InputType, typename OutputType>
+		const StructRegistryEntry *config_struct;
+		size_t config_offset;
+
+		const StructRegistryEntry *input_struct;
+		size_t input_offset;
+
+		const StructRegistryEntry *output_struct;
+		size_t output_offset;
+
+		void (*tick_fn)(void *, double);
+		void (*pre_load_fn)(void *);
+		void (*load_fn)(void *);
+		void (*setup_fn)(void *);
+		void (*start_fn)(void *);
+		void (*stop_fn)(void *);
+	};
+
+	const WorkloadRegistryEntry *get_workload_registry_entry(const std::string &);
+	void register_workload_entry(const WorkloadRegistryEntry &);
+
+	// === the new, fixed register_workload ===
+	template <typename Type, typename ConfigType = void, typename InputType = void, typename OutputType = void>
 	const WorkloadRegistryEntry &register_workload()
 	{
-		const auto pre_load_fn = [](void *ptr) {
-			if constexpr (has_pre_load<Type>::value)
-				static_cast<Type *>(ptr)->pre_load();
-		};
+		// 1) Prepare lambdas for each optional method:
+		void (*pre_load_fn)(void *) = nullptr;
+		if constexpr (has_pre_load<Type>::value)
+		{
+			pre_load_fn = +[](void *p) { static_cast<Type *>(p)->pre_load(); };
+		}
 
-		const auto load_fn = [](void *ptr) {
-			if constexpr (has_load<Type>::value)
-				static_cast<Type *>(ptr)->load();
-		};
+		void (*load_fn)(void *) = nullptr;
+		if constexpr (has_load<Type>::value)
+		{
+			load_fn = +[](void *p) { static_cast<Type *>(p)->load(); };
+		}
 
-		const auto setup_fn = [](void *ptr) {
-			if constexpr (has_setup<Type>::value)
-				static_cast<Type *>(ptr)->setup();
-		};
+		void (*setup_fn)(void *) = nullptr;
+		if constexpr (has_setup<Type>::value)
+		{
+			setup_fn = +[](void *p) { static_cast<Type *>(p)->setup(); };
+		}
 
-		const auto start_fn = [](void *ptr) {
-			if constexpr (has_start<Type>::value)
-				static_cast<Type *>(ptr)->start();
-		};
+		void (*start_fn)(void *) = nullptr;
+		if constexpr (has_start<Type>::value)
+		{
+			start_fn = +[](void *p) { static_cast<Type *>(p)->start(); };
+		}
 
-		const auto stop_fn = [](void *ptr) {
-			if constexpr (has_stop<Type>::value)
-				static_cast<Type *>(ptr)->stop();
-		};
+		void (*stop_fn)(void *) = nullptr;
+		if constexpr (has_stop<Type>::value)
+		{
+			stop_fn = +[](void *p) { static_cast<Type *>(p)->stop(); };
+		}
 
-		const auto get_tick_rate_fn = [](void *ptr) -> double {
-			if constexpr (has_get_tick_rate_hz<Type>::value)
-				return static_cast<Type *>(ptr)->get_tick_rate_hz();
-			else
-				return 0.0;
-		};
+		void (*tick_fn)(void *, double) = nullptr;
+		if constexpr (has_tick<Type>::value)
+		{
+			tick_fn = +[](void *p, double dt) { static_cast<Type *>(p)->tick(dt); };
+		}
 
-		const std::string type_name = get_clean_typename(typeid(Type));
+		// 2) Compute struct‐reflection pointers and offsets:
+		const StructRegistryEntry *cfg_struct = nullptr;
+		size_t cfg_offset = std::numeric_limits<size_t>::max();
+		if constexpr (!is_void_v<ConfigType>)
+		{
+			cfg_struct = ConfigType::get_struct_reflection();
+			cfg_offset = offsetof(Type, config);
+		}
 
-		static const WorkloadRegistryEntry entry = {type_name,
-													sizeof(Type),
-													alignof(Type),
-													[](void *ptr) { new (ptr) Type(); },
-													ConfigType::get_struct_reflection(),
-													offsetof(Type, config),
-													[](void *ptr, double dt) { static_cast<Type *>(ptr)->tick(dt); },
-													pre_load_fn,
-													load_fn,
-													setup_fn,
-													start_fn,
-													stop_fn,
-													get_tick_rate_fn};
+		const StructRegistryEntry *in_struct = nullptr;
+		size_t in_offset = std::numeric_limits<size_t>::max();
+		if constexpr (!is_void_v<InputType>)
+		{
+			in_struct = InputType::get_struct_reflection();
+			in_offset = offsetof(Type, inputs);
+		}
+
+		const StructRegistryEntry *out_struct = nullptr;
+		size_t out_offset = std::numeric_limits<size_t>::max();
+		if constexpr (!is_void_v<OutputType>)
+		{
+			out_struct = OutputType::get_struct_reflection();
+			out_offset = offsetof(Type, outputs);
+		}
+
+		// 3) Build the registry entry once:
+		static const WorkloadRegistryEntry entry = {/* name      = */ get_clean_typename(typeid(Type)),
+													/* size      = */ sizeof(Type),
+													/* alignment = */ alignof(Type),
+													/* construct = */ [](void *p) { new (p) Type(); },
+
+													/* config_struct      = */ cfg_struct,
+													/* config_offset      = */ cfg_offset,
+
+													/* input_struct       = */ in_struct,
+													/* input_offset       = */ in_offset,
+
+													/* output_struct      = */ out_struct,
+													/* output_offset      = */ out_offset,
+
+													/* tick               = */ tick_fn,
+													/* pre_load           = */ pre_load_fn,
+													/* load               = */ load_fn,
+													/* setup              = */ setup_fn,
+													/* start              = */ start_fn,
+													/* stop               = */ stop_fn};
 
 		return entry;
 	}
 
-	// === Registration helper ===
-
+	// === Registration helper unchanged ===
 	template <typename T> struct WorkloadRegistration
 	{
-		WorkloadRegistration(const WorkloadRegistryEntry &entry)
+		WorkloadRegistration(const WorkloadRegistryEntry &e)
 		{
-			register_workload_entry(entry);
+			register_workload_entry(e);
 		}
 	};
 
-	// === Optional: support manual type-key registration
-
-	template <typename T> const WorkloadRegistryEntry *register_workload_type(const WorkloadRegistryEntry &entry)
+	// === WorkloadAutoRegister helper ===
+	template <typename T, typename Config = void, typename Inputs = void, typename Outputs = void>
+	struct WorkloadAutoRegister
 	{
-		register_workload_entry(entry);
-		return &entry;
-	}
-
-#define ROBOTICK_REGISTER_WORKLOAD(Type, Config, Input, Output)                                                        \
-	static const ::robotick::WorkloadRegistryEntry &Type##_entry =                                                     \
-		::robotick::register_workload<Type, Config, Input, Output>();                                                  \
-	static ::robotick::WorkloadRegistration<Type> Type##_registrar(Type##_entry)
+		WorkloadAutoRegister()
+		{
+			static_assert(std::is_base_of_v<WorkloadBase, T>, "Must derive from WorkloadBase");
+			// no more standard-layout assert
+			static const auto &e = register_workload<T, Config, Inputs, Outputs>();
+			static WorkloadRegistration<T> reg{e};
+		}
+	};
 
 } // namespace robotick
