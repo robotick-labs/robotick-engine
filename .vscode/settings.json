@@ -102,5 +102,8 @@
         "span": "cpp",
         "cinttypes": "cpp",
         "cassert": "cpp"
-    }, // Top-level CMakeLists.txt
+    },
+    "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
+        "modernize-use-trailing-return-type"
+    ], // Top-level CMakeLists.txt
 }

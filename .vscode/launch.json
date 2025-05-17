@@ -24,7 +24,7 @@
             "name": "Example: C++ - robotick_main",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/robotick_tests",
+            "program": "${workspaceFolder}/build/robotick_main",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
