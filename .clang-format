@@ -1,10 +1,14 @@
-BasedOnStyle: Microsoft
-BreakBeforeBraces: Custom
-BraceWrapping:
-  AfterFunction: true
-  AfterFunctionDefinition: true
-  AfterLambda: false
-UseTab: Always
+BasedOnStyle: Google
+ColumnLimit: 132
+AllowShortFunctionsOnASingleLine: InlineOnly
 IndentWidth: 4
 TabWidth: 4
+UseTab: Never
+DerivePointerAlignment: false
+PointerAlignment: Left
 NamespaceIndentation: All
+SortIncludes: false
+SpacesInAngles: false
+SpaceBeforeParens: ControlStatements
+AlignConsecutiveDeclarations: true
+BreakBeforeBraces: Allman

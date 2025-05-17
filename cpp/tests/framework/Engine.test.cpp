@@ -8,37 +8,34 @@ using namespace robotick;
 
 struct CountingWorkload
 {
-	int tick_count = 0;
+    int tick_count = 0;
 
-	void tick(double)
-	{
-		tick_count++;
-	}
+    void tick(double) { tick_count++; }
 };
 
 static robotick::WorkloadAutoRegister<CountingWorkload> s_auto_register;
 
 TEST_CASE("Unit|Framework|Engine|Engine runs tick() loop for registered workload")
 {
-	Model model;
-	auto h = model.add_by_type("CountingWorkload", "counter", 100.0, {});
-	model.finalise();
+    Model model;
+    auto  h = model.add("CountingWorkload", "counter", 100.0, {});
+    model.finalise();
 
-	auto *w = model.get<CountingWorkload>(h);
+    auto* w = model.get<CountingWorkload>(h);
 
-	Engine engine;
-	engine.load(model);
-	engine.setup();
-	engine.start();
+    Engine engine;
+    engine.load(model);
+    engine.setup();
+    engine.start();
 
-	auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
-	while (w->tick_count == 0 && std::chrono::steady_clock::now() < deadline)
-	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-	}
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (w->tick_count == 0 && std::chrono::steady_clock::now() < deadline)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 
-	engine.stop();
+    engine.stop();
 
-	INFO("Tick count should have incremented within 1s of engine start");
-	REQUIRE(w->tick_count >= 1);
+    INFO("Tick count should have incremented within 1s of engine start");
+    REQUIRE(w->tick_count >= 1);
 }

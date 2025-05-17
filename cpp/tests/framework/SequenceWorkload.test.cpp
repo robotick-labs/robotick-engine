@@ -27,11 +27,11 @@ TEST_CASE("SequenceWorkload ticks children in order")
     Model model;
     int state = 0;
 
-    auto a = model.add_by_type("TickOrder", "a", {{"ref", &state}, {"expect", 1}});
-    auto b = model.add_by_type("TickOrder", "b", {{"ref", &state}, {"expect", 2}});
-    auto c = model.add_by_type("TickOrder", "c", {{"ref", &state}, {"expect", 3}});
+    auto a = model.add("TickOrder", "a", {{"ref", &state}, {"expect", 1}});
+    auto b = model.add("TickOrder", "b", {{"ref", &state}, {"expect", 2}});
+    auto c = model.add("TickOrder", "c", {{"ref", &state}, {"expect", 3}});
 
-    auto s = model.add_by_type("SequenceWorkload", "seq", {{"children", std::vector<WorkloadHandle>{a, b, c}}});
+    auto s = model.add("SequenceWorkload", "seq", {{"children", std::vector<WorkloadHandle>{a, b, c}}});
     model.finalise();
 
     auto *ptr = model.factory().get_raw_ptr(s);
@@ -42,4 +42,4 @@ TEST_CASE("SequenceWorkload ticks children in order")
 
     REQUIRE(state == 3);
 }
-#endif // #if 0
+#endif  // #if 0

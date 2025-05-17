@@ -5,6 +5,7 @@
     "[cpp]": {
         "editor.defaultFormatter": "ms-vscode.cpptools"
     },
+    "C_Cpp.codeAnalysis.clangTidy.enabled": true,
     "files.associations": {
         "thread": "cpp",
         "atomic": "cpp",

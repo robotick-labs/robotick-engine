@@ -5,59 +5,58 @@
 #include <any>
 #include <cstdint>
 #include <map>
+#include <string>
 #include <vector>
 
 namespace robotick
 {
 
-	struct WorkloadHandle
-	{
-		uint32_t index;
-	};
+    struct WorkloadHandle
+    {
+        uint32_t index;
+    };
 
-	struct WorkloadInstance
-	{
-		void *ptr;
-		const WorkloadRegistryEntry *type;
-		std::string unique_name;
-		double tick_rate_hz = 0.0;
-	};
+    struct WorkloadInstance
+    {
+        void*                        ptr;
+        const WorkloadRegistryEntry* type;
+        std::string                  unique_name;
+        double                       tick_rate_hz = 0.0;
+    };
 
-	class ROBOTICK_API WorkloadFactory
-	{
-	  public:
-		WorkloadFactory();
-		~WorkloadFactory();
+    class ROBOTICK_API WorkloadFactory
+    {
+       public:
+        WorkloadFactory();
+        ~WorkloadFactory();
 
-		WorkloadHandle add_by_type(const std::string &type_name, const std::string &name, const double tick_rate_hz,
-								   const std::map<std::string, std::any> &config);
-		void finalise();
-		bool is_finalised() const
-		{
-			return m_finalised;
-		}
+        WorkloadHandle add(const std::string& type_name, const std::string& name, const double tick_rate_hz,
+                           const std::map<std::string, std::any>& config);
 
-		void *get_raw_ptr(WorkloadHandle h) const;
+        void finalise();
+        bool is_finalised() const { return m_finalised; }
 
-		const char *get_type_name(WorkloadHandle h) const;
+        void* get_raw_ptr(WorkloadHandle h) const;
 
-		const std::vector<WorkloadInstance> &get_all() const;
+        const char* get_type_name(WorkloadHandle h) const;
 
-	  private:
-		struct Pending
-		{
-			const WorkloadRegistryEntry *type;
-			std::string name;
-			double tick_rate_hz = 0.0;
-			std::map<std::string, std::any> config;
-		};
+        const std::vector<WorkloadInstance>& get_all() const;
 
-		std::vector<Pending> m_pending;
-		std::vector<WorkloadInstance> m_instances;
+       private:
+        struct PendingInstance
+        {
+            const WorkloadRegistryEntry*    type;
+            std::string                     name;
+            double                          tick_rate_hz = 0.0;
+            std::map<std::string, std::any> config;
+        };
 
-		uint8_t *m_buffer = nullptr;
-		size_t m_buffer_size = 0;
-		bool m_finalised = false;
-	};
+        std::vector<PendingInstance>  m_pending_instances;
+        std::vector<WorkloadInstance> m_instances;
 
-} // namespace robotick
+        uint8_t* m_buffer = nullptr;
+        size_t   m_buffer_size = 0;
+        bool     m_finalised = false;
+    };
+
+}  // namespace robotick

@@ -22,9 +22,9 @@ TEST_CASE("SyncedPairWorkload ticks both children")
 {
     Model model;
 
-    auto p = model.add_by_type("TickCounter", "p", {});
-    auto s = model.add_by_type("TickCounter", "s", {});
-    auto pair = model.add_by_type("SyncedPairWorkload", "pair", {{"primary", p}, {"secondary", s}});
+    auto p = model.add("TickCounter", "p", {});
+    auto s = model.add("TickCounter", "s", {});
+    auto pair = model.add("SyncedPairWorkload", "pair", {{"primary", p}, {"secondary", s}});
 
     model.finalise();
 
@@ -43,4 +43,4 @@ TEST_CASE("SyncedPairWorkload ticks both children")
     REQUIRE(sInst->count >= 1);
 }
 
-#endif // #if 0
+#endif  // #if 0

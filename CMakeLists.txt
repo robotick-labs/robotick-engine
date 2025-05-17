@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(robotick_framework)
 
+# Enable clang-tidy
+# set(CMAKE_CXX_CLANG_TIDY "clang-tidy;-p=${CMAKE_BINARY_DIR}")
+
 include(FetchContent)  # ← This is the missing piece
 
 set(CMAKE_CXX_STANDARD 17)

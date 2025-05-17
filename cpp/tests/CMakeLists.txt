@@ -17,6 +17,10 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
+# ⛔ Don't run clang-tidy on Catch2 targets
+set_target_properties(Catch2WithMain PROPERTIES CXX_CLANG_TIDY "")
+set_target_properties(Catch2 PROPERTIES CXX_CLANG_TIDY "")
+
 # 🔍 Find test files
 file(GLOB_RECURSE ROBOTICK_TEST_SOURCES
   CONFIGURE_DEPENDS

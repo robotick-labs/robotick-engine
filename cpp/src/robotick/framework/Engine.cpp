@@ -11,204 +11,207 @@
 namespace robotick
 {
 
-	namespace
-	{
-		// Platform helpers
-		void enable_high_resolution_timing()
-		{
+    namespace
+    {
+        // Platform helpers
+        void enable_high_resolution_timing()
+        {
 #ifdef _WIN32
-			timeBeginPeriod(1);
+            timeBeginPeriod(1);
 #else
-			// No-op on Linux
+            // No-op on Linux
 #endif
-		}
+        }
 
-		void disable_high_resolution_timing()
-		{
+        void disable_high_resolution_timing()
+        {
 #ifdef _WIN32
-			timeEndPeriod(1);
+            timeEndPeriod(1);
 #else
-			// No-op on Linux
+            // No-op on Linux
 #endif
-		}
+        }
 
-		void set_thread_priority_high()
-		{
+        void set_thread_priority_high()
+        {
 #ifdef _WIN32
-			SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+            SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 #else
-			// Optional: use pthread_setschedparam if real-time priority is
-			// needed
+            // Optional: use pthread_setschedparam if real-time priority is
+            // needed
 #endif
-		}
+        }
 
-		void set_thread_affinity(int core)
-		{
+        void set_thread_affinity(int core)
+        {
 #ifdef _WIN32
-			DWORD_PTR mask = 1 << core;
-			SetThreadAffinityMask(GetCurrentThread(), mask);
+            DWORD_PTR mask = 1 << core;
+            SetThreadAffinityMask(GetCurrentThread(), mask);
 #else
-			(void)core; // suppress unused parameter warning
-						// Optional: use pthread_setaffinity_np
+            (void)core;  // suppress unused parameter warning
+                         // Optional: use pthread_setaffinity_np
 #endif
-		}
-	} // namespace
+        }
+    }  // namespace
 
-	struct Engine::Impl
-	{
-		std::vector<std::thread> threads;
-		std::atomic<bool> stop_flag = false;
-		const Model *model = nullptr;
-	};
+    struct Engine::Impl
+    {
+        std::vector<std::thread> threads;
+        std::atomic<bool>        stop_flag = false;
+        const Model*             model = nullptr;
+    };
 
-	Engine::Engine() : m_impl(std::make_unique<Impl>())
-	{
-	}
+    Engine::Engine() : m_impl(std::make_unique<Impl>())
+    {
+    }
 
-	Engine::~Engine()
-	{
-		m_impl->stop_flag = true;
-		for (auto &t : m_impl->threads)
-		{
-			if (t.joinable())
-				t.join();
-		}
-	}
+    Engine::~Engine()
+    {
+        m_impl->stop_flag = true;
+        for (auto& t : m_impl->threads)
+        {
+            if (t.joinable()) t.join();
+        }
+    }
 
-	void Engine::load(const Model &model)
-	{
-		m_impl->threads.clear();
-		m_impl->model = &model;
+    void Engine::load(const Model& model)
+    {
+        m_impl->threads.clear();
+        m_impl->model = &model;
 
-		const auto &handles = model.get_workloads();
-		const auto &instances = model.factory().get_all();
+        const auto& workload_handles = model.get_workload_handles();
 
-		for (auto &h : handles)
-		{
-			const auto &instance = instances[h.index];
-			m_impl->threads.emplace_back([&]() {
-				if (instance.type->pre_load_fn)
-					instance.type->pre_load_fn(instance.ptr);
-				if (instance.type->load_fn)
-					instance.type->load_fn(instance.ptr);
-			});
-		}
+        for (const auto& workload_handle : workload_handles)
+        {
+            const auto& instance = model.get_instance(workload_handle);
 
-		for (auto &t : m_impl->threads)
-		{
-			if (t.joinable())
-				t.join();
-		}
+            m_impl->threads.emplace_back(
+                [&]()
+                {
+                    if (instance.type->pre_load_fn)
+                    {
+                        instance.type->pre_load_fn(instance.ptr);
+                    }
 
-		m_impl->threads.clear();
-	}
+                    if (instance.type->load_fn)
+                    {
+                        instance.type->load_fn(instance.ptr);
+                    }
+                });
+        }
 
-	void Engine::setup()
-	{
-		if (!m_impl->model)
-			throw std::runtime_error("Engine::setup called before load()");
+        for (auto& thread : m_impl->threads)
+        {
+            if (thread.joinable())
+            {
+                thread.join();
+            }
+        }
 
-		const auto &factory = m_impl->model->factory();
-		for (auto &h : m_impl->model->get_workloads())
-		{
-			const auto &instance = factory.get_all()[h.index];
-			if (instance.type->setup_fn)
-				instance.type->setup_fn(instance.ptr);
-		}
+        m_impl->threads.clear();
+    }
 
-		enable_high_resolution_timing();
-	}
+    void Engine::setup()
+    {
+        if (!m_impl->model) throw std::runtime_error("Engine::setup called before load()");
 
-	void hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
-	{
-		using namespace std::chrono;
-		constexpr auto coarse_margin = 500us;
-		constexpr auto coarse_step = 100us;
+        const auto& factory = m_impl->model->factory();
+        for (auto& h : m_impl->model->get_workload_handles())
+        {
+            const auto& instance = factory.get_all()[h.index];
+            if (instance.type->setup_fn) instance.type->setup_fn(instance.ptr);
+        }
 
-		auto now = steady_clock::now();
-		while (now < target_time - coarse_margin)
-		{
-			std::this_thread::sleep_for(coarse_step);
-			now = steady_clock::now();
-		}
+        enable_high_resolution_timing();
+    }
 
-		while (steady_clock::now() < target_time)
-		{
-			// spin
-		}
-	}
+    void hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
+    {
+        using namespace std::chrono;
+        constexpr auto coarse_margin = 500us;
+        constexpr auto coarse_step = 100us;
 
-	void Engine::start()
-	{
-		if (!m_impl->model)
-			throw std::runtime_error("Engine::start called before load()");
+        auto now = steady_clock::now();
+        while (now < target_time - coarse_margin)
+        {
+            std::this_thread::sleep_for(coarse_step);
+            now = steady_clock::now();
+        }
 
-		const auto &handles = m_impl->model->get_workloads();
-		const auto &instances = m_impl->model->factory().get_all();
+        while (steady_clock::now() < target_time)
+        {
+            // spin
+        }
+    }
 
-		m_impl->stop_flag = false;
+    void Engine::start()
+    {
+        if (!m_impl->model) throw std::runtime_error("Engine::start called before load()");
 
-		for (auto &h : handles)
-		{
-			const auto &instance = instances[h.index];
+        const auto& handles = m_impl->model->get_workload_handles();
+        const auto& instances = m_impl->model->factory().get_all();
 
-			if (instance.tick_rate_hz <= 0 || !instance.type->tick_fn || !instance.ptr)
-			{
-				continue; // no point in spawning a thread if we don't intend to tick
-			}
+        m_impl->stop_flag = false;
 
-			m_impl->threads.emplace_back([this, &instance]() {
-				// one-time setup of this workload's tick-thread:
-				set_thread_affinity(2);
-				set_thread_priority_high();
-				set_thread_name("robotick_" + std::string(instance.type->name) + "_" +
-								std::string(instance.unique_name));
+        for (auto& h : handles)
+        {
+            const auto& instance = instances[h.index];
 
-				using namespace std::chrono;
-				const auto tick_interval = duration<double>(1.0 / instance.tick_rate_hz);
-				auto next_tick_time = steady_clock::now() + tick_interval;
-				auto last_time = steady_clock::now();
+            if (instance.tick_rate_hz <= 0 || !instance.type->tick_fn || !instance.ptr)
+            {
+                continue;  // no point in spawning a thread if we don't intend to tick
+            }
 
-				// this workload's main tick-thread loop:
-				while (!m_impl->stop_flag)
-				{
-					auto now = steady_clock::now();
-					double time_delta = duration<double>(now - last_time).count();
-					last_time = now;
+            m_impl->threads.emplace_back(
+                [this, &instance]()
+                {
+                    // one-time setup of this workload's tick-thread:
+                    set_thread_affinity(2);
+                    set_thread_priority_high();
+                    set_thread_name("robotick_" + std::string(instance.type->name) + "_" + std::string(instance.unique_name));
 
-					instance.type->tick_fn(instance.ptr, time_delta);
-					next_tick_time += tick_interval;
+                    using namespace std::chrono;
+                    const auto tick_interval = duration<double>(1.0 / instance.tick_rate_hz);
+                    auto       next_tick_time = steady_clock::now() + tick_interval;
+                    auto       last_time = steady_clock::now();
 
-					hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
-				}
-			});
-		}
-	}
+                    // this workload's main tick-thread loop:
+                    while (!m_impl->stop_flag)
+                    {
+                        auto   now = steady_clock::now();
+                        double time_delta = duration<double>(now - last_time).count();
+                        last_time = now;
 
-	void Engine::stop()
-	{
-		if (!m_impl->model)
-			throw std::runtime_error("Engine::stop called before load()");
+                        instance.type->tick_fn(instance.ptr, time_delta);
+                        next_tick_time += tick_interval;
 
-		m_impl->stop_flag = true;
+                        hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
+                    }
+                });
+        }
+    }
 
-		const auto &factory = m_impl->model->factory();
-		for (auto &h : m_impl->model->get_workloads())
-		{
-			const auto &instance = factory.get_all()[h.index];
-			if (instance.type->stop_fn)
-				instance.type->stop_fn(instance.ptr);
-		}
+    void Engine::stop()
+    {
+        if (!m_impl->model) throw std::runtime_error("Engine::stop called before load()");
 
-		for (auto &t : m_impl->threads)
-		{
-			if (t.joinable())
-				t.join();
-		}
+        m_impl->stop_flag = true;
 
-		m_impl->threads.clear();
+        const auto& factory = m_impl->model->factory();
+        for (auto& h : m_impl->model->get_workload_handles())
+        {
+            const auto& instance = factory.get_all()[h.index];
+            if (instance.type->stop_fn) instance.type->stop_fn(instance.ptr);
+        }
 
-		disable_high_resolution_timing();
-	}
+        for (auto& t : m_impl->threads)
+        {
+            if (t.joinable()) t.join();
+        }
 
-} // namespace robotick
+        m_impl->threads.clear();
+
+        disable_high_resolution_timing();
+    }
+
+}  // namespace robotick
