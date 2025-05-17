@@ -1,10 +1,8 @@
+// Engine.h
 #pragma once
 
 #include "robotick/framework/api.h"
 
-#include <vector>
-#include <thread>
-#include <atomic>
 #include <memory>
 
 namespace robotick
@@ -13,17 +11,16 @@ namespace robotick
 
     class ROBOTICK_API Engine
     {
-    public:
+       public:
         Engine();
         ~Engine();
 
-        void load(const Model &model); // multi-threaded workload load()
-        void setup();                  // single-threaded workload setup()
-        void start();                  // main tick loop
-        void stop();                   // single-thread stop() - cleanly terminates all threads
+        void load(const Model& model);
+        void setup();
+        void start();
+        void stop();
 
-    private:
+       private:
         ROBOTICK_DECLARE_PIMPL();
     };
-
-}
+}  // namespace robotick

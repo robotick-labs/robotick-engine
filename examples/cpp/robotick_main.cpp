@@ -58,12 +58,11 @@ int main()
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    Model model;
+    Model model;  // the model is our "seed data"
     populate_model(model);
-    model.finalise();  // finalise memory - creating actual workloads in a single large buffer
 
     Engine engine;
-    engine.load(model);
+    engine.load(model);  // instances our model and allows multithreaded-load/config for each
     engine.setup();
     engine.start();
 
