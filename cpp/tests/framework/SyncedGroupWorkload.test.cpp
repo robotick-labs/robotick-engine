@@ -112,8 +112,8 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|All children tick in parallel")
 	const double tick_interval = 1.0 / tick_rate_hz;
 
 	Model model;
-	const auto a = model.add("CountingWorkload", "a");
-	const auto b = model.add("CountingWorkload", "b");
+	const auto a = model.add("CountingWorkload", "a", tick_rate_hz);
+	const auto b = model.add("CountingWorkload", "b", tick_rate_hz);
 	const auto group = model.add("SyncedGroupWorkload", "group", {a, b}, tick_rate_hz);
 	model.set_root(group);
 
@@ -153,8 +153,8 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|Child busy flags skip ticks")
 	constexpr int num_ticks = 5;
 
 	Model model;
-	const auto s1 = model.add("SlowWorkload", "s1");
-	const auto s2 = model.add("SlowWorkload", "s2");
+	const auto s1 = model.add("SlowWorkload", "s1", tick_rate_hz);
+	const auto s2 = model.add("SlowWorkload", "s2", tick_rate_hz);
 	const auto group = model.add("SyncedGroupWorkload", "group", {s1, s2}, tick_rate_hz);
 	model.set_root(group);
 
@@ -195,7 +195,7 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|tick() passes real time_delta (chi
 	constexpr auto tick_interval = duration<double>(1.0 / tick_rate_hz);
 
 	Model model;
-	const auto h = model.add("CountingWorkload", "ticky");
+	const auto h = model.add("CountingWorkload", "ticky", tick_rate_hz);
 	const auto group = model.add("SyncedGroupWorkload", "group", {h}, tick_rate_hz);
 	model.set_root(group);
 
@@ -223,5 +223,5 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|tick() passes real time_delta (chi
 	CHECK_THAT(first_dt, Catch::Matchers::WithinAbs(0.02, 0.005)); // allow ±5ms - since we're not allowing for code-duration when sleeping above
 
 	INFO("Last dt (expected 0.03): " << counting->impl->last_dt);
-	CHECK_THAT(counting->impl->last_dt, Catch::Matchers::WithinAbs(0.03, 0.005)); // (ditto)
+	CHECK_THAT(counting->impl->last_dt, Catch::Matchers::WithinAbs(0.02, 0.005)); // (ditto)
 }

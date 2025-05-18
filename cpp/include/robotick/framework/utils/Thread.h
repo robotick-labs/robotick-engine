@@ -1,5 +1,7 @@
 #pragma once
+#include <chrono>
 #include <string>
+#include <thread>
 
 #if defined(_WIN32)
 // Windows 10+ and Visual Studio 2017+
@@ -71,4 +73,20 @@ namespace robotick
 #endif
 	}
 
+	inline void hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
+	{
+		using namespace std::chrono;
+		constexpr auto coarse_margin = 500us;
+		constexpr auto coarse_step = 100us;
+
+		auto now = steady_clock::now();
+		while (now < target_time - coarse_margin)
+		{
+			std::this_thread::sleep_for(coarse_step);
+			now = steady_clock::now();
+		}
+		while (steady_clock::now() < target_time)
+		{
+		}
+	}
 } // namespace robotick

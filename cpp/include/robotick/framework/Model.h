@@ -27,8 +27,7 @@ namespace robotick
 			std::map<std::string, std::any> config;
 		};
 
-		WorkloadHandle add(
-			const std::string& type, const std::string& name, double tick_rate_hz = 0, const std::map<std::string, std::any>& config = {})
+		WorkloadHandle add(const std::string& type, const std::string& name, double tick_rate_hz, const std::map<std::string, std::any>& config = {})
 		{
 			assert(!m_root.is_valid() && "Model root must be added last");
 			const std::vector<WorkloadHandle> children = {};

@@ -98,8 +98,8 @@ TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Child ticks are invoked in sequ
 	DummyTickingWorkload::reset();
 
 	Model model;
-	const auto child1 = model.add("DummyTickingWorkload", "child1");
-	const auto child2 = model.add("DummyTickingWorkload", "child2");
+	const auto child1 = model.add("DummyTickingWorkload", "child1", 50.0);
+	const auto child2 = model.add("DummyTickingWorkload", "child2", 50.0);
 	const auto group = model.add("SequencedGroupWorkload", "group", {child1, child2}, 50.0);
 	model.set_root(group);
 
@@ -119,7 +119,7 @@ TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Child ticks are invoked in sequ
 TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Overrun logs if exceeded")
 {
 	Model model;
-	const auto handle = model.add("SlowTickWorkload", "slow");
+	const auto handle = model.add("SlowTickWorkload", "slow", 50.0);
 	const auto group = model.add("SequencedGroupWorkload", "group", {handle}, 1000.0);
 	model.set_root(group);
 

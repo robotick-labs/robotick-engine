@@ -144,23 +144,6 @@ namespace robotick
 		assert(m_impl->root_instance != nullptr);
 	}
 
-	static void hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
-	{
-		using namespace std::chrono;
-		constexpr auto coarse_margin = 500us;
-		constexpr auto coarse_step = 100us;
-
-		auto now = steady_clock::now();
-		while (now < target_time - coarse_margin)
-		{
-			std::this_thread::sleep_for(coarse_step);
-			now = steady_clock::now();
-		}
-		while (steady_clock::now() < target_time)
-		{
-		}
-	}
-
 	void Engine::run(const std::atomic<bool>& stop_flag)
 	{
 		using namespace std::chrono;
@@ -186,14 +169,14 @@ namespace robotick
 		const auto tick_interval_sec = duration<double>(1.0 / root_info.tick_rate_hz);
 		const auto tick_interval = duration_cast<steady_clock::duration>(tick_interval_sec);
 		auto next_tick_time = steady_clock::now();
-		auto last_time = steady_clock::now();
+		auto last_tick_time = steady_clock::now();
 
 		// main tick-loop: (tick at least once, before checking stop_flag - e.g. useful for testing)
 		do
 		{
 			auto now = steady_clock::now();
-			double time_delta = duration<double>(now - last_time).count();
-			last_time = now;
+			double time_delta = duration<double>(now - last_tick_time).count();
+			last_tick_time = now;
 
 			root_info.type->tick_fn(root_info.ptr, time_delta);
 			next_tick_time += tick_interval;

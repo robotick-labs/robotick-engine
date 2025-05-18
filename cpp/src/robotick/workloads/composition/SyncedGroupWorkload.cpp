@@ -11,6 +11,8 @@
 #include <thread>
 #include <vector>
 
+using namespace std::chrono;
+
 namespace robotick
 {
 
@@ -18,8 +20,6 @@ namespace robotick
 	{
 		std::vector<const WorkloadInstanceInfo*> children;
 		std::vector<std::thread> child_threads;
-		std::vector<std::atomic_flag> child_busy_flags;
-		std::vector<std::atomic<uint32_t>> missed_ticks_all_time;
 
 		std::condition_variable tick_cv;
 		std::mutex tick_mutex;
@@ -33,13 +33,6 @@ namespace robotick
 		{
 			children = child_workloads;
 
-			child_busy_flags = std::vector<std::atomic_flag>(children.size());
-			for (auto& flag : child_busy_flags)
-			{
-				flag.clear();
-			}
-
-			missed_ticks_all_time = std::vector<std::atomic<uint32_t>>(children.size());
 			tick_counters = std::vector<std::atomic<uint32_t>>(children.size());
 			for (auto& tick_counter : tick_counters)
 			{
@@ -54,10 +47,17 @@ namespace robotick
 
 			for (size_t i = 0; i < children.size(); ++i)
 			{
+				const auto* child = children[i];
+
+				if (child == nullptr || child->type == nullptr || child->type->tick_fn == nullptr || child->tick_rate_hz == 0.0)
+				{
+					continue; // don't spawn threads for children that can't / dont need to need
+				}
+
 				child_threads.emplace_back(
-					[this, i]()
+					[this, i, child]()
 					{
-						child_tick_loop(i);
+						child_tick_loop(i, *child);
 					});
 			}
 		}
@@ -89,68 +89,55 @@ namespace robotick
 		}
 
 		// Runs on its own thread for each child
-		void child_tick_loop(size_t i)
+		void child_tick_loop(size_t child_index, const WorkloadInstanceInfo& child)
 		{
 			assert(children.size() == tick_counters.size());
-
-			auto* child = children[i];
-			assert(child);
-
-			auto& child_busy_flag = child_busy_flags[i];
+			assert(child.type != nullptr && child.type->tick_fn != nullptr && child.tick_rate_hz > 0.0);
 
 			uint32_t last_tick = 0;
-			auto last_tick_time = std::chrono::steady_clock::now();
+			auto next_tick_time = steady_clock::now();
+			auto last_tick_time = steady_clock::now();
+
+			const auto tick_interval_sec = duration<double>(1.0 / child.tick_rate_hz);
+			const auto tick_interval = duration_cast<steady_clock::duration>(tick_interval_sec);
 
 			set_thread_affinity(2);
 			set_thread_priority_high();
 
-			std::string thread_name = child->unique_name;
+			std::string thread_name = child.unique_name;
 			thread_name = thread_name.substr(0, 15); // linux doesn't like thread-names more than 16 characters incl /0
 			set_thread_name(thread_name);
 
 			while (true)
 			{
-				// Wait for tick or shutdown signal
-				std::unique_lock<std::mutex> lock(tick_mutex);
-				tick_cv.wait(lock,
-					[&]()
-					{
-						return tick_counters[i] > last_tick || !running;
-					});
+				// Wait for tick or shutdown signal (lock scoped with braces):
+				{
+					std::unique_lock<std::mutex> lock(tick_mutex);
+					tick_cv.wait(lock,
+						[&]()
+						{
+							return tick_counters[child_index] > last_tick || !running;
+						});
+
+					last_tick = tick_counters[child_index];
+				}
 
 				if (!running)
 					return;
 
-				last_tick = tick_counters[i];
-
-				lock.unlock();
-
-				// If previous tick still running, skip this one
-				if (child_busy_flag.test_and_set(std::memory_order_acquire))
-				{
-					log_overrun(i);
-					++missed_ticks_all_time[i];
-					continue;
-				}
-
 				// Calculate time since last tick for this child (will be larger than tick_interval_sec if we've missed some ticks)
-				auto now = std::chrono::steady_clock::now();
-				double time_delta = std::chrono::duration<double>(now - last_tick_time).count();
+				auto now = steady_clock::now();
+				double time_delta = duration<double>(now - last_tick_time).count();
 				last_tick_time = now;
 
 				// Tick the workload with real elapsed time
-				if (child != nullptr && child->type->tick_fn != nullptr)
-				{
-					child->type->tick_fn(child->ptr, time_delta);
-				}
+				child.type->tick_fn(child.ptr, time_delta);
+				next_tick_time += tick_interval;
 
-				child_busy_flag.clear(std::memory_order_release);
+				// ensure that we honour the desired tick-rate of every child (even if some slower than this SyncedGroup's tick-rate - just let them
+				// fall back into step when ready):
+				hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
 			}
-		}
-
-		void log_overrun(size_t i)
-		{
-			std::printf("[Synced] Overrun: child %zu still running, tick skipped (missed: %u)\n", i, missed_ticks_all_time[i].load());
 		}
 	};
 
