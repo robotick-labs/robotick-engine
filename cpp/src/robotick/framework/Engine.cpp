@@ -188,6 +188,7 @@ namespace robotick
 		auto next_tick_time = steady_clock::now();
 		auto last_time = steady_clock::now();
 
+		// main tick-loop: (tick at least once, before checking stop_flag - e.g. useful for testing)
 		do
 		{
 			auto now = steady_clock::now();
