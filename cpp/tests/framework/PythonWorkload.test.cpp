@@ -1,4 +1,3 @@
-
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -6,28 +5,37 @@
 #include "utils/EngineInspector.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <iostream>
-#include <sstream>
-#include <streambuf>
 
 using namespace robotick;
-using namespace robotick::test_access;
+using namespace robotick::test;
 
-TEST_CASE("Unit|Workloads|PythonWorkload|PythonWorkload can tick without crash")
+TEST_CASE("Unit|Workloads|PythonWorkload|PythonWorkload can start, tick and stop without crash")
 {
 	Model model;
-	model.add("PythonWorkload", "py", 5.0,
-			  {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
+	const auto handle =
+		model.add("PythonWorkload", "py", 5.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
+	model.set_root(handle);
 
 	Engine engine;
 	REQUIRE_NOTHROW(engine.load(model));
 
-	const WorkloadInstanceInfo* instance_info = nullptr;
-	REQUIRE_NOTHROW(instance_info = &EngineInspector::get_instance_info(engine, 0)); // fail early if unregistered
+	const auto& info = EngineInspector::get_instance_info(engine, handle.index);
 
-	// Try ticking it manually
-	REQUIRE(instance_info->ptr); // fail early if unregistered
-	REQUIRE_NOTHROW(instance_info->type->tick_fn(instance_info->ptr, 0.01));
+	const double tick_rate_hz = 100.0;
+	const double time_delta = 1.0 / tick_rate_hz;
 
-	REQUIRE_NOTHROW(engine.stop()); // we must clean up properly else we'll get exceptions
+	REQUIRE(info.ptr != nullptr);
+	REQUIRE(info.type != nullptr);
+
+	if (info.type->start_fn != nullptr)
+	{
+		REQUIRE_NOTHROW(info.type->start_fn(info.ptr, tick_rate_hz));
+	}
+
+	REQUIRE_NOTHROW(info.type->tick_fn(info.ptr, time_delta));
+
+	if (info.type->stop_fn != nullptr)
+	{
+		REQUIRE_NOTHROW(info.type->stop_fn(info.ptr));
+	}
 }

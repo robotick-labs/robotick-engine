@@ -13,10 +13,10 @@ using namespace robotick;
 
 struct TimingDiagnosticsConfig
 {
-	int report_every = 100; // Number of ticks per report
+	int log_rate_hz = 1; // how often we log to console
 	ROBOTICK_DECLARE_FIELDS();
 };
-ROBOTICK_DEFINE_FIELDS(TimingDiagnosticsConfig, ROBOTICK_FIELD(TimingDiagnosticsConfig, report_every))
+ROBOTICK_DEFINE_FIELDS(TimingDiagnosticsConfig, ROBOTICK_FIELD(TimingDiagnosticsConfig, log_rate_hz))
 
 struct TimingDiagnosticsInputs
 {
@@ -32,8 +32,7 @@ struct TimingDiagnosticsOutputs
 	ROBOTICK_DECLARE_FIELDS();
 };
 ROBOTICK_DEFINE_FIELDS(TimingDiagnosticsOutputs, ROBOTICK_FIELD(TimingDiagnosticsOutputs, last_tick_rate),
-					   ROBOTICK_FIELD(TimingDiagnosticsOutputs, avg_tick_rate),
-					   ROBOTICK_FIELD(TimingDiagnosticsOutputs, tick_stddev))
+	ROBOTICK_FIELD(TimingDiagnosticsOutputs, avg_tick_rate), ROBOTICK_FIELD(TimingDiagnosticsOutputs, tick_stddev))
 
 struct TimingDiagnosticsInternalState
 {
@@ -59,12 +58,15 @@ struct TimingDiagnosticsWorkload
 		internal_state.last_time = std::chrono::steady_clock::now();
 	}
 
-	void tick(double dt)
+	void tick(double time_delta)
 	{
-		using namespace std;
+		if (config.log_rate_hz == 0)
+		{
+			return; // nothing to do if no need to log
+		}
 
 		auto now = std::chrono::steady_clock::now();
-		double actual_dt = dt;
+		double actual_dt = time_delta;
 		double tick_rate = 1.0 / actual_dt;
 
 		outputs.last_tick_rate = tick_rate;
@@ -73,18 +75,22 @@ struct TimingDiagnosticsWorkload
 		internal_state.sum_dt += actual_dt;
 		internal_state.sum_dt2 += actual_dt * actual_dt;
 
-		if (internal_state.count >= config.report_every)
+		const double tick_period = 1.0 / config.log_rate_hz;
+
+		if (internal_state.sum_dt >= tick_period)
 		{
 			double mean_dt = internal_state.sum_dt / internal_state.count;
 			double mean_dt2 = internal_state.sum_dt2 / internal_state.count;
-			double stddev = sqrt(mean_dt2 - mean_dt * mean_dt);
+			double stddev = std::sqrt(mean_dt2 - (mean_dt * mean_dt));
 
 			outputs.avg_tick_rate = 1.0 / mean_dt;
 			outputs.tick_stddev = stddev;
 
-			cerr << fixed;
-			cerr << "[TimingDiagnostics] avg: " << outputs.avg_tick_rate
-				 << " Hz, stddev: " << outputs.tick_stddev * 1000.0 * 1000.0 << " µs\n";
+			static const double seconds_to_microseconds_mul(1000.0 * 1000.0);
+
+			std::cerr << std::fixed;
+			std::cerr << "[TimingDiagnostics] avg: " << outputs.avg_tick_rate
+					  << " Hz, stddev: " << outputs.tick_stddev * seconds_to_microseconds_mul << " µs\n";
 
 			internal_state.count = 0;
 			internal_state.sum_dt = 0.0;
@@ -96,5 +102,5 @@ struct TimingDiagnosticsWorkload
 };
 
 static WorkloadAutoRegister<TimingDiagnosticsWorkload, TimingDiagnosticsConfig, TimingDiagnosticsInputs,
-							TimingDiagnosticsOutputs>
+	TimingDiagnosticsOutputs>
 	s_auto_register;

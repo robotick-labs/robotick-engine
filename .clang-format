@@ -1,5 +1,6 @@
 BasedOnStyle: Microsoft
 AllowShortFunctionsOnASingleLine: InlineOnly
+ColumnLimit: 150
 IndentWidth: 4
 TabWidth: 4
 UseTab: Always
@@ -9,7 +10,7 @@ NamespaceIndentation: All
 SortIncludes: true
 SpacesInAngles: false
 SpaceBeforeParens: ControlStatements
-AlignConsecutiveDeclarations: true
 AlignAfterOpenBracket: DontAlign
 AllowShortLambdasOnASingleLine: Empty
-BreakBeforeBraces: Attach
+BreakBeforeBraces: Allman
+AlignConsecutiveDeclarations: false

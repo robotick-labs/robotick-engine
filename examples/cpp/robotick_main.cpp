@@ -11,22 +11,40 @@
 
 using namespace robotick;
 
-std::atomic<bool> g_exit_requested = false;
+std::atomic<bool> g_stop_flag = false;
 
 void signal_handler(int)
 {
-	g_exit_requested = true;
+	std::cout << "\nShutting down...\n";
+	g_stop_flag = true;
 }
 
-void populate_model(Model& model)
+void populate_model_groups(Model& model)
 {
-	model.add("TimingDiagnosticsWorkload", "timing_diagnostics", 1000.0, {{"report_every", 1000}});
+	auto sequence_tick_1 = model.add("TimingDiagnosticsWorkload", "sequence_tick_1");
+	auto sequence_tick_2 = model.add("TimingDiagnosticsWorkload", "sequence_tick_2");
+	auto sequence_tick_3 = model.add("TimingDiagnosticsWorkload", "sequence_tick_3");
 
-	if (true)
-	{
-		return;
-	}
+	std::vector<WorkloadHandle> sequence_children = {sequence_tick_1, sequence_tick_2, sequence_tick_3};
+	auto sequenced_group = model.add("SequencedGroupWorkload", "synced_group", sequence_children, 1000.0);
+	// note - a SequencedGroupWorkload should just get through its child-ticks as quickly as they allow, in sequence -
+	// it's done when its done (though see note below)
 
+	auto synced_child_single = model.add("TimingDiagnosticsWorkload", "synced_child_single");
+
+	std::vector<WorkloadHandle> synced_children = {synced_child_single, sequenced_group};
+	auto synced_group = model.add("SyncedGroupWorkload", "synced_group", synced_children, 100.0);
+
+	auto slow_ticker = model.add("TimingDiagnosticsWorkload", "slow_ticker_10Hz", 10.0);
+	auto slowest_ticker = model.add("TimingDiagnosticsWorkload", "slow_ticker_1Hz", 1.0);
+
+	std::vector<WorkloadHandle> resynced_children = {synced_group, slow_ticker, slowest_ticker};
+	/*auto resynced_group =*/model.add("SyncedGroupWorkload", "resynced_group", resynced_children, 100.0);
+}
+
+void populate_model_brickpi(Model&)
+{
+#if 0
 	// === Add top-level standalone workloads ===
 	model.add("PythonWorkload", "comms", 30.0,
 			  {{"script_name", "robotick.workloads.core.telemetry.mqtt_update"}, {"class_name", "MqttUpdate"}});
@@ -47,10 +65,16 @@ void populate_model(Model& model)
 						   {{"script_name", "steering"}, {"class_name", "SteeringMixerTransformer"}});
 
 	// === Sequence and Pair ===
-	auto sequence = model.add("SequenceWorkload", "control_sequence", 0.0,
-							  {{"children", std::vector<WorkloadHandle>{remote, deadzone, mixer}}});
+	std::vector<WorkloadHandle> sequence_children = {remote, deadzone, mixer};
+	auto sequence = model.add("SequenceWorkload", "control_sequence", 0.0, sequence_children, {});
 
 	model.add("SyncedPairWorkload", "control_pair", 100.0, {{"primary", brickpi}, {"secondary", sequence}});
+#endif // #if 0
+}
+
+void populate_model(Model& model)
+{
+	populate_model_groups(model);
 }
 
 int main()
@@ -63,12 +87,8 @@ int main()
 
 	Engine engine;
 	engine.load(model); // instances our model and allows multithreaded-load/config for each
-	engine.start();
 
-	while (!g_exit_requested)
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	engine.run(g_stop_flag); // engine runs on this thread, until requested to stop
 
-	std::cout << "\nShutting down...\n";
-	engine.stop();
 	return 0;
 }

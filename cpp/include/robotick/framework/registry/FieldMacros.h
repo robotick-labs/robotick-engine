@@ -3,6 +3,8 @@
 #include "robotick/framework/registry/FieldRegistry.h"
 #include <typeinfo>
 
+// clang-format off
+
 #define ROBOTICK_OFFSET_OF(type, field) \
     reinterpret_cast<size_t>(           \
         &reinterpret_cast<const volatile char&>(((type*)0)->field))
@@ -12,6 +14,7 @@
     static std::vector<::robotick::FieldInfo>     get_fields();
 
 #define ROBOTICK_DEFINE_FIELDS(Type, ...)                                \
+	static_assert(std::is_standard_layout<Type>::value, "Workload field-containers must be standard layout"); \
     const ::robotick::StructRegistryEntry* Type::get_struct_reflection() \
     {                                                                    \
         static const auto* entry = ::robotick::register_struct(          \
@@ -28,3 +31,4 @@
     {                                                                          \
         #field, ROBOTICK_OFFSET_OF(type, field), typeid(decltype(type::field)) \
     }
+// clang-format on

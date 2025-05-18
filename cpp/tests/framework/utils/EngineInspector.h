@@ -7,19 +7,16 @@
 #include <string>
 #include <typeinfo>
 
-namespace robotick::test_access
+namespace robotick::test
 {
 	struct EngineInspector
 	{
-		static const WorkloadInstanceInfo& get_instance_info(const Engine& engine, size_t index)
-		{
-			return engine.get_instance_info(index);
-		}
+		static const WorkloadInstanceInfo& get_instance_info(const Engine& engine, size_t index) { return engine.get_instance_info(index); }
 
 		template <typename T> static const T* get_instance(const Engine& engine, size_t index)
 		{
 			const WorkloadInstanceInfo& info = get_instance_info(engine, index);
-			const std::string			expected_type = get_clean_typename(typeid(T));
+			const std::string expected_type = get_clean_typename(typeid(T));
 
 			if (info.type->name != expected_type)
 			{
@@ -29,4 +26,4 @@ namespace robotick::test_access
 			return static_cast<const T*>(info.ptr);
 		}
 	};
-} // namespace robotick::test_access
+} // namespace robotick::test

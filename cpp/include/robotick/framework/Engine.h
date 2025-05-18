@@ -1,40 +1,40 @@
-// Engine.h
 #pragma once
 
+#include "robotick/framework/Model.h"
 #include "robotick/framework/api.h"
 
+#include <atomic>
 #include <memory>
 #include <string>
 
 namespace robotick
 {
-	class Model;
 	struct WorkloadRegistryEntry;
 
 	struct WorkloadInstanceInfo
 	{
-		void*						 ptr;
+		void* ptr;
 		const WorkloadRegistryEntry* type;
-		std::string					 unique_name;
-		double						 tick_rate_hz;
+		std::string unique_name;
+		double tick_rate_hz;
+		const std::vector<const WorkloadInstanceInfo*> children;
 	};
 
-	namespace test_access
+	namespace test
 	{
 		struct EngineInspector;
 	}
 
 	class ROBOTICK_API Engine
 	{
-		friend struct robotick::test_access::EngineInspector;
+		friend struct robotick::test::EngineInspector;
 
 	  public:
 		Engine();
 		~Engine();
 
 		void load(const Model& model);
-		void start();
-		void stop();
+		void run(const std::atomic<bool>& stop_flag);
 
 	  protected:
 		const WorkloadInstanceInfo& get_instance_info(size_t index) const;

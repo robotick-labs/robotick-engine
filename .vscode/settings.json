@@ -3,7 +3,8 @@
     "cmake.generator": "Unix Makefiles",
     "cmake.buildDirectory": "${workspaceFolder}/build",
     "[cpp]": {
-        "editor.defaultFormatter": "ms-vscode.cpptools"
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.tabSize": 4,
     },
     "C_Cpp.codeAnalysis.clangTidy.enabled": true,
     "files.associations": {
@@ -101,7 +102,11 @@
         "semaphore": "cpp",
         "span": "cpp",
         "cinttypes": "cpp",
-        "cassert": "cpp"
+        "cassert": "cpp",
+        "coroutine": "cpp",
+        "source_location": "cpp",
+        "ranges": "cpp",
+        "shared_mutex": "cpp"
     },
     "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
         "modernize-use-trailing-return-type"
