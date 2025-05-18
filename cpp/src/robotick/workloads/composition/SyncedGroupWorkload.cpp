@@ -103,7 +103,10 @@ namespace robotick
 
 			set_thread_affinity(2);
 			set_thread_priority_high();
-			set_thread_name("robotick_syncedgroup_" + std::string(child->type->name) + "_" + child->unique_name);
+
+			std::string thread_name = child->unique_name;
+			thread_name = thread_name.substr(0, 15); // linux doesn't like thread-names more than 16 characters incl /0
+			set_thread_name(thread_name);
 
 			while (true)
 			{
