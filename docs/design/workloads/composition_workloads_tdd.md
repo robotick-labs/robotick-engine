@@ -51,7 +51,7 @@ Composition workloads define how a group of child workloads are ticked in coordi
 - Serves as the **root tick barrier** in systems needing safe per-frame data movement.
 
 
-## 🎞️ Execution Timeline Example (ASCII Tracy-style)
+## 🎞️ Execution Timeline Example
 
 Demonstrates a `SyncedGroupWorkload` running at **1kHz**, with a mixture of child workloads:
 - Some ticking at slower rates
@@ -60,14 +60,14 @@ Demonstrates a `SyncedGroupWorkload` running at **1kHz**, with a mixture of chil
 - All ticks aligned to a central sync frame (safe barrier for data transfer)
 
 ```
-Time → → →         0ms       1ms       2ms       3ms       4ms       5ms
+Time → → →      0ms       1ms       2ms       3ms       4ms       5ms
 
 SyncedGroup (1kHz)
 ├─ A (1kHz)     [──A──]   [──A──]   [──A──]   [──A──]   [──A──]   [──A──]
 ├─ B (500Hz)    [───────B───────]   [───────B───────]
 ├─ C (1Hz)      [───────────────────────────────C──────────────────────────────...
 ├─ SeqGroup D (500Hz)
-│              [─D1─][────D2────]  [─D1─][────D2────]  [─D1─][────D2────]
+│               [─D1─][────D2────]  [─D1─][────D2────]  [─D1─][────D2────]
 └─ E (333Hz)    [──E──]                      [──E──]                      ...
 
                 ↑        ↑           ↑         ↑           ↑
