@@ -10,6 +10,7 @@ Composition workloads in Robotick define how a group of child workloads are tick
 - **Slower children** are allowed — they will be called only when their individual tick interval has elapsed.
 - **Faster children are not allowed** — their tick opportunity is limited to the group’s cadence.
 - Only **root workloads** can own a tick loop. All child groups are ticked by their parent.
+- Each workload instance must belong to exactly one parent group or the Engine's root. This is enforced at setup. Adding a workload to multiple groups (even across threads) is a configuration error.
 
 ---
 
