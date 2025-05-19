@@ -77,6 +77,62 @@ Connections may route:
 
 Config values can be dynamically edited at runtime, and are treated like regular data fields.
 
+### 🧩 Workload and Field Registration Syntax
+
+To support clean, macro-minimal auto-registration of workloads and their field metadata, Robotick provides two compact macros:
+
+---
+
+### ✅ `ROBOTICK_DEFINE_FIELDS(...)`
+
+This macro declares field metadata for a given struct.
+
+```cpp
+struct HelloInputs {
+    double a;
+    double b;
+};
+
+ROBOTICK_DEFINE_FIELDS(HelloInputs, a, b)
+```
+
+This expands to:
+
+```cpp
+static FieldAutoRegister<HelloInputs> s_robotick_fields_HelloInputs{
+    {"a", &HelloInputs::a},
+    {"b", &HelloInputs::b}
+};
+```
+
+It registers each field’s name and offset for use by the reflection and data-pipeline systems.
+
+---
+
+### ✅ `ROBOTICK_DEFINE_WORKLOAD(...)`
+
+This macro registers a workload and automatically infers its associated config, input, and output types using template deduction.
+
+```cpp
+ROBOTICK_DEFINE_WORKLOAD(HelloWorkload)
+```
+
+This expands to:
+
+```cpp
+static WorkloadAutoRegister<
+    HelloWorkload,
+    decltype(HelloWorkload::config),
+    decltype(HelloWorkload::inputs),
+    decltype(HelloWorkload::outputs)> s_auto_register;
+```
+
+The workload must declare `config`, `inputs`, and `outputs` as public fields with valid types.
+
+---
+
+These macros provide a minimal-declaration workflow that avoids boilerplate while remaining transparent and compile-time resolvable. They are designed to be compatible with both embedded and desktop targets.
+
 ---
 
 ## 📦 Memory Semantics
@@ -122,7 +178,7 @@ Note:
 While zero-copy pointer aliasing between fields might seem attractive, it is **not used** in Robotick because:
 
 - Workloads declare fields using **value-based structs**, not pointer fields.
-- Patchable pointer aliasing would require awkward manual dereferencing, and checking if each pointer is set - causing costly branching.
+- Patchable pointer aliasing would require awkward manual dereferencing, and checking if each pointer is set — causing costly branching.
 - We aim for **simple, clean, and predictable code**, especially for MCUs.
 
 Therefore, **all data-connections are implemented as explicit memcpy operations**, precomputed and minimal.  
@@ -144,6 +200,45 @@ Notes:
 - `DataConnectionHandle` is not needed — connections are one-way setup-only
 
 ---
+
+## 🧾 Logging / Telemetry Access via Registry Overlay
+
+To support logging workloads or bulk telemetry consumers, Robotick interprets **data buffers directly** using the **field metadata** stored in the workload registry.
+
+When a buffer (live or cloned) is passed to the data pipeline, the system already knows:
+- The originating workload(s)
+- The field layout (via `WorkloadRegistryEntry`)
+- Each field's name, offset, and size
+
+This allows structured access to:
+- A single workload's outputs
+- A full group or system-wide memory snapshot
+- A thread-local clone produced during pipelined tick execution
+
+No dedicated snapshot struct is needed — the registry provides a complete, runtime-resolvable description of the buffer.
+
+### 🧪 Example: Logging a Cloned Output Buffer
+
+```cpp
+const void* buffer = get_cloned_snapshot(); // From synced group
+for (const WorkloadInstanceInfo& inst : model.workloads) {
+    const auto* reg = inst.registry_entry;
+    const uint8_t* base = reinterpret_cast<const uint8_t*>(buffer) + inst.offset;
+
+    for (const auto& field : reg->output_fields) {
+        const void* data_ptr = base + field.offset;
+        log_value(inst.name, field.name, data_ptr, field.size);
+    }
+}
+```
+
+This unified overlay approach allows logging, testing, and telemetry to operate without generating special-purpose access structures or wiring. It works across all tick phases and threading models.
+
+### ✅ Benefits
+- No custom logging structs required
+- Supports both real-time and post-tick inspection
+- Field layout handled via existing registry metadata
+- Minimal overhead and full portability
 
 ## 🚫 Constraints
 
