@@ -9,3 +9,4 @@ robotick/cpp/build/*
 Testing/*
 cpp/build/*
 *_LOG.TXT
+out/*
