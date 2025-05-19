@@ -1,5 +1,3 @@
-> ⚠️ Draft notes. Not yet reviewed/formalised.
-
 # 🧩 Composition Workloads - Technical Design
 
 Composition workloads in Robotick define how a group of child workloads are ticked in coordination. Each group sets its own tick cadence and governs how and when children are invoked.
