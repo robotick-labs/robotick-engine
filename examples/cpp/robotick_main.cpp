@@ -21,14 +21,14 @@ void signal_handler(int)
 
 void populate_model_groups(Model& model)
 {
-	auto sequence_tick_1 = model.add("TimingDiagnosticsWorkload", "seq_tick_1", 1000.0);
-	auto sequence_tick_2 = model.add("TimingDiagnosticsWorkload", "seq_tick_2", 1000.0);
-	auto sequence_tick_3 = model.add("TimingDiagnosticsWorkload", "seq_tick_3", 1000.0);
+	auto sequence_tick_1 = model.add("TimingDiagnosticsWorkload", "seq_tick_1");
+	auto sequence_tick_2 = model.add("TimingDiagnosticsWorkload", "seq_tick_2");
+	auto sequence_tick_3 = model.add("TimingDiagnosticsWorkload", "seq_tick_3");
 
 	std::vector<WorkloadHandle> sequence_children = {sequence_tick_1, sequence_tick_2, sequence_tick_3};
-	auto sequenced_group = model.add("SequencedGroupWorkload", "seq_gp_fast", sequence_children, 1000.0);
+	auto sequenced_group = model.add("SequencedGroupWorkload", "seq_gp_fast", sequence_children);
 
-	auto synced_child_single = model.add("TimingDiagnosticsWorkload", "sync_child_single", 1000.0);
+	auto synced_child_single = model.add("TimingDiagnosticsWorkload", "sync_child_single");
 
 	auto slow_ticker = model.add("TimingDiagnosticsWorkload", "snail_10Hz", 10.0);
 	auto slowest_ticker = model.add("TimingDiagnosticsWorkload", "snail_1Hz", 1.0);
