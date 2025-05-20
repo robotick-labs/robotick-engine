@@ -19,7 +19,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: /tmp/.docker-cache
-        key: docker-${{ runner.os }}-${{ hashFiles('.devcontainer/Docker.ubuntu-x64.dev') }}
+        key: docker-${{ runner.os }}-${{ runner.os-version }}-${{ hashFiles('.devcontainer/Docker.ubuntu-x64.dev') }}
         restore-keys: |
           docker-${{ runner.os }}-
 
@@ -50,5 +50,5 @@ jobs:
           bash -c "
             cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . &&
             cmake --build build &&
-            ctest --test-dir build --output-on-failure
+            ctest --test-dir build --output-on-failure --timeout 300
           "
