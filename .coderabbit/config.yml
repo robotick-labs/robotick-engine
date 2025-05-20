@@ -1,10 +1,31 @@
 review:
-  summary: true
-  inline: true
-  severity: all
-  exclude_paths:
-    - "docs/"
-    - "scripts/"
+  summary: true           # Add a top-level PR summary comment
+  inline: true            # Include inline comments on code
+  severity: all           # Show all levels (info, low, medium, high)
+  approve: false          # ❌ Never auto-approve
+  min_severity_for_comments: low
+
+  test_requirements:
+    check_for_tests: true
+    allow_no_tests: false       # 🚫 Tests must exist (new or pre-existing)
+    check_coverage: true        # Encourage high coverage
+    check_files_modified: true  # Tie tests to changed files
+
+  comment_requirements:
+    enforce_comments_on:
+      - complex_logic
+      - unsafe_operations
+      - numerical_constants
+    minimum_comment_ratio: 0.10  # At least 10% of lines should be commented if logic is non-trivial
+
   prompt:
-    language: "C++, Python"
-    tone: "constructive"
+    tone: "strict but constructive"
+    language: "C++ and Python"
+    style_guide: |
+      Follow industry best practices for safety-critical systems:
+      - All public APIs must be documented.
+      - All non-obvious logic should have comments.
+      - Functions should be short and single-responsibility.
+      - Prefer RAII and exception-safe code patterns in C++.
+      - Avoid undefined or platform-specific behaviour.
+      - All new logic must be covered by automated tests or explain why not.
