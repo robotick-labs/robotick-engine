@@ -1,6 +1,10 @@
 
 <img src="https://robotick.org/images/logo.png" style="display: block; width: 300px; border-radius: 12px;" />
 
+<br/>
+
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
 ## 🤖 Overview
 
 **Robotick** is a high-performance, modular C++ runtime for robotics and control systems — engineered for reliability, introspection, and composability across the full spectrum of platforms.

@@ -105,3 +105,14 @@ if (ROBOTICK_BUILD_TESTS)
             ${CMAKE_BINARY_DIR}/Debug
     )
 endif()
+
+# =========================================
+# ✅ Auto-add License Info to cpp Files:
+# =========================================
+
+add_custom_target(add_license
+    COMMAND ${CMAKE_COMMAND} -E echo "Adding Apache 2.0 headers..."
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/add_license_header.py ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
