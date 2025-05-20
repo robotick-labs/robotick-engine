@@ -1,0 +1,20 @@
+{
+    "name": "Robotick Ubuntu x64 Dev",
+    "build": {
+        "dockerfile": "Docker.ubuntu-x64.dev",
+        "context": ".."
+    },
+    "workspaceFolder": "/workspaces/robotick",
+    "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+    },
+    "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "matepek.vscode-catch2-test-adapter"
+    ],
+    "postCreateCommand": "pwd && ls && pip install --break-system-packages -e . && cmake --preset dev-gcc",
+    "mounts": [
+        "source=${env:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
+    ]
+}
