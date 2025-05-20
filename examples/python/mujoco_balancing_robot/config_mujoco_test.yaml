@@ -1,0 +1,64 @@
+workloads:
+  - type: RemoteControlInterface
+    name: remote_control_interface
+
+  - type: DeadZoneScaleAndSplitTransformer
+    name: deadzone_transformer
+    args:
+      dead_zone: 0.2
+      scale_x: -0.15
+      scale_y: 0.4
+      data_bindings:
+        - input_vector <- remote_control_interface.left_stick
+        - output_y -> speed_to_lean_control.desired_speed
+        - output_x -> steering_mixer.input_turn_rate
+
+  - type: BalanceRobotSpeedToLeanController
+    name: speed_to_lean_control
+    args:
+      tick_parent_name: mujoco_interface
+      max_acceleration: 0.05
+      max_lean_angle: 0.4
+      data_bindings:
+        - current_speed <- balance_pid.control_output # since our actual speed is ~proportional to motor-torque, assuming no slipping
+        - goal_lean -> balance_pid.setpoint
+
+  - type: AxisToAngleFromVerticalTransformer
+    name: pitch_transformer
+    args:
+      axis_name: z
+      data_bindings:
+        - input_vector <- mujoco_interface.body_axis_sensor
+
+  - type: PidControl
+    name: balance_pid
+    args:
+      tick_parent_name: mujoco_interface
+      kp: 1.2
+      ki: 0.0
+      kd: 0.005
+      data_bindings:      
+        - measured <- pitch_transformer.output_angle
+        - control_output -> steering_mixer.input_speed
+
+  - type: SteeringMixerTransformer
+    name: steering_mixer
+    args:
+      power_scale_both: 100.0
+      power_scale_left: -1.0
+      data_bindings:
+        - output_left_motor -> mujoco_interface.motor_left_wheel
+        - output_right_motor -> mujoco_interface.motor_right_wheel
+
+  - type: MujocoInterface
+    name: mujoco_interface
+    args:
+      tick_rate_hz: 200 # note - the mujoco world its self honours the (generally much higher for sim-stability) tick-rate specified in the below xml file
+      xml_path: "examples/mujoco_balancing_robot/mujoco_scene.xml"
+      display_enabled: True
+
+  - type: MqttUpdate
+    name: comms
+
+  - type: ConsoleUpdate
+    name: console

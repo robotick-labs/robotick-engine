@@ -1,0 +1,12 @@
+robotick/__pycache__/*
+*.pyc
+robotick.egg-info
+*/MUJOCO_LOG.TXT
+.obsidian/*
+build/*
+robotick/cpp/build/*
+*.log
+Testing/*
+cpp/build/*
+*_LOG.TXT
+out/*
