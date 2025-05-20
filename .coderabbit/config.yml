@@ -3,7 +3,8 @@ review:
   summary: true           # Add a top-level PR summary comment
   inline: true            # Include inline comments on code
   severity: all           # Show all levels (info, low, medium, high)
-  approve: false          # ❌ Never auto-approve
+  approve: true           # Allow CodeRabbit to auto-approve PRs that pass review
+  min_severity_for_approval: medium  # only approve if no high-severity issues found
   min_severity_for_comments: low
 
   test_requirements:
