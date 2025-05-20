@@ -1,9 +1,8 @@
 # 🤖 Contributing to Robotick
 
-Welcome, and thanks for your interest in contributing to Robotick!  
-We're building an open, modular robotics platform — and your ideas, bug fixes, experiments, and improvements are welcome.
+**Welcome** and thanks for your interest in contributing to **Robotick**! 🤖
 
-Whether you're a seasoned developer, a curious maker, or someone just exploring ROS and embedded systems — we’re glad you're here.
+We're building an open, modular, real-time robotics platform — and your ideas, bug fixes, experiments, and improvements are welcome. Whether you're a seasoned developer, a curious maker, or someone just exploring ROS and embedded systems, we’re glad you're here!
 
 ---
 
