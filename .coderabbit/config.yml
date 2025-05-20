@@ -1,4 +1,5 @@
 review:
+  review_profile: PRECISE # "Focused, technical, direct. Good for professionals who want signal, not noise"
   summary: true           # Add a top-level PR summary comment
   inline: true            # Include inline comments on code
   severity: all           # Show all levels (info, low, medium, high)
