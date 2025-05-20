@@ -1,4 +1,4 @@
-// Copyright 2025 Robotick Labs CIC
+// Copyright 2025 Robotick Labs
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-
 #include "robotick/framework/utils/Typename.h"
 
 #ifdef __GNUG__ // GCC/Clang only
@@ -24,14 +22,13 @@
 #include <string>
 #include <typeindex>
 
-std::string get_clean_typename(const std::type_index &t)
+std::string get_clean_typename(const std::type_index& t)
 {
 	std::string name = t.name();
 
 #ifdef __GNUG__
 	int status = -1;
-	std::unique_ptr<char, void (*)(void *)> demangled(abi::__cxa_demangle(name.c_str(), nullptr, nullptr, &status),
-													  std::free);
+	std::unique_ptr<char, void (*)(void*)> demangled(abi::__cxa_demangle(name.c_str(), nullptr, nullptr, &status), std::free);
 
 	if (status == 0 && demangled)
 		name = demangled.get();

@@ -1,4 +1,4 @@
-// Copyright 2025 Robotick Labs CIC
+// Copyright 2025 Robotick Labs
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,8 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-
 
 #include "robotick/framework/FixedString.h"
 #include "robotick/framework/registry/FieldMacros.h"
@@ -104,8 +102,8 @@ struct TimingDiagnosticsWorkload
 			static const double seconds_to_microseconds_mul(1000.0 * 1000.0);
 
 			std::cerr << std::fixed;
-			std::cerr << "[TimingDiagnostics] avg: " << outputs.avg_tick_rate
-					  << " Hz, stddev: " << outputs.tick_stddev * seconds_to_microseconds_mul << " µs\n";
+			std::cerr << "[TimingDiagnostics] avg: " << outputs.avg_tick_rate << " Hz, stddev: " << outputs.tick_stddev * seconds_to_microseconds_mul
+					  << " µs\n";
 
 			internal_state.count = 0;
 			internal_state.sum_dt = 0.0;
@@ -116,6 +114,4 @@ struct TimingDiagnosticsWorkload
 	}
 };
 
-static WorkloadAutoRegister<TimingDiagnosticsWorkload, TimingDiagnosticsConfig, TimingDiagnosticsInputs,
-	TimingDiagnosticsOutputs>
-	s_auto_register;
+static WorkloadAutoRegister<TimingDiagnosticsWorkload, TimingDiagnosticsConfig, TimingDiagnosticsInputs, TimingDiagnosticsOutputs> s_auto_register;

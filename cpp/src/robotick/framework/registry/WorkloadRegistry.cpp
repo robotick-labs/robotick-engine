@@ -1,4 +1,4 @@
-// Copyright 2025 Robotick Labs CIC
+// Copyright 2025 Robotick Labs
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,28 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #include "robotick/framework/registry/WorkloadRegistry.h"
 
-#include <map>     // for std::map
-#include <string>  // for std::string
+#include <map>	  // for std::map
+#include <string> // for std::string
 
 namespace robotick
 {
-    std::map<std::string, const WorkloadRegistryEntry*>& WorkloadRegistry::registry()
-    {
-        static std::map<std::string, const WorkloadRegistryEntry*> instance;
-        return instance;
-    }
+	std::map<std::string, const WorkloadRegistryEntry*>& WorkloadRegistry::registry()
+	{
+		static std::map<std::string, const WorkloadRegistryEntry*> instance;
+		return instance;
+	}
 
-    void WorkloadRegistry::register_entry(const WorkloadRegistryEntry& entry)
-    {
-        registry()[entry.name] = &entry;
-    }
+	void WorkloadRegistry::register_entry(const WorkloadRegistryEntry& entry)
+	{
+		registry()[entry.name] = &entry;
+	}
 
-    const WorkloadRegistryEntry* WorkloadRegistry::find(const std::string& name) const
-    {
-        auto it = registry().find(name);
-        return it != registry().end() ? it->second : nullptr;
-    }
-}  // namespace robotick
+	const WorkloadRegistryEntry* WorkloadRegistry::find(const std::string& name) const
+	{
+		auto it = registry().find(name);
+		return it != registry().end() ? it->second : nullptr;
+	}
+} // namespace robotick

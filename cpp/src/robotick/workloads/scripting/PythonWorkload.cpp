@@ -1,4 +1,4 @@
-// Copyright 2025 Robotick Labs CIC
+// Copyright 2025 Robotick Labs
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,8 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-
 
 #include "robotick/framework/FixedString.h"
 #include "robotick/framework/registry/FieldMacros.h"
@@ -36,11 +34,10 @@ namespace robotick
 		struct PythonConfig
 		{
 			FixedString128 script_name;
-			FixedString64  class_name;
+			FixedString64 class_name;
 			ROBOTICK_DECLARE_FIELDS();
 		};
-		ROBOTICK_DEFINE_FIELDS(PythonConfig, ROBOTICK_FIELD(PythonConfig, script_name),
-							   ROBOTICK_FIELD(PythonConfig, class_name))
+		ROBOTICK_DEFINE_FIELDS(PythonConfig, ROBOTICK_FIELD(PythonConfig, script_name), ROBOTICK_FIELD(PythonConfig, class_name))
 
 		struct PythonInputs
 		{
@@ -69,8 +66,8 @@ namespace robotick
 
 	struct PythonWorkload
 	{
-		PythonConfig  config;
-		PythonInputs  inputs;
+		PythonConfig config;
+		PythonInputs inputs;
 		PythonOutputs outputs;
 
 		PythonInternalState* internal_state = nullptr;
@@ -87,11 +84,11 @@ namespace robotick
 		{
 			static std::once_flag init_flag;
 			std::call_once(init_flag,
-						   []()
-						   {
-							   py::initialize_interpreter();
-							   PyEval_SaveThread(); // release the GIL
-						   });
+				[]()
+				{
+					py::initialize_interpreter();
+					PyEval_SaveThread(); // release the GIL
+				});
 
 			try
 			{

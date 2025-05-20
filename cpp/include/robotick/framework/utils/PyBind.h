@@ -1,4 +1,4 @@
-// Copyright 2025 Robotick Labs CIC
+// Copyright 2025 Robotick Labs
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #pragma once
 #include "robotick/framework/registry/FieldRegistry.h"
 #include <pybind11/pybind11.h>
@@ -22,7 +21,7 @@ namespace py = pybind11;
 namespace robotick
 {
 
-	void marshal_struct_to_dict(void *struct_ptr, const StructRegistryEntry &info, py::dict &py_out);
-	void marshal_dict_to_struct(const py::dict &py_in, const StructRegistryEntry &info, void *struct_ptr);
+	void marshal_struct_to_dict(void* struct_ptr, const StructRegistryEntry& info, py::dict& py_out);
+	void marshal_dict_to_struct(const py::dict& py_in, const StructRegistryEntry& info, void* struct_ptr);
 
 } // namespace robotick

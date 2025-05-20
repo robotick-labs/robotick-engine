@@ -1,4 +1,4 @@
-// Copyright 2025 Robotick Labs CIC
+// Copyright 2025 Robotick Labs
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 
 #pragma once
 
@@ -30,52 +29,34 @@ namespace robotick
 
 		FixedString() = default;
 
-		FixedString(const char *str)
+		FixedString(const char* str)
 		{
 			strncpy(data, str, N - 1);
 			data[N - 1] = '\0';
 		}
 
-		FixedString &operator=(const char *str)
+		FixedString& operator=(const char* str)
 		{
 			strncpy(data, str, N - 1);
 			data[N - 1] = '\0';
 			return *this;
 		}
 
-		const char *c_str() const
-		{
-			return data;
-		}
+		const char* c_str() const { return data; }
 
-		operator const char *() const
-		{
-			return data;
-		}
+		operator const char*() const { return data; }
 
-		bool operator==(const FixedString<N> &other) const
-		{
-			return std::strncmp(data, other.data, N) == 0;
-		}
+		bool operator==(const FixedString<N>& other) const { return std::strncmp(data, other.data, N) == 0; }
 
-		bool operator!=(const FixedString<N> &other) const
-		{
-			return !(*this == other);
-		}
+		bool operator!=(const FixedString<N>& other) const { return !(*this == other); }
 
-		bool empty() const
-		{
-			return data[0] == '\0';
-		}
+		bool empty() const { return data[0] == '\0'; }
 
-		std::string to_string() const
-		{
-			return std::string(data);
-		}
+		std::string to_string() const { return std::string(data); }
 	};
 
 	// Stream output (e.g., for logging)
-	template <size_t N> inline std::ostream &operator<<(std::ostream &os, const FixedString<N> &str)
+	template <size_t N> inline std::ostream& operator<<(std::ostream& os, const FixedString<N>& str)
 	{
 		return os << str.c_str();
 	}
