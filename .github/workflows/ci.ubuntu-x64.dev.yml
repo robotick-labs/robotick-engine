@@ -1,0 +1,54 @@
+name: CI - Build & Test (ubuntu-x64.dev)
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  docker-ci:
+    runs-on: ubuntu-latest
+    name: Docker CI (ubuntu-x64.dev)
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Cache Docker layers
+      uses: actions/cache@v4
+      with:
+        path: /tmp/.docker-cache
+        key: docker-${{ runner.os }}-${{ hashFiles('.devcontainer/Docker.ubuntu-x64.dev') }}
+        restore-keys: |
+          docker-${{ runner.os }}-
+
+    - name: Load Docker cache
+      run: |
+        mkdir -p /tmp/.docker-cache
+        if [ -f /tmp/.docker-cache/image.tar ]; then
+          docker load -i /tmp/.docker-cache/image.tar || true
+        fi
+
+    - name: Build Docker image (robotick-ci)
+      run: |
+        docker build -t robotick-ci \
+          -f .devcontainer/Docker.ubuntu-x64.dev \
+          .
+
+    - name: Save Docker image to cache
+      run: |
+        mkdir -p /tmp/.docker-cache
+        docker save robotick-ci > /tmp/.docker-cache/image.tar
+
+    - name: Run CI inside container
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}:/workspace \
+          -w /workspace \
+          robotick-ci \
+          bash -c "
+            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . &&
+            cmake --build build &&
+            ctest --test-dir build --output-on-failure
+          "
