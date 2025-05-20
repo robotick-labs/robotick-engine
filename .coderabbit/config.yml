@@ -1,0 +1,10 @@
+review:
+  summary: true
+  inline: true
+  severity: all
+  exclude_paths:
+    - "docs/"
+    - "scripts/"
+  prompt:
+    language: "C++, Python"
+    tone: "constructive"
