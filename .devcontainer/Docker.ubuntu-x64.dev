@@ -1,8 +1,9 @@
 FROM ubuntu:24.04
 
-# Install dependencies
+# 🛠 Install system dependencies
 RUN apt-get update && apt-get install -y \
     cmake \
+    clang \
     clang-tidy \
     curl \
     g++ \
@@ -11,8 +12,18 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-venv \
-    clang \
     ninja-build \
     gdb \
     && apt-get clean
 
+# Create and activate Python venv, install robotick in editable mode
+WORKDIR /workspace
+COPY . .
+
+# Create virtual environment and install into it
+RUN python3 -m venv /venv && \
+    /venv/bin/pip install -U pip && \
+    /venv/bin/pip install -e .
+
+# Make it default for future Docker RUN/CMD steps
+ENV PATH="/venv/bin:$PATH"

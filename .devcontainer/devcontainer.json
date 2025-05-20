@@ -11,7 +11,8 @@
     "extensions": [
         "ms-vscode.cpptools",
         "ms-vscode.cmake-tools",
-        "matepek.vscode-catch2-test-adapter"
+        "matepek.vscode-catch2-test-adapter",
+        "coderabbit.coderabbit-vscode"
     ],
     "postCreateCommand": "pwd && ls && pip install --break-system-packages -e . && cmake --preset dev-gcc",
     "mounts": [
