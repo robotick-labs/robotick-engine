@@ -1,38 +1,27 @@
-// Copyright 2025 Robotick Labs
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
+// Copyright Robotick Labs
 #include "robotick/framework/registry/WorkloadRegistry.h"
 
-#include <map>	  // for std::map
-#include <string> // for std::string
+#include <memory>
 
 namespace robotick
 {
-	std::map<std::string, const WorkloadRegistryEntry*>& WorkloadRegistry::registry()
+	WorkloadRegistry& WorkloadRegistry::get()
 	{
-		static std::map<std::string, const WorkloadRegistryEntry*> instance;
+		static WorkloadRegistry instance;
 		return instance;
 	}
 
 	void WorkloadRegistry::register_entry(const WorkloadRegistryEntry& entry)
 	{
-		registry()[entry.name] = &entry;
+		std::scoped_lock lock(mutex);
+		entries[entry.name] = std::make_unique<WorkloadRegistryEntry>(entry);
 	}
 
 	const WorkloadRegistryEntry* WorkloadRegistry::find(const std::string& name) const
 	{
-		auto it = registry().find(name);
-		return it != registry().end() ? it->second : nullptr;
+		std::scoped_lock lock(mutex);
+		auto it_entries = entries.find(name);
+		return it_entries != entries.end() ? it_entries->second.get() : nullptr;
 	}
+
 } // namespace robotick

@@ -1,21 +1,9 @@
-// Copyright 2025 Robotick Labs
+// Copyright Robotick Labs
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
-#include "robotick/framework/registry/FieldMacros.h"
-#include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 
 #include "utils/EngineInspector.h"
@@ -26,155 +14,110 @@
 #include <chrono>
 #include <thread>
 
-using namespace Catch;
-using namespace robotick;
-using namespace robotick::test;
-
-namespace
+namespace robotick::test
 {
-	// === DummyWorkload (with config/load) ===
 
-	struct DummyConfig
+	namespace
 	{
-		int value = 0;
-		ROBOTICK_DECLARE_FIELDS();
-	};
-	ROBOTICK_DEFINE_FIELDS(DummyConfig, ROBOTICK_FIELD(DummyConfig, value))
+		// === DummyWorkload (with config/load) ===
 
-	struct DummyWorkload
-	{
-		DummyConfig config;
-		int loaded_value = 0;
-
-		void load() { loaded_value = config.value; }
-	};
-
-	struct DummyWorkloadRegister
-	{
-		DummyWorkloadRegister()
+		struct DummyConfig
 		{
-			static const WorkloadRegistryEntry entry = {"DummyWorkload", sizeof(DummyWorkload), alignof(DummyWorkload),
-				[](void* p)
-				{
-					new (p) DummyWorkload();
-				},
-				[](void* p)
-				{
-					static_cast<DummyWorkload*>(p)->~DummyWorkload();
-				},
-				DummyConfig::get_struct_reflection(), offsetof(DummyWorkload, config), nullptr, 0, nullptr, 0, nullptr, nullptr,
-				[](void* p)
-				{
-					static_cast<DummyWorkload*>(p)->load();
-				},
-				nullptr, nullptr, nullptr, nullptr};
+			int value = 0;
+		};
+		ROBOTICK_BEGIN_FIELDS(DummyConfig)
+		ROBOTICK_FIELD(DummyConfig, value)
+		ROBOTICK_END_FIELDS()
 
-			WorkloadRegistry::get().register_entry(entry);
-		}
-	};
-	static DummyWorkloadRegister s_register_dummy;
-
-	// === TickCounterWorkload ===
-
-	struct TickCounterWorkload
-	{
-		int count = 0;
-		void tick(double) { count++; }
-	};
-
-	struct TickCounterWorkloadRegister
-	{
-		TickCounterWorkloadRegister()
+		struct DummyWorkload
 		{
-			static const WorkloadRegistryEntry entry = {"TickCounterWorkload", sizeof(TickCounterWorkload), alignof(TickCounterWorkload),
-				[](void* p)
-				{
-					new (p) TickCounterWorkload();
-				},
-				[](void* p)
-				{
-					static_cast<TickCounterWorkload*>(p)->~TickCounterWorkload();
-				},
-				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr,
-				[](void* p, double dt)
-				{
-					static_cast<TickCounterWorkload*>(p)->tick(dt);
-				},
-				nullptr};
+			DummyConfig config;
+			int loaded_value = 0;
 
-			WorkloadRegistry::get().register_entry(entry);
-		}
-	};
-	static TickCounterWorkloadRegister s_register_tick;
-} // namespace
+			void load() { loaded_value = config.value; }
+		};
+		ROBOTICK_DEFINE_WORKLOAD(DummyWorkload)
 
-// === Tests ===
+		// === TickCounterWorkload ===
 
-TEST_CASE("Unit|Framework|Engine|DummyWorkload stores tick rate correctly")
-{
-	Model model;
-	auto handle = model.add("DummyWorkload", "A", 123.0, {});
-	model.set_root(handle);
+		struct TickCounterWorkload
+		{
+			int count = 0;
+			void tick(double) { count++; }
+		};
+		ROBOTICK_DEFINE_WORKLOAD(TickCounterWorkload)
 
-	Engine engine;
-	engine.load(model);
+	} // namespace
 
-	double tick_rate = EngineInspector::get_instance_info(engine, 0).tick_rate_hz;
-	REQUIRE(tick_rate == 123.0);
-}
+	// === Tests ===
 
-TEST_CASE("Unit|Framework|Engine|DummyWorkload config is loaded via load()")
-{
-	Model model;
-	auto handle = model.add("DummyWorkload", "A", 1.0, {{"value", 42}});
-	model.set_root(handle);
+	TEST_CASE("Unit|Framework|Engine|DummyWorkload stores tick rate correctly")
+	{
+		Model model;
+		auto handle = model.add("DummyWorkload", "A", 123.0, {});
+		model.set_root(handle);
 
-	Engine engine;
-	engine.load(model);
+		Engine engine;
+		engine.load(model);
 
-	const DummyWorkload* ptr = EngineInspector::get_instance<DummyWorkload>(engine, 0);
-	REQUIRE(ptr->loaded_value == 42);
-}
+		double tick_rate = EngineInspector::get_instance_info(engine, 0).tick_rate_hz;
+		REQUIRE(tick_rate == Catch::Approx(123.0));
+	}
 
-TEST_CASE("Unit|Framework|Engine|Rejects unknown workload type")
-{
-	Model model;
-	auto handle = model.add("UnknownType", "fail", 1.0, {});
-	model.set_root(handle);
+	TEST_CASE("Unit|Framework|Engine|DummyWorkload config is loaded via load()")
+	{
+		Model model;
+		auto handle = model.add("DummyWorkload", "A", 1.0, {{"value", 42}});
+		model.set_root(handle);
 
-	Engine engine;
-	REQUIRE_THROWS_WITH(engine.load(model), "Unknown workload type: UnknownType");
-}
+		Engine engine;
+		engine.load(model);
 
-TEST_CASE("Unit|Framework|Engine|Multiple workloads supported")
-{
-	Model model;
-	model.add("DummyWorkload", "one", 1.0, {{"value", 1}});
-	model.add("DummyWorkload", "two", 2.0, {{"value", 2}});
-	model_helpers::wrap_all_in_sequenced_group(model);
+		const DummyWorkload* ptr = EngineInspector::get_instance<DummyWorkload>(engine, 0);
+		REQUIRE(ptr->loaded_value == 42);
+	}
 
-	Engine engine;
-	engine.load(model);
+	TEST_CASE("Unit|Framework|Engine|Rejects unknown workload type")
+	{
+		Model model;
+		auto handle = model.add("UnknownType", "fail", 1.0, {});
+		model.set_root(handle);
 
-	const DummyWorkload* one = EngineInspector::get_instance<DummyWorkload>(engine, 0);
-	const DummyWorkload* two = EngineInspector::get_instance<DummyWorkload>(engine, 1);
+		Engine engine;
+		REQUIRE_THROWS(engine.load(model));
+	}
 
-	REQUIRE(one->loaded_value == 1);
-	REQUIRE(two->loaded_value == 2);
-}
+	TEST_CASE("Unit|Framework|Engine|Multiple workloads supported")
+	{
+		Model model;
+		model.add("DummyWorkload", "one", 1.0, {{"value", 1}});
+		model.add("DummyWorkload", "two", 2.0, {{"value", 2}});
+		model_helpers::wrap_all_in_sequenced_group(model);
 
-TEST_CASE("Unit|Framework|Engine|Workloads receive tick call")
-{
-	Model model;
-	auto handle = model.add("TickCounterWorkload", "ticky", 200.0, {});
-	model.set_root(handle);
+		Engine engine;
+		engine.load(model);
 
-	Engine engine;
-	engine.load(model);
+		const DummyWorkload* one = EngineInspector::get_instance<DummyWorkload>(engine, 0);
+		const DummyWorkload* two = EngineInspector::get_instance<DummyWorkload>(engine, 1);
 
-	std::atomic<bool> stop_flag = true;
-	engine.run(stop_flag); // will tick at least once
+		REQUIRE(one->loaded_value == 1);
+		REQUIRE(two->loaded_value == 2);
+	}
 
-	const TickCounterWorkload* ptr = EngineInspector::get_instance<TickCounterWorkload>(engine, 0);
-	REQUIRE(ptr->count >= 1);
-}
+	TEST_CASE("Unit|Framework|Engine|Workloads receive tick call")
+	{
+		Model model;
+		auto handle = model.add("TickCounterWorkload", "ticky", 200.0, {});
+		model.set_root(handle);
+
+		Engine engine;
+		engine.load(model);
+
+		std::atomic<bool> stop_after_next_tick_flag = true;
+		engine.run(stop_after_next_tick_flag); // will tick at least once even if stop_after_next_tick_flag is true
+
+		const TickCounterWorkload* ptr = EngineInspector::get_instance<TickCounterWorkload>(engine, 0);
+		REQUIRE(ptr->count >= 1);
+	}
+
+} // namespace robotick::test

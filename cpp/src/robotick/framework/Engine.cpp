@@ -1,19 +1,10 @@
-// Copyright 2025 Robotick Labs
+// Copyright Robotick Labs
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
+#include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/Thread.h"
@@ -158,7 +149,7 @@ namespace robotick
 		assert(m_impl->root_instance != nullptr);
 	}
 
-	void Engine::run(const std::atomic<bool>& stop_flag)
+	void Engine::run(const std::atomic<bool>& stop_after_next_tick_flag)
 	{
 		using namespace std::chrono;
 
@@ -185,7 +176,7 @@ namespace robotick
 		auto next_tick_time = steady_clock::now();
 		auto last_tick_time = steady_clock::now();
 
-		// main tick-loop: (tick at least once, before checking stop_flag - e.g. useful for testing)
+		// main tick-loop: (tick at least once, before checking stop_after_next_tick_flag - e.g. useful for testing)
 		do
 		{
 			auto now = steady_clock::now();
@@ -197,7 +188,7 @@ namespace robotick
 
 			hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
 
-		} while (!stop_flag);
+		} while (!stop_after_next_tick_flag);
 
 		// call stop() on all children (do it safely here, rather than relying on stop() to propagate through hierarchy)
 		for (auto& inst : m_impl->instances)

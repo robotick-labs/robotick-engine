@@ -1,16 +1,6 @@
-// Copyright 2025 Robotick Labs
+// Copyright Robotick Labs
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
@@ -53,7 +43,7 @@ namespace
 	{
 		CountingRegister()
 		{
-			static const WorkloadRegistryEntry entry = {"CountingWorkload", sizeof(CountingWrapper), alignof(CountingWrapper),
+			const WorkloadRegistryEntry entry = {"CountingWorkload", sizeof(CountingWrapper), alignof(CountingWrapper),
 				[](void* p)
 				{
 					new (p) CountingWrapper();
@@ -97,7 +87,7 @@ namespace
 	{
 		SlowRegister()
 		{
-			static const WorkloadRegistryEntry entry = {"SlowWorkload", sizeof(SlowWrapper), alignof(SlowWrapper),
+			const WorkloadRegistryEntry entry = {"SlowWorkload", sizeof(SlowWrapper), alignof(SlowWrapper),
 				[](void* p)
 				{
 					new (p) SlowWrapper();

@@ -1,39 +1,41 @@
-// Copyright 2025 Robotick Labs
+// Copyright Robotick Labs
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
+// SPDX-License-Identifier: Apache-2.0
 #include "robotick/framework/registry/FieldRegistry.h"
 
 namespace robotick
 {
-
-	static std::unordered_map<std::string, StructRegistryEntry> struct_registry;
-
-	const StructRegistryEntry* register_struct(const std::string& name, size_t struct_size, std::vector<FieldInfo> fields)
+	FieldRegistry& FieldRegistry::get()
 	{
-		auto& entry = struct_registry[name];
+		static FieldRegistry instance;
+		return instance;
+	}
+	const StructRegistryEntry* FieldRegistry::register_struct(const std::string& name, size_t size, std::vector<FieldInfo> fields)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+
+		auto& entry = entries[name];
+
 		entry.name = name;
-		entry.size = struct_size;
-		entry.fields = std::move(fields);
+		entry.size = size;
+
+		if (entry.fields.empty() && !fields.empty())
+		{
+			entry.fields = std::move(fields); // first valid registration populates fields
+		}
+		// else: retain existing field definitions
+		// (first registration call may actually come from Workload registration code, since static execution is
+		// hard to predict.  So in that case we allow that to register an empty struct, and then populate the same
+		// object with fields when "real" registration happens)
+
 		return &entry;
 	}
 
-	const StructRegistryEntry* get_struct(const std::string& name)
+	const StructRegistryEntry* FieldRegistry::get_struct(const std::string& name) const
 	{
-		auto it = struct_registry.find(name);
-		if (it != struct_registry.end())
-			return &it->second;
-		return nullptr;
-	}
+		std::lock_guard<std::mutex> lock(mutex);
 
+		auto it = entries.find(name);
+		return it != entries.end() ? &it->second : nullptr;
+	}
 } // namespace robotick
