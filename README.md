@@ -1,15 +1,22 @@
-
 <img src="https://robotick.org/images/logo.png" style="display: block; width: 300px; border-radius: 12px;" />
 
 <br/>
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
+> ⚠️ **Work In Progress**
+>
+> This project is under active development and not yet production-ready.
+> The repo is public to support tools like [CodeRabbit](https://coderabbit.ai) and promote early collaboration and transparency.
+> Expect incomplete features, ongoing changes, and occasional mess.
+
+---
+
 ## 🤖 Overview
 
-**Robotick** is a high-performance, modular C++ runtime for robotics and control systems — engineered for reliability, introspection, and composability across the full spectrum of platforms.
+**Robotick** is a high-performance, modular C++ runtime for robotics and control systems - engineered for reliability, introspection, and composability across the full spectrum of platforms.
 
-From bare-metal microcontrollers like the STM32 to Raspberry Pi, desktop systems, and edge-AI devices like NVIDIA Jetson (arm64), Robotick delivers real-time precision where it counts, and excellent performance everywhere else — without sacrificing ease of use or flexibility.
+From bare-metal microcontrollers like the STM32 and ESP32 to Raspberry Pi, desktop systems, and edge-AI devices like NVIDIA Jetson (arm64), Robotick delivers real-time precision where it counts, and excellent performance everywhere else - without sacrificing ease of use or flexibility.
 
 ---
 
@@ -24,14 +31,14 @@ Robotick is a modern control engine designed to execute structured workloads wit
 - Full lifecycle management (load, start, tick, stop)
 - Remote telemetry and future remote control
 
-Built for early learners and industry professionals alike, Robotick is simple enough for educational bots and sophisticated enough for serious research.
+Built for early learners and industry professionals alike, Robotick is simple enough for educational bots and sophisticated enough for serious research and development.
 
 ---
 
 ## ✨ Key Features
 
 ### 🧩 Modular Workloads
-Each unit of logic is a workload — a small, testable module with clearly defined inputs, outputs, and config:
+Each unit of logic is a workload - a small, testable module with clearly defined inputs, outputs, and config:
 ```cpp
 struct HelloWorkload {
     HelloConfig config;
@@ -141,7 +148,7 @@ Compiled and deployed executables are tested across an expanding range of target
 
 ## 📄 License
 
-Licensed under the **MIT License** – free to use, adapt, and build upon.
+Licensed under the **Apache 2.0 License** – free to use, adapt, and build upon.
 
 ---
 

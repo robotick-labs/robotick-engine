@@ -1,78 +1,90 @@
 # 🤖 Contributing to Robotick
 
-**Welcome** and thanks for your interest in contributing to **Robotick**! 🤖
+**Welcome - and thanks for your interest in contributing to Robotick!**  
+We’re building a modular, real-time robotics engine designed for reliability, introspection, and embedded performance.
 
-We're building an open, modular, real-time robotics platform — and your ideas, bug fixes, experiments, and improvements are welcome. Whether you're a seasoned developer, a curious maker, or someone just exploring ROS and embedded systems, we’re glad you're here!
+Whether you're a seasoned robotics engineer, curious maker, or systems tinkerer - we’re glad you're here.
+
+---
+
+## ⚠️ Project Status
+
+Robotick is currently in **active development**. While the codebase is public to support tools like [CodeRabbit](https://coderabbit.ai) and foster transparency, we are not yet actively encouraging external contributions until the project stabilizes.
+
+That said - feedback, questions, and ideas are very welcome! You can track progress and join the conversation via [Discussions](https://github.com/robotick-labs/robotick/discussions).
 
 ---
 
 ## 📜 Branching Strategy
 
-We keep `main` clean and public-facing, with all active development happening in `dev`.
+We use a structured branching model to keep development stable and traceable.
 
 ### Main Branches
-| Branch | Purpose |
-|--------|---------|
-| `main` | Stable, public-ready releases |
-| `dev`  | Active integration for all new work |
+
+| Branch | Purpose                          |
+|--------|----------------------------------|
+| `main` | Stable, public-facing releases   |
+| `dev`  | Active development and integration |
 
 ### Working Branches
 
-Create working branches off `dev`, and prefix them by purpose:
+Create new branches off `dev`, using a prefix that matches intent:
 
-- `feature/my-feature-name` – new functionality
-- `bugfix/fix-description` – bug fixes
-- `docs/usage-guide` – docs or guides
-- `meta/ci-update` – CI, tooling, or config
-- `experiment/idea-name` – short-lived explorations
-- `spike/concept-name` – early-stage design ideas
+- `feature/your-feature` – new functionality
+- `bugfix/issue-description` – bug fixes
+- `docs/readme-update` – docs, guides, comments
+- `meta/ci-change` – CI/config/tooling
+- `experiment/your-idea` – short-term spikes or tests
+- `spike/concept-name` – early-stage explorations
 
-Avoid ambiguous branch names like `test`, `tmp`, or `work`.
+Avoid vague names like `test`, `tmp`, or `wip`.
 
 ---
 
-## ⛏️ Making a Change
+## 🛠️ How to Contribute
 
-1. Fork the repo (if you're external)
-2. Create a new branch from `dev`
-3. Make your changes (add code, tests, comments)
+1. Fork the repo (if you're an external contributor)
+2. Create your branch from `dev`
+3. Make your changes (with comments, tests where possible)
 4. Push and open a Pull Request (PR) into `dev`
-5. Get feedback from CodeRabbit and human reviewers
-6. Once approved and tested, your PR will be merged into `dev`
-7. Periodically, we squash-merge `dev` into `main` for releases
+5. Address feedback from CodeRabbit and human reviewers
+6. Once approved, PRs are merged into `dev`
+7. Periodically, `dev` is squash-merged into `main` for release
 
 ---
 
 ## ✅ PR Checklist
 
-Before submitting a PR, please make sure:
+Before opening a PR, please check:
 
-- [ ] Your branch name follows our naming conventions
-- [ ] Your code passes CI and lint checks
-- [ ] You’ve added tests or explained why not
-- [ ] Your logic is documented where needed
-- [ ] All review comments have been addressed or responded to
+- [ ] Your branch follows naming conventions
+- [ ] Your code builds cleanly and passes lint/CI
+- [ ] Tests have been added (or reasons clearly explained)
+- [ ] You’ve documented any new logic or behaviours
+- [ ] CodeRabbit and reviewer comments are addressed
 
 ---
 
 ## 🤖 Code Review
 
-Robotick uses **CodeRabbit** for AI-assisted reviews:
-- It checks for bugs, unsafe logic, style, and missing comments
-- It may auto-approve clean PRs — but human review is welcome too!
+We use **CodeRabbit** to help review PRs:
 
-We aim for reviews to be constructive, collaborative, and fast.
+- It scans for potential bugs, style issues, and missing comments
+- It may auto-approve safe, simple PRs - but human review is welcome and encouraged
+
+We aim for reviews to be fast, respectful, and constructive.
 
 ---
 
-## 💬 Questions? Ideas?
+## 💬 Questions or Ideas?
 
-- Open a [Discussion](https://github.com/robotick-labs/robotick/discussions)
+- Join a [Discussion](https://github.com/robotick-labs/robotick/discussions)
 - File an [Issue](https://github.com/robotick-labs/robotick/issues)
-- Or join the conversation in our project chat (coming soon!)
+- Or just explore and leave a ⭐ if you're curious - we appreciate it!
 
 ---
 
-Thanks again for contributing — we’re excited to build something great with you!
+Thanks again for your interest in Robotick.  
+Let’s build something reliable, flexible, and genuinely useful - together.
 
 *– The Robotick Team*
