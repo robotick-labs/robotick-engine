@@ -66,7 +66,7 @@ namespace robotick
 
 		// PythonInternalState is heap-allocated to keep PythonWorkload standard-layout. This enables
 		// reflection, runtime construction in raw memory, and predictable data layout for logging and interop.
-		std::unique_ptr<PythonInternalState> internal_state = nullptr;
+		std::unique_ptr<PythonInternalState> internal_state;
 
 		PythonWorkload() : internal_state(std::make_unique<PythonInternalState>()) {}
 
@@ -83,10 +83,15 @@ namespace robotick
 
 		void load()
 		{
-			robotick::ensure_python_runtime(); // ensures it's alive
-
 			try
 			{
+				if (config.script_name.empty() || config.class_name.empty())
+				{
+					throw std::runtime_error("PythonWorkload config must specify script_name and class_name");
+				}
+
+				robotick::ensure_python_runtime(); // ensures it's alive
+
 				py::gil_scoped_acquire gil;
 
 				py::dict py_cfg;
@@ -112,18 +117,18 @@ namespace robotick
 
 		void tick(double time_delta)
 		{
-			if (!internal_state->py_instance)
-				return;
-
-			py::gil_scoped_acquire gil;
-
-			py::dict py_in;
-			const auto* input_info = get_struct_reflection<PythonInputs>();
-			assert(input_info && "Struct not registered: PythonInputs");
-			marshal_struct_to_dict(&inputs, *input_info, py_in);
-
 			try
 			{
+				if (!internal_state->py_instance)
+					return;
+
+				py::gil_scoped_acquire gil;
+
+				py::dict py_in;
+				const auto* input_info = get_struct_reflection<PythonInputs>();
+				assert(input_info && "Struct not registered: PythonInputs");
+				marshal_struct_to_dict(&inputs, *input_info, py_in);
+
 				py::dict py_out;
 				internal_state->py_instance.attr("tick")(time_delta, py_in, py_out);
 

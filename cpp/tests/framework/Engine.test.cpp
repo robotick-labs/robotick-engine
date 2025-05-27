@@ -14,8 +14,6 @@
 #include <chrono>
 #include <thread>
 
-using namespace Catch;
-
 namespace robotick::test
 {
 
@@ -115,8 +113,8 @@ namespace robotick::test
 		Engine engine;
 		engine.load(model);
 
-		std::atomic<bool> stop_flag = true;
-		engine.run(stop_flag); // will tick at least once even if stop_flag is true
+		std::atomic<bool> stop_after_next_tick_flag = true;
+		engine.run(stop_after_next_tick_flag); // will tick at least once even if stop_after_next_tick_flag is true
 
 		const TickCounterWorkload* ptr = EngineInspector::get_instance<TickCounterWorkload>(engine, 0);
 		REQUIRE(ptr->count >= 1);

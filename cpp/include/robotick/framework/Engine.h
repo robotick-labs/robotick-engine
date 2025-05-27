@@ -38,7 +38,7 @@ namespace robotick
 		~Engine();
 
 		void load(const Model& model);
-		void run(const std::atomic<bool>& stop_flag);
+		void run(const std::atomic<bool>& stop_after_next_tick_flag);
 
 	  protected:
 		const WorkloadInstanceInfo& get_instance_info(size_t index) const;

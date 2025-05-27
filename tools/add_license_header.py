@@ -12,7 +12,7 @@ LICENSE_HEADER = '''\
 
 SUFFIXES = ('.cpp', '.h', '.hpp', '.cxx', '.cc', '.c', '.inl')
 
-def has_license(lines):
+def has_license(lines: list[str]) -> bool:
     return any(
         "Licensed under the Apache License" in line
         or "SPDX-License-Identifier" in line

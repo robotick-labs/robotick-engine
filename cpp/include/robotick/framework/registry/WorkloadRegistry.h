@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <map>
+#include <mutex>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
@@ -178,6 +179,7 @@ namespace robotick
 		void register_entry(const WorkloadRegistryEntry& entry);
 
 	  private:
+		mutable std::mutex mutex;
 		std::map<std::string, const WorkloadRegistryEntry*> entries;
 	};
 

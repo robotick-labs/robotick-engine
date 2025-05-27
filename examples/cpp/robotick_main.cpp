@@ -15,12 +15,12 @@
 
 using namespace robotick;
 
-std::atomic<bool> g_stop_flag = false;
+std::atomic<bool> g_stop_after_next_tick_flag = false;
 
 void signal_handler(int)
 {
 	std::cout << "\nShutting down...\n";
-	g_stop_flag = true;
+	g_stop_after_next_tick_flag = true;
 }
 
 void populate_model_groups(Model& model)
@@ -89,7 +89,7 @@ int main()
 	Engine engine;
 	engine.load(model); // instances our model and allows multithreaded-load/config for each
 
-	engine.run(g_stop_flag); // engine runs on this thread, until requested to stop
+	engine.run(g_stop_after_next_tick_flag); // engine runs on this thread, until requested to stop
 
 	return 0;
 }

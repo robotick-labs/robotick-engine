@@ -149,7 +149,7 @@ namespace robotick
 		assert(m_impl->root_instance != nullptr);
 	}
 
-	void Engine::run(const std::atomic<bool>& stop_flag)
+	void Engine::run(const std::atomic<bool>& stop_after_next_tick_flag)
 	{
 		using namespace std::chrono;
 
@@ -176,7 +176,7 @@ namespace robotick
 		auto next_tick_time = steady_clock::now();
 		auto last_tick_time = steady_clock::now();
 
-		// main tick-loop: (tick at least once, before checking stop_flag - e.g. useful for testing)
+		// main tick-loop: (tick at least once, before checking stop_after_next_tick_flag - e.g. useful for testing)
 		do
 		{
 			auto now = steady_clock::now();
@@ -188,7 +188,7 @@ namespace robotick
 
 			hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
 
-		} while (!stop_flag);
+		} while (!stop_after_next_tick_flag);
 
 		// call stop() on all children (do it safely here, rather than relying on stop() to propagate through hierarchy)
 		for (auto& inst : m_impl->instances)

@@ -69,13 +69,13 @@ namespace robotick
 
 		void tick(double time_delta)
 		{
-			if (config.log_rate_hz == 0 || time_delta == 0.0)
+			if (config.log_rate_hz == 0 || time_delta <= 0.0)
 			{
 				return;
 			}
 
-			double actual_dt = time_delta;
-			double tick_rate = 1.0 / actual_dt;
+			const double actual_dt = time_delta;
+			const double tick_rate = 1.0 / actual_dt;
 
 			outputs.last_tick_rate = tick_rate;
 
