@@ -1,21 +1,9 @@
-// Copyright 2025 Robotick Labs
+// Copyright Robotick Labs
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
-// WorkloadRegistry.h
 #pragma once
 
-#include "robotick/framework/registry/FieldMacros.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/utils/Typename.h"
 
@@ -23,31 +11,138 @@
 #include <map>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
+#include <utility>
+#include <vector>
 
 namespace robotick
 {
+
+	// Forward declaration
 	struct WorkloadInstanceInfo;
 
+	// Utility to detect void
 	template <typename T> constexpr bool is_void_v = std::is_same_v<T, void>;
 
-#define ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(trait_name, method_name, signature)                                                               \
-	template <typename T> class trait_name                                                                                                           \
-	{                                                                                                                                                \
-	  private:                                                                                                                                       \
-		template <typename U> static auto test(int) -> std::is_same<decltype(&U::method_name), signature>;                                           \
-		template <typename> static std::false_type test(...);                                                                                        \
-                                                                                                                                                     \
-	  public:                                                                                                                                        \
-		static constexpr bool value = decltype(test<T>(0))::value;                                                                                   \
+	// ——————————————————————————————————————————————————————————————————
+	// 1) Method-presence traits
+	// ——————————————————————————————————————————————————————————————————
+
+	template <typename, typename = std::void_t<>> struct has_set_children : std::false_type
+	{
+	};
+	template <typename T>
+	struct has_set_children<T, std::void_t<decltype(std::declval<T>().set_children(std::declval<const std::vector<const WorkloadInstanceInfo*>&>()))>>
+		: std::true_type
+	{
 	};
 
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_set_children, set_children, void (T::*)(const std::vector<const WorkloadInstanceInfo*>&))
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_pre_load, pre_load, void (T::*)())
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_load, load, void (T::*)())
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_setup, setup, void (T::*)())
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_start, start, void (T::*)(double))
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_stop, stop, void (T::*)())
-	ROBOTICK_DECLARE_HAS_METHOD_TRAIT_WITH_SIG(has_tick, tick, void (T::*)(double))
+	template <typename, typename = std::void_t<>> struct has_pre_load : std::false_type
+	{
+	};
+	template <typename T> struct has_pre_load<T, std::void_t<decltype(std::declval<T>().pre_load())>> : std::true_type
+	{
+	};
+
+	template <typename, typename = std::void_t<>> struct has_load : std::false_type
+	{
+	};
+	template <typename T> struct has_load<T, std::void_t<decltype(std::declval<T>().load())>> : std::true_type
+	{
+	};
+
+	template <typename, typename = std::void_t<>> struct has_setup : std::false_type
+	{
+	};
+	template <typename T> struct has_setup<T, std::void_t<decltype(std::declval<T>().setup())>> : std::true_type
+	{
+	};
+
+	template <typename, typename = std::void_t<>> struct has_start : std::false_type
+	{
+	};
+	template <typename T> struct has_start<T, std::void_t<decltype(std::declval<T>().start(std::declval<double>()))>> : std::true_type
+	{
+	};
+
+	template <typename, typename = std::void_t<>> struct has_tick : std::false_type
+	{
+	};
+	template <typename T> struct has_tick<T, std::void_t<decltype(std::declval<T>().tick(std::declval<double>()))>> : std::true_type
+	{
+	};
+
+	template <typename, typename = std::void_t<>> struct has_stop : std::false_type
+	{
+	};
+	template <typename T> struct has_stop<T, std::void_t<decltype(std::declval<T>().stop())>> : std::true_type
+	{
+	};
+
+	// ——————————————————————————————————————————————————————————————————
+	// 2) Member-presence traits
+	// ——————————————————————————————————————————————————————————————————
+
+	template <typename, typename = std::void_t<>> struct has_member_config : std::false_type
+	{
+	};
+	template <typename T> struct has_member_config<T, std::void_t<decltype(std::declval<T>().config)>> : std::true_type
+	{
+	};
+
+	template <typename, typename = std::void_t<>> struct has_member_inputs : std::false_type
+	{
+	};
+	template <typename T> struct has_member_inputs<T, std::void_t<decltype(std::declval<T>().inputs)>> : std::true_type
+	{
+	};
+
+	template <typename, typename = std::void_t<>> struct has_member_outputs : std::false_type
+	{
+	};
+	template <typename T> struct has_member_outputs<T, std::void_t<decltype(std::declval<T>().outputs)>> : std::true_type
+	{
+	};
+
+	// ——————————————————————————————————————————————————————————————————
+	// 3) Member-or-void helpers
+	// ——————————————————————————————————————————————————————————————————
+
+	template <typename T, bool Has = has_member_config<T>::value> struct config_or_void
+	{
+		using type = void;
+	};
+	template <typename T> struct config_or_void<T, true>
+	{
+		using type = std::remove_reference_t<decltype(std::declval<T>().config)>;
+	};
+
+	template <typename T, bool Has = has_member_inputs<T>::value> struct inputs_or_void
+	{
+		using type = void;
+	};
+	template <typename T> struct inputs_or_void<T, true>
+	{
+		using type = std::remove_reference_t<decltype(std::declval<T>().inputs)>;
+	};
+
+	template <typename T, bool Has = has_member_outputs<T>::value> struct outputs_or_void
+	{
+		using type = void;
+	};
+	template <typename T> struct outputs_or_void<T, true>
+	{
+		using type = std::remove_reference_t<decltype(std::declval<T>().outputs)>;
+	};
+
+	// Aliases for macro use
+	template <typename T> using config_t = typename config_or_void<T>::type;
+	template <typename T> using inputs_t = typename inputs_or_void<T>::type;
+	template <typename T> using outputs_t = typename outputs_or_void<T>::type;
+
+	// ——————————————————————————————————————————————————————————————————
+	// 4) WorkloadRegistryEntry & singleton interface
+	// ——————————————————————————————————————————————————————————————————
 
 	struct WorkloadRegistryEntry
 	{
@@ -66,7 +161,7 @@ namespace robotick
 		const StructRegistryEntry* output_struct;
 		size_t output_offset;
 
-		void (*set_children_fn)(void*, const std::vector<const WorkloadInstanceInfo*>& children);
+		void (*set_children_fn)(void*, const std::vector<const WorkloadInstanceInfo*>&);
 		void (*pre_load_fn)(void*);
 		void (*load_fn)(void*);
 		void (*setup_fn)(void*);
@@ -78,108 +173,99 @@ namespace robotick
 	class WorkloadRegistry
 	{
 	  public:
-		static WorkloadRegistry& get()
-		{
-			static WorkloadRegistry instance;
-			return instance;
-		}
-
+		static WorkloadRegistry& get();
 		const WorkloadRegistryEntry* find(const std::string& name) const;
 		void register_entry(const WorkloadRegistryEntry& entry);
 
 	  private:
-		WorkloadRegistry() = default;
-		static std::map<std::string, const WorkloadRegistryEntry*>& registry();
+		std::map<std::string, const WorkloadRegistryEntry*> entries;
 	};
 
+	// ——————————————————————————————————————————————————————————————————
+	// 5) Core templates (definitions in header) …
 	template <typename Type, typename ConfigType = void, typename InputType = void, typename OutputType = void>
 	const WorkloadRegistryEntry& register_workload()
 	{
-		void (*set_children_fn)(void*, const std::vector<const WorkloadInstanceInfo*>& children) = nullptr;
-		if constexpr (has_set_children<Type>::value)
-			set_children_fn = +[](void* instance_raw_ptr, const std::vector<const WorkloadInstanceInfo*>& children)
-			{
-				static_cast<Type*>(instance_raw_ptr)->set_children(children);
-			};
-
+		// Pointers initialized to nullptr
+		void (*set_children_fn)(void*, const std::vector<const WorkloadInstanceInfo*>&) = nullptr;
 		void (*pre_load_fn)(void*) = nullptr;
-		if constexpr (has_pre_load<Type>::value)
-			pre_load_fn = +[](void* instance_raw_ptr)
-			{
-				static_cast<Type*>(instance_raw_ptr)->pre_load();
-			};
-
 		void (*load_fn)(void*) = nullptr;
-		if constexpr (has_load<Type>::value)
-			load_fn = +[](void* instance_raw_ptr)
-			{
-				static_cast<Type*>(instance_raw_ptr)->load();
-			};
-
 		void (*setup_fn)(void*) = nullptr;
-		if constexpr (has_setup<Type>::value)
-			setup_fn = +[](void* instance_raw_ptr)
-			{
-				static_cast<Type*>(instance_raw_ptr)->setup();
-			};
-
 		void (*start_fn)(void*, double) = nullptr;
-		if constexpr (has_start<Type>::value)
-			start_fn = +[](void* instance_raw_ptr, double tick_rate_hz)
-			{
-				static_cast<Type*>(instance_raw_ptr)->start(tick_rate_hz);
-			};
-
-		void (*stop_fn)(void*) = nullptr;
-		if constexpr (has_stop<Type>::value)
-			stop_fn = +[](void* instance_raw_ptr)
-			{
-				static_cast<Type*>(instance_raw_ptr)->stop();
-			};
-
 		void (*tick_fn)(void*, double) = nullptr;
-		if constexpr (has_tick<Type>::value)
-			tick_fn = +[](void* instance_raw_ptr, double time_delta)
+		void (*stop_fn)(void*) = nullptr;
+
+		// Bind methods if present
+		if constexpr (has_set_children<Type>::value)
+			set_children_fn = +[](void* i, const std::vector<const WorkloadInstanceInfo*>& c)
 			{
-				static_cast<Type*>(instance_raw_ptr)->tick(time_delta);
+				static_cast<Type*>(i)->set_children(c);
+			};
+		if constexpr (has_pre_load<Type>::value)
+			pre_load_fn = +[](void* i)
+			{
+				static_cast<Type*>(i)->pre_load();
+			};
+		if constexpr (has_load<Type>::value)
+			load_fn = +[](void* i)
+			{
+				static_cast<Type*>(i)->load();
+			};
+		if constexpr (has_setup<Type>::value)
+			setup_fn = +[](void* i)
+			{
+				static_cast<Type*>(i)->setup();
+			};
+		if constexpr (has_start<Type>::value)
+			start_fn = +[](void* i, double d)
+			{
+				static_cast<Type*>(i)->start(d);
+			};
+		if constexpr (has_tick<Type>::value)
+			tick_fn = +[](void* i, double d)
+			{
+				static_cast<Type*>(i)->tick(d);
+			};
+		if constexpr (has_stop<Type>::value)
+			stop_fn = +[](void* i)
+			{
+				static_cast<Type*>(i)->stop();
 			};
 
+		// Collect struct metadata
 		const StructRegistryEntry* cfg_struct = nullptr;
-		size_t cfg_offset = 0;
+		const StructRegistryEntry* in_struct = nullptr;
+		const StructRegistryEntry* out_struct = nullptr;
+		size_t cfg_offset = 0, in_offset = 0, out_offset = 0;
+
 		if constexpr (!is_void_v<ConfigType>)
 		{
-			cfg_struct = ConfigType::get_struct_reflection();
+			cfg_struct = FieldRegistry::get().register_struct(get_clean_typename(typeid(ConfigType)), sizeof(ConfigType), {});
 			cfg_offset = offsetof(Type, config);
 		}
-
-		const StructRegistryEntry* in_struct = nullptr;
-		size_t in_offset = 0;
 		if constexpr (!is_void_v<InputType>)
 		{
-			in_struct = InputType::get_struct_reflection();
+			in_struct = FieldRegistry::get().register_struct(get_clean_typename(typeid(InputType)), sizeof(InputType), {});
 			in_offset = offsetof(Type, inputs);
 		}
-
-		const StructRegistryEntry* out_struct = nullptr;
-		size_t out_offset = 0;
 		if constexpr (!is_void_v<OutputType>)
 		{
-			out_struct = OutputType::get_struct_reflection();
+			out_struct = FieldRegistry::get().register_struct(get_clean_typename(typeid(OutputType)), sizeof(OutputType), {});
 			out_offset = offsetof(Type, outputs);
 		}
 
+		// Create/register the static entry
 		static const WorkloadRegistryEntry entry = {get_clean_typename(typeid(Type)), sizeof(Type), alignof(Type),
-			[](void* instance_raw_ptr)
+			[](void* ptr)
 			{
-				new (instance_raw_ptr) Type();
+				new (ptr) Type();
 			},
-			[](void* instance_raw_ptr)
+			[](void* ptr)
 			{
-				static_cast<Type*>(instance_raw_ptr)->~Type();
+				static_cast<Type*>(ptr)->~Type();
 			},
 			cfg_struct, cfg_offset, in_struct, in_offset, out_struct, out_offset, set_children_fn, pre_load_fn, load_fn, setup_fn, start_fn, tick_fn,
 			stop_fn};
-
 		WorkloadRegistry::get().register_entry(entry);
 		return entry;
 	}
@@ -194,9 +280,15 @@ namespace robotick
 		WorkloadAutoRegister()
 		{
 			static_assert(std::is_standard_layout<T>::value, "Workloads must be standard layout");
-			static const auto& e = register_workload<T, Config, Inputs, Outputs>();
-			static WorkloadRegistration<T> reg{e};
+			register_workload<T, Config, Inputs, Outputs>();
 		}
 	};
+
+	// ——————————————————————————————————————————————————————————————————
+	// 6) One-line macro for optional fields
+	// ——————————————————————————————————————————————————————————————————
+
+#define ROBOTICK_DEFINE_WORKLOAD(Type)                                                                                                               \
+	static robotick::WorkloadAutoRegister<Type, robotick::config_t<Type>, robotick::inputs_t<Type>, robotick::outputs_t<Type>> s_auto_register_##Type;
 
 } // namespace robotick
