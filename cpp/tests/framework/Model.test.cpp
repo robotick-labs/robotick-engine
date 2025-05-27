@@ -25,7 +25,7 @@ namespace
 	{
 		DummyModelWorkloadRegister()
 		{
-			static const WorkloadRegistryEntry entry = {"DummyModelWorkload", sizeof(DummyModelWorkload), alignof(DummyModelWorkload),
+			const WorkloadRegistryEntry entry = {"DummyModelWorkload", sizeof(DummyModelWorkload), alignof(DummyModelWorkload),
 				[](void* p)
 				{
 					new (p) DummyModelWorkload();

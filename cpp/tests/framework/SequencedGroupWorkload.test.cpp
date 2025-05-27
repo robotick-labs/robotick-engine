@@ -37,7 +37,7 @@ namespace
 	{
 		DummyTickingRegister()
 		{
-			static const WorkloadRegistryEntry entry = {"DummyTickingWorkload", sizeof(DummyTickingWrapper), alignof(DummyTickingWrapper),
+			const WorkloadRegistryEntry entry = {"DummyTickingWorkload", sizeof(DummyTickingWrapper), alignof(DummyTickingWrapper),
 				[](void* p)
 				{
 					new (p) DummyTickingWrapper();
@@ -75,7 +75,7 @@ namespace
 	{
 		SlowTickRegister()
 		{
-			static const WorkloadRegistryEntry entry = {"SlowTickWorkload", sizeof(SlowWrapper), alignof(SlowWrapper),
+			const WorkloadRegistryEntry entry = {"SlowTickWorkload", sizeof(SlowWrapper), alignof(SlowWrapper),
 				[](void* p)
 				{
 					new (p) SlowWrapper();

@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <type_traits>
@@ -180,13 +181,12 @@ namespace robotick
 
 	  private:
 		mutable std::mutex mutex;
-		std::map<std::string, const WorkloadRegistryEntry*> entries;
+		std::map<std::string, std::unique_ptr<WorkloadRegistryEntry>> entries;
 	};
 
 	// ——————————————————————————————————————————————————————————————————
 	// 5) Core templates (definitions in header) …
-	template <typename Type, typename ConfigType = void, typename InputType = void, typename OutputType = void>
-	const WorkloadRegistryEntry& register_workload()
+	template <typename Type, typename ConfigType = void, typename InputType = void, typename OutputType = void> void register_workload()
 	{
 		// Pointers initialized to nullptr
 		void (*set_children_fn)(void*, const std::vector<const WorkloadInstanceInfo*>&) = nullptr;
@@ -257,7 +257,7 @@ namespace robotick
 		}
 
 		// Create/register the static entry
-		static const WorkloadRegistryEntry entry = {get_clean_typename(typeid(Type)), sizeof(Type), alignof(Type),
+		const WorkloadRegistryEntry entry = {get_clean_typename(typeid(Type)), sizeof(Type), alignof(Type),
 			[](void* ptr)
 			{
 				new (ptr) Type();
@@ -268,13 +268,13 @@ namespace robotick
 			},
 			cfg_struct, cfg_offset, in_struct, in_offset, out_struct, out_offset, set_children_fn, pre_load_fn, load_fn, setup_fn, start_fn, tick_fn,
 			stop_fn};
+
 		WorkloadRegistry::get().register_entry(entry);
-		return entry;
 	}
 
 	template <typename T> struct WorkloadRegistration
 	{
-		WorkloadRegistration(const WorkloadRegistryEntry& e) { WorkloadRegistry::get().register_entry(e); }
+		WorkloadRegistration(const WorkloadRegistryEntry& entry) { WorkloadRegistry::get().register_entry(entry); }
 	};
 
 	template <typename T, typename Config = void, typename Inputs = void, typename Outputs = void> struct WorkloadAutoRegister

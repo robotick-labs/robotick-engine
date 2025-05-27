@@ -43,7 +43,7 @@ namespace
 	{
 		CountingRegister()
 		{
-			static const WorkloadRegistryEntry entry = {"CountingWorkload", sizeof(CountingWrapper), alignof(CountingWrapper),
+			const WorkloadRegistryEntry entry = {"CountingWorkload", sizeof(CountingWrapper), alignof(CountingWrapper),
 				[](void* p)
 				{
 					new (p) CountingWrapper();
@@ -87,7 +87,7 @@ namespace
 	{
 		SlowRegister()
 		{
-			static const WorkloadRegistryEntry entry = {"SlowWorkload", sizeof(SlowWrapper), alignof(SlowWrapper),
+			const WorkloadRegistryEntry entry = {"SlowWorkload", sizeof(SlowWrapper), alignof(SlowWrapper),
 				[](void* p)
 				{
 					new (p) SlowWrapper();
