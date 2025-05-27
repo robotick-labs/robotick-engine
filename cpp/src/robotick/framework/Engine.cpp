@@ -4,6 +4,7 @@
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
+#include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -30,6 +31,8 @@ namespace robotick
 		Model m_loaded_model;
 		uint8_t* buffer = nullptr;
 		size_t buffer_size = 0;
+		uint8_t* blackboards_buffer = nullptr;
+		size_t blackboards_buffer_size = 0;
 	};
 
 	Engine::Engine() : m_impl(std::make_unique<Impl>())
@@ -43,12 +46,87 @@ namespace robotick
 			if (instance.type->destruct)
 				instance.type->destruct(instance.ptr);
 		}
+
 		delete[] m_impl->buffer;
+		delete[] m_impl->blackboards_buffer;
 	}
 
 	const WorkloadInstanceInfo& Engine::get_instance_info(size_t index) const
 	{
 		return m_impl->instances.at(index);
+	}
+
+	size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances)
+	{
+		size_t total = 0;
+
+		for (const auto& instance : instances)
+		{
+			const auto* type = instance.type;
+			if (!type)
+				continue;
+
+			auto accumulate = [&](const StructRegistryEntry* struct_info)
+			{
+				if (!struct_info)
+					return;
+
+				for (const FieldInfo& field : struct_info->fields)
+				{
+					if (field.type == typeid(BlackboardInstance))
+					{
+						const auto* blackboard_raw_ptr = static_cast<const uint8_t*>(instance.ptr) + field.offset;
+						const auto* blackboard = reinterpret_cast<const BlackboardInstance*>(blackboard_raw_ptr);
+
+						if (blackboard && !blackboard->get_schema().empty())
+						{
+							total += blackboard->required_size();
+						}
+					}
+				}
+			};
+
+			accumulate(type->config_struct);
+			accumulate(type->input_struct);
+			accumulate(type->output_struct);
+		}
+
+		return total;
+	}
+
+	void bind_blackboards_in_struct(void* base_ptr, const StructRegistryEntry& struct_entry, uint8_t*& blackboard_storage)
+	{
+		for (const FieldInfo& field : struct_entry.fields)
+		{
+			if (field.type == typeid(BlackboardInstance))
+			{
+				auto* blackboard = reinterpret_cast<BlackboardInstance*>(static_cast<uint8_t*>(base_ptr) + field.offset);
+				if (blackboard && !blackboard->get_schema().empty())
+				{
+					blackboard->bind(blackboard_storage);
+					blackboard_storage += blackboard->required_size();
+				}
+			}
+		}
+	}
+
+	void bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances, uint8_t* blackboards_buffer)
+	{
+		uint8_t* blackboard_storage = blackboards_buffer;
+
+		for (const auto& instance : instances)
+		{
+			const auto* type = instance.type;
+			if (!type)
+				continue;
+
+			if (type->config_struct)
+				bind_blackboards_in_struct(instance.ptr, *type->config_struct, blackboard_storage);
+			if (type->input_struct)
+				bind_blackboards_in_struct(instance.ptr, *type->input_struct, blackboard_storage);
+			if (type->output_struct)
+				bind_blackboards_in_struct(instance.ptr, *type->output_struct, blackboard_storage);
+		}
 	}
 
 	void Engine::load(const Model& model)
@@ -80,42 +158,78 @@ namespace robotick
 			offset += type->size;
 		}
 
+		// Primary workloads buffer allocation:
 		m_impl->buffer_size = offset;
 		m_impl->buffer = new uint8_t[m_impl->buffer_size];
 		std::memset(m_impl->buffer, 0, m_impl->buffer_size);
 
-		std::vector<std::future<WorkloadInstanceInfo>> futures;
-		futures.reserve(workload_seeds.size());
+		std::vector<WorkloadInstanceInfo> instance_infos(workload_seeds.size());
+		std::vector<std::future<void>> preload_futures;
+		preload_futures.reserve(workload_seeds.size());
 
+		// construct + apply config + call pre_load_fn (multi-threaded):
 		for (size_t i = 0; i < workload_seeds.size(); ++i)
 		{
 			const auto& workload_seed = workload_seeds[i];
 			const auto* type = WorkloadRegistry::get().find(workload_seed.type);
 			void* instance_ptr = m_impl->buffer + aligned_offsets[i];
 
-			futures.push_back(std::async(std::launch::async,
-				[=]() -> WorkloadInstanceInfo
+			preload_futures.push_back(std::async(std::launch::async,
+				[=, &instance_infos]()
 				{
 					if (type->construct)
 						type->construct(instance_ptr);
 
 					if (type->config_struct)
+					{
 						apply_struct_fields(static_cast<uint8_t*>(instance_ptr) + type->config_offset, *type->config_struct, workload_seed.config);
+					}
 
 					if (type->pre_load_fn)
 						type->pre_load_fn(instance_ptr);
-					if (type->load_fn)
-						type->load_fn(instance_ptr);
 
-					const std::vector<const WorkloadInstanceInfo*> children = {}; // fixup add children below once we've created all instances
-					return WorkloadInstanceInfo{instance_ptr, type, workload_seed.name, workload_seed.tick_rate_hz, children};
+					instance_infos[i] = WorkloadInstanceInfo{instance_ptr, type, workload_seed.name, workload_seed.tick_rate_hz, {}};
 				}));
 		}
 
-		for (auto& fut : futures)
+		// wait for "pre_load" futures to complete:
+		for (auto& fut : preload_futures)
 		{
-			m_impl->instances.push_back(fut.get());
+			fut.get();
 		}
+
+		// Blackboards memory allocation and buffer-binding:
+		m_impl->blackboards_buffer_size = compute_blackboard_memory_requirements(m_impl->instances);
+		m_impl->blackboards_buffer = new uint8_t[m_impl->blackboards_buffer_size];
+		std::memset(m_impl->blackboards_buffer, 0, m_impl->blackboards_buffer_size);
+
+		bind_blackboards_for_instances(m_impl->instances, m_impl->blackboards_buffer);
+
+		// call load_fn (multi-threaded):
+		std::vector<std::future<void>> load_futures;
+		load_futures.reserve(workload_seeds.size());
+
+		for (size_t i = 0; i < workload_seeds.size(); ++i)
+		{
+			void* instance_ptr = instance_infos[i].ptr;
+			const auto* type = instance_infos[i].type;
+
+			load_futures.push_back(std::async(std::launch::async,
+				[=]()
+				{
+					if (type->load_fn)
+						type->load_fn(instance_ptr);
+				}));
+		}
+
+		// wait for "load" futures to complete:
+		for (auto& fut : load_futures)
+		{
+			fut.get();
+		}
+
+		// Move completed instances into final storage
+		m_impl->instances = std::move(instance_infos);
 
 		// fixup and add child-instances
 		for (size_t i = 0; i < workload_seeds.size(); ++i)

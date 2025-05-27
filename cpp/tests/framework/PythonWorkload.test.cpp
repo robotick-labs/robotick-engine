@@ -69,7 +69,6 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	const auto* output_struct = info.type->output_struct;
 	REQUIRE(output_struct != nullptr);
 
-#if defined(PYTHON_BLACKBOARDS_SUPPORTED)
 	const void* output_base = static_cast<const uint8_t*>(info.ptr) + info.type->output_offset;
 
 	bool found = false;
@@ -86,7 +85,6 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	}
 
 	REQUIRE(found);
-#endif // #ifdef PYTHON_BLACKBOARDS_SUPPORTED
 }
 
 TEST_CASE("Unit|Workloads|PythonWorkload|start/stop hooks are optional and safe")

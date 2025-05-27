@@ -21,7 +21,7 @@ namespace robotick
 		const WorkloadRegistryEntry* type;
 		std::string unique_name;
 		double tick_rate_hz;
-		const std::vector<const WorkloadInstanceInfo*> children;
+		std::vector<const WorkloadInstanceInfo*> children;
 	};
 
 	namespace test
