@@ -88,4 +88,4 @@ We aim for reviews to be fast, respectful, and constructive.
 Thanks again for your interest in Robotick.  
 Let’s build something reliable, flexible, and genuinely useful - together.
 
-*– The Robotick Team*
+> 🐔 – The Robotick Team

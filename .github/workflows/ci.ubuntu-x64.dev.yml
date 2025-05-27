@@ -49,6 +49,6 @@ jobs:
           robotick-ci \
           bash -c "
             cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . &&
-            cmake --build build &&
+            cmake --build build -j$(nproc) &&
             ctest --test-dir build --output-on-failure --timeout 300
           "
