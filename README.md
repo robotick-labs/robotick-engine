@@ -38,6 +38,7 @@ Built for early learners and industry professionals alike, Robotick is simple en
 ## ✨ Key Features
 
 ### 🧩 Modular Workloads
+
 Each unit of logic is a workload - a small, testable module with clearly defined inputs, outputs, and config:
 ```cpp
 struct HelloWorkload {
@@ -51,6 +52,7 @@ struct HelloWorkload {
 Reflection macros make every field visible and usable for config, scripting, or telemetry.
 
 ### 🔁 Real-Time Engine
+
 - Individual tick rates per workload
 - Deterministic scheduling
 - Ready for multithreaded execution
@@ -58,6 +60,7 @@ Reflection macros make every field visible and usable for config, scripting, or 
 - Excellent latency characteristics on general-purpose platforms
 
 ### 📦 Composition System
+
 Compose workloads into rich behaviours:
 
 - `SequenceWorkload`: run workloads in order
@@ -65,6 +68,7 @@ Compose workloads into rich behaviours:
 - Future: event-driven, reactive, and conditional branching
 
 ### 🔬 Introspection & Reflection
+
 Every field in config, inputs, and outputs is exposed at runtime, enabling:
 
 - Remote configuration
@@ -74,6 +78,7 @@ Every field in config, inputs, and outputs is exposed at runtime, enabling:
 No boilerplate. No fuss. Just structured access to everything that matters.
 
 ### 📡 Remote Telemetry & UI
+
 Designed for live telemetry from the start:
 
 - Structured data streaming
@@ -82,6 +87,7 @@ Designed for live telemetry from the start:
 - Foundation for remote tuning and remote control
 
 ### 🐍 Python Bindings
+
 Use Python to:
 
 - Orchestrate workload execution
@@ -92,6 +98,7 @@ Use Python to:
 Zero-copy overlay support is in progress for high-efficiency interop.
 
 ### 🧪 Simulation-First Testing
+
 Built to be tested:
 
 - Mockable physics interfaces

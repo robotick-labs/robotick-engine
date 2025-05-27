@@ -1,6 +1,7 @@
 # 🤖 Contributing to Robotick
 
-**Welcome - and thanks for your interest in contributing to Robotick!**  
+**Welcome - and thanks for your interest in contributing to Robotick!**
+
 We’re building a modular, real-time robotics engine designed for reliability, introspection, and embedded performance.
 
 Whether you're a seasoned robotics engineer, curious maker, or systems tinkerer - we’re glad you're here.
