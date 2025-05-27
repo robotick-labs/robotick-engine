@@ -6,6 +6,7 @@
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/PyBind.h"
+#include "robotick/framework/utils/PythonRuntime.h"
 
 #include <cassert>
 #include <cstdlib>
@@ -82,19 +83,7 @@ namespace robotick
 
 		void load()
 		{
-			static std::once_flag init_flag;
-
-			std::call_once(init_flag,
-				[]
-				{
-					py::initialize_interpreter();
-					PyEval_SaveThread();
-					std::atexit(
-						[]
-						{
-							py::finalize_interpreter();
-						});
-				});
+			robotick::ensure_python_runtime(); // ensures it's alive
 
 			try
 			{
