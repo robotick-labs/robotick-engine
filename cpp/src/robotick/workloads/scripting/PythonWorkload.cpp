@@ -116,9 +116,9 @@ namespace robotick
 			return fields;
 		}
 
-		void initialize_blackboards(py::object& py_instance)
+		void initialize_blackboards(py::object& py_class)
 		{
-			py::dict desc = py_instance.attr("describe")();
+			py::dict desc = py_class.attr("describe")();
 
 			auto config_schema = parse_blackboard_schema(desc["config"]);
 			auto input_schema = parse_blackboard_schema(desc["inputs"]);
@@ -143,9 +143,8 @@ namespace robotick
 
 				internal_state->py_module = py::module_::import(config.script_name.c_str());
 				internal_state->py_class = internal_state->py_module.attr(config.class_name.c_str());
-				internal_state->py_instance = internal_state->py_class();
 
-				initialize_blackboards(internal_state->py_instance);
+				initialize_blackboards(internal_state->py_class);
 			}
 			catch (const py::error_already_set& e)
 			{
@@ -188,7 +187,7 @@ namespace robotick
 					}
 				}
 
-				internal_state->py_instance.attr("init")(py_cfg);
+				internal_state->py_instance = internal_state->py_class(py_cfg);
 			}
 			catch (const py::error_already_set& e)
 			{
