@@ -10,9 +10,9 @@ class HelloWorkload:
                 "force_error": "int"
             },
             "outputs": {
-                "greeting": "double",
-                "val1": "double",
-                "val2": "double"
+                "greeting": "FixedString32",
+                "val_double": "double",
+                "val_int": "int"
             }
         }
         
@@ -24,12 +24,13 @@ class HelloWorkload:
             raise Exception("Simulated failure")
 
         if input.get("output_all", 0):
-            output['val1'] = 1.23
-            output['val2'] = 4.56
+            output['val_double'] = 1.23
+            output['val_int'] = 456
             return
 
         if input.get("no_output", 0):
             return
 
-        output['greeting'] = 42.0
-        print(f"[Python] Hello! {1.0 / time_delta:.2f} Hz")
+        output['greeting'] = f"[Python] Hello! {1.0 / time_delta:.2f} Hz"
+
+        print(output['greeting'])

@@ -66,17 +66,19 @@ namespace robotick
 			if (!type)
 				continue;
 
-			auto accumulate = [&](const StructRegistryEntry* struct_info)
+			auto accumulate = [&](void* instance_ptr, const StructRegistryEntry* struct_info, const size_t struct_offset)
 			{
 				if (!struct_info)
 					return;
 
+				const auto struct_ptr = static_cast<uint8_t*>(instance_ptr) + struct_offset;
+
 				for (const FieldInfo& field : struct_info->fields)
 				{
-					if (field.type == typeid(BlackboardInstance))
+					if (field.type == typeid(Blackboard))
 					{
-						const auto* blackboard_raw_ptr = static_cast<const uint8_t*>(instance.ptr) + field.offset;
-						const auto* blackboard = reinterpret_cast<const BlackboardInstance*>(blackboard_raw_ptr);
+						const auto* blackboard_raw_ptr = struct_ptr + field.offset;
+						const auto* blackboard = reinterpret_cast<const Blackboard*>(blackboard_raw_ptr);
 
 						if (blackboard && !blackboard->get_schema().empty())
 						{
@@ -86,21 +88,22 @@ namespace robotick
 				}
 			};
 
-			accumulate(type->config_struct);
-			accumulate(type->input_struct);
-			accumulate(type->output_struct);
+			accumulate(instance.ptr, type->config_struct, type->config_offset);
+			accumulate(instance.ptr, type->input_struct, type->input_offset);
+			accumulate(instance.ptr, type->output_struct, type->output_offset);
 		}
 
 		return total;
 	}
 
-	void bind_blackboards_in_struct(void* base_ptr, const StructRegistryEntry& struct_entry, uint8_t*& blackboard_storage)
+	void bind_blackboards_in_struct(
+		void* instance_ptr, const StructRegistryEntry& struct_entry, const size_t struct_offset, uint8_t*& blackboard_storage)
 	{
 		for (const FieldInfo& field : struct_entry.fields)
 		{
-			if (field.type == typeid(BlackboardInstance))
+			if (field.type == typeid(Blackboard))
 			{
-				auto* blackboard = reinterpret_cast<BlackboardInstance*>(static_cast<uint8_t*>(base_ptr) + field.offset);
+				auto* blackboard = reinterpret_cast<Blackboard*>(static_cast<uint8_t*>(instance_ptr) + struct_offset + field.offset);
 				if (blackboard && !blackboard->get_schema().empty())
 				{
 					blackboard->bind(blackboard_storage);
@@ -121,11 +124,11 @@ namespace robotick
 				continue;
 
 			if (type->config_struct)
-				bind_blackboards_in_struct(instance.ptr, *type->config_struct, blackboard_storage);
+				bind_blackboards_in_struct(instance.ptr, *type->config_struct, type->config_offset, blackboard_storage);
 			if (type->input_struct)
-				bind_blackboards_in_struct(instance.ptr, *type->input_struct, blackboard_storage);
+				bind_blackboards_in_struct(instance.ptr, *type->input_struct, type->input_offset, blackboard_storage);
 			if (type->output_struct)
-				bind_blackboards_in_struct(instance.ptr, *type->output_struct, blackboard_storage);
+				bind_blackboards_in_struct(instance.ptr, *type->output_struct, type->output_offset, blackboard_storage);
 		}
 	}
 

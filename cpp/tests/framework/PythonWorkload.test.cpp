@@ -4,6 +4,7 @@
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
+#include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 
@@ -65,26 +66,37 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	// Execute tick
 	info.type->tick_fn(info.ptr, 0.01);
 
-	// Reflect over outputs
+	// === Find the output blackboard ===
 	const auto* output_struct = info.type->output_struct;
 	REQUIRE(output_struct != nullptr);
 
 	const void* output_base = static_cast<const uint8_t*>(info.ptr) + info.type->output_offset;
 
-	bool found = false;
+	const robotick::Blackboard* output_blackboard = nullptr;
 	for (const auto& field : output_struct->fields)
 	{
-		if (field.name == "greeting")
+		if (field.name == "blackboard")
 		{
 			const void* field_ptr = static_cast<const uint8_t*>(output_base) + field.offset;
-			double value = *static_cast<const double*>(field_ptr);
-			REQUIRE(value == Catch::Approx(42.0));
-			found = true;
+			output_blackboard = static_cast<const robotick::Blackboard*>(field_ptr);
 			break;
 		}
 	}
 
-	REQUIRE(found);
+	REQUIRE(output_blackboard != nullptr);
+	REQUIRE(output_blackboard->has("val_double"));
+	const double val_double = output_blackboard->get<double>("val_double");
+	REQUIRE(val_double == 1.23);
+
+	REQUIRE(output_blackboard != nullptr);
+	REQUIRE(output_blackboard->has("val_int"));
+	const double val_int = output_blackboard->get<int>("val_int");
+	REQUIRE(val_int == 456);
+
+	REQUIRE(output_blackboard != nullptr);
+	REQUIRE(output_blackboard->has("greeting"));
+	const double greeting = output_blackboard->get<FixedString32>("greeting");
+	REQUIRE(greeting == 42);
 }
 
 TEST_CASE("Unit|Workloads|PythonWorkload|start/stop hooks are optional and safe")

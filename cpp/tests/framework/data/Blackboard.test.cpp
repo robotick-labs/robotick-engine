@@ -9,12 +9,12 @@
 
 using namespace robotick;
 
-TEST_CASE("BlackboardInstance basic construction and memory layout", "[blackboard]")
+TEST_CASE("Blackboard basic construction and memory layout", "[blackboard]")
 {
 	std::vector<BlackboardField> schema = {
 		{"age", BlackboardFieldType::Int}, {"score", BlackboardFieldType::Double}, {"name", BlackboardFieldType::FixedString64}};
 
-	BlackboardInstance blackboard(schema);
+	Blackboard blackboard(schema);
 
 	REQUIRE(blackboard.get_schema().size() == 3);
 	REQUIRE(blackboard.required_size() >= sizeof(int) + sizeof(double) + sizeof(FixedString64));
@@ -26,12 +26,12 @@ TEST_CASE("BlackboardInstance basic construction and memory layout", "[blackboar
 	REQUIRE_FALSE(blackboard.has("missing"));
 }
 
-TEST_CASE("BlackboardInstance binds external memory and performs typed access", "[blackboard]")
+TEST_CASE("Blackboard binds external memory and performs typed access", "[blackboard]")
 {
 	std::vector<BlackboardField> schema = {
 		{"age", BlackboardFieldType::Int}, {"score", BlackboardFieldType::Double}, {"name", BlackboardFieldType::FixedString64}};
 
-	BlackboardInstance blackboard(schema);
+	Blackboard blackboard(schema);
 	size_t buffer_size = blackboard.required_size();
 
 	std::vector<uint8_t> memory(buffer_size, 0);
@@ -57,10 +57,10 @@ TEST_CASE("BlackboardInstance binds external memory and performs typed access", 
 	}
 }
 
-TEST_CASE("BlackboardInstance throws on missing keys or unbound memory", "[blackboard][errors]")
+TEST_CASE("Blackboard throws on missing keys or unbound memory", "[blackboard][errors]")
 {
 	std::vector<BlackboardField> schema = {{"alpha", BlackboardFieldType::Int}};
-	BlackboardInstance blackboard(schema);
+	Blackboard blackboard(schema);
 	std::vector<uint8_t> memory(blackboard.required_size(), 0);
 
 	SECTION("Access before bind throws")
@@ -108,11 +108,11 @@ TEST_CASE("BlackboardInstance throws on missing keys or unbound memory", "[black
 	}
 }
 
-TEST_CASE("BlackboardInstance handles alignment and offset consistency", "[blackboard][layout]")
+TEST_CASE("Blackboard handles alignment and offset consistency", "[blackboard][layout]")
 {
 	std::vector<BlackboardField> schema = {{"a", BlackboardFieldType::Int}, {"b", BlackboardFieldType::Double}, {"c", BlackboardFieldType::Int}};
 
-	BlackboardInstance blackboard(schema);
+	Blackboard blackboard(schema);
 	auto schema_ref = blackboard.get_schema();
 
 	REQUIRE(blackboard.has("a"));

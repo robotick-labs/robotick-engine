@@ -26,7 +26,7 @@ namespace robotick
 	{
 		FixedString128 script_name;
 		FixedString64 class_name;
-		BlackboardInstance blackboard;
+		Blackboard blackboard;
 	};
 	ROBOTICK_BEGIN_FIELDS(PythonConfig)
 	ROBOTICK_FIELD(PythonConfig, script_name)
@@ -36,7 +36,7 @@ namespace robotick
 
 	struct PythonInputs
 	{
-		BlackboardInstance blackboard;
+		Blackboard blackboard;
 	};
 	ROBOTICK_BEGIN_FIELDS(PythonInputs)
 	ROBOTICK_FIELD(PythonInputs, blackboard)
@@ -44,7 +44,7 @@ namespace robotick
 
 	struct PythonOutputs
 	{
-		BlackboardInstance blackboard;
+		Blackboard blackboard;
 	};
 	ROBOTICK_BEGIN_FIELDS(PythonOutputs)
 	ROBOTICK_FIELD(PythonOutputs, blackboard)
@@ -124,9 +124,9 @@ namespace robotick
 			auto input_schema = parse_blackboard_schema(desc["inputs"]);
 			auto output_schema = parse_blackboard_schema(desc["outputs"]);
 
-			config.blackboard = BlackboardInstance(config_schema);
-			inputs.blackboard = BlackboardInstance(input_schema);
-			outputs.blackboard = BlackboardInstance(output_schema);
+			config.blackboard = Blackboard(config_schema);
+			inputs.blackboard = Blackboard(input_schema);
+			outputs.blackboard = Blackboard(output_schema);
 		}
 
 		void pre_load()

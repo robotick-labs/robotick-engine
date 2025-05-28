@@ -9,7 +9,7 @@
 namespace robotick
 {
 
-	BlackboardInstance::BlackboardInstance(const std::vector<BlackboardField>& schema) : schema(schema)
+	Blackboard::Blackboard(const std::vector<BlackboardField>& schema) : schema(schema)
 	{
 		size_t offset = 0;
 		for (const auto& field : schema)
@@ -26,27 +26,27 @@ namespace robotick
 		total_size = offset;
 	}
 
-	void BlackboardInstance::bind(uint8_t* external_memory)
+	void Blackboard::bind(uint8_t* external_memory)
 	{
 		base_ptr = external_memory;
 	}
 
-	size_t BlackboardInstance::required_size() const
+	size_t Blackboard::required_size() const
 	{
 		return total_size;
 	}
 
-	const std::vector<BlackboardField>& BlackboardInstance::get_schema() const
+	const std::vector<BlackboardField>& Blackboard::get_schema() const
 	{
 		return schema;
 	}
 
-	bool BlackboardInstance::has(const std::string& key) const
+	bool Blackboard::has(const std::string& key) const
 	{
 		return offsets.count(key) > 0;
 	}
 
-	size_t BlackboardInstance::type_size(BlackboardFieldType type) const
+	size_t Blackboard::type_size(BlackboardFieldType type) const
 	{
 		switch (type)
 		{
@@ -62,7 +62,7 @@ namespace robotick
 		throw std::runtime_error("Unknown BlackboardFieldType");
 	}
 
-	size_t BlackboardInstance::type_align(BlackboardFieldType type) const
+	size_t Blackboard::type_align(BlackboardFieldType type) const
 	{
 		switch (type)
 		{
@@ -78,7 +78,7 @@ namespace robotick
 		throw std::runtime_error("Unknown BlackboardFieldType");
 	}
 
-	void* BlackboardInstance::get_ptr(const std::string& key)
+	void* Blackboard::get_ptr(const std::string& key)
 	{
 		auto it = offsets.find(key);
 		if (it == offsets.end() || base_ptr == nullptr)
@@ -88,7 +88,7 @@ namespace robotick
 		return base_ptr + it->second;
 	}
 
-	const void* BlackboardInstance::get_ptr(const std::string& key) const
+	const void* Blackboard::get_ptr(const std::string& key) const
 	{
 		auto it = offsets.find(key);
 		if (it == offsets.end() || base_ptr == nullptr)
@@ -98,12 +98,13 @@ namespace robotick
 		return base_ptr + it->second;
 	}
 
-	template <typename T> void BlackboardInstance::set(const std::string& key, const T& value)
+	template <typename T> void Blackboard::set(const std::string& key, const T& value)
 	{
-		std::memcpy(get_ptr(key), &value, sizeof(T));
+		void* field_data_ptr = get_ptr(key);
+		std::memcpy(field_data_ptr, &value, sizeof(T));
 	}
 
-	template <typename T> T BlackboardInstance::get(const std::string& key) const
+	template <typename T> T Blackboard::get(const std::string& key) const
 	{
 		T out;
 		std::memcpy(&out, get_ptr(key), sizeof(T));
@@ -111,14 +112,14 @@ namespace robotick
 	}
 
 	// Explicit instantiations
-	template void BlackboardInstance::set<int>(const std::string&, const int&);
-	template void BlackboardInstance::set<double>(const std::string&, const double&);
-	template void BlackboardInstance::set<FixedString64>(const std::string&, const FixedString64&);
-	template void BlackboardInstance::set<FixedString128>(const std::string&, const FixedString128&);
+	template void Blackboard::set<int>(const std::string&, const int&);
+	template void Blackboard::set<double>(const std::string&, const double&);
+	template void Blackboard::set<FixedString64>(const std::string&, const FixedString64&);
+	template void Blackboard::set<FixedString128>(const std::string&, const FixedString128&);
 
-	template int BlackboardInstance::get<int>(const std::string&) const;
-	template double BlackboardInstance::get<double>(const std::string&) const;
-	template FixedString64 BlackboardInstance::get<FixedString64>(const std::string&) const;
-	template FixedString128 BlackboardInstance::get<FixedString128>(const std::string&) const;
+	template int Blackboard::get<int>(const std::string&) const;
+	template double Blackboard::get<double>(const std::string&) const;
+	template FixedString64 Blackboard::get<FixedString64>(const std::string&) const;
+	template FixedString128 Blackboard::get<FixedString128>(const std::string&) const;
 
 } // namespace robotick

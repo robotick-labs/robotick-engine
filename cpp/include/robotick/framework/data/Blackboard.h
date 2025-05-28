@@ -30,11 +30,11 @@ namespace robotick
 	};
 
 	// === A flat memory block with named fields and typed access ===
-	class BlackboardInstance
+	class Blackboard
 	{
 	  public:
-		BlackboardInstance() = default;
-		explicit BlackboardInstance(const std::vector<BlackboardField>& schema);
+		Blackboard() = default;
+		explicit Blackboard(const std::vector<BlackboardField>& schema);
 
 		void bind(uint8_t* external_memory); // Caller owns the buffer
 
