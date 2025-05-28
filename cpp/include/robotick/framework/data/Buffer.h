@@ -12,7 +12,6 @@
 
 namespace robotick
 {
-
 	class RawBuffer
 	{
 	  public:
@@ -71,12 +70,15 @@ namespace robotick
 	  public:
 		using RawBuffer::RawBuffer;
 
-		static BlackboardsBuffer& get();
+		static BlackboardsBuffer& get_local_mirror();
+		static const BlackboardsBuffer& get_source();
 		static void set_source(const BlackboardsBuffer* buffer);
+
 		void mirror_from_source();
 
 	  private:
-		static thread_local const BlackboardsBuffer* source_buffer;
+		static thread_local BlackboardsBuffer local_instance;
+		static const BlackboardsBuffer* source_buffer;
 	};
 
 	class WorkloadsBuffer : public RawBuffer
@@ -84,12 +86,14 @@ namespace robotick
 	  public:
 		using RawBuffer::RawBuffer;
 
-		static WorkloadsBuffer& get();
+		static WorkloadsBuffer& get_local_mirror();
+		static const WorkloadsBuffer& get_source();
 		static void set_source(const WorkloadsBuffer* buffer);
+
 		void mirror_from_source();
 
 	  private:
-		static thread_local const WorkloadsBuffer* source_buffer;
+		static thread_local WorkloadsBuffer local_instance;
+		static const WorkloadsBuffer* source_buffer;
 	};
-
 } // namespace robotick

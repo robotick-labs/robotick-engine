@@ -6,14 +6,20 @@
 
 namespace robotick
 {
-	// ---- BlackboardsBuffer ----
+	// BlackboardsBuffer static members
+	thread_local BlackboardsBuffer BlackboardsBuffer::local_instance;
+	const BlackboardsBuffer* BlackboardsBuffer::source_buffer = nullptr;
 
-	thread_local const BlackboardsBuffer* BlackboardsBuffer::source_buffer = nullptr;
-
-	BlackboardsBuffer& BlackboardsBuffer::get()
+	BlackboardsBuffer& BlackboardsBuffer::get_local_mirror()
 	{
-		thread_local BlackboardsBuffer buffer;
-		return buffer;
+		return local_instance;
+	}
+
+	const BlackboardsBuffer& BlackboardsBuffer::get_source()
+	{
+		if (!source_buffer)
+			throw std::runtime_error("BlackboardsBuffer::get_source: no source set");
+		return *source_buffer;
 	}
 
 	void BlackboardsBuffer::set_source(const BlackboardsBuffer* buffer)
@@ -24,18 +30,24 @@ namespace robotick
 	void BlackboardsBuffer::mirror_from_source()
 	{
 		if (!source_buffer)
-			throw std::runtime_error("BlackboardsBuffer: no source buffer set");
-		this->mirror_from(*source_buffer);
+			throw std::runtime_error("BlackboardsBuffer::mirror_from_source: no source set");
+		local_instance.mirror_from(*source_buffer);
 	}
 
-	// ---- WorkloadsBuffer ----
+	// WorkloadsBuffer static members
+	thread_local WorkloadsBuffer WorkloadsBuffer::local_instance;
+	const WorkloadsBuffer* WorkloadsBuffer::source_buffer = nullptr;
 
-	thread_local const WorkloadsBuffer* WorkloadsBuffer::source_buffer = nullptr;
-
-	WorkloadsBuffer& WorkloadsBuffer::get()
+	WorkloadsBuffer& WorkloadsBuffer::get_local_mirror()
 	{
-		thread_local WorkloadsBuffer buffer;
-		return buffer;
+		return local_instance;
+	}
+
+	const WorkloadsBuffer& WorkloadsBuffer::get_source()
+	{
+		if (!source_buffer)
+			throw std::runtime_error("WorkloadsBuffer::get_source: no source set");
+		return *source_buffer;
 	}
 
 	void WorkloadsBuffer::set_source(const WorkloadsBuffer* buffer)
@@ -46,8 +58,7 @@ namespace robotick
 	void WorkloadsBuffer::mirror_from_source()
 	{
 		if (!source_buffer)
-			throw std::runtime_error("WorkloadsBuffer: no source buffer set");
-		this->mirror_from(*source_buffer);
+			throw std::runtime_error("WorkloadsBuffer::mirror_from_source: no source set");
+		local_instance.mirror_from(*source_buffer);
 	}
-
 } // namespace robotick
