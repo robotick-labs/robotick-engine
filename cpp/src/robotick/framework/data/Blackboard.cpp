@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/data/Buffer.h"
 #include <cstring>
 #include <stdexcept>
 #include <typeindex>
@@ -35,9 +36,16 @@ namespace robotick
 		total_size = offset;
 	}
 
-	void Blackboard::bind(uint8_t* external_memory)
+	void Blackboard::bind(const size_t buffer_offset_in)
 	{
-		base_ptr = external_memory;
+		buffer_offset = buffer_offset_in;
+	}
+
+	uint8_t* Blackboard::get_base_ptr() const
+	{
+		// TODO - ensure we're clear about when we'll instead use the thread-local source instead
+		BlackboardsBuffer& buffer = BlackboardsBuffer::get_source();
+		return buffer.raw_ptr();
 	}
 
 	size_t Blackboard::required_size() const
@@ -57,6 +65,8 @@ namespace robotick
 
 	void* Blackboard::get_ptr(const string& key)
 	{
+		uint8_t* base_ptr = get_base_ptr();
+
 		auto it = offsets.find(key);
 		if (it == offsets.end() || base_ptr == nullptr)
 			throw runtime_error("Blackboard::get_ptr failed for key: " + key);
@@ -66,6 +76,8 @@ namespace robotick
 
 	const void* Blackboard::get_ptr(const string& key) const
 	{
+		uint8_t* base_ptr = get_base_ptr();
+
 		auto it = offsets.find(key);
 		if (it == offsets.end() || base_ptr == nullptr)
 			throw runtime_error("Blackboard::get_ptr failed for key: " + key);

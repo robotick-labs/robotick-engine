@@ -31,8 +31,7 @@ namespace robotick
 		std::vector<WorkloadInstanceInfo> instances;
 		Model m_loaded_model;
 		WorkloadsBuffer workloads_source_buffer;
-		uint8_t* blackboards_buffer = nullptr;
-		size_t blackboards_buffer_size = 0;
+		BlackboardsBuffer blackboards_source_buffer;
 	};
 
 	Engine::Engine() : m_impl(std::make_unique<Impl>())
@@ -95,8 +94,7 @@ namespace robotick
 		return total;
 	}
 
-	void bind_blackboards_in_struct(
-		void* instance_ptr, const StructRegistryEntry& struct_entry, const size_t struct_offset, uint8_t*& blackboard_storage)
+	void bind_blackboards_in_struct(void* instance_ptr, const StructRegistryEntry& struct_entry, const size_t struct_offset)
 	{
 		for (const FieldInfo& field : struct_entry.fields)
 		{
@@ -112,10 +110,8 @@ namespace robotick
 		}
 	}
 
-	void bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances, uint8_t* blackboards_buffer)
+	void bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances)
 	{
-		uint8_t* blackboard_storage = blackboards_buffer;
-
 		for (const auto& instance : instances)
 		{
 			const auto* type = instance.type;
@@ -123,11 +119,11 @@ namespace robotick
 				continue;
 
 			if (type->config_struct)
-				bind_blackboards_in_struct(instance.ptr, *type->config_struct, type->config_offset, blackboard_storage);
+				bind_blackboards_in_struct(instance.ptr, *type->config_struct, type->config_offset);
 			if (type->input_struct)
-				bind_blackboards_in_struct(instance.ptr, *type->input_struct, type->input_offset, blackboard_storage);
+				bind_blackboards_in_struct(instance.ptr, *type->input_struct, type->input_offset);
 			if (type->output_struct)
-				bind_blackboards_in_struct(instance.ptr, *type->output_struct, type->output_offset, blackboard_storage);
+				bind_blackboards_in_struct(instance.ptr, *type->output_struct, type->output_offset);
 		}
 	}
 
@@ -198,11 +194,11 @@ namespace robotick
 		}
 
 		// Blackboards memory allocation and buffer-binding:
-		m_impl->blackboards_buffer_size = compute_blackboard_memory_requirements(m_impl->instances);
-		m_impl->blackboards_buffer = new uint8_t[m_impl->blackboards_buffer_size];
-		std::memset(m_impl->blackboards_buffer, 0, m_impl->blackboards_buffer_size);
+		const size_t blackboards_buffer_size = compute_blackboard_memory_requirements(m_impl->instances);
+		m_impl->blackboards_source_buffer = BlackboardsBuffer(blackboards_buffer_size);
+		BlackboardsBuffer::set_source(&m_impl->blackboards_source_buffer);
 
-		bind_blackboards_for_instances(m_impl->instances, m_impl->blackboards_buffer);
+		bind_blackboards_for_instances(m_impl->instances, m_impl->blackboards_source_buffer);
 
 		// call load_fn (multi-threaded):
 		std::vector<std::future<void>> load_futures;

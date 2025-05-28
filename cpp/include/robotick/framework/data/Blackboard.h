@@ -28,8 +28,10 @@ namespace robotick
 		Blackboard() = default;
 		explicit Blackboard(const std::vector<BlackboardField>& schema);
 
-		void bind(uint8_t* external_memory);
+		void bind(size_t buffer_offset_in); // sets the offset of the blackboard's fields-data relative to ANY BlackboardsBuffer
 		size_t required_size() const;
+
+		uint8_t* get_base_ptr() const;
 
 		const std::vector<BlackboardField>& get_schema() const;
 		bool has(const std::string& key) const;
@@ -43,7 +45,7 @@ namespace robotick
 		std::unordered_map<std::string, size_t> offsets;
 		std::unordered_map<std::string, std::type_index> types;
 		size_t total_size = 0;
-		uint8_t* base_ptr = nullptr;
+		size_t buffer_offset = 0;
 
 		void* get_ptr(const std::string& key);
 		const void* get_ptr(const std::string& key) const;
