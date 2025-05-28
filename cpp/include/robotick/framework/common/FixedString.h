@@ -28,7 +28,7 @@ namespace robotick
 
 		FixedString(const std::string& str)
 		{
-			const size_t len = std::min(std::strlen(str.c_str()), N - 1);
+			const size_t len = std::min(str.size(), N - 1);
 			std::memcpy(data, str.c_str(), len);
 			data[len] = '\0';
 		}
@@ -43,7 +43,7 @@ namespace robotick
 
 		FixedString& operator=(const std::string& str)
 		{
-			const size_t len = std::min(std::strlen(str.c_str()), N - 1);
+			const size_t len = std::min(str.size(), N - 1);
 			std::memcpy(data, str.c_str(), len);
 			data[len] = '\0';
 			return *this;

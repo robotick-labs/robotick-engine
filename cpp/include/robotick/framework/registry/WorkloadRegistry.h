@@ -11,6 +11,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <new>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
@@ -271,11 +272,6 @@ namespace robotick
 
 		WorkloadRegistry::get().register_entry(entry);
 	}
-
-	template <typename T> struct WorkloadRegistration
-	{
-		WorkloadRegistration(const WorkloadRegistryEntry& entry) { WorkloadRegistry::get().register_entry(entry); }
-	};
 
 	template <typename T, typename Config = void, typename Inputs = void, typename Outputs = void> struct WorkloadAutoRegister
 	{

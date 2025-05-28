@@ -30,7 +30,11 @@ namespace robotick
 		~Engine();
 
 		void load(const Model& model);
+
+		// The stop_flag must outlive this call. Do not pass temporaries.
 		void run(const std::atomic<bool>& stop_after_next_tick_flag);
+
+		void run(const std::atomic<bool>&&) = delete; // cause compile-error if a temporary is used
 
 	  protected:
 		const WorkloadInstanceInfo& get_instance_info(size_t index) const;

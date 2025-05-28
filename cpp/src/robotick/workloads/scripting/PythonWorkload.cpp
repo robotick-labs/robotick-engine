@@ -85,7 +85,7 @@ namespace robotick
 				std::string name = py::str(item.first);
 				std::string type_str = py::str(item.second);
 				std::transform(type_str.begin(), type_str.end(), type_str.begin(),
-					[](char c)
+					[](unsigned char c)
 					{
 						return static_cast<char>(std::tolower(c));
 					});
@@ -213,7 +213,7 @@ namespace robotick
 					auto it = std::find_if(schema.begin(), schema.end(),
 						[&](const BlackboardField& f)
 						{
-							return f.name.c_str() == key;
+							return key == f.name.c_str();
 						});
 					if (it == schema.end())
 						continue;
@@ -223,9 +223,15 @@ namespace robotick
 					else if (it->type == typeid(double))
 						outputs.blackboard.set<double>(key, val.cast<double>());
 					else if (it->type == typeid(FixedString64))
-						outputs.blackboard.set<FixedString64>(key, val.cast<std::string>().c_str());
+					{
+						const std::string tmp = val.cast<std::string>();
+						outputs.blackboard.set<FixedString64>(key, tmp.c_str());
+					}
 					else if (it->type == typeid(FixedString128))
-						outputs.blackboard.set<FixedString128>(key, val.cast<std::string>().c_str());
+					{
+						const std::string tmp = val.cast<std::string>();
+						outputs.blackboard.set<FixedString128>(key, tmp.c_str());
+					}
 				}
 			}
 			catch (const py::error_already_set& e)
