@@ -1,20 +1,11 @@
-// Copyright 2025 Robotick Labs
+// Copyright Robotick Labs
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
 #include "robotick/framework/Engine.h"
+#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/Typename.h"
 
 #include <stdexcept>
@@ -27,7 +18,9 @@ namespace robotick::test
 	{
 		static const WorkloadInstanceInfo& get_instance_info(const Engine& engine, size_t index) { return engine.get_instance_info(index); }
 
-		template <typename T> static const T* get_instance(const Engine& engine, size_t index)
+		static const std::vector<WorkloadInstanceInfo>& get_all_instance_info(const Engine& engine) { return engine.get_all_instance_info(); }
+
+		template <typename T> static T* get_instance(const Engine& engine, size_t index)
 		{
 			const WorkloadInstanceInfo& info = get_instance_info(engine, index);
 			const std::string expected_type = get_clean_typename(typeid(T));
@@ -37,7 +30,7 @@ namespace robotick::test
 				throw std::runtime_error("Type mismatch: expected " + expected_type + ", got " + info.type->name);
 			}
 
-			return static_cast<const T*>(info.ptr);
+			return static_cast<T*>((void*)info.ptr);
 		}
 	};
 } // namespace robotick::test

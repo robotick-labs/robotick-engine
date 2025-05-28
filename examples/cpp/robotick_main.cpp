@@ -1,16 +1,6 @@
-// Copyright 2025 Robotick Labs
+// Copyright Robotick Labs
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
@@ -25,12 +15,12 @@
 
 using namespace robotick;
 
-std::atomic<bool> g_stop_flag = false;
+std::atomic<bool> g_stop_after_next_tick_flag = false;
 
 void signal_handler(int)
 {
 	std::cout << "\nShutting down...\n";
-	g_stop_flag = true;
+	g_stop_after_next_tick_flag = true;
 }
 
 void populate_model_groups(Model& model)
@@ -99,7 +89,7 @@ int main()
 	Engine engine;
 	engine.load(model); // instances our model and allows multithreaded-load/config for each
 
-	engine.run(g_stop_flag); // engine runs on this thread, until requested to stop
+	engine.run(g_stop_after_next_tick_flag); // engine runs on this thread, until requested to stop
 
 	return 0;
 }

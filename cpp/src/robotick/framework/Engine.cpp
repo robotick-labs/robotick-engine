@@ -1,19 +1,12 @@
-// Copyright 2025 Robotick Labs
+// Copyright Robotick Labs
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
+#include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/data/Buffer.h"
+#include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/Thread.h"
@@ -37,8 +30,8 @@ namespace robotick
 		const WorkloadInstanceInfo* root_instance = nullptr;
 		std::vector<WorkloadInstanceInfo> instances;
 		Model m_loaded_model;
-		uint8_t* buffer = nullptr;
-		size_t buffer_size = 0;
+		WorkloadsBuffer workloads_source_buffer;
+		BlackboardsBuffer blackboards_source_buffer;
 	};
 
 	Engine::Engine() : m_impl(std::make_unique<Impl>())
@@ -52,12 +45,106 @@ namespace robotick
 			if (instance.type->destruct)
 				instance.type->destruct(instance.ptr);
 		}
-		delete[] m_impl->buffer;
 	}
 
 	const WorkloadInstanceInfo& Engine::get_instance_info(size_t index) const
 	{
 		return m_impl->instances.at(index);
+	}
+
+	const std::vector<WorkloadInstanceInfo>& Engine::get_all_instance_info() const
+	{
+		return m_impl->instances;
+	}
+
+	size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances)
+	{
+		// note - this function is not recursive, since we don't expect to have nested blackboards
+
+		size_t total = 0;
+
+		for (const auto& instance : instances)
+		{
+			const auto* type = instance.type;
+			if (!type)
+				continue;
+
+			auto accumulate = [&](void* instance_ptr, const StructRegistryEntry* struct_info, const size_t struct_offset)
+			{
+				if (!struct_info)
+					return;
+
+				const auto struct_ptr = static_cast<uint8_t*>(instance_ptr) + struct_offset;
+
+				for (const FieldInfo& field : struct_info->fields)
+				{
+					if (field.type == typeid(Blackboard))
+					{
+						const auto* blackboard_raw_ptr = struct_ptr + field.offset;
+						const auto* blackboard = reinterpret_cast<const Blackboard*>(blackboard_raw_ptr);
+
+						if (blackboard && !blackboard->get_schema().empty())
+						{
+							total += blackboard->required_size();
+						}
+					}
+				}
+			};
+
+			accumulate(instance.ptr, type->config_struct, type->config_offset);
+			accumulate(instance.ptr, type->input_struct, type->input_offset);
+			accumulate(instance.ptr, type->output_struct, type->output_offset);
+		}
+
+		return total;
+	}
+
+	void bind_blackboards_in_struct(WorkloadInstanceInfo& workload_instance_info, const StructRegistryEntry& struct_entry, const size_t struct_offset,
+		size_t& blackboard_storage_offset)
+	{
+		// note - this function is not recursive, since we don't expect to have nested blackboards
+
+		for (const FieldInfo& field : struct_entry.fields)
+		{
+			if (field.type == typeid(Blackboard))
+			{
+				auto* blackboard = reinterpret_cast<Blackboard*>(workload_instance_info.ptr + struct_offset + field.offset);
+				if (blackboard && !blackboard->get_schema().empty())
+				{
+					blackboard->bind(blackboard_storage_offset);
+					blackboard_storage_offset += blackboard->required_size();
+				}
+			}
+		}
+	}
+
+	void bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances)
+	{
+		size_t blackboard_storage_offset = 0;
+
+		for (WorkloadInstanceInfo& instance : instances)
+		{
+			const auto* type = instance.type;
+			if (!type)
+			{
+				continue;
+			}
+
+			if (type->config_struct)
+			{
+				bind_blackboards_in_struct(instance, *type->config_struct, type->config_offset, blackboard_storage_offset);
+			}
+
+			if (type->input_struct)
+			{
+				bind_blackboards_in_struct(instance, *type->input_struct, type->input_offset, blackboard_storage_offset);
+			}
+
+			if (type->output_struct)
+			{
+				bind_blackboards_in_struct(instance, *type->output_struct, type->output_offset, blackboard_storage_offset);
+			}
+		}
 	}
 
 	void Engine::load(const Model& model)
@@ -68,9 +155,7 @@ namespace robotick
 		}
 
 		m_impl->instances.clear();
-		delete[] m_impl->buffer;
-		m_impl->buffer = nullptr;
-		m_impl->buffer_size = 0;
+		m_impl->workloads_source_buffer = WorkloadsBuffer();
 		m_impl->m_loaded_model = model;
 
 		const auto& workload_seeds = model.get_workload_seeds();
@@ -89,41 +174,73 @@ namespace robotick
 			offset += type->size;
 		}
 
-		m_impl->buffer_size = offset;
-		m_impl->buffer = new uint8_t[m_impl->buffer_size];
-		std::memset(m_impl->buffer, 0, m_impl->buffer_size);
+		// Primary workloads buffer allocation:
+		m_impl->workloads_source_buffer = WorkloadsBuffer(offset);
+		uint8_t* workloads_buffer_ptr = m_impl->workloads_source_buffer.raw_ptr();
 
-		std::vector<std::future<WorkloadInstanceInfo>> futures;
-		futures.reserve(workload_seeds.size());
+		std::vector<std::future<WorkloadInstanceInfo>> preload_futures;
+		preload_futures.reserve(workload_seeds.size());
 
+		// construct + apply config + call pre_load_fn (multi-threaded):
 		for (size_t i = 0; i < workload_seeds.size(); ++i)
 		{
 			const auto& workload_seed = workload_seeds[i];
 			const auto* type = WorkloadRegistry::get().find(workload_seed.type);
-			void* instance_ptr = m_impl->buffer + aligned_offsets[i];
+			uint8_t* instance_ptr = workloads_buffer_ptr + aligned_offsets[i];
 
-			futures.push_back(std::async(std::launch::async,
+			preload_futures.push_back(std::async(std::launch::async,
 				[=]() -> WorkloadInstanceInfo
 				{
 					if (type->construct)
 						type->construct(instance_ptr);
 
 					if (type->config_struct)
+					{
 						apply_struct_fields(static_cast<uint8_t*>(instance_ptr) + type->config_offset, *type->config_struct, workload_seed.config);
+					}
 
 					if (type->pre_load_fn)
 						type->pre_load_fn(instance_ptr);
-					if (type->load_fn)
-						type->load_fn(instance_ptr);
 
-					const std::vector<const WorkloadInstanceInfo*> children = {}; // fixup add children below once we've created all instances
-					return WorkloadInstanceInfo{instance_ptr, type, workload_seed.name, workload_seed.tick_rate_hz, children};
+					return WorkloadInstanceInfo{instance_ptr, type, workload_seed.name, workload_seed.tick_rate_hz, {}};
 				}));
 		}
 
-		for (auto& fut : futures)
+		// wait for "pre_load" futures to complete and collect results:
+		m_impl->instances.reserve(workload_seeds.size());
+		for (auto& fut : preload_futures)
 		{
 			m_impl->instances.push_back(fut.get());
+		}
+
+		// Blackboards memory allocation and buffer-binding (at least 1 byte to please all platforms):
+		const size_t blackboards_buffer_size = std::max<size_t>(1, compute_blackboard_memory_requirements(m_impl->instances));
+		m_impl->blackboards_source_buffer = BlackboardsBuffer(blackboards_buffer_size);
+		BlackboardsBuffer::set_source(&m_impl->blackboards_source_buffer);
+
+		bind_blackboards_for_instances(m_impl->instances);
+
+		// call load_fn (multi-threaded):
+		std::vector<std::future<void>> load_futures;
+		load_futures.reserve(workload_seeds.size());
+
+		for (size_t i = 0; i < workload_seeds.size(); ++i)
+		{
+			void* instance_ptr = m_impl->instances[i].ptr;
+			const auto* type = m_impl->instances[i].type;
+
+			load_futures.push_back(std::async(std::launch::async,
+				[=]()
+				{
+					if (type->load_fn)
+						type->load_fn(instance_ptr);
+				}));
+		}
+
+		// wait for "load" futures to complete:
+		for (auto& fut : load_futures)
+		{
+			fut.get();
 		}
 
 		// fixup and add child-instances
@@ -158,7 +275,7 @@ namespace robotick
 		assert(m_impl->root_instance != nullptr);
 	}
 
-	void Engine::run(const std::atomic<bool>& stop_flag)
+	void Engine::run(const std::atomic<bool>& stop_after_next_tick_flag)
 	{
 		using namespace std::chrono;
 
@@ -185,7 +302,7 @@ namespace robotick
 		auto next_tick_time = steady_clock::now();
 		auto last_tick_time = steady_clock::now();
 
-		// main tick-loop: (tick at least once, before checking stop_flag - e.g. useful for testing)
+		// main tick-loop: (tick at least once, before checking stop_after_next_tick_flag - e.g. useful for testing)
 		do
 		{
 			auto now = steady_clock::now();
@@ -197,7 +314,7 @@ namespace robotick
 
 			hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
 
-		} while (!stop_flag);
+		} while (!stop_after_next_tick_flag);
 
 		// call stop() on all children (do it safely here, rather than relying on stop() to propagate through hierarchy)
 		for (auto& inst : m_impl->instances)

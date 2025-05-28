@@ -1,20 +1,11 @@
-// Copyright 2025 Robotick Labs
+// Copyright Robotick Labs
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
 #include "robotick/framework/Model.h"
+#include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/api.h"
 
 #include <atomic>
@@ -24,15 +15,6 @@
 namespace robotick
 {
 	struct WorkloadRegistryEntry;
-
-	struct WorkloadInstanceInfo
-	{
-		void* ptr;
-		const WorkloadRegistryEntry* type;
-		std::string unique_name;
-		double tick_rate_hz;
-		const std::vector<const WorkloadInstanceInfo*> children;
-	};
 
 	namespace test
 	{
@@ -48,10 +30,15 @@ namespace robotick
 		~Engine();
 
 		void load(const Model& model);
-		void run(const std::atomic<bool>& stop_flag);
+
+		// The stop_flag must outlive this call. Do not pass temporaries.
+		void run(const std::atomic<bool>& stop_after_next_tick_flag);
+
+		void run(const std::atomic<bool>&&) = delete; // cause compile-error if a temporary is used
 
 	  protected:
 		const WorkloadInstanceInfo& get_instance_info(size_t index) const;
+		const std::vector<WorkloadInstanceInfo>& get_all_instance_info() const;
 
 	  private:
 		ROBOTICK_DECLARE_PIMPL();

@@ -1,19 +1,32 @@
 class HelloWorkload:
+
+    @staticmethod
+    def describe():
+        return {
+            "config": {},
+            "inputs": {
+                "no_output": "int",
+                "force_error": "int"
+            },
+            "outputs": {
+                "greeting": "FixedString64",
+                "val_double": "double",
+                "val_int": "int"
+            }
+        }
+        
     def __init__(self, config):
-        print(f"[Python] HelloWorkload init!")
+        print("[Python] HelloWorkload __init__")
 
     def tick(self, time_delta, input, output):
-        if input.get("force_error"):
+        if input.get("force_error", 0):
             raise Exception("Simulated failure")
 
-        if input.get("output_all"):
-            output['val1'] = 1.23
-            output['val2'] = 4.56
+        if input.get("no_output", 0):
             return
 
-        if input.get("no_output"):
-            return
+        output['val_double'] = 1.23
+        output['val_int'] = 456
+        output['greeting'] = f"[Python] Hello! {1.0 / time_delta:.2f} Hz"
 
-        output['greeting'] = 42.0
-
-        print(f"[Python] Hello! {1.0/time_delta} Hz")
+        print(output['greeting'])

@@ -1,19 +1,10 @@
-// Copyright 2025 Robotick Labs
+// Copyright Robotick Labs
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -31,14 +22,31 @@ namespace robotick
 
 		FixedString(const char* str)
 		{
-			strncpy(data, str, N - 1);
-			data[N - 1] = '\0';
+			const size_t len = std::min(std::strlen(str), N - 1);
+			std::memcpy(data, str, len);
+			data[len] = '\0';
+		}
+
+		FixedString(const std::string& str)
+		{
+			const size_t len = std::min(str.size(), N - 1);
+			std::memcpy(data, str.c_str(), len);
+			data[len] = '\0';
 		}
 
 		FixedString& operator=(const char* str)
 		{
-			strncpy(data, str, N - 1);
-			data[N - 1] = '\0';
+			const size_t len = std::min(std::strlen(str), N - 1);
+			std::memcpy(data, str, len);
+			data[len] = '\0';
+			return *this;
+		}
+
+		FixedString& operator=(const std::string& str)
+		{
+			const size_t len = std::min(str.size(), N - 1);
+			std::memcpy(data, str.c_str(), len);
+			data[len] = '\0';
 			return *this;
 		}
 
@@ -46,6 +54,7 @@ namespace robotick
 
 		operator const char*() const { return data; }
 
+		bool operator==(const char* other) const noexcept { return std::strncmp(data, other, N) == 0; }
 		bool operator==(const FixedString<N>& other) const { return std::strncmp(data, other.data, N) == 0; }
 
 		bool operator!=(const FixedString<N>& other) const { return !(*this == other); }

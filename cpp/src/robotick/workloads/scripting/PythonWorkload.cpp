@@ -1,23 +1,17 @@
-// Copyright 2025 Robotick Labs
+// Copyright Robotick Labs
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/FixedString.h"
-#include "robotick/framework/registry/FieldMacros.h"
-#include "robotick/framework/registry/FieldUtils.h"
+#include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
-#include "robotick/framework/utils/PyBind.h"
+#include "robotick/framework/utils/PythonRuntime.h"
 
+#include <algorithm>
+#include <cassert>
+#include <cctype>
+#include <cstdlib>
 #include <iostream>
 #include <mutex>
 #include <pybind11/embed.h>
@@ -27,111 +21,222 @@ namespace py = pybind11;
 
 namespace robotick
 {
-	namespace
+
+	struct PythonConfig
 	{
-		// === Structs ===
+		FixedString128 script_name;
+		FixedString64 class_name;
+		Blackboard blackboard;
+	};
+	ROBOTICK_BEGIN_FIELDS(PythonConfig)
+	ROBOTICK_FIELD(PythonConfig, script_name)
+	ROBOTICK_FIELD(PythonConfig, class_name)
+	ROBOTICK_FIELD(PythonConfig, blackboard)
+	ROBOTICK_END_FIELDS()
 
-		struct PythonConfig
-		{
-			FixedString128 script_name;
-			FixedString64 class_name;
-			ROBOTICK_DECLARE_FIELDS();
-		};
-		ROBOTICK_DEFINE_FIELDS(PythonConfig, ROBOTICK_FIELD(PythonConfig, script_name), ROBOTICK_FIELD(PythonConfig, class_name))
+	struct PythonInputs
+	{
+		Blackboard blackboard;
+	};
+	ROBOTICK_BEGIN_FIELDS(PythonInputs)
+	ROBOTICK_FIELD(PythonInputs, blackboard)
+	ROBOTICK_END_FIELDS()
 
-		struct PythonInputs
-		{
-			double example_in = 0.0;
-			ROBOTICK_DECLARE_FIELDS();
-		};
-		ROBOTICK_DEFINE_FIELDS(PythonInputs, ROBOTICK_FIELD(PythonInputs, example_in))
+	struct PythonOutputs
+	{
+		Blackboard blackboard;
+	};
+	ROBOTICK_BEGIN_FIELDS(PythonOutputs)
+	ROBOTICK_FIELD(PythonOutputs, blackboard)
+	ROBOTICK_END_FIELDS()
 
-		struct PythonOutputs
-		{
-			double example_out = 0.0;
-			ROBOTICK_DECLARE_FIELDS();
-		};
-		ROBOTICK_DEFINE_FIELDS(PythonOutputs, ROBOTICK_FIELD(PythonOutputs, example_out))
+	struct __attribute__((visibility("hidden"))) PythonInternalState
+	{
+		py::object py_module;
+		py::object py_class;
+		py::object py_instance;
+	};
 
-		struct PythonInternalState
-		{
-			// Python embedding members
-			py::object py_module;
-			py::object py_class;
-			py::object py_instance;
-		};
-	}; // namespace
-
-	// === Workload ===
-
-	struct PythonWorkload
+	struct __attribute__((visibility("hidden"))) PythonWorkload
 	{
 		PythonConfig config;
 		PythonInputs inputs;
 		PythonOutputs outputs;
 
-		PythonInternalState* internal_state = nullptr;
+		std::unique_ptr<PythonInternalState> internal_state;
 
-		PythonWorkload() { internal_state = new PythonInternalState(); }
+		PythonWorkload() : internal_state(std::make_unique<PythonInternalState>()) {}
 
 		~PythonWorkload()
 		{
 			py::gil_scoped_acquire gil;
-			delete internal_state;
+			internal_state.reset();
+		}
+
+		PythonWorkload(const PythonWorkload&) = delete;
+		PythonWorkload& operator=(const PythonWorkload&) = delete;
+		PythonWorkload(PythonWorkload&&) noexcept = default;
+		PythonWorkload& operator=(PythonWorkload&&) noexcept = default;
+
+		std::vector<BlackboardField> parse_blackboard_schema(const py::dict& desc_dict)
+		{
+			std::vector<BlackboardField> fields;
+
+			for (auto item : desc_dict)
+			{
+				std::string name = py::str(item.first);
+				std::string type_str = py::str(item.second);
+				std::transform(type_str.begin(), type_str.end(), type_str.begin(),
+					[](unsigned char c)
+					{
+						return static_cast<char>(std::tolower(c));
+					});
+
+				std::type_index type = (type_str == "int")				? std::type_index(typeid(int))
+									   : (type_str == "double")			? std::type_index(typeid(double))
+									   : (type_str == "fixedstring64")	? std::type_index(typeid(FixedString64))
+									   : (type_str == "fixedstring128") ? std::type_index(typeid(FixedString128))
+																		: throw std::runtime_error("Unsupported field type: " + type_str);
+
+				fields.emplace_back(FixedString64(name.c_str()), type);
+			}
+
+			return fields;
+		}
+
+		void initialize_blackboards(py::object& py_class)
+		{
+			py::dict desc = py_class.attr("describe")();
+
+			config.blackboard = Blackboard(parse_blackboard_schema(desc["config"]));
+			inputs.blackboard = Blackboard(parse_blackboard_schema(desc["inputs"]));
+			outputs.blackboard = Blackboard(parse_blackboard_schema(desc["outputs"]));
+		}
+
+		void pre_load()
+		{
+			try
+			{
+				if (config.script_name.empty() || config.class_name.empty())
+					throw std::runtime_error("PythonWorkload config must specify script_name and class_name");
+
+				robotick::ensure_python_runtime();
+				py::gil_scoped_acquire gil;
+
+				internal_state->py_module = py::module_::import(config.script_name.c_str());
+				internal_state->py_class = internal_state->py_module.attr(config.class_name.c_str());
+
+				initialize_blackboards(internal_state->py_class);
+			}
+			catch (const py::error_already_set& e)
+			{
+				std::cerr << "[Python ERROR] Failed to preload workload: " << e.what() << std::endl;
+				throw;
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "[ERROR] Exception during Python workload preload(): " << e.what() << std::endl;
+				throw;
+			}
 		}
 
 		void load()
 		{
-			static std::once_flag init_flag;
-			std::call_once(init_flag,
-				[]()
-				{
-					py::initialize_interpreter();
-					PyEval_SaveThread(); // release the GIL
-				});
-
 			try
 			{
+				robotick::ensure_python_runtime();
 				py::gil_scoped_acquire gil;
-
 				py::dict py_cfg;
-				marshal_struct_to_dict(&config, *config.get_struct_reflection(), py_cfg);
 
-				internal_state->py_module = py::module_::import(config.script_name.c_str());
-				internal_state->py_class = internal_state->py_module.attr(config.class_name.c_str());
+				for (const auto& field : config.blackboard.get_schema())
+				{
+					const std::string key = field.name.c_str();
+					const auto& type = field.type;
+
+					if (type == typeid(int))
+						py_cfg[key.c_str()] = config.blackboard.get<int>(key);
+					else if (type == typeid(double))
+						py_cfg[key.c_str()] = config.blackboard.get<double>(key);
+					else if (type == typeid(FixedString64))
+						py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString64>(key).c_str());
+					else if (type == typeid(FixedString128))
+						py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString128>(key).c_str());
+					else
+						throw std::runtime_error("Unsupported config field type for key '" + key + "' in PythonWorkload");
+				}
+
 				internal_state->py_instance = internal_state->py_class(py_cfg);
 			}
 			catch (const py::error_already_set& e)
 			{
 				std::cerr << "[Python ERROR] Failed to load workload: " << e.what() << std::endl;
-				throw; // rethrow same exception
+				throw;
 			}
 			catch (const std::exception& e)
 			{
 				std::cerr << "[ERROR] Exception during Python workload load(): " << e.what() << std::endl;
-				throw; // rethrow same exception
+				throw;
 			}
 		}
 
 		void tick(double time_delta)
 		{
-			if (!internal_state->py_instance)
-				return;
-
-			// Acquire GIL for calling into Python
-			py::gil_scoped_acquire gil;
-
-			// Prepare inputs
-			py::dict py_in;
-			marshal_struct_to_dict(&inputs, *inputs.get_struct_reflection(), py_in);
-			py::dict py_out;
-
 			try
 			{
-				// Call the Python 'tick' method
+				if (!internal_state->py_instance)
+					return;
+				py::gil_scoped_acquire gil;
+
+				py::dict py_in;
+				for (const auto& field : inputs.blackboard.get_schema())
+				{
+					const std::string key = field.name.c_str();
+					const auto& type = field.type;
+
+					if (type == typeid(int))
+						py_in[key.c_str()] = inputs.blackboard.get<int>(key);
+					else if (type == typeid(double))
+						py_in[key.c_str()] = inputs.blackboard.get<double>(key);
+					else if (type == typeid(FixedString64))
+						py_in[key.c_str()] = std::string(inputs.blackboard.get<FixedString64>(key).c_str());
+					else if (type == typeid(FixedString128))
+						py_in[key.c_str()] = std::string(inputs.blackboard.get<FixedString128>(key).c_str());
+				}
+
+				py::dict py_out;
 				internal_state->py_instance.attr("tick")(time_delta, py_in, py_out);
-				// Marshal outputs back into C++ struct
-				marshal_dict_to_struct(py_out, *outputs.get_struct_reflection(), &outputs);
+
+				for (auto item : py_out)
+				{
+					std::string key = py::str(item.first);
+					auto val = item.second;
+
+					const auto& schema = outputs.blackboard.get_schema();
+					auto it = std::find_if(schema.begin(), schema.end(),
+						[&](const BlackboardField& f)
+						{
+							return key == f.name.c_str();
+						});
+					if (it == schema.end())
+						continue;
+
+					if (it->type == typeid(int))
+						outputs.blackboard.set<int>(key, val.cast<int>());
+					else if (it->type == typeid(double))
+						outputs.blackboard.set<double>(key, val.cast<double>());
+					else if (it->type == typeid(FixedString64))
+					{
+						const std::string tmp = val.cast<std::string>();
+						FixedString64 fs64(tmp.c_str());
+						outputs.blackboard.set<FixedString64>(key, fs64);
+					}
+					else if (it->type == typeid(FixedString128))
+					{
+						const std::string tmp = val.cast<std::string>();
+						FixedString128 fs128(tmp.c_str());
+						outputs.blackboard.set<FixedString128>(key, fs128);
+					}
+				}
 			}
 			catch (const py::error_already_set& e)
 			{
@@ -140,6 +245,6 @@ namespace robotick
 		}
 	};
 
-	static robotick::WorkloadAutoRegister<PythonWorkload, PythonConfig, PythonInputs, PythonOutputs> s_auto_register;
+	ROBOTICK_DEFINE_WORKLOAD(PythonWorkload)
 
 } // namespace robotick
