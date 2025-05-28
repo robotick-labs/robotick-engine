@@ -84,6 +84,11 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	}
 
 	REQUIRE(output_blackboard != nullptr);
+	REQUIRE(output_blackboard->has("greeting"));
+	const FixedString64 greeting = output_blackboard->get<FixedString64>("greeting");
+	REQUIRE(greeting.to_string().substr(0, 15) == "[Python] Hello!");
+
+	REQUIRE(output_blackboard != nullptr);
 	REQUIRE(output_blackboard->has("val_double"));
 	const double val_double = output_blackboard->get<double>("val_double");
 	REQUIRE(val_double == 1.23);
@@ -92,11 +97,6 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	REQUIRE(output_blackboard->has("val_int"));
 	const double val_int = output_blackboard->get<int>("val_int");
 	REQUIRE(val_int == 456);
-
-	REQUIRE(output_blackboard != nullptr);
-	REQUIRE(output_blackboard->has("greeting"));
-	const double greeting = output_blackboard->get<FixedString32>("greeting");
-	REQUIRE(greeting == 42);
 }
 
 TEST_CASE("Unit|Workloads|PythonWorkload|start/stop hooks are optional and safe")
