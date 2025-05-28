@@ -17,6 +17,8 @@ namespace robotick
 		schema.reserve(source_schema.size());
 		size_t offset = 0;
 
+		size_t index = 0;
+
 		for (const auto& field : source_schema)
 		{
 			BlackboardField& field_copy = schema.emplace_back(field); // invokes copy constructor
@@ -28,11 +30,13 @@ namespace robotick
 			// Align offset
 			offset = (offset + align - 1) & ~(align - 1);
 			field_copy.offset = offset;
+			field_copy.size = size;
 
 			offset += size;
 
 			// Store into schema and map
-			schema_by_field[field_copy.name.c_str()] = &field_copy;
+			schema_index_by_name[field_copy.name.c_str()] = index;
+			index++;
 		}
 
 		total_size = offset;
@@ -62,40 +66,55 @@ namespace robotick
 		return schema;
 	}
 
+	const BlackboardField* Blackboard::get_schema_field(const std::string& key) const
+	{
+		auto it = schema_index_by_name.find(key);
+		if (it == schema_index_by_name.end())
+		{
+			return nullptr;
+		}
+
+		return &schema[schema_index_by_name.at(key)];
+	}
+
 	bool Blackboard::has(const std::string& key) const
 	{
-		return schema_by_field.count(key) > 0;
+		return schema_index_by_name.count(key) > 0;
 	}
 
 	void* Blackboard::get_ptr(const std::string& key)
 	{
 		uint8_t* base_ptr = get_base_ptr();
 
-		auto it = schema_by_field.find(key);
-		if (it == schema_by_field.end() || base_ptr == nullptr)
+		auto it = schema_index_by_name.find(key);
+		if (it == schema_index_by_name.end() || base_ptr == nullptr)
 			throw std::runtime_error("Blackboard::get_ptr failed for key: " + key);
 
-		return base_ptr + it->second->offset;
+		const BlackboardField& field = schema[schema_index_by_name.at(key)];
+		return base_ptr + field.offset;
 	}
 
 	const void* Blackboard::get_ptr(const std::string& key) const
 	{
 		uint8_t* base_ptr = get_base_ptr();
 
-		auto it = schema_by_field.find(key);
-		if (it == schema_by_field.end() || base_ptr == nullptr)
+		auto it = schema_index_by_name.find(key);
+		if (it == schema_index_by_name.end() || base_ptr == nullptr)
 			throw std::runtime_error("Blackboard::get_ptr failed for key: " + key);
 
-		return base_ptr + it->second->offset;
+		const BlackboardField& field = schema[schema_index_by_name.at(key)];
+		return base_ptr + field.offset;
 	}
 
 	void Blackboard::verify_type(const std::string& key, std::type_index expected) const
 	{
-		auto it = schema_by_field.find(key);
-		if (it == schema_by_field.end())
+		auto it = schema_index_by_name.find(key);
+		if (it == schema_index_by_name.end())
 			throw std::runtime_error("Blackboard::verify_type failed, missing key: " + key);
 
-		if (it->second->type != expected)
+		const BlackboardField& field = schema[it->second];
+
+		if (field.type != expected)
 			throw std::runtime_error("Blackboard::verify_type failed, type mismatch for key: " + key);
 	}
 

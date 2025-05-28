@@ -4,6 +4,7 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
+#include <cassert>
 #include <stdexcept>
 #include <string>
 #include <typeindex>
@@ -24,12 +25,22 @@ namespace robotick
 		void* dest_ptr;
 		size_t size;
 		std::type_index type;
+
+		void copy_data() const
+		{
+			assert(source_ptr != nullptr && "DataConnectionInfo: source_ptr is null");
+			assert(dest_ptr != nullptr && "DataConnectionInfo: dest_ptr is null");
+			assert(size > 0 && "DataConnectionInfo: size must be greater than 0");
+			assert(source_ptr != dest_ptr && "DataConnectionInfo: source_ptr and dest_ptr must not alias");
+
+			std::memcpy(dest_ptr, source_ptr, size);
+		}
 	};
 
 	struct ParsedFieldPath
 	{
 		FixedString64 workload_name;
-		FixedString64 section_name; // input/output/config
+		FixedString64 section_name; // workload_name/section_name/field_path[0](/field_path[1])
 		std::vector<FixedString64> field_path;
 	};
 
