@@ -45,8 +45,6 @@ namespace robotick
 			if (instance.type->destruct)
 				instance.type->destruct(instance.ptr);
 		}
-
-		delete[] m_impl->blackboards_buffer;
 	}
 
 	const WorkloadInstanceInfo& Engine::get_instance_info(size_t index) const
@@ -94,17 +92,18 @@ namespace robotick
 		return total;
 	}
 
-	void bind_blackboards_in_struct(void* instance_ptr, const StructRegistryEntry& struct_entry, const size_t struct_offset)
+	void bind_blackboards_in_struct(WorkloadInstanceInfo& workload_instance_info, const StructRegistryEntry& struct_entry, const size_t struct_offset,
+		size_t& blackboard_storage_offset)
 	{
 		for (const FieldInfo& field : struct_entry.fields)
 		{
 			if (field.type == typeid(Blackboard))
 			{
-				auto* blackboard = reinterpret_cast<Blackboard*>(static_cast<uint8_t*>(instance_ptr) + struct_offset + field.offset);
+				auto* blackboard = reinterpret_cast<Blackboard*>(workload_instance_info.ptr + struct_offset + field.offset);
 				if (blackboard && !blackboard->get_schema().empty())
 				{
-					blackboard->bind(blackboard_storage);
-					blackboard_storage += blackboard->required_size();
+					blackboard->bind(blackboard_storage_offset);
+					blackboard_storage_offset += blackboard->required_size();
 				}
 			}
 		}
@@ -112,18 +111,30 @@ namespace robotick
 
 	void bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances)
 	{
-		for (const auto& instance : instances)
+		size_t blackboard_storage_offset = 0;
+
+		for (WorkloadInstanceInfo& instance : instances)
 		{
 			const auto* type = instance.type;
 			if (!type)
+			{
 				continue;
+			}
 
 			if (type->config_struct)
-				bind_blackboards_in_struct(instance.ptr, *type->config_struct, type->config_offset);
+			{
+				bind_blackboards_in_struct(instance, *type->config_struct, type->config_offset, blackboard_storage_offset);
+			}
+
 			if (type->input_struct)
-				bind_blackboards_in_struct(instance.ptr, *type->input_struct, type->input_offset);
+			{
+				bind_blackboards_in_struct(instance, *type->input_struct, type->input_offset, blackboard_storage_offset);
+			}
+
 			if (type->output_struct)
-				bind_blackboards_in_struct(instance.ptr, *type->output_struct, type->output_offset);
+			{
+				bind_blackboards_in_struct(instance, *type->output_struct, type->output_offset, blackboard_storage_offset);
+			}
 		}
 	}
 
@@ -166,7 +177,7 @@ namespace robotick
 		{
 			const auto& workload_seed = workload_seeds[i];
 			const auto* type = WorkloadRegistry::get().find(workload_seed.type);
-			void* instance_ptr = workloads_buffer_ptr + aligned_offsets[i];
+			uint8_t* instance_ptr = workloads_buffer_ptr + aligned_offsets[i];
 
 			preload_futures.push_back(std::async(std::launch::async,
 				[=]() -> WorkloadInstanceInfo
@@ -198,7 +209,7 @@ namespace robotick
 		m_impl->blackboards_source_buffer = BlackboardsBuffer(blackboards_buffer_size);
 		BlackboardsBuffer::set_source(&m_impl->blackboards_source_buffer);
 
-		bind_blackboards_for_instances(m_impl->instances, m_impl->blackboards_source_buffer);
+		bind_blackboards_for_instances(m_impl->instances);
 
 		// call load_fn (multi-threaded):
 		std::vector<std::future<void>> load_futures;

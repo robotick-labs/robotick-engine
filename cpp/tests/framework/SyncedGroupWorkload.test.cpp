@@ -131,8 +131,8 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|All children tick in parallel")
 
 	const auto& child_a = EngineInspector::get_instance_info(engine, a.index);
 	const auto& child_b = EngineInspector::get_instance_info(engine, b.index);
-	auto* wa = static_cast<CountingWrapper*>(child_a.ptr);
-	auto* wb = static_cast<CountingWrapper*>(child_b.ptr);
+	auto* wa = static_cast<CountingWrapper*>((void*)child_a.ptr);
+	auto* wb = static_cast<CountingWrapper*>((void*)child_b.ptr);
 
 	for (int i = 0; i < tick_count; ++i)
 	{
@@ -180,8 +180,8 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|Child busy flags skip ticks")
 
 	const auto& s1_info = EngineInspector::get_instance_info(engine, s1.index);
 	const auto& s2_info = EngineInspector::get_instance_info(engine, s2.index);
-	const auto* w1 = static_cast<SlowWrapper*>(s1_info.ptr);
-	const auto* w2 = static_cast<SlowWrapper*>(s2_info.ptr);
+	const auto* w1 = static_cast<SlowWrapper*>((void*)s1_info.ptr);
+	const auto* w2 = static_cast<SlowWrapper*>((void*)s2_info.ptr);
 
 	INFO("Tick count s1: " << w1->impl->tick_count);
 	INFO("Tick count s2: " << w2->impl->tick_count);
@@ -208,7 +208,7 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|tick() passes real time_delta (chi
 
 	const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
 	const auto& child_info = EngineInspector::get_instance_info(engine, h.index);
-	auto* counting = static_cast<CountingWrapper*>(child_info.ptr);
+	auto* counting = static_cast<CountingWrapper*>((void*)child_info.ptr);
 
 	group_info.type->start_fn(group_info.ptr, tick_rate_hz);
 

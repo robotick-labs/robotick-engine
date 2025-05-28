@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/data/Buffer.h"
 
 #include <catch2/catch_all.hpp>
 #include <cstring>
@@ -26,16 +27,18 @@ TEST_CASE("Blackboard basic construction and memory layout", "[blackboard]")
 	REQUIRE_FALSE(blackboard.has("missing"));
 }
 
-TEST_CASE("Blackboard binds external memory and performs typed access", "[blackboard]")
+TEST_CASE("Blackboard binds to BlackboardsBuffer and performs typed access", "[blackboard][buffer]")
 {
 	std::vector<BlackboardField> schema = {
 		{"age", std::type_index(typeid(int))}, {"score", std::type_index(typeid(double))}, {"name", std::type_index(typeid(FixedString64))}};
 
 	Blackboard blackboard(schema);
-	size_t buffer_size = blackboard.required_size();
+	size_t size = blackboard.required_size();
 
-	std::vector<uint8_t> memory(buffer_size, 0);
-	blackboard.bind(memory.data());
+	BlackboardsBuffer temp_buffer(size);
+	BlackboardsBuffer::set_source(&temp_buffer);
+
+	blackboard.bind(0);
 
 	SECTION("Set and get int")
 	{
@@ -57,74 +60,45 @@ TEST_CASE("Blackboard binds external memory and performs typed access", "[blackb
 	}
 }
 
-TEST_CASE("Blackboard throws on missing keys or unbound memory", "[blackboard][errors]")
+TEST_CASE("Blackboard throws on missing keys or unbound source", "[blackboard][errors]")
 {
 	std::vector<BlackboardField> schema = {{"alpha", std::type_index(typeid(int))}};
 	Blackboard blackboard(schema);
-	std::vector<uint8_t> memory(blackboard.required_size(), 0);
 
-	SECTION("Access before bind throws")
+	SECTION("Throws if no source buffer set")
 	{
-		try
-		{
-			blackboard.set<int>("alpha", 1);
-			FAIL("Expected exception not thrown");
-		}
-		catch (const std::runtime_error& e)
-		{
-			REQUIRE(std::string(e.what()).find("get_ptr") != std::string::npos);
-		}
-
-		try
-		{
-			blackboard.get<int>("alpha");
-			FAIL("Expected exception not thrown");
-		}
-		catch (const std::runtime_error& e)
-		{
-			REQUIRE(std::string(e.what()).find("get_ptr") != std::string::npos);
-		}
+		BlackboardsBuffer::set_source(nullptr);
+		REQUIRE_THROWS_WITH(blackboard.get<int>("alpha"), Catch::Matchers::ContainsSubstring("Blackboard"));
 	}
 
-	blackboard.bind(memory.data());
-
-	SECTION("Access after bind succeeds")
+	SECTION("Throws on unbound field offset")
 	{
-		REQUIRE_NOTHROW(blackboard.set<int>("alpha", 123));
-		REQUIRE(blackboard.get<int>("alpha") == 123);
+		BlackboardsBuffer temp_buffer(blackboard.required_size());
+		BlackboardsBuffer::set_source(&temp_buffer);
+		REQUIRE_THROWS_WITH(blackboard.get<int>("alpha"), Catch::Matchers::ContainsSubstring("Blackboard"));
 	}
 
-	SECTION("Access unknown field still throws")
+	SECTION("Throws on missing field")
 	{
-		try
-		{
-			blackboard.get<int>("nonexistent");
-			FAIL("Expected exception not thrown");
-		}
-		catch (const std::runtime_error& e)
-		{
-			const bool found =
-				std::string(e.what()).find("verify_type") != std::string::npos || std::string(e.what()).find("get_ptr") != std::string::npos;
-
-			REQUIRE(found);
-		}
+		BlackboardsBuffer temp(blackboard.required_size());
+		BlackboardsBuffer::set_source(&temp);
+		blackboard.bind(0);
+		REQUIRE_THROWS_WITH(blackboard.get<int>("nonexistent"), Catch::Matchers::ContainsSubstring("Blackboard"));
 	}
 }
 
-TEST_CASE("Blackboard handles alignment and offset consistency", "[blackboard][layout]")
+TEST_CASE("Blackboard alignment and offset consistency", "[blackboard][layout]")
 {
 	std::vector<BlackboardField> schema = {
 		{"a", std::type_index(typeid(int))}, {"b", std::type_index(typeid(double))}, {"c", std::type_index(typeid(int))}};
 
 	Blackboard blackboard(schema);
-	auto schema_ref = blackboard.get_schema();
+	size_t size = blackboard.required_size();
 
-	REQUIRE(blackboard.has("a"));
-	REQUIRE(blackboard.has("b"));
-	REQUIRE(blackboard.has("c"));
+	BlackboardsBuffer temp_buffer(size);
+	BlackboardsBuffer::set_source(&temp_buffer);
 
-	std::vector<uint8_t> memory(blackboard.required_size(), 0);
-	blackboard.bind(memory.data());
+	blackboard.bind(0);
 
 	blackboard.set<int>("a", 1);
 	blackboard.set<double>("b", 3.14);

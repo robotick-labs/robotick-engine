@@ -43,9 +43,11 @@ namespace robotick
 
 	uint8_t* Blackboard::get_base_ptr() const
 	{
-		// TODO - ensure we're clear about when we'll instead use the thread-local source instead
+		if (buffer_offset == UNBOUND_OFFSET)
+			throw std::runtime_error("Blackboard::get_base_ptr: blackboard is not bound to a buffer");
+
 		BlackboardsBuffer& buffer = BlackboardsBuffer::get_source();
-		return buffer.raw_ptr();
+		return buffer.raw_ptr() + buffer_offset;
 	}
 
 	size_t Blackboard::required_size() const

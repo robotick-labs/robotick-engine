@@ -6,6 +6,7 @@
 
 #include "robotick/framework/data/FixedString.h"
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <typeindex>
 #include <typeinfo>
@@ -25,6 +26,8 @@ namespace robotick
 	class Blackboard
 	{
 	  public:
+		static constexpr size_t UNBOUND_OFFSET = std::numeric_limits<size_t>::max();
+
 		Blackboard() = default;
 		explicit Blackboard(const std::vector<BlackboardField>& schema);
 
@@ -44,8 +47,9 @@ namespace robotick
 		std::vector<BlackboardField> schema;
 		std::unordered_map<std::string, size_t> offsets;
 		std::unordered_map<std::string, std::type_index> types;
+
 		size_t total_size = 0;
-		size_t buffer_offset = 0;
+		size_t buffer_offset = UNBOUND_OFFSET;
 
 		void* get_ptr(const std::string& key);
 		const void* get_ptr(const std::string& key) const;

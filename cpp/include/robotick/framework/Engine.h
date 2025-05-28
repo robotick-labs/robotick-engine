@@ -17,7 +17,7 @@ namespace robotick
 
 	struct WorkloadInstanceInfo
 	{
-		void* ptr;
+		uint8_t* ptr;
 		const WorkloadRegistryEntry* type;
 		std::string unique_name;
 		double tick_rate_hz;

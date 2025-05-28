@@ -27,7 +27,7 @@ namespace robotick::test
 				throw std::runtime_error("Type mismatch: expected " + expected_type + ", got " + info.type->name);
 			}
 
-			return static_cast<const T*>(info.ptr);
+			return static_cast<const T*>((void*)info.ptr);
 		}
 	};
 } // namespace robotick::test
