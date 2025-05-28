@@ -24,7 +24,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Metadata is registered correctly")
 	REQUIRE(in != nullptr);
 	REQUIRE(out != nullptr);
 
-	REQUIRE(cfg->fields.size() == 2);
+	REQUIRE(cfg->fields.size() == 3);
 	REQUIRE(in->fields.size() == 1);
 	REQUIRE(out->fields.size() == 1);
 }

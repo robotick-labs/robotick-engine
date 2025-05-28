@@ -163,8 +163,7 @@ namespace robotick
 		m_impl->buffer = new uint8_t[m_impl->buffer_size];
 		std::memset(m_impl->buffer, 0, m_impl->buffer_size);
 
-		std::vector<WorkloadInstanceInfo> instance_infos(workload_seeds.size());
-		std::vector<std::future<void>> preload_futures;
+		std::vector<std::future<WorkloadInstanceInfo>> preload_futures;
 		preload_futures.reserve(workload_seeds.size());
 
 		// construct + apply config + call pre_load_fn (multi-threaded):
@@ -175,7 +174,7 @@ namespace robotick
 			void* instance_ptr = m_impl->buffer + aligned_offsets[i];
 
 			preload_futures.push_back(std::async(std::launch::async,
-				[=, &instance_infos]()
+				[=]() -> WorkloadInstanceInfo
 				{
 					if (type->construct)
 						type->construct(instance_ptr);
@@ -188,14 +187,15 @@ namespace robotick
 					if (type->pre_load_fn)
 						type->pre_load_fn(instance_ptr);
 
-					instance_infos[i] = WorkloadInstanceInfo{instance_ptr, type, workload_seed.name, workload_seed.tick_rate_hz, {}};
+					return WorkloadInstanceInfo{instance_ptr, type, workload_seed.name, workload_seed.tick_rate_hz, {}};
 				}));
 		}
 
-		// wait for "pre_load" futures to complete:
+		// wait for "pre_load" futures to complete and collect results:
+		m_impl->instances.reserve(workload_seeds.size());
 		for (auto& fut : preload_futures)
 		{
-			fut.get();
+			m_impl->instances.push_back(fut.get());
 		}
 
 		// Blackboards memory allocation and buffer-binding:
@@ -211,8 +211,8 @@ namespace robotick
 
 		for (size_t i = 0; i < workload_seeds.size(); ++i)
 		{
-			void* instance_ptr = instance_infos[i].ptr;
-			const auto* type = instance_infos[i].type;
+			void* instance_ptr = m_impl->instances[i].ptr;
+			const auto* type = m_impl->instances[i].type;
 
 			load_futures.push_back(std::async(std::launch::async,
 				[=]()
@@ -227,9 +227,6 @@ namespace robotick
 		{
 			fut.get();
 		}
-
-		// Move completed instances into final storage
-		m_impl->instances = std::move(instance_infos);
 
 		// fixup and add child-instances
 		for (size_t i = 0; i < workload_seeds.size(); ++i)
