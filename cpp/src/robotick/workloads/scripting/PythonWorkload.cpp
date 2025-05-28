@@ -8,7 +8,9 @@
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/PythonRuntime.h"
 
+#include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <cstdlib>
 #include <iostream>
 #include <mutex>
@@ -225,12 +227,14 @@ namespace robotick
 					else if (it->type == typeid(FixedString64))
 					{
 						const std::string tmp = val.cast<std::string>();
-						outputs.blackboard.set<FixedString64>(key, tmp.c_str());
+						FixedString64 fs64(tmp.c_str());
+						outputs.blackboard.set<FixedString64>(key, fs64);
 					}
 					else if (it->type == typeid(FixedString128))
 					{
 						const std::string tmp = val.cast<std::string>();
-						outputs.blackboard.set<FixedString128>(key, tmp.c_str());
+						FixedString128 fs128(tmp.c_str());
+						outputs.blackboard.set<FixedString128>(key, fs128);
 					}
 				}
 			}

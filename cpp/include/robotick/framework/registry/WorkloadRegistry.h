@@ -225,9 +225,9 @@ namespace robotick
 				static_cast<Type*>(i)->start(d);
 			};
 		if constexpr (has_tick<Type>::value)
-			tick_fn = +[](void* i, double d)
+			tick_fn = +[](void* i, double time_delta)
 			{
-				static_cast<Type*>(i)->tick(d);
+				static_cast<Type*>(i)->tick(time_delta);
 			};
 		if constexpr (has_stop<Type>::value)
 			stop_fn = +[](void* i)

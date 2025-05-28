@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <string>
