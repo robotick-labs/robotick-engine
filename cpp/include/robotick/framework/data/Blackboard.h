@@ -19,6 +19,7 @@ namespace robotick
 	{
 		FixedString64 name;
 		std::type_index type;
+		size_t offset = 0;
 
 		BlackboardField(const FixedString64& name, std::type_index type) : name(name), type(type) {}
 	};
@@ -45,8 +46,7 @@ namespace robotick
 
 	  private:
 		std::vector<BlackboardField> schema;
-		std::unordered_map<std::string, size_t> offsets;
-		std::unordered_map<std::string, std::type_index> types;
+		std::unordered_map<std::string, BlackboardField*> schema_by_field;
 
 		size_t total_size = 0;
 		size_t buffer_offset = UNBOUND_OFFSET;

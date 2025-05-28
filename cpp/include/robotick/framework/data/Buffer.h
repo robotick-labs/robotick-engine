@@ -70,7 +70,6 @@ namespace robotick
 	  public:
 		using RawBuffer::RawBuffer;
 
-		static BlackboardsBuffer& get_local_mirror();
 		static BlackboardsBuffer& get_source();
 		static void set_source(BlackboardsBuffer* buffer);
 
@@ -86,7 +85,6 @@ namespace robotick
 	  public:
 		using RawBuffer::RawBuffer;
 
-		static WorkloadsBuffer& get_local_mirror();
 		static WorkloadsBuffer& get_source();
 		static void set_source(WorkloadsBuffer* buffer);
 

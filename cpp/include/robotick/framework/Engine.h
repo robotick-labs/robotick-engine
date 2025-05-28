@@ -5,6 +5,7 @@
 #pragma once
 
 #include "robotick/framework/Model.h"
+#include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/api.h"
 
 #include <atomic>
@@ -14,15 +15,6 @@
 namespace robotick
 {
 	struct WorkloadRegistryEntry;
-
-	struct WorkloadInstanceInfo
-	{
-		uint8_t* ptr;
-		const WorkloadRegistryEntry* type;
-		std::string unique_name;
-		double tick_rate_hz;
-		std::vector<const WorkloadInstanceInfo*> children;
-	};
 
 	namespace test
 	{

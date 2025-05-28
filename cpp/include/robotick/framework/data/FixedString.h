@@ -32,6 +32,13 @@ namespace robotick
 			return *this;
 		}
 
+		FixedString& operator=(const std::string& str)
+		{
+			strncpy(data, str.c_str(), N - 1);
+			data[N - 1] = '\0';
+			return *this;
+		}
+
 		const char* c_str() const { return data; }
 
 		operator const char*() const { return data; }
