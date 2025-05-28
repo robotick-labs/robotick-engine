@@ -126,32 +126,25 @@ namespace robotick
 		std::vector<DataConnectionInfo> results;
 		std::unordered_set<std::string> seen_destinations;
 
+		std::unordered_map<std::string_view, const WorkloadInstanceInfo*> idx;
+		for (const auto& inst : instances)
+			idx.emplace(inst.unique_name.c_str(), &inst);
+
 		for (const auto& seed : seeds)
 		{
 			ParsedFieldPath src = parse_field_path(seed.source_path);
 			ParsedFieldPath dst = parse_field_path(seed.dest_path);
 
-			// Lookup instances
-			const WorkloadInstanceInfo* src_inst = nullptr;
-			const WorkloadInstanceInfo* dst_inst = nullptr;
+			const auto src_it = idx.find(src.workload_name.c_str());
+			const auto dst_it = idx.find(dst.workload_name.c_str());
+			const WorkloadInstanceInfo* src_inst = src_it != idx.end() ? src_it->second : nullptr;
+			const WorkloadInstanceInfo* dst_inst = dst_it != idx.end() ? dst_it->second : nullptr;
 
-			for (const auto& inst : instances)
-			{
-				if (inst.unique_name == src.workload_name.c_str())
-				{
-					src_inst = &inst;
-				}
-				if (inst.unique_name == dst.workload_name.c_str())
-				{
-					dst_inst = &inst;
-				}
-			}
-
-			if (!src_inst)
+			if (!src_inst || !src_inst->ptr)
 			{
 				throw std::runtime_error("Unknown source workload: " + std::string(src.workload_name.c_str()));
 			}
-			if (!dst_inst)
+			if (!dst_inst || !dst_inst->ptr)
 			{
 				throw std::runtime_error("Unknown destination workload: " + std::string(dst.workload_name.c_str()));
 			}
@@ -164,6 +157,9 @@ namespace robotick
 			{
 				throw std::runtime_error("Source field not found: " + seed.source_path);
 			}
+
+			if (!src_inst->ptr)
+				throw std::runtime_error("Workload '" + src_inst->unique_name + "' data buffer is null – cannot resolve connection");
 
 			const uint8_t* src_ptr = src_inst->ptr + src_offset + src_field->offset;
 			std::type_index src_type = src_field->type;
@@ -208,7 +204,7 @@ namespace robotick
 					throw std::runtime_error("Dest subfield not found: " + seed.dest_path);
 				}
 
-				const auto* blackboard = reinterpret_cast<const Blackboard*>(dst_ptr);
+				auto* blackboard = reinterpret_cast<Blackboard*>(dst_ptr);
 				dst_ptr = blackboard->get_base_ptr() + dst_blackboard_field->offset;
 				dst_type = dst_blackboard_field->type;
 				dst_size = dst_blackboard_field->size;
@@ -223,7 +219,9 @@ namespace robotick
 			// Validate size match
 			if (src_size != dst_size)
 			{
-				throw std::runtime_error("Size mismatch between source and dest: " + seed.source_path + " vs. " + seed.dest_path);
+				std::ostringstream oss;
+				oss << "Size mismatch (" << src_size << " vs " << dst_size << ") between " << seed.source_path << " and " << seed.dest_path;
+				throw std::runtime_error(oss.str());
 			}
 
 			std::string dst_key = std::string(dst.workload_name.c_str()) + "." + dst.section_name.c_str() + "." + dst.field_path[0].c_str();

@@ -84,10 +84,16 @@ namespace robotick
 			{
 				std::string name = py::str(item.first);
 				std::string type_str = py::str(item.second);
+				std::transform(type_str.begin(), type_str.end(), type_str.begin(),
+					[](char c)
+					{
+						return static_cast<char>(std::tolower(c));
+					});
+
 				std::type_index type = (type_str == "int")				? std::type_index(typeid(int))
 									   : (type_str == "double")			? std::type_index(typeid(double))
-									   : (type_str == "FixedString64")	? std::type_index(typeid(FixedString64))
-									   : (type_str == "FixedString128") ? std::type_index(typeid(FixedString128))
+									   : (type_str == "fixedstring64")	? std::type_index(typeid(FixedString64))
+									   : (type_str == "fixedstring128") ? std::type_index(typeid(FixedString128))
 																		: throw std::runtime_error("Unsupported field type: " + type_str);
 
 				fields.emplace_back(FixedString64(name.c_str()), type);
@@ -153,6 +159,8 @@ namespace robotick
 						py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString64>(key).c_str());
 					else if (type == typeid(FixedString128))
 						py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString128>(key).c_str());
+					else
+						throw std::runtime_error("Unsupported config field type for key '" + key + "' in PythonWorkload");
 				}
 
 				internal_state->py_instance = internal_state->py_class(py_cfg);

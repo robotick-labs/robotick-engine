@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -16,6 +17,7 @@ namespace robotick
 	{
 	  public:
 		RawBuffer() = default;
+		RawBuffer(RawBuffer&&) noexcept = default;
 
 		explicit RawBuffer(size_t size) : size(size), data(std::make_unique<uint8_t[]>(size)) {}
 
@@ -24,12 +26,17 @@ namespace robotick
 			std::memcpy(data.get(), other.data.get(), size);
 		}
 
+		RawBuffer& operator=(RawBuffer&&) noexcept = default;
+
 		RawBuffer& operator=(const RawBuffer& other)
 		{
 			if (this != &other)
 			{
 				size = other.size;
-				data = std::make_unique<uint8_t[]>(size);
+				if (size != other.size)
+				{
+					data = std::make_unique<uint8_t[]>(other.size);
+				}
 				std::memcpy(data.get(), other.data.get(), size);
 			}
 			return *this;
@@ -50,14 +57,20 @@ namespace robotick
 		{
 			if (offset + sizeof(T) > size)
 				throw std::out_of_range("RawBuffer::as<T>: Offset out of range");
-			return reinterpret_cast<T*>(data.get() + offset);
+
+			uint8_t* ptr = data.get() + offset;
+			assert(reinterpret_cast<std::uintptr_t>(ptr) % alignof(T) == 0 && "Misaligned field offset for type T");
+			return std::launder(reinterpret_cast<T*>(ptr));
 		}
 
 		template <typename T> const T* as(size_t offset = 0) const
 		{
 			if (offset + sizeof(T) > size)
 				throw std::out_of_range("RawBuffer::as<T>: Offset out of range");
-			return reinterpret_cast<const T*>(data.get() + offset);
+
+			uint8_t* ptr = data.get() + offset;
+			assert(reinterpret_cast<std::uintptr_t>(ptr) % alignof(T) == 0 && "Misaligned field offset for type T");
+			return std::launder(reinterpret_cast<T*>(ptr));
 		}
 
 	  private:
@@ -91,7 +104,6 @@ namespace robotick
 		void mirror_from_source();
 
 	  private:
-		static thread_local WorkloadsBuffer local_instance;
 		static WorkloadsBuffer* source_buffer;
 	};
 } // namespace robotick

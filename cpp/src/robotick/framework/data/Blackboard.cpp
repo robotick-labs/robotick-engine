@@ -47,7 +47,16 @@ namespace robotick
 		buffer_offset = buffer_offset_in;
 	}
 
-	uint8_t* Blackboard::get_base_ptr() const
+	const uint8_t* Blackboard::get_base_ptr() const
+	{
+		if (buffer_offset == UNBOUND_OFFSET)
+			throw std::runtime_error("Blackboard::get_base_ptr: blackboard is not bound to a buffer");
+
+		BlackboardsBuffer& buffer = BlackboardsBuffer::get_source();
+		return buffer.raw_ptr() + buffer_offset;
+	}
+
+	uint8_t* Blackboard::get_base_ptr()
 	{
 		if (buffer_offset == UNBOUND_OFFSET)
 			throw std::runtime_error("Blackboard::get_base_ptr: blackboard is not bound to a buffer");
@@ -96,7 +105,7 @@ namespace robotick
 
 	const void* Blackboard::get_ptr(const std::string& key) const
 	{
-		uint8_t* base_ptr = get_base_ptr();
+		const uint8_t* base_ptr = get_base_ptr();
 
 		auto it = schema_index_by_name.find(key);
 		if (it == schema_index_by_name.end() || base_ptr == nullptr)
@@ -146,6 +155,7 @@ namespace robotick
 
 	template <typename T> void Blackboard::set(const std::string& key, const T& value)
 	{
+		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
 		verify_type(key, typeid(T));
 		void* field_data_ptr = get_ptr(key);
 		std::memcpy(field_data_ptr, &value, sizeof(T));
@@ -153,6 +163,7 @@ namespace robotick
 
 	template <typename T> T Blackboard::get(const std::string& key) const
 	{
+		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
 		verify_type(key, typeid(T));
 		T out;
 		const void* field_data_ptr = get_ptr(key);

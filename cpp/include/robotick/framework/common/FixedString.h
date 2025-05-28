@@ -21,27 +21,31 @@ namespace robotick
 
 		FixedString(const char* str)
 		{
-			strncpy(data, str, N - 1);
-			data[N - 1] = '\0';
+			const size_t len = std::min(std::strlen(str), N - 1);
+			std::memcpy(data, str, len);
+			data[len] = '\0';
 		}
 
 		FixedString(const std::string& str)
 		{
-			strncpy(data, str.c_str(), N - 1);
-			data[N - 1] = '\0';
+			const size_t len = std::min(std::strlen(str.c_str()), N - 1);
+			std::memcpy(data, str.c_str(), len);
+			data[len] = '\0';
 		}
 
 		FixedString& operator=(const char* str)
 		{
-			strncpy(data, str, N - 1);
-			data[N - 1] = '\0';
+			const size_t len = std::min(std::strlen(str), N - 1);
+			std::memcpy(data, str, len);
+			data[len] = '\0';
 			return *this;
 		}
 
 		FixedString& operator=(const std::string& str)
 		{
-			strncpy(data, str.c_str(), N - 1);
-			data[N - 1] = '\0';
+			const size_t len = std::min(std::strlen(str.c_str()), N - 1);
+			std::memcpy(data, str.c_str(), len);
+			data[len] = '\0';
 			return *this;
 		}
 
@@ -49,6 +53,7 @@ namespace robotick
 
 		operator const char*() const { return data; }
 
+		bool operator==(const char* other) const noexcept { return std::strncmp(data, other, N) == 0; }
 		bool operator==(const FixedString<N>& other) const { return std::strncmp(data, other.data, N) == 0; }
 
 		bool operator!=(const FixedString<N>& other) const { return !(*this == other); }

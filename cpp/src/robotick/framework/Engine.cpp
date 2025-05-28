@@ -59,6 +59,8 @@ namespace robotick
 
 	size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances)
 	{
+		// note - this function is not recursive, since we don't expect to have nested blackboards
+
 		size_t total = 0;
 
 		for (const auto& instance : instances)
@@ -100,6 +102,8 @@ namespace robotick
 	void bind_blackboards_in_struct(WorkloadInstanceInfo& workload_instance_info, const StructRegistryEntry& struct_entry, const size_t struct_offset,
 		size_t& blackboard_storage_offset)
 	{
+		// note - this function is not recursive, since we don't expect to have nested blackboards
+
 		for (const FieldInfo& field : struct_entry.fields)
 		{
 			if (field.type == typeid(Blackboard))
@@ -209,8 +213,8 @@ namespace robotick
 			m_impl->instances.push_back(fut.get());
 		}
 
-		// Blackboards memory allocation and buffer-binding:
-		const size_t blackboards_buffer_size = compute_blackboard_memory_requirements(m_impl->instances);
+		// Blackboards memory allocation and buffer-binding (at least 1 byte to please all platforms):
+		const size_t blackboards_buffer_size = std::max<size_t>(1, compute_blackboard_memory_requirements(m_impl->instances));
 		m_impl->blackboards_source_buffer = BlackboardsBuffer(blackboards_buffer_size);
 		BlackboardsBuffer::set_source(&m_impl->blackboards_source_buffer);
 

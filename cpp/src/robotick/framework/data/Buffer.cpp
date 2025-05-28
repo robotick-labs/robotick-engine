@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/Buffer.h"
+#include <stdexcept>
 
 namespace robotick
 {

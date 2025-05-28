@@ -65,15 +65,15 @@ namespace robotick::test
 	TEST_CASE("Unit|Framework|DataConnection|Resolves non-blackboard to non-blackboard")
 	{
 		Model model;
-		model.add("DummyA", "A", 1.0);
-		model.add("DummyB", "B", 1.0);
+		const WorkloadHandle handle_a = model.add("DummyA", "A", 1.0);
+		const WorkloadHandle handle_b = model.add("DummyB", "B", 1.0);
 		model_helpers::wrap_all_in_sequenced_group(model);
 
 		Engine engine;
 		engine.load(model);
 
 		// Modify live instance values
-		auto* a = EngineInspector::get_instance<DummyA>(engine, 0);
+		auto* a = EngineInspector::get_instance<DummyA>(engine, handle_a.index);
 		a->outputs.x = 42;
 		a->outputs.y = 3.14;
 
@@ -92,7 +92,7 @@ namespace robotick::test
 			conn.copy_data();
 		}
 
-		const DummyB* b = EngineInspector::get_instance<DummyB>(engine, 1);
+		const DummyB* b = EngineInspector::get_instance<DummyB>(engine, handle_b.index);
 		REQUIRE(b->inputs.x == 42);
 		REQUIRE(b->inputs.y == Catch::Approx(3.14));
 	}

@@ -4,7 +4,9 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
+
 #include <cassert>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <typeindex>
@@ -26,13 +28,12 @@ namespace robotick
 		size_t size;
 		std::type_index type;
 
-		void copy_data() const
+		void copy_data() const noexcept
 		{
-			assert(source_ptr != nullptr && "DataConnectionInfo: source_ptr is null");
-			assert(dest_ptr != nullptr && "DataConnectionInfo: dest_ptr is null");
-			assert(size > 0 && "DataConnectionInfo: size must be greater than 0");
-			assert(source_ptr != dest_ptr && "DataConnectionInfo: source_ptr and dest_ptr must not alias");
+			assert(source_ptr != nullptr && dest_ptr != nullptr && size > 0);
+			static_assert(std::is_trivially_copyable_v<std::byte>, "copy_data() assumes trivially-copyable payloads");
 
+			// If aliasing is possible, use std::memmove instead.
 			std::memcpy(dest_ptr, source_ptr, size);
 		}
 	};
