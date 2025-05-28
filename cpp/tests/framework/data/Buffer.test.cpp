@@ -42,17 +42,17 @@ TEST_CASE("RawBuffer clones data correctly", "[buffer][clone]")
 	REQUIRE(static_cast<const char*>(clone.raw_ptr())[0] == static_cast<char>(0xAB));
 }
 
-TEST_CASE("RawBuffer sync_from validates size and performs copy", "[buffer][sync]")
+TEST_CASE("RawBuffer mirror_from validates size and performs copy", "[buffer][sync]")
 {
 	RawBuffer a(16);
 	RawBuffer b(16);
 	std::memset(b.raw_ptr(), 0x66, 16);
 
-	a.sync_from(b);
+	a.mirror_from(b);
 	REQUIRE(std::memcmp(a.raw_ptr(), b.raw_ptr(), 16) == 0);
 
 	RawBuffer c(32);
-	REQUIRE_THROWS_WITH(a.sync_from(c), Catch::Matchers::ContainsSubstring("size mismatch"));
+	REQUIRE_THROWS_WITH(a.mirror_from(c), Catch::Matchers::ContainsSubstring("size mismatch"));
 }
 
 TEST_CASE("BlackboardsBuffer syncs from source", "[blackboard][buffer]")
@@ -64,7 +64,7 @@ TEST_CASE("BlackboardsBuffer syncs from source", "[blackboard][buffer]")
 
 	BlackboardsBuffer& mirror = BlackboardsBuffer::get();
 	mirror = BlackboardsBuffer(24); // reallocate thread-local buffer
-	mirror.sync_from_source();
+	mirror.mirror_from_source();
 
 	REQUIRE(mirror.get_size() == 24);
 	REQUIRE(std::memcmp(mirror.raw_ptr(), source.raw_ptr(), 24) == 0);
@@ -79,7 +79,7 @@ TEST_CASE("WorkloadsBuffer syncs from source", "[workload][buffer]")
 
 	WorkloadsBuffer& mirror = WorkloadsBuffer::get();
 	mirror = WorkloadsBuffer(48); // reallocate thread-local buffer
-	mirror.sync_from_source();
+	mirror.mirror_from_source();
 
 	REQUIRE(mirror.get_size() == 48);
 	REQUIRE(std::memcmp(mirror.raw_ptr(), source.raw_ptr(), 48) == 0);

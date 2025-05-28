@@ -21,11 +21,11 @@ namespace robotick
 		source_buffer = buffer;
 	}
 
-	void BlackboardsBuffer::sync_from_source()
+	void BlackboardsBuffer::mirror_from_source()
 	{
 		if (!source_buffer)
 			throw std::runtime_error("BlackboardsBuffer: no source buffer set");
-		this->sync_from(*source_buffer);
+		this->mirror_from(*source_buffer);
 	}
 
 	// ---- WorkloadsBuffer ----
@@ -43,11 +43,11 @@ namespace robotick
 		source_buffer = buffer;
 	}
 
-	void WorkloadsBuffer::sync_from_source()
+	void WorkloadsBuffer::mirror_from_source()
 	{
 		if (!source_buffer)
 			throw std::runtime_error("WorkloadsBuffer: no source buffer set");
-		this->sync_from(*source_buffer);
+		this->mirror_from(*source_buffer);
 	}
 
 } // namespace robotick

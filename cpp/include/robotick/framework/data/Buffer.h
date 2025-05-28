@@ -40,10 +40,10 @@ namespace robotick
 		const void* raw_ptr() const { return data.get(); }
 		size_t get_size() const { return size; }
 
-		void sync_from(const RawBuffer& source)
+		void mirror_from(const RawBuffer& source)
 		{
 			if (size != source.size)
-				throw std::runtime_error("RawBuffer::sync_from: size mismatch");
+				throw std::runtime_error("RawBuffer::mirror_from: size mismatch");
 			std::memcpy(data.get(), source.data.get(), size);
 		}
 
@@ -73,7 +73,7 @@ namespace robotick
 
 		static BlackboardsBuffer& get();
 		static void set_source(const BlackboardsBuffer* buffer);
-		void sync_from_source();
+		void mirror_from_source();
 
 	  private:
 		static thread_local const BlackboardsBuffer* source_buffer;
@@ -86,7 +86,7 @@ namespace robotick
 
 		static WorkloadsBuffer& get();
 		static void set_source(const WorkloadsBuffer* buffer);
-		void sync_from_source();
+		void mirror_from_source();
 
 	  private:
 		static thread_local const WorkloadsBuffer* source_buffer;
