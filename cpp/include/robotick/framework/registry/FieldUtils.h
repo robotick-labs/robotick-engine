@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "robotick/framework/data/FixedString.h"
+#include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/utils/Typename.h"
 #include <any>

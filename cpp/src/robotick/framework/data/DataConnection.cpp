@@ -1,8 +1,14 @@
-#if 0
+// Copyright Robotick
+// SPDX-License-Identifier: Apache-2.0
+
 #include "robotick/framework/data/DataConnection.h"
-#include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/WorkloadInstanceInfo.h"
+#include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include <cstdint>
+#include <cstring>
 #include <sstream>
+#include <stdexcept>
 #include <unordered_set>
 
 namespace robotick
@@ -14,7 +20,7 @@ namespace robotick
 
 	bool is_valid_section(const std::string& s)
 	{
-		return s == "input" || s == "output" || s == "config";
+		return (s == "inputs" || s == "outputs" || s == "config");
 	}
 
 	ParsedFieldPath parse_field_path(const std::string& raw)
@@ -32,9 +38,9 @@ namespace robotick
 			tokens.push_back(token);
 		}
 
-		if (tokens.size() < 3)
+		if (tokens.size() != 3)
 		{
-			throw FieldPathParseError("Expected at least 3 components in field path: " + raw);
+			throw FieldPathParseError("Expected format <workload>.<section>.<field>: " + raw);
 		}
 
 		if (!is_valid_section(tokens[1]))
@@ -42,88 +48,56 @@ namespace robotick
 			throw FieldPathParseError("Invalid section '" + tokens[1] + "' in path: " + raw);
 		}
 
-		ParsedFieldPath result;
-		result.workload_name = tokens[0];
-		result.section_name = tokens[1];
-		for (size_t i = 2; i < tokens.size(); ++i)
-		{
-			result.field_path.emplace_back(tokens[i]);
-		}
-
-		return result;
+		return ParsedFieldPath{FixedString64(tokens[0]), FixedString64(tokens[1]), {FixedString64(tokens[2])}};
 	}
 
-	const BlackboardField* find_field_recursive(
-		const std::vector<BlackboardField>& schema, const std::vector<FixedString64>& path, size_t& offset_out)
+	const StructRegistryEntry* get_struct_entry(const WorkloadInstanceInfo& instance, const std::string& section, size_t& out_offset)
 	{
-		const std::vector<BlackboardField>* current_schema = &schema;
-		size_t current_offset = 0;
-
-		for (size_t i = 0; i < path.size(); ++i)
+		const auto* type = instance.type;
+		if (!type)
 		{
-			bool found = false;
-
-			for (const auto& field : *current_schema)
-			{
-				if (field.name == path[i])
-				{
-					current_offset += field.offset;
-
-					if (i == path.size() - 1)
-					{
-						offset_out = current_offset;
-						return &field;
-					}
-
-					if (field.type != typeid(Blackboard))
-					{
-						throw std::runtime_error("Field '" + std::string(field.name.c_str()) + "' is not a blackboard");
-					}
-
-					current_schema = &field.subfields;
-					found = true;
-					break;
-				}
-			}
-
-			if (!found)
-			{
-				throw std::runtime_error("Field '" + std::string(path[i].c_str()) + "' not found");
-			}
+			throw std::runtime_error("Missing type info for workload: " + instance.unique_name);
 		}
 
-		throw std::runtime_error("Field path resolution failed");
-	}
-
-	const std::vector<BlackboardField>& get_schema_section(const WorkloadInstanceInfo& info, const FixedString64& section)
-	{
-		if (section == "input")
-			return info.input_schema;
-		if (section == "output")
-			return info.output_schema;
+		if (section == "inputs")
+		{
+			out_offset = type->input_offset;
+			return type->input_struct;
+		}
+		if (section == "outputs")
+		{
+			out_offset = type->output_offset;
+			return type->output_struct;
+		}
 		if (section == "config")
-			return info.config_schema;
-		throw std::runtime_error("Invalid blackboard section: " + std::string(section.c_str()));
+		{
+			out_offset = type->config_offset;
+			return type->config_struct;
+		}
+
+		throw std::runtime_error("Invalid section: " + section);
 	}
 
-	uint8_t* resolve_ptr(
-		const ParsedFieldPath& path, const BlackboardsBuffer& blackboards, bool is_write, std::type_index& type_out, size_t& size_out)
+	const FieldInfo* find_field(const StructRegistryEntry* struct_entry, const std::string& field_name)
 	{
-		const WorkloadInstanceInfo& workload_info = WorkloadRegistry::get(path.workload_name);
-		const std::vector<BlackboardField>& schema = get_schema_section(workload_info, path.section_name);
+		if (!struct_entry)
+		{
+			return nullptr;
+		}
 
-		size_t offset = 0;
-		const BlackboardField* field = find_field_recursive(schema, path.field_path, offset);
+		for (const auto& field : struct_entry->fields)
+		{
+			if (field.name == field_name)
+			{
+				return &field;
+			}
+		}
 
-		type_out = field->type;
-		size_out = field->size;
-
-		const uint8_t* base = blackboards.get_source().raw_ptr();
-		return const_cast<uint8_t*>(base + field->offset);
+		return nullptr;
 	}
 
 	std::vector<DataConnectionInfo> DataConnectionResolver::resolve(
-		const std::vector<DataConnectionSeed>& seeds, const BlackboardsBuffer& blackboards)
+		const std::vector<DataConnectionSeed>& seeds, const std::vector<WorkloadInstanceInfo>& instances)
 	{
 		std::vector<DataConnectionInfo> results;
 		std::unordered_set<std::string> seen_destinations;
@@ -133,28 +107,75 @@ namespace robotick
 			ParsedFieldPath src = parse_field_path(seed.source_path);
 			ParsedFieldPath dst = parse_field_path(seed.dest_path);
 
-			std::type_index src_type, dst_type;
-			size_t src_size = 0, dst_size = 0;
+			// Lookup instances
+			const WorkloadInstanceInfo* src_inst = nullptr;
+			const WorkloadInstanceInfo* dst_inst = nullptr;
 
-			const void* source_ptr = resolve_ptr(src, blackboards, false, src_type, src_size);
-			void* dest_ptr = resolve_ptr(dst, blackboards, true, dst_type, dst_size);
-
-			if (src_type != dst_type || src_size != dst_size)
+			for (const auto& inst : instances)
 			{
-				throw std::runtime_error("Type or size mismatch between '" + seed.source_path + "' and '" + seed.dest_path + "'");
+				if (inst.unique_name == src.workload_name.c_str())
+				{
+					src_inst = &inst;
+				}
+				if (inst.unique_name == dst.workload_name.c_str())
+				{
+					dst_inst = &inst;
+				}
 			}
 
-			std::string dest_key = dst.workload_name.c_str() + "." + dst.section_name.c_str() + "." + dst.field_path.front().c_str();
-			if (!seen_destinations.insert(dest_key).second)
+			if (!src_inst)
 			{
-				throw std::runtime_error("Duplicate destination field: " + dest_key);
+				throw std::runtime_error("Unknown source workload: " + std::string(src.workload_name.c_str()));
+			}
+			if (!dst_inst)
+			{
+				throw std::runtime_error("Unknown destination workload: " + std::string(dst.workload_name.c_str()));
 			}
 
-			results.push_back(DataConnectionInfo{source_ptr, dest_ptr, src_size, src_type});
+			// Lookup struct + field for source
+			size_t src_offset = 0;
+			const StructRegistryEntry* src_struct = get_struct_entry(*src_inst, src.section_name.c_str(), src_offset);
+			const FieldInfo* src_field = find_field(src_struct, src.field_path[0].c_str());
+			if (!src_field)
+			{
+				throw std::runtime_error("Source field not found: " + seed.source_path);
+			}
+
+			// Lookup struct + field for dest
+			size_t dst_offset = 0;
+			const StructRegistryEntry* dst_struct = get_struct_entry(*dst_inst, dst.section_name.c_str(), dst_offset);
+			const FieldInfo* dst_field = find_field(dst_struct, dst.field_path[0].c_str());
+			if (!dst_field)
+			{
+				throw std::runtime_error("Destination field not found: " + seed.dest_path);
+			}
+
+			// Validate type match
+			if (src_field->type != dst_field->type)
+			{
+				throw std::runtime_error("Type mismatch between source and dest: " + seed.source_path + " vs. " + seed.dest_path);
+			}
+
+			// Validate size match
+			if (src_field->size != dst_field->size)
+			{
+				throw std::runtime_error("Size mismatch between source and dest: " + seed.source_path + " vs. " + seed.dest_path);
+			}
+
+			const void* src_ptr = src_inst->ptr + src_offset + src_field->offset;
+			void* dst_ptr = dst_inst->ptr + dst_offset + dst_field->offset;
+
+			std::string dst_key = std::string(dst.workload_name.c_str()) + "." + dst.section_name.c_str() + "." + dst.field_path[0].c_str();
+
+			if (!seen_destinations.insert(dst_key).second)
+			{
+				throw std::runtime_error("Duplicate destination field: " + dst_key);
+			}
+
+			results.push_back(DataConnectionInfo{src_ptr, dst_ptr, src_field->size, src_field->type});
 		}
 
 		return results;
 	}
 
 } // namespace robotick
-#endif // if 0

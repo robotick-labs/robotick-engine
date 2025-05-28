@@ -34,6 +34,7 @@ namespace robotick
 
 	  protected:
 		const WorkloadInstanceInfo& get_instance_info(size_t index) const;
+		const std::vector<WorkloadInstanceInfo>& get_all_instance_info() const;
 
 	  private:
 		ROBOTICK_DECLARE_PIMPL();

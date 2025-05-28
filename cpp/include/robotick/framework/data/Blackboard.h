@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "robotick/framework/data/FixedString.h"
+#include "robotick/framework/common/FixedString.h"
 #include <cstdint>
 #include <limits>
 #include <string>

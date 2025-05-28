@@ -3,9 +3,7 @@
 
 #pragma once
 
-#include "robotick/framework/data/Buffer.h"
-#include "robotick/framework/data/FixedString.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/framework/common/FixedString.h"
 #include <stdexcept>
 #include <string>
 #include <typeindex>
@@ -16,8 +14,8 @@ namespace robotick
 
 	struct DataConnectionSeed
 	{
-		std::string source_path; // e.g. "A.output.temp"
-		std::string dest_path;	 // e.g. "B.input.goal"
+		std::string source_path;
+		std::string dest_path;
 	};
 
 	struct DataConnectionInfo
@@ -44,10 +42,12 @@ namespace robotick
 	ParsedFieldPath parse_field_path(const std::string& raw);
 	bool is_valid_section(const std::string& s);
 
+	class WorkloadInstanceInfo;
 	class DataConnectionResolver
 	{
 	  public:
-		static std::vector<DataConnectionInfo> resolve(const std::vector<DataConnectionSeed>& seeds, const BlackboardsBuffer& blackboards);
+		static std::vector<DataConnectionInfo> resolve(
+			const std::vector<DataConnectionSeed>& seeds, const std::vector<WorkloadInstanceInfo>& instances);
 	};
 
 } // namespace robotick

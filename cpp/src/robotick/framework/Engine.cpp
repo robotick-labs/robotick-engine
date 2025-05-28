@@ -52,6 +52,11 @@ namespace robotick
 		return m_impl->instances.at(index);
 	}
 
+	const std::vector<WorkloadInstanceInfo>& Engine::get_all_instance_info() const
+	{
+		return m_impl->instances;
+	}
+
 	size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances)
 	{
 		size_t total = 0;

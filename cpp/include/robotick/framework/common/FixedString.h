@@ -25,6 +25,12 @@ namespace robotick
 			data[N - 1] = '\0';
 		}
 
+		FixedString(const std::string& str)
+		{
+			strncpy(data, str.c_str(), N - 1);
+			data[N - 1] = '\0';
+		}
+
 		FixedString& operator=(const char* str)
 		{
 			strncpy(data, str, N - 1);

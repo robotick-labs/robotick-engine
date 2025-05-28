@@ -22,6 +22,7 @@ namespace robotick
 		std::string name;
 		size_t offset;
 		std::type_index type;
+		size_t size;
 	};
 
 	struct StructRegistryEntry
@@ -66,7 +67,8 @@ namespace robotick
 	static robotick::FieldAutoRegister<StructType>                       \
         s_robotick_fields_##StructType({
 
-#define ROBOTICK_FIELD(StructType, FieldName) {#FieldName, offsetof(StructType, FieldName), typeid(decltype(StructType::FieldName))},
+#define ROBOTICK_FIELD(StructType, FieldName)                                                                                                        \
+	{#FieldName, offsetof(StructType, FieldName), typeid(decltype(StructType::FieldName)), sizeof(decltype(StructType::FieldName))},
 
 #define ROBOTICK_END_FIELDS()                                                                                                                        \
 	});
