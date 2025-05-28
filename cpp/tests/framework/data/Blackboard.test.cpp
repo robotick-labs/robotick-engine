@@ -6,20 +6,20 @@
 
 #include <catch2/catch_all.hpp>
 #include <cstring>
+#include <typeindex>
 
 using namespace robotick;
 
 TEST_CASE("Blackboard basic construction and memory layout", "[blackboard]")
 {
 	std::vector<BlackboardField> schema = {
-		{"age", BlackboardFieldType::Int}, {"score", BlackboardFieldType::Double}, {"name", BlackboardFieldType::FixedString64}};
+		{"age", std::type_index(typeid(int))}, {"score", std::type_index(typeid(double))}, {"name", std::type_index(typeid(FixedString64))}};
 
 	Blackboard blackboard(schema);
 
 	REQUIRE(blackboard.get_schema().size() == 3);
 	REQUIRE(blackboard.required_size() >= sizeof(int) + sizeof(double) + sizeof(FixedString64));
 
-	// Ensure `has` reports correctly
 	REQUIRE(blackboard.has("age"));
 	REQUIRE(blackboard.has("score"));
 	REQUIRE(blackboard.has("name"));
@@ -29,7 +29,7 @@ TEST_CASE("Blackboard basic construction and memory layout", "[blackboard]")
 TEST_CASE("Blackboard binds external memory and performs typed access", "[blackboard]")
 {
 	std::vector<BlackboardField> schema = {
-		{"age", BlackboardFieldType::Int}, {"score", BlackboardFieldType::Double}, {"name", BlackboardFieldType::FixedString64}};
+		{"age", std::type_index(typeid(int))}, {"score", std::type_index(typeid(double))}, {"name", std::type_index(typeid(FixedString64))}};
 
 	Blackboard blackboard(schema);
 	size_t buffer_size = blackboard.required_size();
@@ -59,7 +59,7 @@ TEST_CASE("Blackboard binds external memory and performs typed access", "[blackb
 
 TEST_CASE("Blackboard throws on missing keys or unbound memory", "[blackboard][errors]")
 {
-	std::vector<BlackboardField> schema = {{"alpha", BlackboardFieldType::Int}};
+	std::vector<BlackboardField> schema = {{"alpha", std::type_index(typeid(int))}};
 	Blackboard blackboard(schema);
 	std::vector<uint8_t> memory(blackboard.required_size(), 0);
 
@@ -103,14 +103,18 @@ TEST_CASE("Blackboard throws on missing keys or unbound memory", "[blackboard][e
 		}
 		catch (const std::runtime_error& e)
 		{
-			REQUIRE(std::string(e.what()).find("get_ptr") != std::string::npos);
+			const bool found =
+				std::string(e.what()).find("verify_type") != std::string::npos || std::string(e.what()).find("get_ptr") != std::string::npos;
+
+			REQUIRE(found);
 		}
 	}
 }
 
 TEST_CASE("Blackboard handles alignment and offset consistency", "[blackboard][layout]")
 {
-	std::vector<BlackboardField> schema = {{"a", BlackboardFieldType::Int}, {"b", BlackboardFieldType::Double}, {"c", BlackboardFieldType::Int}};
+	std::vector<BlackboardField> schema = {
+		{"a", std::type_index(typeid(int))}, {"b", std::type_index(typeid(double))}, {"c", std::type_index(typeid(int))}};
 
 	Blackboard blackboard(schema);
 	auto schema_ref = blackboard.get_schema();
@@ -122,7 +126,6 @@ TEST_CASE("Blackboard handles alignment and offset consistency", "[blackboard][l
 	std::vector<uint8_t> memory(blackboard.required_size(), 0);
 	blackboard.bind(memory.data());
 
-	// Set distinct values and validate memory independence
 	blackboard.set<int>("a", 1);
 	blackboard.set<double>("b", 3.14);
 	blackboard.set<int>("c", 7);

@@ -20,8 +20,6 @@ namespace py = pybind11;
 namespace robotick
 {
 
-	// === Field registrations ===
-
 	struct PythonConfig
 	{
 		FixedString128 script_name;
@@ -86,31 +84,13 @@ namespace robotick
 			{
 				std::string name = py::str(item.first);
 				std::string type_str = py::str(item.second);
+				std::type_index type = (type_str == "int")				? std::type_index(typeid(int))
+									   : (type_str == "double")			? std::type_index(typeid(double))
+									   : (type_str == "FixedString64")	? std::type_index(typeid(FixedString64))
+									   : (type_str == "FixedString128") ? std::type_index(typeid(FixedString128))
+																		: throw std::runtime_error("Unsupported field type: " + type_str);
 
-				BlackboardFieldType field_type;
-
-				if (type_str == "int")
-				{
-					field_type = BlackboardFieldType::Int;
-				}
-				else if (type_str == "double")
-				{
-					field_type = BlackboardFieldType::Double;
-				}
-				else if (type_str == "FixedString64")
-				{
-					field_type = BlackboardFieldType::FixedString64;
-				}
-				else if (type_str == "FixedString128")
-				{
-					field_type = BlackboardFieldType::FixedString128;
-				}
-				else
-				{
-					throw std::runtime_error("Unsupported field type: " + type_str);
-				}
-
-				fields.push_back(BlackboardField{.name = FixedString64(name.c_str()), .type = field_type});
+				fields.emplace_back(FixedString64(name.c_str()), type);
 			}
 
 			return fields;
@@ -120,13 +100,9 @@ namespace robotick
 		{
 			py::dict desc = py_class.attr("describe")();
 
-			auto config_schema = parse_blackboard_schema(desc["config"]);
-			auto input_schema = parse_blackboard_schema(desc["inputs"]);
-			auto output_schema = parse_blackboard_schema(desc["outputs"]);
-
-			config.blackboard = Blackboard(config_schema);
-			inputs.blackboard = Blackboard(input_schema);
-			outputs.blackboard = Blackboard(output_schema);
+			config.blackboard = Blackboard(parse_blackboard_schema(desc["config"]));
+			inputs.blackboard = Blackboard(parse_blackboard_schema(desc["inputs"]));
+			outputs.blackboard = Blackboard(parse_blackboard_schema(desc["outputs"]));
 		}
 
 		void pre_load()
@@ -134,9 +110,7 @@ namespace robotick
 			try
 			{
 				if (config.script_name.empty() || config.class_name.empty())
-				{
 					throw std::runtime_error("PythonWorkload config must specify script_name and class_name");
-				}
 
 				robotick::ensure_python_runtime();
 				py::gil_scoped_acquire gil;
@@ -164,27 +138,21 @@ namespace robotick
 			{
 				robotick::ensure_python_runtime();
 				py::gil_scoped_acquire gil;
-
 				py::dict py_cfg;
 
 				for (const auto& field : config.blackboard.get_schema())
 				{
 					const std::string key = field.name.c_str();
-					switch (field.type)
-					{
-					case BlackboardFieldType::Int:
+					const auto& type = field.type;
+
+					if (type == typeid(int))
 						py_cfg[key.c_str()] = config.blackboard.get<int>(key);
-						break;
-					case BlackboardFieldType::Double:
+					else if (type == typeid(double))
 						py_cfg[key.c_str()] = config.blackboard.get<double>(key);
-						break;
-					case BlackboardFieldType::FixedString64:
+					else if (type == typeid(FixedString64))
 						py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString64>(key).c_str());
-						break;
-					case BlackboardFieldType::FixedString128:
+					else if (type == typeid(FixedString128))
 						py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString128>(key).c_str());
-						break;
-					}
 				}
 
 				internal_state->py_instance = internal_state->py_class(py_cfg);
@@ -206,31 +174,23 @@ namespace robotick
 			try
 			{
 				if (!internal_state->py_instance)
-				{
 					return;
-				}
-
 				py::gil_scoped_acquire gil;
 
 				py::dict py_in;
 				for (const auto& field : inputs.blackboard.get_schema())
 				{
 					const std::string key = field.name.c_str();
-					switch (field.type)
-					{
-					case BlackboardFieldType::Int:
+					const auto& type = field.type;
+
+					if (type == typeid(int))
 						py_in[key.c_str()] = inputs.blackboard.get<int>(key);
-						break;
-					case BlackboardFieldType::Double:
+					else if (type == typeid(double))
 						py_in[key.c_str()] = inputs.blackboard.get<double>(key);
-						break;
-					case BlackboardFieldType::FixedString64:
+					else if (type == typeid(FixedString64))
 						py_in[key.c_str()] = std::string(inputs.blackboard.get<FixedString64>(key).c_str());
-						break;
-					case BlackboardFieldType::FixedString128:
+					else if (type == typeid(FixedString128))
 						py_in[key.c_str()] = std::string(inputs.blackboard.get<FixedString128>(key).c_str());
-						break;
-					}
 				}
 
 				py::dict py_out;
@@ -248,25 +208,16 @@ namespace robotick
 							return f.name.c_str() == key;
 						});
 					if (it == schema.end())
-					{
 						continue;
-					}
 
-					switch (it->type)
-					{
-					case BlackboardFieldType::Int:
+					if (it->type == typeid(int))
 						outputs.blackboard.set<int>(key, val.cast<int>());
-						break;
-					case BlackboardFieldType::Double:
+					else if (it->type == typeid(double))
 						outputs.blackboard.set<double>(key, val.cast<double>());
-						break;
-					case BlackboardFieldType::FixedString64:
+					else if (it->type == typeid(FixedString64))
 						outputs.blackboard.set<FixedString64>(key, val.cast<std::string>().c_str());
-						break;
-					case BlackboardFieldType::FixedString128:
+					else if (it->type == typeid(FixedString128))
 						outputs.blackboard.set<FixedString128>(key, val.cast<std::string>().c_str());
-						break;
-					}
 				}
 			}
 			catch (const py::error_already_set& e)

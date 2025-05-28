@@ -7,58 +7,51 @@
 #include "robotick/framework/data/FixedString.h"
 #include <cstdint>
 #include <string>
+#include <typeindex>
+#include <typeinfo>
 #include <unordered_map>
 #include <vector>
 
 namespace robotick
 {
-
-	// === Field types allowed in blackboards ===
-	enum class BlackboardFieldType
-	{
-		Int,
-		Double,
-		FixedString64,
-		FixedString128,
-	};
-
-	// A single named field with known type
 	struct BlackboardField
 	{
 		FixedString64 name;
-		BlackboardFieldType type;
+		std::type_index type;
+
+		BlackboardField(const FixedString64& name, std::type_index type) : name(name), type(type) {}
 	};
 
-	// === A flat memory block with named fields and typed access ===
 	class Blackboard
 	{
 	  public:
 		Blackboard() = default;
 		explicit Blackboard(const std::vector<BlackboardField>& schema);
 
-		void bind(uint8_t* external_memory); // Caller owns the buffer
-
+		void bind(uint8_t* external_memory);
 		size_t required_size() const;
 
 		const std::vector<BlackboardField>& get_schema() const;
+		bool has(const std::string& key) const;
 
 		template <typename T> void set(const std::string& key, const T& value);
 
 		template <typename T> T get(const std::string& key) const;
 
-		bool has(const std::string& key) const;
-
 	  private:
 		std::vector<BlackboardField> schema;
 		std::unordered_map<std::string, size_t> offsets;
+		std::unordered_map<std::string, std::type_index> types;
 		size_t total_size = 0;
 		uint8_t* base_ptr = nullptr;
 
 		void* get_ptr(const std::string& key);
 		const void* get_ptr(const std::string& key) const;
 
-		size_t type_size(BlackboardFieldType type) const;
-		size_t type_align(BlackboardFieldType type) const;
+		size_t type_size(std::type_index type) const;
+		size_t type_align(std::type_index type) const;
+
+		void verify_type(const std::string& key, std::type_index expected) const;
 	};
 
 } // namespace robotick
