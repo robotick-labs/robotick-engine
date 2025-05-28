@@ -5,6 +5,7 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/data/Buffer.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -29,8 +30,7 @@ namespace robotick
 		const WorkloadInstanceInfo* root_instance = nullptr;
 		std::vector<WorkloadInstanceInfo> instances;
 		Model m_loaded_model;
-		uint8_t* buffer = nullptr;
-		size_t buffer_size = 0;
+		WorkloadsBuffer workloads_source_buffer;
 		uint8_t* blackboards_buffer = nullptr;
 		size_t blackboards_buffer_size = 0;
 	};
@@ -47,7 +47,6 @@ namespace robotick
 				instance.type->destruct(instance.ptr);
 		}
 
-		delete[] m_impl->buffer;
 		delete[] m_impl->blackboards_buffer;
 	}
 
@@ -140,9 +139,7 @@ namespace robotick
 		}
 
 		m_impl->instances.clear();
-		delete[] m_impl->buffer;
-		m_impl->buffer = nullptr;
-		m_impl->buffer_size = 0;
+		m_impl->workloads_source_buffer = WorkloadsBuffer();
 		m_impl->m_loaded_model = model;
 
 		const auto& workload_seeds = model.get_workload_seeds();
@@ -162,9 +159,8 @@ namespace robotick
 		}
 
 		// Primary workloads buffer allocation:
-		m_impl->buffer_size = offset;
-		m_impl->buffer = new uint8_t[m_impl->buffer_size];
-		std::memset(m_impl->buffer, 0, m_impl->buffer_size);
+		m_impl->workloads_source_buffer = WorkloadsBuffer(offset);
+		uint8_t* workloads_buffer_ptr = m_impl->workloads_source_buffer.raw_ptr();
 
 		std::vector<std::future<WorkloadInstanceInfo>> preload_futures;
 		preload_futures.reserve(workload_seeds.size());
@@ -174,7 +170,7 @@ namespace robotick
 		{
 			const auto& workload_seed = workload_seeds[i];
 			const auto* type = WorkloadRegistry::get().find(workload_seed.type);
-			void* instance_ptr = m_impl->buffer + aligned_offsets[i];
+			void* instance_ptr = workloads_buffer_ptr + aligned_offsets[i];
 
 			preload_futures.push_back(std::async(std::launch::async,
 				[=]() -> WorkloadInstanceInfo

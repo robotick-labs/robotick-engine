@@ -8,21 +8,21 @@ namespace robotick
 {
 	// BlackboardsBuffer static members
 	thread_local BlackboardsBuffer BlackboardsBuffer::local_instance;
-	const BlackboardsBuffer* BlackboardsBuffer::source_buffer = nullptr;
+	BlackboardsBuffer* BlackboardsBuffer::source_buffer = nullptr;
 
 	BlackboardsBuffer& BlackboardsBuffer::get_local_mirror()
 	{
 		return local_instance;
 	}
 
-	const BlackboardsBuffer& BlackboardsBuffer::get_source()
+	BlackboardsBuffer& BlackboardsBuffer::get_source()
 	{
 		if (!source_buffer)
 			throw std::runtime_error("BlackboardsBuffer::get_source: no source set");
 		return *source_buffer;
 	}
 
-	void BlackboardsBuffer::set_source(const BlackboardsBuffer* buffer)
+	void BlackboardsBuffer::set_source(BlackboardsBuffer* buffer)
 	{
 		source_buffer = buffer;
 	}
@@ -36,21 +36,21 @@ namespace robotick
 
 	// WorkloadsBuffer static members
 	thread_local WorkloadsBuffer WorkloadsBuffer::local_instance;
-	const WorkloadsBuffer* WorkloadsBuffer::source_buffer = nullptr;
+	WorkloadsBuffer* WorkloadsBuffer::source_buffer = nullptr;
 
 	WorkloadsBuffer& WorkloadsBuffer::get_local_mirror()
 	{
 		return local_instance;
 	}
 
-	const WorkloadsBuffer& WorkloadsBuffer::get_source()
+	WorkloadsBuffer& WorkloadsBuffer::get_source()
 	{
 		if (!source_buffer)
 			throw std::runtime_error("WorkloadsBuffer::get_source: no source set");
 		return *source_buffer;
 	}
 
-	void WorkloadsBuffer::set_source(const WorkloadsBuffer* buffer)
+	void WorkloadsBuffer::set_source(WorkloadsBuffer* buffer)
 	{
 		source_buffer = buffer;
 	}

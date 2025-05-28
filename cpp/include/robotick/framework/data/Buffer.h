@@ -17,9 +17,9 @@ namespace robotick
 	  public:
 		RawBuffer() = default;
 
-		explicit RawBuffer(size_t size) : size(size), data(std::make_unique<char[]>(size)) {}
+		explicit RawBuffer(size_t size) : size(size), data(std::make_unique<uint8_t[]>(size)) {}
 
-		RawBuffer(const RawBuffer& other) : size(other.size), data(std::make_unique<char[]>(other.size))
+		RawBuffer(const RawBuffer& other) : size(other.size), data(std::make_unique<uint8_t[]>(other.size))
 		{
 			std::memcpy(data.get(), other.data.get(), size);
 		}
@@ -29,14 +29,14 @@ namespace robotick
 			if (this != &other)
 			{
 				size = other.size;
-				data = std::make_unique<char[]>(size);
+				data = std::make_unique<uint8_t[]>(size);
 				std::memcpy(data.get(), other.data.get(), size);
 			}
 			return *this;
 		}
 
-		void* raw_ptr() { return data.get(); }
-		const void* raw_ptr() const { return data.get(); }
+		uint8_t* raw_ptr() { return data.get(); }
+		const uint8_t* raw_ptr() const { return data.get(); }
 		size_t get_size() const { return size; }
 
 		void mirror_from(const RawBuffer& source)
@@ -62,7 +62,7 @@ namespace robotick
 
 	  private:
 		size_t size = 0;
-		std::unique_ptr<char[]> data;
+		std::unique_ptr<uint8_t[]> data;
 	};
 
 	class BlackboardsBuffer : public RawBuffer
@@ -71,14 +71,14 @@ namespace robotick
 		using RawBuffer::RawBuffer;
 
 		static BlackboardsBuffer& get_local_mirror();
-		static const BlackboardsBuffer& get_source();
-		static void set_source(const BlackboardsBuffer* buffer);
+		static BlackboardsBuffer& get_source();
+		static void set_source(BlackboardsBuffer* buffer);
 
 		void mirror_from_source();
 
 	  private:
 		static thread_local BlackboardsBuffer local_instance;
-		static const BlackboardsBuffer* source_buffer;
+		static BlackboardsBuffer* source_buffer;
 	};
 
 	class WorkloadsBuffer : public RawBuffer
@@ -87,13 +87,13 @@ namespace robotick
 		using RawBuffer::RawBuffer;
 
 		static WorkloadsBuffer& get_local_mirror();
-		static const WorkloadsBuffer& get_source();
-		static void set_source(const WorkloadsBuffer* buffer);
+		static WorkloadsBuffer& get_source();
+		static void set_source(WorkloadsBuffer* buffer);
 
 		void mirror_from_source();
 
 	  private:
 		static thread_local WorkloadsBuffer local_instance;
-		static const WorkloadsBuffer* source_buffer;
+		static WorkloadsBuffer* source_buffer;
 	};
 } // namespace robotick

@@ -37,8 +37,8 @@ TEST_CASE("RawBuffer clones data correctly", "[buffer][clone]")
 	REQUIRE(clone.get_size() == 64);
 	REQUIRE(std::memcmp(clone.raw_ptr(), original.raw_ptr(), 64) == 0);
 
-	static_cast<char*>(original.raw_ptr())[0] = 0xCD;
-	REQUIRE(static_cast<const char*>(clone.raw_ptr())[0] == static_cast<char>(0xAB));
+	original.raw_ptr()[0] = 0xCD;
+	REQUIRE(clone.raw_ptr()[0] == static_cast<uint8_t>(0xAB));
 }
 
 TEST_CASE("RawBuffer mirror_from validates size and performs copy", "[buffer][mirror]")
