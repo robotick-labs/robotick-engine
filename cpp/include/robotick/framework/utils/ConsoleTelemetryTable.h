@@ -11,29 +11,23 @@ namespace robotick
 {
 	struct ConsoleTelemetryRow
 	{
-		ConsoleTelemetryRow() = default;
-		ConsoleTelemetryRow(std::string type, std::string name, std::string inputs, std::string outputs, double tick_ms = 0.0, double goal_ms = 0.0,
-			double percent = 0.0)
-			: type(std::move(type)), name(std::move(name)), inputs(std::move(inputs)), outputs(std::move(outputs)), tick_ms(tick_ms),
-			  goal_ms(goal_ms), percent(percent)
-		{
-		}
-
 		std::string type;
 		std::string name;
 		std::string inputs;
 		std::string outputs;
-		double tick_ms = 0.0;
-		double goal_ms = 0.0;
-		double percent = 0.0;
+		double tick_duration_ms = 0.0; // actual work time
+		double tick_delta_ms = 0.0;	   // time since last tick call
+		double goal_interval_ms = 0.0; // expected interval
+
+		ConsoleTelemetryRow() = default;
+		ConsoleTelemetryRow(std::string type, std::string name, std::string inputs, std::string outputs, double tick_duration_ms,
+			double tick_delta_ms, double goal_interval_ms)
+			: type(std::move(type)), name(std::move(name)), inputs(std::move(inputs)), outputs(std::move(outputs)),
+			  tick_duration_ms(tick_duration_ms), tick_delta_ms(tick_delta_ms), goal_interval_ms(goal_interval_ms)
+		{
+		}
 	};
 
-	/// Prints telemetry data in a console table format.
-	/// @param rows Vector of telemetry data rows to display
-	/// @param pretty_print If true, renders a formatted table with borders and colors;
-	///                     if false, outputs simple tab-separated format
-	/// @param enable_unicode If true, uses Unicode box-drawing characters;
-	///                       if false, uses ASCII characters (only affects pretty_print mode)
+	/// Prints telemetry info using the generic table infrastructure
 	void print_console_telemetry_table(const std::vector<ConsoleTelemetryRow>& rows, bool pretty_print, bool enable_unicode);
-
 } // namespace robotick

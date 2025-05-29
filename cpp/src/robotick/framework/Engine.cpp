@@ -30,8 +30,8 @@ namespace robotick
 	{
 		Model m_loaded_model;
 
-		WorkloadsBuffer workloads_source_buffer;
-		BlackboardsBuffer blackboards_source_buffer;
+		WorkloadsBuffer workloads_buffer;
+		BlackboardsBuffer blackboards_buffer;
 
 		const WorkloadInstanceInfo* root_instance = nullptr;
 		std::vector<WorkloadInstanceInfo> instances;
@@ -70,6 +70,16 @@ namespace robotick
 	const std::vector<DataConnectionInfo>& Engine::get_all_data_connections() const
 	{
 		return state->data_connections_all;
+	}
+
+	const WorkloadsBuffer& Engine::get_workloads_buffer_readonly() const
+	{
+		return state->workloads_buffer;
+	}
+
+	const BlackboardsBuffer& Engine::get_blackboards_buffer_readonly() const
+	{
+		return state->blackboards_buffer;
 	}
 
 	size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances)
@@ -173,7 +183,7 @@ namespace robotick
 		state->data_connections_all.clear();
 		state->data_connections_acquired_indices.clear();
 		state->root_instance = nullptr;
-		state->workloads_source_buffer = WorkloadsBuffer();
+		state->workloads_buffer = WorkloadsBuffer();
 		state->m_loaded_model = model;
 
 		const auto& workload_seeds = model.get_workload_seeds();
@@ -193,8 +203,8 @@ namespace robotick
 		}
 
 		// Primary workloads buffer allocation:
-		state->workloads_source_buffer = WorkloadsBuffer(offset);
-		uint8_t* workloads_buffer_ptr = state->workloads_source_buffer.raw_ptr();
+		state->workloads_buffer = WorkloadsBuffer(offset);
+		uint8_t* workloads_buffer_ptr = state->workloads_buffer.raw_ptr();
 
 		std::vector<std::future<WorkloadInstanceInfo>> preload_futures;
 		preload_futures.reserve(workload_seeds.size());
@@ -223,7 +233,7 @@ namespace robotick
 					if (type->pre_load_fn)
 						type->pre_load_fn(instance_ptr);
 
-					return WorkloadInstanceInfo{instance_ptr, type, workload_seed.name, workload_seed.tick_rate_hz, {}};
+					return WorkloadInstanceInfo{instance_ptr, type, workload_seed.name, workload_seed.tick_rate_hz, {}, WorkloadInstanceStats{}};
 				}));
 		}
 
@@ -236,8 +246,8 @@ namespace robotick
 
 		// Blackboards memory allocation and buffer-binding (at least 1 byte to please all platforms):
 		const size_t blackboards_buffer_size = std::max<size_t>(1, compute_blackboard_memory_requirements(state->instances));
-		state->blackboards_source_buffer = BlackboardsBuffer(blackboards_buffer_size);
-		BlackboardsBuffer::set_source(&state->blackboards_source_buffer);
+		state->blackboards_buffer = BlackboardsBuffer(blackboards_buffer_size);
+		BlackboardsBuffer::set_source(&state->blackboards_buffer);
 
 		bind_blackboards_for_instances(state->instances);
 
@@ -372,9 +382,9 @@ namespace robotick
 		// main tick-loop: (tick at least once, before checking stop_after_next_tick_flag - e.g. useful for testing)
 		do
 		{
-			auto now = steady_clock::now();
-			double time_delta = duration<double>(now - last_tick_time).count();
-			last_tick_time = now;
+			const auto now_pre_tick = steady_clock::now();
+			const double time_delta = duration<double>(now_pre_tick - last_tick_time).count();
+			last_tick_time = now_pre_tick;
 
 			// update any data-connections owned by the engine:
 			for (size_t index : state->data_connections_acquired_indices)
@@ -388,7 +398,10 @@ namespace robotick
 			// tick root (will cause children to tick recursively)
 			root_info.type->tick_fn(root_info.ptr, time_delta);
 
-			root_info.last_time_delta = time_delta;
+			const auto now_post_tick = steady_clock::now();
+			root_info.mutable_stats.last_tick_duration = duration<double>(now_post_tick - now_pre_tick).count();
+
+			root_info.mutable_stats.last_time_delta = time_delta;
 			next_tick_time += tick_interval;
 
 			hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));

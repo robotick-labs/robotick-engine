@@ -7,6 +7,7 @@
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/ConsoleTelemetryTable.h"
 
+#include <cassert> // assert
 #include <random>  // std::random_device, std::mt19937, std::uniform_real_distribution
 #include <sstream> // std::ostringstream
 #include <string>  // std::string, std::to_string
@@ -51,31 +52,29 @@ namespace robotick
 		{
 			(void)engine;
 
-			/*
-					std::string type;
-					std::string name;
-					std::string inputs;
-					std::string outputs;
-					double tick_ms = 0.0;
-					double goal_ms = 0.0;
-					double percent = 0.0;
-			*/
-
 			instance_row.type = depth_prefix(current_depth, instance_info.type->name);
 			instance_row.name = instance_info.unique_name;
 			instance_row.inputs = "?";
 			instance_row.outputs = "?";
-			instance_row.tick_ms = instance_info.last_time_delta * 1000.0;
-			instance_row.goal_ms = instance_info.tick_rate_hz > 0.0 ? 1000.0 / instance_info.tick_rate_hz : -1.0;
-			instance_row.percent = (instance_info.last_time_delta * instance_info.tick_rate_hz) * 100.0;
+
+			// actual work time
+			instance_row.tick_duration_ms = instance_info.mutable_stats.last_tick_duration * 1000.0;
+
+			// time since last tick call
+			instance_row.tick_delta_ms = instance_info.mutable_stats.last_time_delta * 1000.0;
+
+			// expected interval (as specified in model seed data)
+			instance_row.goal_interval_ms = instance_info.tick_rate_hz > 0.0 ? 1000.0 / instance_info.tick_rate_hz : -1.0;
 		}
 
 		static std::vector<ConsoleTelemetryRow> collect_console_telemetry_rows(const Engine& engine)
 		{
-			// TODO - obtain clone of workloads and bb's buffers for non-aliased use below...
-			// .
-			// .
-			// .
+			// obtain clone of workloads and bb's buffers for non-aliased use below...
+			const WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer_readonly();
+			(void)workloads_buffer;
+			const BlackboardsBuffer& blackboards_buffer = engine.get_blackboards_buffer_readonly();
+			(void)blackboards_buffer;
+			// TODO - remove "source" concept from these and others - we need to eliminate global-singletons
 
 			std::vector<ConsoleTelemetryRow> console_rows;
 			console_rows.reserve(engine.get_all_instance_info().size());
@@ -137,7 +136,11 @@ namespace robotick
 
 		void tick(double)
 		{
-			assert(engine != nullptr);
+			// Note - when using ConsoleTelemetryWorkload it is strongly recommended to run it at 3-5Hz max.
+			// This avoids overwhelming stdout and dominating frame time, even without pretty printing.
+			// To help mitigate this, printing is built as a single string and flushed once per tick.
+
+			assert(engine != nullptr && "ConsoleTelemetryWorkload - engine should never be null during tick");
 			// ^- we should never reach the point of ticking without set_engine having been called.
 			//  - we also assume that any given workload-instance can only ever be part of a single
 			//    engine, and that the lifespan of the engine is longer than the workloads that are

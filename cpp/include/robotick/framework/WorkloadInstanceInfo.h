@@ -12,6 +12,12 @@ namespace robotick
 {
 	struct WorkloadRegistryEntry;
 
+	struct WorkloadInstanceStats
+	{
+		double last_tick_duration = 0.0;
+		double last_time_delta = 0.0;
+	};
+
 	struct WorkloadInstanceInfo
 	{
 		// constant once created:
@@ -22,6 +28,7 @@ namespace robotick
 		std::vector<const WorkloadInstanceInfo*> children;
 
 		// mutable state:
-		mutable double last_time_delta = 0.0; // mutable so we can set it during ticking, even when WorkloadInstanceInfo is const
+		mutable WorkloadInstanceStats mutable_stats;
+		// ^- mutable so we can set it during ticking, even when WorkloadInstanceInfo is const - e.g. for stats
 	};
 } // namespace robotick

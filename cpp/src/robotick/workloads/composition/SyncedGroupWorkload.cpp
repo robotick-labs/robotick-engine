@@ -164,9 +164,9 @@ namespace robotick
 					return;
 
 				// Calculate time since last tick for this child (will be larger than tick_interval_sec if we've missed some ticks)
-				auto now = steady_clock::now();
-				double time_delta = duration<double>(now - last_tick_time).count();
-				last_tick_time = now;
+				auto now_pre_tick = steady_clock::now();
+				double time_delta = duration<double>(now_pre_tick - last_tick_time).count();
+				last_tick_time = now_pre_tick;
 
 				std::atomic_thread_fence(std::memory_order_acquire);
 				// ^- Ensures we see all writes from parent before using shared data
@@ -175,7 +175,10 @@ namespace robotick
 				child.type->tick_fn(child.ptr, time_delta);
 				next_tick_time += tick_interval;
 
-				child.last_time_delta = time_delta;
+				const auto now_post_tick = steady_clock::now();
+				child.mutable_stats.last_tick_duration = duration<double>(now_post_tick - now_pre_tick).count();
+
+				child.mutable_stats.last_time_delta = time_delta;
 
 				// ensure that we honour the desired tick-rate of every child (even if some slower than this SyncedGroup's tick-rate - just let them
 				// fall back into step when ready):

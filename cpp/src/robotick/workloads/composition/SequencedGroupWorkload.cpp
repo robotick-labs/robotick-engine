@@ -80,6 +80,8 @@ namespace robotick
 			{
 				if (child_info.workload_info != nullptr && child_info.workload_info->type->tick_fn != nullptr)
 				{
+					const auto now_pre_tick = std::chrono::steady_clock::now();
+
 					// process any incoming data-connections:
 					for (auto connection_in : child_info.connections_in)
 					{
@@ -89,7 +91,10 @@ namespace robotick
 					// tick the child:
 					child_info.workload_info->type->tick_fn(child_info.workload_info->ptr, time_delta);
 
-					child_info.workload_info->last_time_delta = time_delta;
+					const auto now_post_tick = std::chrono::steady_clock::now();
+					child_info.workload_info->mutable_stats.last_tick_duration = std::chrono::duration<double>(now_post_tick - now_pre_tick).count();
+
+					child_info.workload_info->mutable_stats.last_time_delta = time_delta;
 				}
 			}
 
