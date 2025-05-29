@@ -39,8 +39,10 @@ namespace robotick
 	  protected:
 		const WorkloadInstanceInfo& get_instance_info(size_t index) const;
 		const std::vector<WorkloadInstanceInfo>& get_all_instance_info() const;
+		const std::vector<DataConnectionInfo>& get_all_data_connections() const;
 
 	  private:
-		ROBOTICK_DECLARE_PIMPL();
+		struct State;
+		std::unique_ptr<State> state;
 	};
 } // namespace robotick

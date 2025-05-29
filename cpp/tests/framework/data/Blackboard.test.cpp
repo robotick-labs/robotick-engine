@@ -11,7 +11,7 @@
 
 using namespace robotick;
 
-TEST_CASE("Blackboard basic construction and memory layout", "[blackboard]")
+TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard basic construction and memory layout", "[blackboard]")
 {
 	std::vector<BlackboardField> schema = {
 		{"age", std::type_index(typeid(int))}, {"score", std::type_index(typeid(double))}, {"name", std::type_index(typeid(FixedString64))}};
@@ -27,7 +27,7 @@ TEST_CASE("Blackboard basic construction and memory layout", "[blackboard]")
 	REQUIRE_FALSE(blackboard.has("missing"));
 }
 
-TEST_CASE("Blackboard binds to BlackboardsBuffer and performs typed access", "[blackboard][buffer]")
+TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard binds to BlackboardsBuffer and performs typed access", "[blackboard][buffer]")
 {
 	std::vector<BlackboardField> schema = {
 		{"age", std::type_index(typeid(int))}, {"score", std::type_index(typeid(double))}, {"name", std::type_index(typeid(FixedString64))}};
@@ -60,7 +60,7 @@ TEST_CASE("Blackboard binds to BlackboardsBuffer and performs typed access", "[b
 	}
 }
 
-TEST_CASE("Blackboard throws on missing keys or unbound source", "[blackboard][errors]")
+TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard throws on missing keys or unbound source", "[blackboard][errors]")
 {
 	std::vector<BlackboardField> schema = {{"alpha", std::type_index(typeid(int))}};
 	Blackboard blackboard(schema);
@@ -87,7 +87,7 @@ TEST_CASE("Blackboard throws on missing keys or unbound source", "[blackboard][e
 	}
 }
 
-TEST_CASE("Blackboard alignment and offset consistency", "[blackboard][layout]")
+TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard alignment and offset consistency", "[blackboard][layout]")
 {
 	std::vector<BlackboardField> schema = {
 		{"a", std::type_index(typeid(int))}, {"b", std::type_index(typeid(double))}, {"c", std::type_index(typeid(int))}};

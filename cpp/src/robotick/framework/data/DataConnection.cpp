@@ -120,7 +120,7 @@ namespace robotick
 		return blackboard->get_schema_field(blackboard_subfield_name);
 	}
 
-	std::vector<DataConnectionInfo> DataConnectionResolver::resolve(
+	std::vector<DataConnectionInfo> DataConnectionsFactory::create(
 		const std::vector<DataConnectionSeed>& seeds, const std::vector<WorkloadInstanceInfo>& instances)
 	{
 		std::vector<DataConnectionInfo> results;
@@ -132,8 +132,8 @@ namespace robotick
 
 		for (const auto& seed : seeds)
 		{
-			ParsedFieldPath src = parse_field_path(seed.source_path);
-			ParsedFieldPath dst = parse_field_path(seed.dest_path);
+			ParsedFieldPath src = parse_field_path(seed.source_field_path);
+			ParsedFieldPath dst = parse_field_path(seed.dest_field_path);
 
 			const auto src_it = idx.find(src.workload_name.c_str());
 			const auto dst_it = idx.find(dst.workload_name.c_str());
@@ -155,7 +155,7 @@ namespace robotick
 			const FieldInfo* src_field = find_field(src_struct, src.field_path[0].c_str());
 			if (!src_field)
 			{
-				throw std::runtime_error("Source field not found: " + seed.source_path);
+				throw std::runtime_error("Source field not found: " + seed.source_field_path);
 			}
 
 			if (!src_inst->ptr)
@@ -172,7 +172,7 @@ namespace robotick
 
 				if (!src_blackboard_field)
 				{
-					throw std::runtime_error("Source subfield not found: " + seed.source_path);
+					throw std::runtime_error("Source subfield not found: " + seed.source_field_path);
 				}
 
 				const auto* blackboard = reinterpret_cast<const Blackboard*>(src_ptr);
@@ -187,7 +187,7 @@ namespace robotick
 			const FieldInfo* dst_field = find_field(dst_struct, dst.field_path[0].c_str());
 			if (!dst_field)
 			{
-				throw std::runtime_error("Destination field not found: " + seed.dest_path);
+				throw std::runtime_error("Destination field not found: " + seed.dest_field_path);
 			}
 
 			uint8_t* dst_ptr = dst_inst->ptr + dst_offset + dst_field->offset;
@@ -201,7 +201,7 @@ namespace robotick
 
 				if (!dst_blackboard_field)
 				{
-					throw std::runtime_error("Dest subfield not found: " + seed.dest_path);
+					throw std::runtime_error("Dest subfield not found: " + seed.dest_field_path);
 				}
 
 				auto* blackboard = reinterpret_cast<Blackboard*>(dst_ptr);
@@ -213,14 +213,15 @@ namespace robotick
 			// Validate type match
 			if (src_type != dst_type)
 			{
-				throw std::runtime_error("Type mismatch between source and dest: " + seed.source_path + " vs. " + seed.dest_path);
+				throw std::runtime_error("Type mismatch between source and dest: " + seed.source_field_path + " vs. " + seed.dest_field_path);
 			}
 
 			// Validate size match
 			if (src_size != dst_size)
 			{
 				std::ostringstream oss;
-				oss << "Size mismatch (" << src_size << " vs " << dst_size << ") between " << seed.source_path << " and " << seed.dest_path;
+				oss << "Size mismatch (" << src_size << " vs " << dst_size << ") between " << seed.source_field_path << " and "
+					<< seed.dest_field_path;
 				throw std::runtime_error(oss.str());
 			}
 
@@ -236,7 +237,7 @@ namespace robotick
 			}
 
 			// results.push_back(DataConnectionInfo{src_ptr, dst_ptr, src_field->size, src_field->type});
-			results.push_back(DataConnectionInfo{src_ptr, dst_ptr, src_size, src_type});
+			results.push_back(DataConnectionInfo{seed, src_ptr, dst_ptr, src_inst, dst_inst, src_size, src_type});
 		}
 
 		return results;

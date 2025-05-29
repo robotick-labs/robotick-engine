@@ -15,23 +15,35 @@
 namespace robotick
 {
 
+	class WorkloadInstanceInfo;
+
 	struct DataConnectionSeed
 	{
-		std::string source_path;
-		std::string dest_path;
+		std::string source_field_path;
+		std::string dest_field_path;
 	};
 
 	struct DataConnectionInfo
 	{
-		const void* source_ptr;
-		void* dest_ptr;
-		size_t size;
+		const DataConnectionSeed& seed;
+		const void* source_ptr = nullptr;
+		void* dest_ptr = nullptr;
+		const WorkloadInstanceInfo* source_workload = nullptr;
+		const WorkloadInstanceInfo* dest_workload = nullptr;
+		size_t size = 0;
 		std::type_index type;
 
-		void copy_data() const noexcept
+		enum class ExpectedHandler
+		{
+			NotSet,
+			ParentGroupOrEngine // set by a child-group if it wants parent-group (or Engine) to handle this update for them
+		};
+		ExpectedHandler expected_handler = ExpectedHandler::NotSet;
+
+		void do_data_copy() const noexcept
 		{
 			assert(source_ptr != nullptr && dest_ptr != nullptr && size > 0);
-			static_assert(std::is_trivially_copyable_v<std::byte>, "copy_data() assumes trivially-copyable payloads");
+			static_assert(std::is_trivially_copyable_v<std::byte>, "do_data_copy() assumes trivially-copyable payloads");
 
 			// If aliasing is possible, use std::memmove instead.
 			std::memcpy(dest_ptr, source_ptr, size);
@@ -51,14 +63,10 @@ namespace robotick
 		explicit FieldPathParseError(const std::string& msg);
 	};
 
-	ParsedFieldPath parse_field_path(const std::string& raw);
-	bool is_valid_section(const std::string& s);
-
-	class WorkloadInstanceInfo;
-	class DataConnectionResolver
+	class DataConnectionsFactory
 	{
 	  public:
-		static std::vector<DataConnectionInfo> resolve(
+		static std::vector<DataConnectionInfo> create(
 			const std::vector<DataConnectionSeed>& seeds, const std::vector<WorkloadInstanceInfo>& instances);
 	};
 
