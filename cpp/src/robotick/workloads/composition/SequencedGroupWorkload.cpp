@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cstdio>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 namespace robotick
@@ -27,7 +28,7 @@ namespace robotick
 		void set_children(const std::vector<const WorkloadInstanceInfo*>& child_workloads, std::vector<DataConnectionInfo*>& pending_connections)
 		{
 			// map from workload pointer to its ChildWorkloadInfo (for fast lookup)
-			children.reserve(child_workloads.size());
+			children.reserve(child_workloads.size()); // <- reserve so we don't keep reallocating children during population
 			std::unordered_map<const WorkloadInstanceInfo*, ChildWorkloadInfo*> workload_to_child;
 
 			// add child workloads and call set_children_fn on each, if present:
@@ -58,7 +59,8 @@ namespace robotick
 					const auto child_workload_info = workload_to_child[pending_connection->dest_workload];
 					child_workload_info->connections_in.push_back(pending_connection);
 
-					assert(pending_connection->expected_handler == DataConnectionInfo::ExpectedHandler::NotSet);
+					assert(pending_connection->expected_handler == DataConnectionInfo::ExpectedHandler::Unassigned);
+					pending_connection->expected_handler = DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload;
 
 					it = pending_connections.erase(it);
 				}

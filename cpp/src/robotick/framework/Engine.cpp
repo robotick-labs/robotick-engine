@@ -35,7 +35,7 @@ namespace robotick
 		const WorkloadInstanceInfo* root_instance = nullptr;
 		std::vector<WorkloadInstanceInfo> instances;
 		std::vector<DataConnectionInfo> data_connections_all;
-		std::vector<const DataConnectionInfo*> data_connections_acquired;
+		std::vector<size_t> data_connections_acquired_indices;
 	};
 
 	Engine::Engine() : state(std::make_unique<Engine::State>())
@@ -164,6 +164,9 @@ namespace robotick
 		}
 
 		state->instances.clear();
+		state->data_connections_all.clear();
+		state->data_connections_acquired_indices.clear();
+		state->root_instance = nullptr;
 		state->workloads_source_buffer = WorkloadsBuffer();
 		state->m_loaded_model = model;
 
@@ -297,7 +300,7 @@ namespace robotick
 			const DataConnectionInfo* conn = (*it);
 			if (conn->expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine)
 			{
-				state->data_connections_acquired.emplace_back(conn);
+				state->data_connections_acquired_indices.push_back(static_cast<size_t>(conn - state->data_connections_all.data()));
 				it = data_connections_pending_acquisition.erase(it);
 			}
 			else
@@ -314,7 +317,7 @@ namespace robotick
 
 			for (const DataConnectionInfo* conn : data_connections_pending_acquisition)
 			{
-				msg += "  - " + std::string(conn->seed.source_field_path.c_str()) + " → " + std::string(conn->seed.dest_field_path.c_str()) + "\n";
+				msg += "  - " + conn->seed.source_field_path + " -> " + conn->seed.dest_field_path + '\n';
 			}
 
 			throw std::runtime_error(msg);
@@ -366,9 +369,9 @@ namespace robotick
 			last_tick_time = now;
 
 			// update any data-connections owned by the engine:
-			for (const auto& data_connection_acquired : state->data_connections_acquired)
+			for (size_t index : state->data_connections_acquired_indices)
 			{
-				data_connection_acquired->do_data_copy();
+				state->data_connections_all[index].do_data_copy();
 			}
 
 			// tick root (will cause children to tick recursively)

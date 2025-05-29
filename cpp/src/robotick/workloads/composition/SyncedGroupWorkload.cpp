@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <mutex>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 using namespace std::chrono;
@@ -69,6 +70,9 @@ namespace robotick
 				{
 					// we own this workload but (since SyncedGroup is just 1 workload per thread) only the target of the
 					// connection - so ask engine to update the connection for us at its safe sync-point before each main tick.
+
+					// Note - we only care about "what our workloads need" for their inputs - hence why we only for this
+					// when the destination is local
 
 					pending_connection->expected_handler = DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine;
 				}
@@ -164,8 +168,6 @@ namespace robotick
 
 				if (!running)
 					return;
-
-				// (not data-connections to update ourself - we leave that to the engine to do safely on the main-thread each tick)
 
 				// Calculate time since last tick for this child (will be larger than tick_interval_sec if we've missed some ticks)
 				auto now = steady_clock::now();

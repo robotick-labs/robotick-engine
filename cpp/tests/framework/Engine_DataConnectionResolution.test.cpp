@@ -101,7 +101,7 @@ namespace robotick::test
 		REQUIRE(found);
 	}
 
-	TEST_CASE("Unit|Framework|DataConnections|ExpectedHandler not set for internal connections")
+	TEST_CASE("Unit|Framework|DataConnections|ExpectedHandler set to SequencedGroupWorkload for internal connections")
 	{
 		Model model;
 		auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
@@ -120,7 +120,7 @@ namespace robotick::test
 		{
 			if (conn.seed.source_field_path == "Child1.outputs.output_value" && conn.seed.dest_field_path == "Child2.inputs.input_value")
 			{
-				CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::NotSet);
+				CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload);
 				found = true;
 			}
 		}

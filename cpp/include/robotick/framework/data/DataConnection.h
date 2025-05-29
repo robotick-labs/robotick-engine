@@ -6,6 +6,7 @@
 #include "robotick/framework/common/FixedString.h"
 
 #include <cassert>
+#include <cstddef>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -25,7 +26,7 @@ namespace robotick
 
 	struct DataConnectionInfo
 	{
-		const DataConnectionSeed& seed;
+		const DataConnectionSeed seed; // intentional copy of the original seed for safety
 		const void* source_ptr = nullptr;
 		void* dest_ptr = nullptr;
 		const WorkloadInstanceInfo* source_workload = nullptr;
@@ -35,10 +36,11 @@ namespace robotick
 
 		enum class ExpectedHandler
 		{
-			NotSet,
+			Unassigned,
+			SequencedGroupWorkload,
 			ParentGroupOrEngine // set by a child-group if it wants parent-group (or Engine) to handle this update for them
 		};
-		ExpectedHandler expected_handler = ExpectedHandler::NotSet;
+		ExpectedHandler expected_handler = ExpectedHandler::Unassigned;
 
 		void do_data_copy() const noexcept
 		{

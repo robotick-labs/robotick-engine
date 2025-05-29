@@ -38,7 +38,9 @@ namespace robotick
 		WorkloadHandle add(const std::string& type, const std::string& name, double tick_rate_hz = TICK_RATE_FROM_PARENT,
 			const std::map<std::string, std::any>& config = {})
 		{
-			assert(!root_workload.is_valid() && "Model root must be set last");
+			if (root_workload.is_valid())
+				throw std::logic_error("Cannot add workloads after root has been set. Model root must be set last.");
+
 			const std::vector<WorkloadHandle> children = {};
 			workload_seeds.push_back({type, name, tick_rate_hz, children, config});
 			return {static_cast<uint32_t>(workload_seeds.size() - 1)};
@@ -47,14 +49,21 @@ namespace robotick
 		WorkloadHandle add(const std::string& type, const std::string& name, const std::vector<WorkloadHandle>& children,
 			double tick_rate_hz = TICK_RATE_FROM_PARENT, const std::map<std::string, std::any>& config = {})
 		{
-			assert(!root_workload.is_valid() && "Model root must be set last");
+			if (root_workload.is_valid())
+				throw std::logic_error("Cannot add workloads after root has been set. Model root must be set last.");
+
 			workload_seeds.push_back({type, name, tick_rate_hz, children, config});
 			return {static_cast<uint32_t>(workload_seeds.size() - 1)};
 		}
 
 		void connect(const std::string& source_field_path, const std::string& dest_field_path)
 		{
-			assert(!root_workload.is_valid() && "Model root must be set last");
+			if (source_field_path.empty() || dest_field_path.empty())
+				throw std::invalid_argument("Field paths must be non-empty");
+
+			if (root_workload.is_valid())
+				throw std::logic_error("Cannot add connections after root has been set. Model root must be set last.");
+
 			data_connection_seeds.push_back({source_field_path, dest_field_path});
 		}
 
