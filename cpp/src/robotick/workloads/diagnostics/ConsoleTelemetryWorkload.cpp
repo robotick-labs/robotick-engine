@@ -15,6 +15,7 @@ namespace robotick
 	struct ConsoleTelemetryConfig
 	{
 		bool pretty_print = true;
+		bool enable_unicode = true;
 	};
 
 	ROBOTICK_BEGIN_FIELDS(ConsoleTelemetryConfig)
@@ -24,6 +25,8 @@ namespace robotick
 	std::vector<ConsoleTelemetryRow> collect_console_telemetry_rows()
 	{
 		std::vector<ConsoleTelemetryRow> rows;
+
+		// Random distributions for generating demo telemetry data:
 
 		static std::random_device rd;
 		static std::mt19937 gen(rd());
@@ -56,7 +59,7 @@ namespace robotick
 		void tick(double)
 		{
 			std::vector<ConsoleTelemetryRow> rows = collect_console_telemetry_rows();
-			print_console_telemetry_table(rows, config.pretty_print);
+			print_console_telemetry_table(rows, config.pretty_print, config.enable_unicode);
 		}
 	};
 
