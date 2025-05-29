@@ -32,5 +32,7 @@ namespace robotick::test
 
 			return static_cast<T*>((void*)info.ptr);
 		}
+
+		static const std::vector<DataConnectionInfo>& get_all_data_connections(const Engine& engine) { return engine.get_all_data_connections(); }
 	};
 } // namespace robotick::test

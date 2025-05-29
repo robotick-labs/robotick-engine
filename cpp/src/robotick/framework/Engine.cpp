@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstring>
 #include <future>
+#include <sstream>
 #include <stdexcept>
 #include <thread>
 #include <vector>
@@ -25,22 +26,26 @@
 namespace robotick
 {
 
-	struct Engine::Impl
+	struct Engine::State
 	{
-		const WorkloadInstanceInfo* root_instance = nullptr;
-		std::vector<WorkloadInstanceInfo> instances;
 		Model m_loaded_model;
+
 		WorkloadsBuffer workloads_source_buffer;
 		BlackboardsBuffer blackboards_source_buffer;
+
+		const WorkloadInstanceInfo* root_instance = nullptr;
+		std::vector<WorkloadInstanceInfo> instances;
+		std::vector<DataConnectionInfo> data_connections_all;
+		std::vector<size_t> data_connections_acquired_indices;
 	};
 
-	Engine::Engine() : m_impl(std::make_unique<Impl>())
+	Engine::Engine() : state(std::make_unique<Engine::State>())
 	{
 	}
 
 	Engine::~Engine()
 	{
-		for (auto& instance : m_impl->instances)
+		for (auto& instance : state->instances)
 		{
 			if (instance.type->destruct)
 				instance.type->destruct(instance.ptr);
@@ -49,12 +54,17 @@ namespace robotick
 
 	const WorkloadInstanceInfo& Engine::get_instance_info(size_t index) const
 	{
-		return m_impl->instances.at(index);
+		return state->instances.at(index);
 	}
 
 	const std::vector<WorkloadInstanceInfo>& Engine::get_all_instance_info() const
 	{
-		return m_impl->instances;
+		return state->instances;
+	}
+
+	const std::vector<DataConnectionInfo>& Engine::get_all_data_connections() const
+	{
+		return state->data_connections_all;
 	}
 
 	size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances)
@@ -154,9 +164,12 @@ namespace robotick
 			throw std::runtime_error("Model has no root workload set via model.set_root(...)");
 		}
 
-		m_impl->instances.clear();
-		m_impl->workloads_source_buffer = WorkloadsBuffer();
-		m_impl->m_loaded_model = model;
+		state->instances.clear();
+		state->data_connections_all.clear();
+		state->data_connections_acquired_indices.clear();
+		state->root_instance = nullptr;
+		state->workloads_source_buffer = WorkloadsBuffer();
+		state->m_loaded_model = model;
 
 		const auto& workload_seeds = model.get_workload_seeds();
 
@@ -175,8 +188,8 @@ namespace robotick
 		}
 
 		// Primary workloads buffer allocation:
-		m_impl->workloads_source_buffer = WorkloadsBuffer(offset);
-		uint8_t* workloads_buffer_ptr = m_impl->workloads_source_buffer.raw_ptr();
+		state->workloads_source_buffer = WorkloadsBuffer(offset);
+		uint8_t* workloads_buffer_ptr = state->workloads_source_buffer.raw_ptr();
 
 		std::vector<std::future<WorkloadInstanceInfo>> preload_futures;
 		preload_futures.reserve(workload_seeds.size());
@@ -207,18 +220,18 @@ namespace robotick
 		}
 
 		// wait for "pre_load" futures to complete and collect results:
-		m_impl->instances.reserve(workload_seeds.size());
+		state->instances.reserve(workload_seeds.size());
 		for (auto& fut : preload_futures)
 		{
-			m_impl->instances.push_back(fut.get());
+			state->instances.push_back(fut.get());
 		}
 
 		// Blackboards memory allocation and buffer-binding (at least 1 byte to please all platforms):
-		const size_t blackboards_buffer_size = std::max<size_t>(1, compute_blackboard_memory_requirements(m_impl->instances));
-		m_impl->blackboards_source_buffer = BlackboardsBuffer(blackboards_buffer_size);
-		BlackboardsBuffer::set_source(&m_impl->blackboards_source_buffer);
+		const size_t blackboards_buffer_size = std::max<size_t>(1, compute_blackboard_memory_requirements(state->instances));
+		state->blackboards_source_buffer = BlackboardsBuffer(blackboards_buffer_size);
+		BlackboardsBuffer::set_source(&state->blackboards_source_buffer);
 
-		bind_blackboards_for_instances(m_impl->instances);
+		bind_blackboards_for_instances(state->instances);
 
 		// call load_fn (multi-threaded):
 		std::vector<std::future<void>> load_futures;
@@ -226,8 +239,8 @@ namespace robotick
 
 		for (size_t i = 0; i < workload_seeds.size(); ++i)
 		{
-			void* instance_ptr = m_impl->instances[i].ptr;
-			const auto* type = m_impl->instances[i].type;
+			void* instance_ptr = state->instances[i].ptr;
+			const auto* type = state->instances[i].type;
 
 			load_futures.push_back(std::async(std::launch::async,
 				[=]()
@@ -243,53 +256,99 @@ namespace robotick
 			fut.get();
 		}
 
-		// fixup and add child-instances
+		// Setup data connections from the model and store them in the engine state.
+		// We also collect pointers to all connections that still need to be acquired
+		// by a workload (typically handled by Grouped Workloads via set_children_fn() below).
+		state->data_connections_all = DataConnectionsFactory::create(model.get_data_connection_seeds(), state->instances);
+		std::vector<DataConnectionInfo*> data_connections_pending_acquisition;
+		for (auto& conn : state->data_connections_all)
+		{
+			data_connections_pending_acquisition.push_back(&conn);
+		}
+
+		// fixup child-instances:
 		for (size_t i = 0; i < workload_seeds.size(); ++i)
 		{
 			const auto& workload_seed = workload_seeds[i];
-			auto& instance = m_impl->instances[i];
+			auto& instance = state->instances[i];
 
 			assert(instance.unique_name == workload_seed.name && "[Engine] Workload instances should be in same order as seeds (different names)");
 			assert(instance.type->name == workload_seed.type && "[Engine] Workload instances should be in same order as seeds (different types");
 
 			if (instance.type->set_children_fn)
 			{
-				std::vector<const WorkloadInstanceInfo*> children;
 				for (auto child_handle : workload_seed.children)
 				{
 					const WorkloadInstanceInfo& child_workload = get_instance_info(child_handle.index);
-					children.push_back(&child_workload);
+					instance.children.push_back(&child_workload);
 				}
-				instance.type->set_children_fn(instance.ptr, children);
 			}
 		}
 
+		// call set_children_fn on root-instance - we expect that to recursively do so for any children
+		// allowing them to set up their children, acquire responsibility for data-connections, etc as needed.
+		const WorkloadInstanceInfo* root_instance = &get_instance_info(model.get_root().index);
+		assert(root_instance != nullptr);
+
+		if (root_instance && root_instance->type && root_instance->type->set_children_fn)
+		{
+			root_instance->type->set_children_fn(root_instance->ptr, root_instance->children, data_connections_pending_acquisition);
+		}
+
+		// acquire any pending data_connections have been requested for engine-handling - these should be all that remain:
+		auto new_end = std::remove_if(data_connections_pending_acquisition.begin(), data_connections_pending_acquisition.end(),
+			[this](const DataConnectionInfo* conn)
+			{
+				if (conn->expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine)
+				{
+					state->data_connections_acquired_indices.push_back(static_cast<size_t>(conn - state->data_connections_all.data()));
+					return true;
+				}
+				return false;
+			});
+		data_connections_pending_acquisition.erase(new_end, data_connections_pending_acquisition.end());
+
+		// validate that all pending data_connections have been acquired by workloads:
+		if (!data_connections_pending_acquisition.empty())
+		{
+			std::ostringstream msg;
+			msg << "Error: Not all data connections were acquired by workloads or engine.\n";
+			msg << "Unclaimed connections (" << data_connections_pending_acquisition.size() << "):\n";
+
+			for (const DataConnectionInfo* conn : data_connections_pending_acquisition)
+			{
+				msg << "  - " << conn->seed.source_field_path << " -> " << conn->seed.dest_field_path << '\n';
+			}
+
+			throw std::runtime_error(msg.str());
+		}
+
 		// setup each instance
-		for (auto& instance : m_impl->instances)
+		for (auto& instance : state->instances)
 		{
 			if (instance.type->setup_fn)
 				instance.type->setup_fn(instance.ptr);
 		}
 
-		m_impl->root_instance = &get_instance_info(model.get_root().index);
-		assert(m_impl->root_instance != nullptr);
+		state->root_instance = root_instance;
+		assert(state->root_instance != nullptr);
 	}
 
 	void Engine::run(const std::atomic<bool>& stop_after_next_tick_flag)
 	{
 		using namespace std::chrono;
 
-		const WorkloadHandle root_handle = m_impl->m_loaded_model.get_root();
-		if (root_handle.index >= m_impl->instances.size())
+		const WorkloadHandle root_handle = state->m_loaded_model.get_root();
+		if (root_handle.index >= state->instances.size())
 			throw std::runtime_error("Invalid root workload handle");
 
-		const auto& root_info = m_impl->instances[root_handle.index];
+		const auto& root_info = state->instances[root_handle.index];
 
 		if (root_info.tick_rate_hz <= 0 || !root_info.type->tick_fn || !root_info.ptr)
 			throw std::runtime_error("Root workload must have valid tick_rate_hz and tick()");
 
 		// call start() on all workloads
-		for (auto& inst : m_impl->instances)
+		for (auto& inst : state->instances)
 		{
 			if (inst.type->start_fn)
 			{
@@ -309,6 +368,16 @@ namespace robotick
 			double time_delta = duration<double>(now - last_tick_time).count();
 			last_tick_time = now;
 
+			// update any data-connections owned by the engine:
+			for (size_t index : state->data_connections_acquired_indices)
+			{
+				state->data_connections_all[index].do_data_copy();
+			}
+
+			// Ensure all data writes complete before tick begins
+			std::atomic_thread_fence(std::memory_order_release);
+
+			// tick root (will cause children to tick recursively)
 			root_info.type->tick_fn(root_info.ptr, time_delta);
 			next_tick_time += tick_interval;
 
@@ -317,7 +386,7 @@ namespace robotick
 		} while (!stop_after_next_tick_flag);
 
 		// call stop() on all children (do it safely here, rather than relying on stop() to propagate through hierarchy)
-		for (auto& inst : m_impl->instances)
+		for (auto& inst : state->instances)
 		{
 			if (inst.type->stop_fn)
 			{
