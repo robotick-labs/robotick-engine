@@ -19,6 +19,7 @@ namespace robotick
 	struct DataConnectionInfo;
 	struct WorkloadRegistryEntry;
 	struct TelemetryCollector;
+	struct WorkloadFieldsIterator;
 
 	namespace test
 	{
@@ -29,6 +30,7 @@ namespace robotick
 	{
 		friend struct robotick::test::EngineInspector;
 		friend struct robotick::TelemetryCollector;
+		friend struct robotick::WorkloadFieldsIterator;
 
 	  public:
 		Engine();

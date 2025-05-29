@@ -3,8 +3,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#if 0
-
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/data/Blackboard.h"
@@ -59,8 +57,8 @@ namespace robotick::test
 		const auto& workload_infos = EngineInspector::get_all_instance_info(engine);
 		REQUIRE(workload_infos.size() == 1);
 
-		const auto& workloads_buf = EngineInspector::get_workloads_buffer(engine);
-		const auto& blackboards_buf = EngineInspector::get_blackboards_buffer(engine);
+		const auto& workloads_buf = EngineInspector::get_workloads_buffer_readonly(engine);
+		// const auto& blackboards_buf = EngineInspector::get_blackboards_buffer_readonly(engine);
 
 		// Set known values in workload memory
 		auto* workload_ptr = reinterpret_cast<SimpleWorkload*>(workload_infos[0].ptr);
@@ -70,25 +68,24 @@ namespace robotick::test
 		bool found_input = false;
 		bool found_output = false;
 
-		for_each_workload_field(engine, nullptr, nullptr,
+		WorkloadFieldsIterator::for_each_workload_field(engine, nullptr, nullptr,
 			[&](const WorkloadFieldView& view)
 			{
 				CHECK(view.instance->unique_name == "W");
-				const auto* field_ptr = static_cast<const uint8_t*>(view.raw_ptr);
+				const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
 				// Verify pointer lies within workloads buffer
-				CHECK(field_ptr >= workloads_buf.raw_ptr());
-				CHECK(field_ptr < workloads_buf.raw_ptr() + workloads_buf.size);
+				CHECK(workloads_buf.is_within_buffer(field_ptr));
 
 				if (view.field->name == "input_value")
 				{
 					found_input = true;
-					CHECK(*static_cast<const int*>(view.raw_ptr) == 42);
+					CHECK(*static_cast<const int*>(view.field_ptr) == 42);
 				}
 				if (view.field->name == "output_value")
 				{
 					found_output = true;
-					CHECK(*static_cast<const int*>(view.raw_ptr) == 123);
+					CHECK(*static_cast<const int*>(view.field_ptr) == 123);
 				}
 			});
 
@@ -105,11 +102,11 @@ namespace robotick::test
 		Engine engine;
 		engine.load(model);
 
-		const auto& original = EngineInspector::get_all_instance_info(engine);
-		const auto& original_buf = EngineInspector::get_workloads_buffer(engine);
+		// const auto& original = EngineInspector::get_all_instance_info(engine);
+		const auto& original_buf = EngineInspector::get_workloads_buffer_readonly(engine);
 
-		WorkloadsBuffer mirror_buf(original_buf.size);
-		std::memcpy(mirror_buf.raw_ptr(), original_buf.raw_ptr(), original_buf.size);
+		WorkloadsBuffer mirror_buf(original_buf.get_size());
+		std::memcpy(mirror_buf.raw_ptr(), original_buf.raw_ptr(), original_buf.get_size());
 
 		auto* mirror_workload = reinterpret_cast<SimpleWorkload*>(mirror_buf.raw_ptr());
 		mirror_workload->inputs.input_value = 99;
@@ -118,24 +115,23 @@ namespace robotick::test
 		bool found_input = false;
 		bool found_output = false;
 
-		for_each_workload_field(engine, &mirror_buf, nullptr,
+		WorkloadFieldsIterator::for_each_workload_field(engine, &mirror_buf, nullptr,
 			[&](const WorkloadFieldView& view)
 			{
 				CHECK(view.instance->unique_name == "W");
-				const auto* field_ptr = static_cast<const uint8_t*>(view.raw_ptr);
+				const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
-				CHECK(field_ptr >= mirror_buf.raw_ptr());
-				CHECK(field_ptr < mirror_buf.raw_ptr() + mirror_buf.size);
+				CHECK(mirror_buf.is_within_buffer(field_ptr));
 
 				if (view.field->name == "input_value")
 				{
 					found_input = true;
-					CHECK(*static_cast<const int*>(view.raw_ptr) == 99);
+					CHECK(*static_cast<const int*>(view.field_ptr) == 99);
 				}
 				if (view.field->name == "output_value")
 				{
 					found_output = true;
-					CHECK(*static_cast<const int*>(view.raw_ptr) == 888);
+					CHECK(*static_cast<const int*>(view.field_ptr) == 888);
 				}
 			});
 
@@ -143,5 +139,3 @@ namespace robotick::test
 		CHECK(found_output);
 	}
 } // namespace robotick::test
-
-#endif // #if 0

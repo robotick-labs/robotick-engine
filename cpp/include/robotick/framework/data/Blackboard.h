@@ -36,6 +36,8 @@ namespace robotick
 		void bind(size_t buffer_offset_in); // sets the offset of the blackboard's fields-data relative to ANY BlackboardsBuffer
 		size_t required_size() const;
 
+		size_t get_buffer_offset() const { return buffer_offset; }
+
 		uint8_t* get_base_ptr();			 // mutating access
 		const uint8_t* get_base_ptr() const; // read-only access
 

@@ -46,6 +46,10 @@ namespace robotick
 		const uint8_t* raw_ptr() const { return data.get(); }
 		size_t get_size() const { return size; }
 
+		bool is_within_buffer(const uint8_t* query_ptr) const { return (query_ptr >= raw_ptr()) && (query_ptr < raw_ptr() + get_size()); }
+
+		bool is_within_buffer(void* query_ptr) const { return is_within_buffer((uint8_t*)query_ptr); };
+
 		void mirror_from(const RawBuffer& source)
 		{
 			if (size != source.size)
