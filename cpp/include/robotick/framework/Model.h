@@ -54,6 +54,12 @@ namespace robotick
 			if (root_workload.is_valid())
 				throw std::logic_error("Cannot add workloads after root has been set. Model root must be set last.");
 
+			for (auto child : children)
+			{
+				if (!child.is_valid() || child.index >= workload_seeds.size())
+					throw std::out_of_range("Child handle out of range when adding workload '" + name + "'");
+			}
+
 			workload_seeds.push_back({type, name, tick_rate_hz, children, config});
 			return {static_cast<uint32_t>(workload_seeds.size() - 1)};
 		}

@@ -59,25 +59,14 @@ namespace robotick
 				}
 			}
 
-			// iterate + classify connections
-			for (auto it = pending_connections.begin(); it != pending_connections.end();)
+			// classify relevant pending-connections
+			for (DataConnectionInfo* conn : pending_connections)
 			{
-				DataConnectionInfo* pending_connection = *it;
-
-				const bool dst_is_local = workload_to_child.count(pending_connection->dest_workload);
-
+				const bool dst_is_local = workload_to_child.count(conn->dest_workload);
 				if (dst_is_local)
 				{
-					// we own this workload but (since SyncedGroup is just 1 workload per thread) only the target of the
-					// connection - so ask engine to update the connection for us at its safe sync-point before each main tick.
-
-					// Note - we only care about "what our workloads need" for their inputs - hence why we only for this
-					// when the destination is local
-
-					pending_connection->expected_handler = DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine;
+					conn->expected_handler = DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine;
 				}
-
-				++it;
 			}
 		}
 
