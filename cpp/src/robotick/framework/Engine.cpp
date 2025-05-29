@@ -52,6 +52,11 @@ namespace robotick
 		}
 	}
 
+	const WorkloadInstanceInfo* Engine::get_root_instance_info() const
+	{
+		return state->root_instance;
+	}
+
 	const WorkloadInstanceInfo& Engine::get_instance_info(size_t index) const
 	{
 		return state->instances.at(index);
@@ -206,6 +211,9 @@ namespace robotick
 				{
 					if (type->construct)
 						type->construct(instance_ptr);
+
+					if (type->set_engine_fn)
+						type->set_engine_fn(instance_ptr, *this);
 
 					if (type->config_struct)
 					{
@@ -379,6 +387,8 @@ namespace robotick
 
 			// tick root (will cause children to tick recursively)
 			root_info.type->tick_fn(root_info.ptr, time_delta);
+
+			root_info.last_time_delta = time_delta;
 			next_tick_time += tick_interval;
 
 			hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));

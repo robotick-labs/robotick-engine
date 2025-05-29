@@ -46,7 +46,7 @@ namespace
 				{
 					static_cast<DummyTickingWrapper*>(p)->~DummyTickingWrapper();
 				},
-				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr,
+				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 				[](void* p, double time_delta)
 				{
 					static_cast<DummyTickingWrapper*>(p)->tick(time_delta);
@@ -84,7 +84,7 @@ namespace
 				{
 					static_cast<SlowWrapper*>(p)->~SlowWrapper();
 				},
-				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr,
+				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 				[](void* p, double time_delta)
 				{
 					static_cast<SlowWrapper*>(p)->tick(time_delta);

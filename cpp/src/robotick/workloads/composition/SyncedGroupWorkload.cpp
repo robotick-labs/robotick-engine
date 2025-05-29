@@ -175,6 +175,8 @@ namespace robotick
 				child.type->tick_fn(child.ptr, time_delta);
 				next_tick_time += tick_interval;
 
+				child.last_time_delta = time_delta;
+
 				// ensure that we honour the desired tick-rate of every child (even if some slower than this SyncedGroup's tick-rate - just let them
 				// fall back into step when ready):
 				hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));

@@ -16,6 +16,7 @@ namespace robotick
 {
 	struct DataConnectionInfo;
 	struct WorkloadRegistryEntry;
+	struct ConsoleTelemetryWorkload;
 
 	namespace test
 	{
@@ -25,6 +26,7 @@ namespace robotick
 	class ROBOTICK_API Engine
 	{
 		friend struct robotick::test::EngineInspector;
+		friend struct robotick::ConsoleTelemetryWorkload;
 
 	  public:
 		Engine();
@@ -38,6 +40,7 @@ namespace robotick
 		void run(const std::atomic<bool>&&) = delete; // cause compile-error if a temporary is used
 
 	  protected:
+		const WorkloadInstanceInfo* get_root_instance_info() const;
 		const WorkloadInstanceInfo& get_instance_info(size_t index) const;
 		const std::vector<WorkloadInstanceInfo>& get_all_instance_info() const;
 		const std::vector<DataConnectionInfo>& get_all_data_connections() const;

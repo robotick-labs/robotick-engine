@@ -34,7 +34,7 @@ namespace
 				{
 					static_cast<DummyModelWorkload*>(p)->~DummyModelWorkload();
 				},
-				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 
 			WorkloadRegistry::get().register_entry(entry);
 		}

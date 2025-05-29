@@ -13,7 +13,7 @@ namespace robotick
 {
 	namespace
 	{
-		const size_t width_type = 24;
+		const size_t width_type = 36;
 		const size_t width_name = 24;
 		const size_t width_inputs = 40;
 		const size_t width_outputs = 40;
@@ -47,12 +47,18 @@ namespace robotick
 			return out;
 		}
 
-		std::string colored_percent(const std::string& val, double percent, bool first, bool pretty)
+		std::string colored_percent(
+			const std::string& val, double percent, bool first, bool pretty, double warning_percent = 100.0, double danger_percent = 105.0)
 		{
 			if (!first || !pretty)
 				return val;
 
-			const char* color = (percent < 80.0) ? "\033[32m" : (percent <= 100.0 ? "\033[33m" : "\033[31m");
+			constexpr const char* GREEN = "\033[32m";
+			constexpr const char* YELLOW = "\033[33m";
+			constexpr const char* RED = "\033[31m";
+
+			const char* color = (percent <= warning_percent) ? GREEN : (percent < danger_percent) ? YELLOW : RED;
+
 			std::ostringstream oss;
 			oss << color << std::setw(width_percent) << val << "\033[0m";
 			return oss.str();
@@ -98,8 +104,8 @@ namespace robotick
 			oss << "\n";
 			for (const auto& row : rows)
 			{
-				oss << row.type << "\t" << row.name << "\t" << row.inputs << "\t" << row.outputs << "\t" << std::fixed << std::setprecision(2)
-					<< row.tick_ms << "\t" << std::fixed << std::setprecision(2) << row.goal_ms << "\t" << std::fixed << std::setprecision(1)
+				oss << row.type << "\t" << row.name << "\t" << row.inputs << "\t" << row.outputs << "\t" << std::fixed << std::setprecision(3)
+					<< row.tick_ms << "\t" << std::fixed << std::setprecision(3) << row.goal_ms << "\t" << std::fixed << std::setprecision(1)
 					<< row.percent << "%\n";
 			}
 			std::cout << oss.str() << std::flush;

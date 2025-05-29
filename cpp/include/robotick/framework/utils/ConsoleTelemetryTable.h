@@ -32,5 +32,8 @@ namespace robotick
 	/// @param rows Vector of telemetry data rows to display
 	/// @param pretty_print If true, renders a formatted table with borders and colors;
 	///                     if false, outputs simple tab-separated format
+	/// @param enable_unicode If true, uses Unicode box-drawing characters;
+	///                       if false, uses ASCII characters (only affects pretty_print mode)
 	void print_console_telemetry_table(const std::vector<ConsoleTelemetryRow>& rows, bool pretty_print, bool enable_unicode);
+
 } // namespace robotick

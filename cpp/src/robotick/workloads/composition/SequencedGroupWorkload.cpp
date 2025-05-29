@@ -19,7 +19,7 @@ namespace robotick
 	{
 		struct ChildWorkloadInfo
 		{
-			const WorkloadInstanceInfo* workload = nullptr;
+			const WorkloadInstanceInfo* workload_info = nullptr;
 			std::vector<const DataConnectionInfo*> connections_in;
 		};
 
@@ -27,7 +27,7 @@ namespace robotick
 
 		void set_children(const std::vector<const WorkloadInstanceInfo*>& child_workloads, std::vector<DataConnectionInfo*>& pending_connections)
 		{
-			// map from workload pointer to its ChildWorkloadInfo (for fast lookup)
+			// map from workload_info pointer to its ChildWorkloadInfo (for fast lookup)
 			children.reserve(child_workloads.size()); // <- reserve so we don't keep reallocating children during population
 			std::unordered_map<const WorkloadInstanceInfo*, ChildWorkloadInfo*> workload_to_child;
 
@@ -35,12 +35,12 @@ namespace robotick
 			for (const WorkloadInstanceInfo* child_workload : child_workloads)
 			{
 				ChildWorkloadInfo& info = children.emplace_back();
-				info.workload = child_workload;
+				info.workload_info = child_workload;
 				workload_to_child[child_workload] = &info;
 
-				if (info.workload && info.workload->type && info.workload->type->set_children_fn)
+				if (info.workload_info && info.workload_info->type && info.workload_info->type->set_children_fn)
 				{
-					info.workload->type->set_children_fn(info.workload->ptr, info.workload->children, pending_connections);
+					info.workload_info->type->set_children_fn(info.workload_info->ptr, info.workload_info->children, pending_connections);
 				}
 			}
 
@@ -78,7 +78,7 @@ namespace robotick
 
 			for (auto& child_info : children)
 			{
-				if (child_info.workload != nullptr && child_info.workload->type->tick_fn != nullptr)
+				if (child_info.workload_info != nullptr && child_info.workload_info->type->tick_fn != nullptr)
 				{
 					// process any incoming data-connections:
 					for (auto connection_in : child_info.connections_in)
@@ -87,7 +87,9 @@ namespace robotick
 					}
 
 					// tick the child:
-					child_info.workload->type->tick_fn(child_info.workload->ptr, time_delta);
+					child_info.workload_info->type->tick_fn(child_info.workload_info->ptr, time_delta);
+
+					child_info.workload_info->last_time_delta = time_delta;
 				}
 			}
 
