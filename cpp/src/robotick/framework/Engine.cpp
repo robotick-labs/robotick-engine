@@ -94,10 +94,12 @@ namespace robotick
 			if (!type)
 				continue;
 
-			auto accumulate = [&](void* instance_ptr, const StructRegistryEntry* struct_info, const size_t struct_offset)
+			auto accumulate = [&](void* instance_ptr, const StructRegistryEntry* struct_info)
 			{
 				if (!struct_info)
 					return;
+
+				const size_t struct_offset = struct_info->offset;
 
 				const auto struct_ptr = static_cast<uint8_t*>(instance_ptr) + struct_offset;
 
@@ -116,18 +118,19 @@ namespace robotick
 				}
 			};
 
-			accumulate(instance.ptr, type->config_struct, type->config_offset);
-			accumulate(instance.ptr, type->input_struct, type->input_offset);
-			accumulate(instance.ptr, type->output_struct, type->output_offset);
+			accumulate(instance.ptr, type->config_struct);
+			accumulate(instance.ptr, type->input_struct);
+			accumulate(instance.ptr, type->output_struct);
 		}
 
 		return total;
 	}
 
-	void bind_blackboards_in_struct(WorkloadInstanceInfo& workload_instance_info, const StructRegistryEntry& struct_entry, const size_t struct_offset,
-		size_t& blackboard_storage_offset)
+	void bind_blackboards_in_struct(
+		WorkloadInstanceInfo& workload_instance_info, const StructRegistryEntry& struct_entry, size_t& blackboard_storage_offset)
 	{
 		// note - this function is not recursive, since we don't expect to have nested blackboards
+		const size_t struct_offset = struct_entry.offset;
 
 		for (const FieldInfo& field : struct_entry.fields)
 		{
@@ -157,17 +160,17 @@ namespace robotick
 
 			if (type->config_struct)
 			{
-				bind_blackboards_in_struct(instance, *type->config_struct, type->config_offset, blackboard_storage_offset);
+				bind_blackboards_in_struct(instance, *type->config_struct, blackboard_storage_offset);
 			}
 
 			if (type->input_struct)
 			{
-				bind_blackboards_in_struct(instance, *type->input_struct, type->input_offset, blackboard_storage_offset);
+				bind_blackboards_in_struct(instance, *type->input_struct, blackboard_storage_offset);
 			}
 
 			if (type->output_struct)
 			{
-				bind_blackboards_in_struct(instance, *type->output_struct, type->output_offset, blackboard_storage_offset);
+				bind_blackboards_in_struct(instance, *type->output_struct, blackboard_storage_offset);
 			}
 		}
 	}
@@ -227,7 +230,8 @@ namespace robotick
 
 					if (type->config_struct)
 					{
-						apply_struct_fields(static_cast<uint8_t*>(instance_ptr) + type->config_offset, *type->config_struct, workload_seed.config);
+						apply_struct_fields(
+							static_cast<uint8_t*>(instance_ptr) + type->config_struct->offset, *type->config_struct, workload_seed.config);
 					}
 
 					if (type->pre_load_fn)

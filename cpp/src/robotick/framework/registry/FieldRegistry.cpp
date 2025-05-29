@@ -10,7 +10,8 @@ namespace robotick
 		static FieldRegistry instance;
 		return instance;
 	}
-	const StructRegistryEntry* FieldRegistry::register_struct(const std::string& name, size_t size, std::vector<FieldInfo> fields)
+	const StructRegistryEntry* FieldRegistry::register_struct(
+		const std::string& name, size_t size, const std::type_index& type, size_t offset, std::vector<FieldInfo> fields)
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 
@@ -18,6 +19,9 @@ namespace robotick
 
 		entry.name = name;
 		entry.size = size;
+		entry.offset = std::max(offset, entry.offset); // one of the registrations doesn't know the offset - TODO - create a ticket to address the
+													   // disparity - 2 sets of registrations is a sign of a wrong pattern somewhere
+		entry.type = type;
 
 		if (entry.fields.empty() && !fields.empty())
 		{

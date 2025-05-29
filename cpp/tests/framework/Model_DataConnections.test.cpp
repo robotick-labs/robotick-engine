@@ -29,7 +29,7 @@ namespace robotick::test
 					{
 						static_cast<DummyModelDataConnWorkload*>(p)->~DummyModelDataConnWorkload();
 					},
-					nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+					nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 
 				WorkloadRegistry::get().register_entry(entry);
 			}

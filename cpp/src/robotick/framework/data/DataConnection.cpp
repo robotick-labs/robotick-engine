@@ -68,17 +68,17 @@ namespace robotick
 
 		if (section == "inputs")
 		{
-			out_offset = type->input_offset;
+			out_offset = type->input_struct->offset;
 			return type->input_struct;
 		}
 		if (section == "outputs")
 		{
-			out_offset = type->output_offset;
+			out_offset = type->output_struct->offset;
 			return type->output_struct;
 		}
 		if (section == "config")
 		{
-			out_offset = type->config_offset;
+			out_offset = type->config_struct->offset;
 			return type->config_struct;
 		}
 

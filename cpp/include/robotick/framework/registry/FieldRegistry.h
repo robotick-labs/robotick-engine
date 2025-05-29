@@ -20,15 +20,17 @@ namespace robotick
 	struct FieldInfo
 	{
 		std::string name;
-		size_t offset;
-		std::type_index type;
-		size_t size;
+		size_t offset = 0;
+		std::type_index type = typeid(void);
+		size_t size = 0;
 	};
 
 	struct StructRegistryEntry
 	{
 		std::string name;
-		size_t size;
+		size_t offset = 0;
+		std::type_index type = typeid(void);
+		size_t size = 0;
 		std::vector<FieldInfo> fields;
 	};
 
@@ -37,7 +39,8 @@ namespace robotick
 	  public:
 		static FieldRegistry& get();
 
-		const StructRegistryEntry* register_struct(const std::string& name, size_t size, std::vector<FieldInfo> fields);
+		const StructRegistryEntry* register_struct(
+			const std::string& name, size_t size, const std::type_index& type, size_t offset, std::vector<FieldInfo> fields);
 
 		const StructRegistryEntry* get_struct(const std::string& name) const;
 
@@ -56,7 +59,11 @@ namespace robotick
 	{
 		FieldAutoRegister(std::vector<FieldInfo> fields)
 		{
-			FieldRegistry::get().register_struct(get_clean_typename(typeid(StructType)), sizeof(StructType), std::move(fields));
+			const size_t offset = 0; // we don't know this as we're not registered with the parent workload - that will supply this info later (see
+									 // TODO in method we call - pattern feels wrong)
+
+			FieldRegistry::get().register_struct(
+				get_clean_typename(typeid(StructType)), sizeof(StructType), typeid(StructType), offset, std::move(fields));
 		}
 	};
 

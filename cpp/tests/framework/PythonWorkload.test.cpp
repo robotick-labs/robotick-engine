@@ -70,7 +70,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	const auto* output_struct = info.type->output_struct;
 	REQUIRE(output_struct != nullptr);
 
-	const void* output_base = static_cast<const uint8_t*>(info.ptr) + info.type->output_offset;
+	const void* output_base = static_cast<const uint8_t*>(info.ptr) + output_struct->offset;
 
 	const robotick::Blackboard* output_blackboard = nullptr;
 	for (const auto& field : output_struct->fields)
