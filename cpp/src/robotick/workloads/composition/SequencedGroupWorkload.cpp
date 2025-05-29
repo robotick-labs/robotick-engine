@@ -45,36 +45,27 @@ namespace robotick
 			}
 
 			// iterate + classify connections
-			for (auto it = pending_connections.begin(); it != pending_connections.end();)
+			std::vector<DataConnectionInfo*> remaining;
+			remaining.reserve(pending_connections.size());
+			for (DataConnectionInfo* conn : pending_connections)
 			{
-				DataConnectionInfo* pending_connection = *it;
-				assert(pending_connection != nullptr); // we should never be passed null connections
-
-				const bool src_is_local = workload_to_child.count(pending_connection->source_workload);
-				const bool dst_is_local = workload_to_child.count(pending_connection->dest_workload);
+				const bool src_is_local = workload_to_child.count(conn->source_workload);
+				const bool dst_is_local = workload_to_child.count(conn->dest_workload);
 
 				if (src_is_local && dst_is_local)
 				{
-					// Internal connection
-					const auto child_workload_info = workload_to_child[pending_connection->dest_workload];
-					child_workload_info->connections_in.push_back(pending_connection);
-
-					assert(pending_connection->expected_handler == DataConnectionInfo::ExpectedHandler::Unassigned);
-					pending_connection->expected_handler = DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload;
-
-					it = pending_connections.erase(it);
-				}
-				else if (dst_is_local)
-				{
-					// Source external, we're the receiver
-					pending_connection->expected_handler = DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine;
-					++it;
+					workload_to_child[conn->dest_workload]->connections_in.push_back(conn);
+					assert(conn->expected_handler == DataConnectionInfo::ExpectedHandler::Unassigned);
+					conn->expected_handler = DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload;
 				}
 				else
 				{
-					++it; // Not ours to handle
+					if (dst_is_local)
+						conn->expected_handler = DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine;
+					remaining.push_back(conn);
 				}
 			}
+			pending_connections.swap(remaining);
 		}
 
 		void start(double) { /* nothing needed */ }

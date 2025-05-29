@@ -61,6 +61,15 @@ namespace robotick
 			if (source_field_path.empty() || dest_field_path.empty())
 				throw std::invalid_argument("Field paths must be non-empty");
 
+			if (std::any_of(data_connection_seeds.begin(), data_connection_seeds.end(),
+					[&](const auto& s)
+					{
+						return s.dest_field_path == dest_field_path;
+					}))
+			{
+				throw std::logic_error("Destination field already has an incoming connection: " + dest_field_path);
+			}
+
 			if (root_workload.is_valid())
 				throw std::logic_error("Cannot add connections after root has been set. Model root must be set last.");
 

@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstring>
 #include <future>
+#include <sstream>
 #include <stdexcept>
 #include <thread>
 #include <vector>
@@ -295,32 +296,31 @@ namespace robotick
 		}
 
 		// acquire any pending data_connections have been requested for engine-handling - these should be all that remain:
-		for (auto it = data_connections_pending_acquisition.begin(); it != data_connections_pending_acquisition.end();)
-		{
-			const DataConnectionInfo* conn = (*it);
-			if (conn->expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine)
+		auto new_end = std::remove_if(data_connections_pending_acquisition.begin(), data_connections_pending_acquisition.end(),
+			[this](const DataConnectionInfo* conn)
 			{
-				state->data_connections_acquired_indices.push_back(static_cast<size_t>(conn - state->data_connections_all.data()));
-				it = data_connections_pending_acquisition.erase(it);
-			}
-			else
-			{
-				++it;
-			}
-		}
+				if (conn->expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine)
+				{
+					state->data_connections_acquired_indices.push_back(static_cast<size_t>(conn - state->data_connections_all.data()));
+					return true;
+				}
+				return false;
+			});
+		data_connections_pending_acquisition.erase(new_end, data_connections_pending_acquisition.end());
 
 		// validate that all pending data_connections have been acquired by workloads:
 		if (!data_connections_pending_acquisition.empty())
 		{
-			std::string msg = "Error: Not all data connections were acquired by workloads or engine.\n";
-			msg += "Unclaimed connections:\n";
+			std::ostringstream msg;
+			msg << "Error: Not all data connections were acquired by workloads or engine.\n";
+			msg << "Unclaimed connections (" << data_connections_pending_acquisition.size() << "):\n";
 
 			for (const DataConnectionInfo* conn : data_connections_pending_acquisition)
 			{
-				msg += "  - " + conn->seed.source_field_path + " -> " + conn->seed.dest_field_path + '\n';
+				msg << "  - " << conn->seed.source_field_path << " -> " << conn->seed.dest_field_path << '\n';
 			}
 
-			throw std::runtime_error(msg);
+			throw std::runtime_error(msg.str());
 		}
 
 		// setup each instance

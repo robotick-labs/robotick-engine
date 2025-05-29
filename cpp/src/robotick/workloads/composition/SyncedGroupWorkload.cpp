@@ -94,10 +94,11 @@ namespace robotick
 					continue; // don't spawn threads for children that can't / dont need to need
 				}
 
+				ChildWorkloadInfo* child_ptr = &child;
 				child.thread = std::thread(
-					[this, &child]()
+					[this, child_ptr]()
 					{
-						child_tick_loop(child);
+						child_tick_loop(*child_ptr);
 					});
 			}
 		}

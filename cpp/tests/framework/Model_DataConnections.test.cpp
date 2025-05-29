@@ -56,17 +56,12 @@ namespace robotick::test
 	{
 		Model model;
 
-		auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
-		auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
-		auto c = model.add("DummyModelDataConnWorkload", "C", 10.0);
+		model.add("DummyModelDataConnWorkload", "A", 10.0);
+		model.add("DummyModelDataConnWorkload", "B", 10.0);
+		model.add("DummyModelDataConnWorkload", "C", 10.0);
 
-		model.connect("A.output", "B.input");
-		model.connect("C.output", "B.input"); // conflict
-
-		auto group = model.add("SequencedGroupWorkload", "Group", std::vector{a, b, c}, 10.0);
-		model.set_root(group, false);
-
-		REQUIRE_THROWS_WITH(model.finalize(), Catch::Matchers::ContainsSubstring("already has an incoming connection"));
+		model.connect("A.output", "C.input");
+		REQUIRE_THROWS_WITH(model.connect("B.output", "C.input"), Catch::Matchers::ContainsSubstring("already has an incoming connection"));
 	}
 
 	TEST_CASE("Unit|Framework|DataConnections|Seeds are preserved for engine use")
