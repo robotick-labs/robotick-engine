@@ -56,6 +56,11 @@ namespace robotick
 										 "' already has an incoming connection. Cannot connect from source field '" +
 										 data_connection_seed.source_field_path + "'.\nEach input field may only be connected once.");
 			}
+			else
+			{
+				// not found - add it
+				connected_inputs.emplace(data_connection_seed.dest_field_path);
+			}
 
 			// (2) we do further validation at engine.load() time and before - we may wish to push some earlier to this stage - if so it can go here
 			// ...

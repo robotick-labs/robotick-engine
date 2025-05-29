@@ -25,9 +25,9 @@ namespace
 		std::atomic<int> tick_count{0};
 		double last_dt{0};
 
-		void tick(double dt)
+		void tick(double time_delta)
 		{
-			last_dt = dt;
+			last_dt = time_delta;
 			tick_count.fetch_add(1);
 		}
 	};
@@ -36,7 +36,7 @@ namespace
 	{
 		CountingWorkload* impl = new CountingWorkload();
 		~CountingWrapper() { delete impl; }
-		void tick(double dt) { impl->tick(dt); }
+		void tick(double time_delta) { impl->tick(time_delta); }
 	};
 
 	struct CountingRegister
@@ -53,9 +53,9 @@ namespace
 					static_cast<CountingWrapper*>(p)->~CountingWrapper();
 				},
 				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr,
-				[](void* p, double dt)
+				[](void* p, double time_delta)
 				{
-					static_cast<CountingWrapper*>(p)->tick(dt);
+					static_cast<CountingWrapper*>(p)->tick(time_delta);
 				},
 				nullptr};
 
@@ -80,7 +80,7 @@ namespace
 	{
 		SlowWorkload* impl = new SlowWorkload();
 		~SlowWrapper() { delete impl; }
-		void tick(double dt) { impl->tick(dt); }
+		void tick(double time_delta) { impl->tick(time_delta); }
 	};
 
 	struct SlowRegister
@@ -97,9 +97,9 @@ namespace
 					static_cast<SlowWrapper*>(p)->~SlowWrapper();
 				},
 				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr,
-				[](void* p, double dt)
+				[](void* p, double time_delta)
 				{
-					static_cast<SlowWrapper*>(p)->tick(dt);
+					static_cast<SlowWrapper*>(p)->tick(time_delta);
 				},
 				nullptr};
 
@@ -223,9 +223,9 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|tick() passes real time_delta (chi
 	std::this_thread::sleep_for(10ms); // give a bit if time for the tick to complete
 	group_info.type->stop_fn(group_info.ptr);
 
-	INFO("First dt (expected 0.02): " << first_dt);
+	INFO("First time_delta (expected 0.02): " << first_dt);
 	CHECK_THAT(first_dt, Catch::Matchers::WithinAbs(0.02, 0.005)); // allow ±5ms - since we're not allowing for code-duration when sleeping above
 
-	INFO("Last dt (expected 0.03): " << counting->impl->last_dt);
+	INFO("Last time_delta (expected 0.03): " << counting->impl->last_dt);
 	CHECK_THAT(counting->impl->last_dt, Catch::Matchers::WithinAbs(0.02, 0.005)); // (ditto)
 }

@@ -30,7 +30,7 @@ namespace
 	{
 		DummyTickingWorkload* impl = new DummyTickingWorkload();
 		~DummyTickingWrapper() { delete impl; }
-		void tick(double dt) { impl->tick(dt); }
+		void tick(double time_delta) { impl->tick(time_delta); }
 	};
 
 	struct DummyTickingRegister
@@ -47,9 +47,9 @@ namespace
 					static_cast<DummyTickingWrapper*>(p)->~DummyTickingWrapper();
 				},
 				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr,
-				[](void* p, double dt)
+				[](void* p, double time_delta)
 				{
-					static_cast<DummyTickingWrapper*>(p)->tick(dt);
+					static_cast<DummyTickingWrapper*>(p)->tick(time_delta);
 				},
 				nullptr};
 
@@ -68,7 +68,7 @@ namespace
 	struct SlowWrapper
 	{
 		SlowTickWorkload impl;
-		void tick(double dt) { impl.tick(dt); }
+		void tick(double time_delta) { impl.tick(time_delta); }
 	};
 
 	struct SlowTickRegister
@@ -85,9 +85,9 @@ namespace
 					static_cast<SlowWrapper*>(p)->~SlowWrapper();
 				},
 				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr,
-				[](void* p, double dt)
+				[](void* p, double time_delta)
 				{
-					static_cast<SlowWrapper*>(p)->tick(dt);
+					static_cast<SlowWrapper*>(p)->tick(time_delta);
 				},
 				nullptr};
 

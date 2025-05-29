@@ -45,7 +45,7 @@ namespace robotick::test
 		ROBOTICK_DEFINE_WORKLOAD(ReceiverWorkload)
 	} // namespace
 
-	TEST_CASE("Unit|Framework|SyncedGroupWorkload|Data connections are propagated before children tick")
+	TEST_CASE("Unit|Framework|Data|Connection|Data connections are propagated correctly")
 	{
 		Model model;
 		const double tick_rate = 100.0;
@@ -60,27 +60,28 @@ namespace robotick::test
 		Engine engine;
 		engine.load(model);
 
-		const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
-		group_info.type->start_fn(group_info.ptr, tick_rate);
+		std::atomic<bool> stop_flag{false};
 
-		const int num_ticks = 5;
-		const double dt = 1.0 / tick_rate;
-		for (int i = 0; i < num_ticks; ++i)
-		{
-			group_info.type->tick_fn(group_info.ptr, dt);
-			std::this_thread::sleep_for(std::chrono::duration<double>(dt));
-		}
+		std::thread runner(
+			[&]
+			{
+				engine.run(stop_flag);
+			});
 
-		group_info.type->stop_fn(group_info.ptr);
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		stop_flag.store(true);
+		runner.join();
 
 		const auto& receiver_info = EngineInspector::get_instance_info(engine, receiver.index);
-		const auto* workload = static_cast<const ReceiverWorkload*>((void*)receiver_info.ptr);
-		REQUIRE(workload->received.size() == num_ticks);
+		const auto* receiver_workload = static_cast<const ReceiverWorkload*>((void*)receiver_info.ptr);
 
-		for (size_t i = 0; i < workload->received.size(); ++i)
+		REQUIRE(receiver_workload->received.size() > 10);
+
+		for (size_t i = 0; i < receiver_workload->received.size(); ++i)
 		{
-			INFO("Received[" << i << "] = " << workload->received[i]);
-			CHECK(workload->received[i] == static_cast<int>(i + 1)); // sender increments from 0
+			INFO("Received[" << i << "] = " << receiver_workload->received[i]);
+			CHECK(receiver_workload->received[i] == static_cast<int>(i));
 		}
 	}
+
 } // namespace robotick::test

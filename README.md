@@ -46,7 +46,7 @@ struct HelloWorkload {
     HelloInputs inputs;
     HelloOutputs outputs;
 
-    void tick(double dt);
+    void tick(double time_delta);
 };
 ```
 Reflection macros make every field visible and usable for config, scripting, or telemetry.

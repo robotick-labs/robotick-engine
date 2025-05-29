@@ -6,83 +6,86 @@
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include <catch2/catch_all.hpp>
 
-using namespace robotick;
-
-namespace
+namespace robotick::test
 {
-	struct DummyModelDataConnWorkload
-	{
-	};
 
-	struct DummyRegister
+	namespace
 	{
-		DummyRegister()
+		struct DummyModelDataConnWorkload
 		{
-			const WorkloadRegistryEntry entry = {"DummyModelDataConnWorkload", sizeof(DummyModelDataConnWorkload),
-				alignof(DummyModelDataConnWorkload),
-				[](void* p)
-				{
-					new (p) DummyModelDataConnWorkload();
-				},
-				[](void* p)
-				{
-					static_cast<DummyModelDataConnWorkload*>(p)->~DummyModelDataConnWorkload();
-				},
-				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+		};
 
-			WorkloadRegistry::get().register_entry(entry);
-		}
-	};
-	static DummyRegister s_register;
-} // namespace
+		struct DummyRegister
+		{
+			DummyRegister()
+			{
+				const WorkloadRegistryEntry entry = {"DummyModelDataConnWorkload", sizeof(DummyModelDataConnWorkload),
+					alignof(DummyModelDataConnWorkload),
+					[](void* p)
+					{
+						new (p) DummyModelDataConnWorkload();
+					},
+					[](void* p)
+					{
+						static_cast<DummyModelDataConnWorkload*>(p)->~DummyModelDataConnWorkload();
+					},
+					nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 
-TEST_CASE("Unit|Framework|DataConnections|Allows connecting input between valid workloads")
-{
-	Model model;
+				WorkloadRegistry::get().register_entry(entry);
+			}
+		};
+		static DummyRegister s_register;
+	} // namespace
 
-	auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
-	auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
+	TEST_CASE("Unit|Framework|DataConnections|Allows connecting input between valid workloads")
+	{
+		Model model;
 
-	model.connect("A.output", "B.input");
+		auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
+		auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
 
-	auto group = model.add("SequencedGroupWorkload", "Group", std::vector{a, b}, 10.0);
-	model.set_root(group);
+		model.connect("A.output", "B.input");
 
-	REQUIRE_NOTHROW(model.finalize());
-}
+		auto group = model.add("SequencedGroupWorkload", "Group", std::vector{a, b}, 10.0);
+		model.set_root(group);
 
-TEST_CASE("Unit|Framework|DataConnections|Duplicate inputs throw with clear error")
-{
-	Model model;
+		REQUIRE_NOTHROW(model.finalize());
+	}
 
-	auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
-	auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
-	auto c = model.add("DummyModelDataConnWorkload", "C", 10.0);
+	TEST_CASE("Unit|Framework|DataConnections|Duplicate inputs throw with clear error")
+	{
+		Model model;
 
-	model.connect("A.output", "B.input");
-	model.connect("C.output", "B.input"); // conflict
+		auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
+		auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
+		auto c = model.add("DummyModelDataConnWorkload", "C", 10.0);
 
-	auto group = model.add("SequencedGroupWorkload", "Group", std::vector{a, b, c}, 10.0);
-	model.set_root(group, false);
+		model.connect("A.output", "B.input");
+		model.connect("C.output", "B.input"); // conflict
 
-	REQUIRE_THROWS_WITH(model.finalize(), Catch::Matchers::ContainsSubstring("already has an incoming connection"));
-}
+		auto group = model.add("SequencedGroupWorkload", "Group", std::vector{a, b, c}, 10.0);
+		model.set_root(group, false);
 
-TEST_CASE("Unit|Framework|DataConnections|Seeds are preserved for engine use")
-{
-	Model model;
+		REQUIRE_THROWS_WITH(model.finalize(), Catch::Matchers::ContainsSubstring("already has an incoming connection"));
+	}
 
-	auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
-	auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
-	model.connect("A.output", "B.input");
+	TEST_CASE("Unit|Framework|DataConnections|Seeds are preserved for engine use")
+	{
+		Model model;
 
-	auto group = model.add("SequencedGroupWorkload", "Group", std::vector{a, b}, 10.0);
-	model.set_root(group);
+		auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
+		auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
+		model.connect("A.output", "B.input");
 
-	const auto& seeds = model.get_data_connection_seeds();
-	REQUIRE(seeds.size() == 1);
-	CHECK(seeds[0].source_field_path == "A.output");
-	CHECK(seeds[0].dest_field_path == "B.input");
+		auto group = model.add("SequencedGroupWorkload", "Group", std::vector{a, b}, 10.0);
+		model.set_root(group);
 
-	REQUIRE_NOTHROW(model.finalize());
-}
+		const auto& seeds = model.get_data_connection_seeds();
+		REQUIRE(seeds.size() == 1);
+		CHECK(seeds[0].source_field_path == "A.output");
+		CHECK(seeds[0].dest_field_path == "B.input");
+
+		REQUIRE_NOTHROW(model.finalize());
+	}
+
+} // namespace robotick::test
