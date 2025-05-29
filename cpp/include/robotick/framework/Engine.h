@@ -14,6 +14,7 @@
 
 namespace robotick
 {
+	struct DataConnectionInfo;
 	struct WorkloadRegistryEntry;
 
 	namespace test

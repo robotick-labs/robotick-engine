@@ -374,6 +374,9 @@ namespace robotick
 				state->data_connections_all[index].do_data_copy();
 			}
 
+			// Ensure all data writes complete before tick begins
+			std::atomic_thread_fence(std::memory_order_release);
+
 			// tick root (will cause children to tick recursively)
 			root_info.type->tick_fn(root_info.ptr, time_delta);
 			next_tick_time += tick_interval;

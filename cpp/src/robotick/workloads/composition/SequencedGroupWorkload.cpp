@@ -49,12 +49,14 @@ namespace robotick
 			remaining.reserve(pending_connections.size());
 			for (DataConnectionInfo* conn : pending_connections)
 			{
-				const bool src_is_local = workload_to_child.count(conn->source_workload);
-				const bool dst_is_local = workload_to_child.count(conn->dest_workload);
+				const auto src_it = workload_to_child.find(conn->source_workload);
+				const auto dst_it = workload_to_child.find(conn->dest_workload);
+				const bool src_is_local = src_it != workload_to_child.end();
+				const bool dst_is_local = dst_it != workload_to_child.end();
 
 				if (src_is_local && dst_is_local)
 				{
-					workload_to_child[conn->dest_workload]->connections_in.push_back(conn);
+					dst_it->second->connections_in.push_back(conn);
 					assert(conn->expected_handler == DataConnectionInfo::ExpectedHandler::Unassigned);
 					conn->expected_handler = DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload;
 				}

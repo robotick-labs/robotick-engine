@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Model.h"
+#include "robotick/framework/data/DataConnection.h"
 
 #include <cassert>
 #include <functional>
@@ -11,6 +12,30 @@
 
 namespace robotick
 {
+
+	void Model::connect(const std::string& source_field_path, const std::string& dest_field_path)
+	{
+		if (source_field_path.empty() || dest_field_path.empty())
+			throw std::invalid_argument("Field paths must be non-empty");
+
+		if (source_field_path == dest_field_path)
+			throw std::logic_error("Source and destination field paths are identical: " + dest_field_path);
+
+		if (std::any_of(data_connection_seeds.begin(), data_connection_seeds.end(),
+				[&](const auto& s)
+				{
+					return s.dest_field_path == dest_field_path;
+				}))
+		{
+			throw std::logic_error("Destination field already has an incoming connection: " + dest_field_path);
+		}
+
+		if (root_workload.is_valid())
+			throw std::logic_error("Cannot add connections after root has been set. Model root must be set last.");
+
+		data_connection_seeds.push_back({source_field_path, dest_field_path});
+	}
+
 	void Model::finalize()
 	{
 		assert(root_workload.is_valid() && "Model root must be set before validation");

@@ -6,10 +6,12 @@
 
 #include "robotick/framework/data/DataConnection.h"
 
+#include <algorithm>
 #include <any>
 #include <cassert>
 #include <cstdint>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -56,25 +58,7 @@ namespace robotick
 			return {static_cast<uint32_t>(workload_seeds.size() - 1)};
 		}
 
-		void connect(const std::string& source_field_path, const std::string& dest_field_path)
-		{
-			if (source_field_path.empty() || dest_field_path.empty())
-				throw std::invalid_argument("Field paths must be non-empty");
-
-			if (std::any_of(data_connection_seeds.begin(), data_connection_seeds.end(),
-					[&](const auto& s)
-					{
-						return s.dest_field_path == dest_field_path;
-					}))
-			{
-				throw std::logic_error("Destination field already has an incoming connection: " + dest_field_path);
-			}
-
-			if (root_workload.is_valid())
-				throw std::logic_error("Cannot add connections after root has been set. Model root must be set last.");
-
-			data_connection_seeds.push_back({source_field_path, dest_field_path});
-		}
+		void connect(const std::string& source_field_path, const std::string& dest_field_path);
 
 		void set_root(WorkloadHandle handle, const bool auto_finalize = true)
 		{

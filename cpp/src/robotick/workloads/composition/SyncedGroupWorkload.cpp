@@ -107,11 +107,15 @@ namespace robotick
 		{
 			tick_interval_sec = time_delta; // update latest interval
 
-			// Notify all child threads: time to tick (if they're ready)
+			// Notify all running child threads: time to tick (if they're ready)
 			// (increment tick-counter too - as their signal)
+
 			for (auto& child : children)
 			{
-				child.tick_counter->fetch_add(1);
+				if (child.thread.joinable()) // only signal running children
+				{
+					child.tick_counter->fetch_add(1);
+				}
 			}
 
 			std::lock_guard<std::mutex> lock(tick_mutex);
@@ -174,6 +178,9 @@ namespace robotick
 				auto now = steady_clock::now();
 				double time_delta = duration<double>(now - last_tick_time).count();
 				last_tick_time = now;
+
+				std::atomic_thread_fence(std::memory_order_acquire);
+				// ^- Ensures we see all writes from parent before using shared data
 
 				// Tick the workload with real elapsed time
 				child.type->tick_fn(child.ptr, time_delta);
