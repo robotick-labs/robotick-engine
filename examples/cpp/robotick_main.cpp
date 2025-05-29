@@ -43,15 +43,13 @@ void populate_model_groups(Model& model)
 	model.set_root(synced_group_with_slow);
 }
 
-void populate_model_brickpi(Model&)
+void populate_model_brickpi(Model& model)
 {
-#if 0
 	// === Add top-level standalone workloads ===
-	model.add("PythonWorkload", "comms", 30.0,
-			  {{"script_name", "robotick.workloads.core.telemetry.mqtt_update"}, {"class_name", "MqttUpdate"}});
+	// auto mqtt = model.add("MqttWorkload", "mqtt", 30.0);
+	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0);
 
-	model.add("PythonWorkload", "console", 2.0, {{"script_name", "console_update"}, {"class_name", "ConsoleUpdate"}});
-
+#if 0
 	// === Subcomponents for synced pair ===
 	auto brickpi = model.add("PythonWorkload", "brickpi3_interface", 100.0,
 							 {{"script_name", "brickpi"}, {"class_name", "BrickPi3Interface"}});
@@ -71,11 +69,17 @@ void populate_model_brickpi(Model&)
 
 	model.add("SyncedPairWorkload", "control_pair", 100.0, {{"primary", brickpi}, {"secondary", sequence}});
 #endif // #if 0
+
+	std::vector<WorkloadHandle> synced_group_children = {/*mqtt,*/ console};
+	auto root_synced_group = model.add("SyncedGroupWorkload", "synced_group", synced_group_children, 1000.0);
+
+	model.set_root(root_synced_group);
 }
 
 void populate_model(Model& model)
 {
-	populate_model_groups(model);
+	// populate_model_groups(model);
+	populate_model_brickpi(model);
 }
 
 int main()
