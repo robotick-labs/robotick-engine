@@ -24,9 +24,9 @@ namespace robotick
 			std::ostringstream dt, goal, dpct, td, tpct;
 			dt << std::fixed << std::setprecision(2) << r.tick_delta_ms;
 			goal << std::fixed << std::setprecision(2) << r.goal_interval_ms;
-			dpct << std::fixed << std::setprecision(0) << ((r.goal_interval_ms > 0.0) ? 100.0 * r.tick_delta_ms / r.goal_interval_ms : 0.0) << "%";
+			dpct << std::fixed << std::setprecision(1) << ((r.goal_interval_ms > 0.0) ? 100.0 * r.tick_delta_ms / r.goal_interval_ms : 0.0) << "%";
 			td << std::fixed << std::setprecision(2) << r.tick_duration_ms;
-			tpct << std::fixed << std::setprecision(2) << ((r.goal_interval_ms > 0.0) ? 100.0 * r.tick_duration_ms / r.goal_interval_ms : 0.0) << "%";
+			tpct << std::fixed << std::setprecision(1) << ((r.goal_interval_ms > 0.0) ? 100.0 * r.tick_duration_ms / r.goal_interval_ms : 0.0) << "%";
 
 			table_rows.push_back({{r.type, r.name, r.inputs, r.outputs, dt.str(), goal.str(), dpct.str(), td.str(), tpct.str()}});
 		}

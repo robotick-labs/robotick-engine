@@ -18,7 +18,7 @@ namespace robotick
 	class BlackboardsBuffer;
 	struct DataConnectionInfo;
 	struct WorkloadRegistryEntry;
-	struct ConsoleTelemetryWorkload;
+	struct TelemetryCollector;
 
 	namespace test
 	{
@@ -28,7 +28,7 @@ namespace robotick
 	class ROBOTICK_API Engine
 	{
 		friend struct robotick::test::EngineInspector;
-		friend struct robotick::ConsoleTelemetryWorkload;
+		friend struct robotick::TelemetryCollector;
 
 	  public:
 		Engine();

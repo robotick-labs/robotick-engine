@@ -149,7 +149,7 @@ namespace robotick
 						{
 						}
 
-						const char* color = (val <= 100.0) ? GREEN : (val < 105.0) ? YELLOW : RED;
+						const char* color = (val <= 105.0) ? GREEN : (val < 110.0) ? YELLOW : RED;
 
 						oss << color << std::setw(widths[col]) << std::left << cell << RESET;
 					}
