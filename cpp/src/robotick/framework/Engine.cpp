@@ -77,7 +77,7 @@ namespace robotick
 		return state->workloads_buffer;
 	}
 
-	size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances)
+	size_t Engine::compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances)
 	{
 		// note - this function is not recursive, since we don't expect to have nested blackboards
 
@@ -118,7 +118,7 @@ namespace robotick
 		return total;
 	}
 
-	void bind_blackboards_in_struct(
+	void Engine::bind_blackboards_in_struct(
 		WorkloadInstanceInfo& workload_instance_info, const StructRegistryEntry& struct_entry, size_t& blackboard_storage_offset)
 	{
 		// note - this function is not recursive, since we don't expect to have nested blackboards
@@ -135,7 +135,7 @@ namespace robotick
 		}
 	}
 
-	void bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances)
+	void Engine::bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances)
 	{
 		size_t blackboard_storage_offset = 0;
 

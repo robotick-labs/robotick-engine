@@ -16,6 +16,11 @@
 namespace robotick
 {
 	class Blackboard;
+	class Engine;
+	struct BlackboardTestUtils;
+	struct DataConnectionUtils;
+	struct DataConnectionsFactory;
+	struct WorkloadFieldsIterator;
 
 	struct BlackboardFieldInfo
 	{
@@ -50,6 +55,15 @@ namespace robotick
 
 	class Blackboard
 	{
+		friend class Engine;
+		friend struct BlackboardFieldInfo;
+		friend struct BlackboardInfo;
+		friend struct BlackboardTestUtils;
+		friend struct DataConnectionUtils;
+		friend struct DataConnectionsFactory;
+		friend struct PythonWorkload;
+		friend struct WorkloadFieldsIterator;
+
 	  public:
 		Blackboard() = default;
 		explicit Blackboard(const std::vector<BlackboardFieldInfo>& schema);
@@ -61,7 +75,7 @@ namespace robotick
 		template <typename T> void set(const std::string& key, const T& value);
 		template <typename T> T get(const std::string& key) const;
 
-	  public: // TODO - make these protected and friend to Engine, DataConnection and tests
+	  protected:
 		void bind(size_t datablock_offset);
 		size_t get_datablock_offset() const;
 

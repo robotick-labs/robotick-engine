@@ -16,9 +16,10 @@ namespace robotick
 {
 	class WorkloadsBuffer;
 	struct DataConnectionInfo;
-	struct WorkloadRegistryEntry;
+	struct StructRegistryEntry;
 	struct TelemetryCollector;
 	struct WorkloadFieldsIterator;
+	struct WorkloadRegistryEntry;
 
 	namespace test
 	{
@@ -49,6 +50,12 @@ namespace robotick
 		const std::vector<DataConnectionInfo>& get_all_data_connections() const;
 
 		const WorkloadsBuffer& get_workloads_buffer_readonly() const;
+
+	  private:
+		void bind_blackboards_in_struct(
+			WorkloadInstanceInfo& workload_instance_info, const StructRegistryEntry& struct_entry, size_t& blackboard_storage_offset);
+		void bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances);
+		size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances);
 
 	  private:
 		struct State;
