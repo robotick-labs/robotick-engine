@@ -26,7 +26,7 @@ namespace robotick
 	struct FieldInfo
 	{
 		std::string name;
-		size_t offset = OFFSET_UNBOUND;
+		size_t offset_within_struct = OFFSET_UNBOUND;
 		std::type_index type = typeid(void);
 		size_t size = 0;
 
@@ -53,9 +53,9 @@ namespace robotick
 	struct StructRegistryEntry
 	{
 		std::string name;
-		size_t offset = OFFSET_UNBOUND;
-		std::type_index type = typeid(void);
 		size_t size = 0;
+		std::type_index type = typeid(void);
+		size_t offset_within_workload = OFFSET_UNBOUND;
 		std::vector<FieldInfo> fields;
 	};
 
@@ -85,7 +85,7 @@ namespace robotick
 		FieldAutoRegister(std::vector<FieldInfo> fields)
 		{
 			const size_t offset = OFFSET_UNBOUND; // we don't know this as we're not registered with the parent workload yet (TODO - address this
-												  // strange double-register patterm)
+												  // strange double-register pattern)
 
 			FieldRegistry::get().register_struct(
 				get_clean_typename(typeid(StructType)), sizeof(StructType), typeid(StructType), offset, std::move(fields));

@@ -58,7 +58,9 @@ namespace robotick
 			if (it == config.end())
 				continue;
 
-			void* field_ptr = static_cast<uint8_t*>(struct_ptr) + field.offset;
+			assert(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+
+			void* field_ptr = static_cast<uint8_t*>(struct_ptr) + field.offset_within_struct;
 
 			if (field.type == typeid(std::string))
 			{

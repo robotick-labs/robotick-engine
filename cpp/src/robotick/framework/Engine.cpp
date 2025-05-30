@@ -50,7 +50,10 @@ namespace robotick
 		{
 			if (instance.type->destruct)
 			{
-				instance.type->destruct(instance.get_ptr(*this));
+				void* instance_ptr = instance.get_ptr(*this);
+				assert(instance_ptr != nullptr && "Workload pointer should not be null at this point");
+
+				instance.type->destruct(instance_ptr);
 			}
 		}
 	}
@@ -102,7 +105,7 @@ namespace robotick
 					return;
 				}
 
-				const size_t struct_offset = struct_info->offset;
+				const size_t struct_offset = struct_info->offset_within_workload;
 
 				const auto struct_ptr = static_cast<uint8_t*>(instance_ptr) + struct_offset;
 
@@ -110,7 +113,9 @@ namespace robotick
 				{
 					if (field.type == typeid(Blackboard))
 					{
-						const auto* blackboard_raw_ptr = struct_ptr + field.offset;
+						assert(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+
+						const auto* blackboard_raw_ptr = struct_ptr + field.offset_within_struct;
 						const auto* blackboard = reinterpret_cast<const Blackboard*>(blackboard_raw_ptr);
 
 						total += blackboard->get_info()->total_datablock_size;
@@ -143,9 +148,9 @@ namespace robotick
 		}
 	}
 
-	void Engine::bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances)
+	void Engine::bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances, const size_t blackboards_data_start_offset)
 	{
-		size_t blackboard_storage_offset = 0;
+		size_t blackboard_storage_offset = blackboards_data_start_offset;
 
 		for (WorkloadInstanceInfo& instance : instances)
 		{
@@ -188,7 +193,8 @@ namespace robotick
 
 		const auto& workload_seeds = model.get_workload_seeds();
 
-		size_t offset = 0;
+		// compute how much room we need in our WorkloadsBuffer, and required offset for each workload object
+		size_t workloads_buffer_cursor = 0;
 		std::vector<size_t> aligned_offsets;
 		for (const auto& workload_seed : workload_seeds)
 		{
@@ -196,13 +202,13 @@ namespace robotick
 			if (!type)
 				throw std::runtime_error("Unknown workload type: " + workload_seed.type);
 
-			size_t alignment = std::max<size_t>(type->alignment, alignof(std::max_align_t));
-			offset = (offset + alignment - 1) & ~(alignment - 1);
-			aligned_offsets.push_back(offset);
-			offset += type->size;
+			const size_t alignment = std::max<size_t>(type->alignment, alignof(std::max_align_t));
+			workloads_buffer_cursor = (workloads_buffer_cursor + alignment - 1) & ~(alignment - 1);
+			aligned_offsets.push_back(workloads_buffer_cursor);
+			workloads_buffer_cursor += type->size;
 		}
 
-		const size_t all_workloads_size = offset;
+		const size_t all_workloads_size = workloads_buffer_cursor;
 
 		// Workloads buffer allocation (add on over-estimate of further size needed for any blackboards-data):
 		state->workloads_buffer = WorkloadsBuffer(all_workloads_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
@@ -231,7 +237,9 @@ namespace robotick
 
 					if (type->config_struct)
 					{
-						apply_struct_fields(instance_ptr + type->config_struct->offset, *type->config_struct, workload_seed.config);
+						assert(type->config_struct->offset_within_workload != OFFSET_UNBOUND && "Struct offset not initialized");
+
+						apply_struct_fields(instance_ptr + type->config_struct->offset_within_workload, *type->config_struct, workload_seed.config);
 					}
 
 					if (type->pre_load_fn)
@@ -248,8 +256,8 @@ namespace robotick
 			state->instances.push_back(fut.get());
 		}
 
-		// Blackboards memory allocation and buffer-binding (at least 1 byte to please all platforms):
-		const size_t blackboards_buffer_size = std::max<size_t>(1, compute_blackboard_memory_requirements(state->instances));
+		// Blackboards memory allocation and buffer-binding:
+		const size_t blackboards_buffer_size = compute_blackboard_memory_requirements(state->instances);
 		if (blackboards_buffer_size > robotick::DEFAULT_MAX_BLACKBOARDS_BYTES)
 		{
 			std::ostringstream msg;
@@ -260,7 +268,15 @@ namespace robotick
 			throw std::runtime_error(msg.str());
 		}
 
-		bind_blackboards_for_instances(state->instances);
+		if (blackboards_buffer_size > 0)
+		{
+			const size_t blackboards_data_start_offset = workloads_buffer_cursor;
+			workloads_buffer_cursor += blackboards_buffer_size;
+
+			assert(blackboards_data_start_offset >= all_workloads_size && "Blackboards data should all appear after workloads-data in buffer");
+
+			bind_blackboards_for_instances(state->instances, blackboards_data_start_offset);
+		}
 
 		// call load_fn (multi-threaded):
 		std::vector<std::future<void>> load_futures;
@@ -356,7 +372,12 @@ namespace robotick
 		for (auto& instance : state->instances)
 		{
 			if (instance.type->setup_fn)
-				instance.type->setup_fn(instance.get_ptr(*this));
+			{
+				void* instance_ptr = instance.get_ptr(*this);
+				assert(instance_ptr != nullptr && "Workload pointer should not be null at this point");
+
+				instance.type->setup_fn(instance_ptr);
+			}
 		}
 
 		state->root_instance = root_instance;

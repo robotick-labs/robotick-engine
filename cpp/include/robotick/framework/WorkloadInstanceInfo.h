@@ -27,7 +27,7 @@ namespace robotick
 		uint8_t* get_ptr(WorkloadsBuffer& workloads_buffer) const;
 
 		// constant once created:
-		size_t offset = OFFSET_UNBOUND;
+		size_t offset_in_workloads_buffer = OFFSET_UNBOUND;
 		const WorkloadRegistryEntry* type = nullptr;
 		std::string unique_name;
 		double tick_rate_hz = 0.0;

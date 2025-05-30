@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/utils/Constants.h"
 #include <cstring>
 #include <stdexcept>
 
@@ -118,8 +119,9 @@ namespace robotick
 
 	size_t Blackboard::get_datablock_offset() const
 	{
-		if (!info)
+		if (!info || info->datablock_offset_from_blackboard == OFFSET_UNBOUND)
 			throw std::runtime_error("Blackboard::get_datablock_offset called on uninitialized Blackboard");
+
 		return info->datablock_offset_from_blackboard;
 	}
 

@@ -65,23 +65,30 @@ namespace robotick
 				throw std::runtime_error("Missing type info for workload: " + instance.unique_name);
 			}
 
+			const StructRegistryEntry* result = nullptr;
+
 			if (section == "inputs")
 			{
-				out_offset = type->input_struct->offset;
-				return type->input_struct;
+				out_offset = type->input_struct->offset_within_workload;
+				result = type->input_struct;
 			}
-			if (section == "outputs")
+			else if (section == "outputs")
 			{
-				out_offset = type->output_struct->offset;
-				return type->output_struct;
+				out_offset = type->output_struct->offset_within_workload;
+				result = type->output_struct;
 			}
-			if (section == "config")
+			else if (section == "config")
 			{
-				out_offset = type->config_struct->offset;
-				return type->config_struct;
+				out_offset = type->config_struct->offset_within_workload;
+				result = type->config_struct;
+			}
+			else
+			{
+				throw std::runtime_error("Invalid section: " + section);
 			}
 
-			throw std::runtime_error("Invalid section: " + section);
+			assert((result == nullptr || out_offset != OFFSET_UNBOUND) && "StructRegistryEntry with unbound offset should not exist");
+			return result;
 		}
 
 		static const FieldInfo* find_field(const StructRegistryEntry* struct_entry, const std::string& field_name)
@@ -189,7 +196,7 @@ namespace robotick
 
 			assert(dst_struct_offset != OFFSET_UNBOUND && "Dest struct offset should have definitely been set by now");
 
-			uint8_t* dst_ptr = src_field->get_data_ptr(workloads_buffer, *dst_inst, *dst_struct);
+			uint8_t* dst_ptr = dst_field->get_data_ptr(workloads_buffer, *dst_inst, *dst_struct);
 			std::type_index dst_type = dst_field->type;
 			size_t dst_size = dst_field->size;
 

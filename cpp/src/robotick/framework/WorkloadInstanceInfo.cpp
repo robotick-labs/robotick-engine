@@ -19,9 +19,13 @@ namespace robotick
 
 	uint8_t* WorkloadInstanceInfo::get_ptr(WorkloadsBuffer& workloads_buffer) const
 	{
-		assert(this->offset != OFFSET_UNBOUND);
+		assert(this->offset_in_workloads_buffer != OFFSET_UNBOUND && "Workload object offset should have been set by now");
 
-		return workloads_buffer.raw_ptr() + this->offset;
+		uint8_t* ptr = workloads_buffer.raw_ptr() + this->offset_in_workloads_buffer;
+
+		assert(workloads_buffer.is_within_buffer(ptr) && "WorkloadInstanceInfo computed should be within the workloads-buffer provided");
+
+		return ptr;
 	}
 
 } // namespace robotick

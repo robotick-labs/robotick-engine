@@ -22,8 +22,14 @@ namespace robotick
 
 		entry.name = name;
 		entry.size = size;
-		entry.offset = std::max(offset, entry.offset); // one of the registrations doesn't know the offset - TODO - create a ticket to address the
-													   // disparity - 2 sets of registrations is a sign of a wrong pattern somewhere
+
+		if (entry.offset_within_workload == OFFSET_UNBOUND)
+		{
+			entry.offset_within_workload = offset;
+		}
+		// ^- one of the registrations doesn't know the offset - TODO - create a ticket to address the disparity - 2 sets of registrations is a sign
+		// of a wrong pattern somewhere
+
 		entry.type = type;
 
 		if (entry.fields.empty() && !fields.empty())
@@ -49,11 +55,14 @@ namespace robotick
 	uint8_t* FieldInfo::get_data_ptr(
 		WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& instance, const StructRegistryEntry& struct_info) const
 	{
-		(void)workloads_buffer;
+		assert(instance.offset_in_workloads_buffer != OFFSET_UNBOUND && "Workload object instance offset should have been correctly set by now");
+		assert(struct_info.offset_within_workload != OFFSET_UNBOUND && "struct offset should have been correctly set by now");
+		assert(this->offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+
 		uint8_t* base_ptr = workloads_buffer.raw_ptr();
-		uint8_t* instance_ptr = base_ptr + instance.offset;
-		uint8_t* struct_ptr = instance_ptr + struct_info.offset;
-		return struct_ptr + this->offset;
+		uint8_t* instance_ptr = base_ptr + instance.offset_in_workloads_buffer;
+		uint8_t* struct_ptr = instance_ptr + struct_info.offset_within_workload;
+		return struct_ptr + this->offset_within_struct;
 	}
 
 } // namespace robotick
