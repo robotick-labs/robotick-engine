@@ -47,11 +47,11 @@ namespace robotick
 	}
 
 	uint8_t* FieldInfo::get_data_ptr(
-		const WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& instance, const StructRegistryEntry& struct_info) const
+		WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& instance, const StructRegistryEntry& struct_info) const
 	{
 		(void)workloads_buffer;
-		// uint8_t* base_ptr = workloads_buffer.raw_ptr();
-		uint8_t* instance_ptr = instance.ptr; // base_ptr + instance.offset;
+		uint8_t* base_ptr = workloads_buffer.raw_ptr();
+		uint8_t* instance_ptr = base_ptr + instance.offset;
 		uint8_t* struct_ptr = instance_ptr + struct_info.offset;
 		return struct_ptr + this->offset;
 	}

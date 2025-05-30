@@ -102,27 +102,21 @@ namespace robotick
 			return nullptr;
 		}
 
-		static const robotick::BlackboardFieldInfo* resolve_blackboard_field_ptr(const robotick::WorkloadInstanceInfo& inst,
-			const robotick::FieldInfo& blackboard_field, const std::string& blackboard_subfield_name, size_t struct_offset)
+		static const BlackboardFieldInfo* resolve_blackboard_field_ptr(WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& inst,
+			const StructRegistryEntry& struct_info, const FieldInfo& blackboard_field, const std::string& blackboard_subfield_name)
 		{
-			if (blackboard_field.type != std::type_index(typeid(robotick::Blackboard)))
+			if (blackboard_field.type != std::type_index(typeid(Blackboard)))
 			{
 				return nullptr;
 			}
 
-			const robotick::Blackboard* blackboard =
-				reinterpret_cast<const robotick::Blackboard*>(inst.ptr + struct_offset + blackboard_field.offset);
-			if (!blackboard)
-			{
-				return nullptr;
-			}
-
-			return blackboard->get_field_info(blackboard_subfield_name);
+			const Blackboard& blackboard = blackboard_field.get_data<Blackboard>(workloads_buffer, inst, struct_info);
+			return blackboard.get_field_info(blackboard_subfield_name);
 		}
 	};
 
 	std::vector<DataConnectionInfo> DataConnectionsFactory::create(
-		const std::vector<DataConnectionSeed>& seeds, const std::vector<WorkloadInstanceInfo>& instances)
+		WorkloadsBuffer& workloads_buffer, const std::vector<DataConnectionSeed>& seeds, const std::vector<WorkloadInstanceInfo>& instances)
 	{
 		std::vector<DataConnectionInfo> results;
 		std::unordered_set<std::string> seen_destinations;
@@ -141,35 +135,35 @@ namespace robotick
 			const WorkloadInstanceInfo* src_inst = src_it != idx.end() ? src_it->second : nullptr;
 			const WorkloadInstanceInfo* dst_inst = dst_it != idx.end() ? dst_it->second : nullptr;
 
-			if (!src_inst || !src_inst->ptr)
+			if (!src_inst)
 			{
 				throw std::runtime_error("Unknown source workload: " + std::string(src.workload_name.c_str()));
 			}
-			if (!dst_inst || !dst_inst->ptr)
+
+			if (!dst_inst)
 			{
 				throw std::runtime_error("Unknown destination workload: " + std::string(dst.workload_name.c_str()));
 			}
 
 			// Lookup struct + field for source
-			size_t src_offset = 0;
-			const StructRegistryEntry* src_struct = DataConnectionUtils::get_struct_entry(*src_inst, src.section_name.c_str(), src_offset);
+			size_t src_struct_offset = OFFSET_UNBOUND;
+			const StructRegistryEntry* src_struct = DataConnectionUtils::get_struct_entry(*src_inst, src.section_name.c_str(), src_struct_offset);
 			const FieldInfo* src_field = DataConnectionUtils::find_field(src_struct, src.field_path[0].c_str());
 			if (!src_field)
 			{
 				throw std::runtime_error("Source field not found: " + seed.source_field_path);
 			}
 
-			if (!src_inst->ptr)
-				throw std::runtime_error("Workload '" + src_inst->unique_name + "' data buffer is null – cannot resolve connection");
+			assert(src_struct_offset != OFFSET_UNBOUND && "Src struct offset should have definitely been set by now");
 
-			const uint8_t* src_ptr = src_inst->ptr + src_offset + src_field->offset;
+			const uint8_t* src_ptr = src_field->get_data_ptr(workloads_buffer, *src_inst, *src_struct);
 			std::type_index src_type = src_field->type;
 			size_t src_size = src_field->size;
 
 			if (src.field_path.size() == 2)
 			{
-				const BlackboardFieldInfo* src_blackboard_field =
-					DataConnectionUtils::resolve_blackboard_field_ptr(*src_inst, *src_field, src.field_path[1].c_str(), src_offset);
+				const BlackboardFieldInfo* src_blackboard_field = DataConnectionUtils::resolve_blackboard_field_ptr(
+					workloads_buffer, *src_inst, *src_struct, *src_field, src.field_path[1].c_str());
 
 				if (!src_blackboard_field)
 				{
@@ -185,22 +179,24 @@ namespace robotick
 			}
 
 			// Lookup struct + field for dest
-			size_t dst_offset = 0;
-			const StructRegistryEntry* dst_struct = DataConnectionUtils::get_struct_entry(*dst_inst, dst.section_name.c_str(), dst_offset);
+			size_t dst_struct_offset = OFFSET_UNBOUND;
+			const StructRegistryEntry* dst_struct = DataConnectionUtils::get_struct_entry(*dst_inst, dst.section_name.c_str(), dst_struct_offset);
 			const FieldInfo* dst_field = DataConnectionUtils::find_field(dst_struct, dst.field_path[0].c_str());
-			if (!dst_field)
+			if (!dst_field || dst_struct_offset == OFFSET_UNBOUND)
 			{
 				throw std::runtime_error("Destination field not found: " + seed.dest_field_path);
 			}
 
-			uint8_t* dst_ptr = dst_inst->ptr + dst_offset + dst_field->offset;
+			assert(dst_struct_offset != OFFSET_UNBOUND && "Dest struct offset should have definitely been set by now");
+
+			uint8_t* dst_ptr = src_field->get_data_ptr(workloads_buffer, *dst_inst, *dst_struct);
 			std::type_index dst_type = dst_field->type;
 			size_t dst_size = dst_field->size;
 
 			if (dst.field_path.size() == 2)
 			{
-				const BlackboardFieldInfo* dst_blackboard_field =
-					DataConnectionUtils::resolve_blackboard_field_ptr(*dst_inst, *dst_field, dst.field_path[1].c_str(), dst_offset);
+				const BlackboardFieldInfo* dst_blackboard_field = DataConnectionUtils::resolve_blackboard_field_ptr(
+					workloads_buffer, *dst_inst, *dst_struct, *dst_field, dst.field_path[1].c_str());
 
 				if (!dst_blackboard_field)
 				{

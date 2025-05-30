@@ -4,13 +4,16 @@
 
 #pragma once
 
+#include "robotick/framework/utils/Constants.h"
 #include <cstdint>
 #include <string>
 #include <vector>
 
 namespace robotick
 {
+	class Engine;
 	struct WorkloadRegistryEntry;
+	struct WorkloadsBuffer;
 
 	struct WorkloadInstanceStats
 	{
@@ -20,8 +23,11 @@ namespace robotick
 
 	struct WorkloadInstanceInfo
 	{
+		uint8_t* get_ptr(const Engine& engine) const;
+		uint8_t* get_ptr(WorkloadsBuffer& workloads_buffer) const;
+
 		// constant once created:
-		uint8_t* ptr = nullptr;
+		size_t offset = OFFSET_UNBOUND;
 		const WorkloadRegistryEntry* type = nullptr;
 		std::string unique_name;
 		double tick_rate_hz = 0.0;

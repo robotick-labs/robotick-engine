@@ -12,9 +12,9 @@ namespace robotick
 {
 
 	void WorkloadFieldsIterator::for_each_workload_field_impl(
-		const Engine& engine, const WorkloadsBuffer* workloads_override, std::function<void(const WorkloadFieldView&)> callback)
+		const Engine& engine, WorkloadsBuffer* workloads_override, std::function<void(const WorkloadFieldView&)> callback)
 	{
-		const auto& workloads_buffer = workloads_override ? *workloads_override : engine.get_workloads_buffer_readonly();
+		auto& workloads_buffer = workloads_override ? *workloads_override : engine.get_workloads_buffer();
 
 		for (const WorkloadInstanceInfo& instance : engine.get_all_instance_info())
 		{

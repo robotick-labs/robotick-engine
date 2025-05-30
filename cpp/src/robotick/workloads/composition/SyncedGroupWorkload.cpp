@@ -28,9 +28,11 @@ namespace robotick
 		{
 			std::thread thread;
 			std::shared_ptr<std::atomic<uint32_t>> tick_counter = std::make_shared<std::atomic<uint32_t>>(0);
-			const WorkloadInstanceInfo* workload = nullptr;
+			const WorkloadInstanceInfo* workload_info = nullptr;
+			void* workload_ptr = nullptr;
 		};
 
+		const Engine* engine = nullptr;
 		std::vector<ChildWorkloadInfo> children;
 
 		std::condition_variable tick_cv;
@@ -39,9 +41,13 @@ namespace robotick
 		bool running = false;
 		double tick_interval_sec = 0.0;
 
+		void set_engine(const Engine& engine_in) { engine = &engine_in; }
+
 		// Called once by engine before tick loop begins
 		void set_children(const std::vector<const WorkloadInstanceInfo*>& child_workloads, std::vector<DataConnectionInfo*>& pending_connections)
 		{
+			assert(engine != nullptr && "Engine should have been set by now");
+
 			// map from workload pointer to its ChildWorkloadInfo (for fast lookup)
 			children.reserve(child_workloads.size());
 			std::unordered_map<const WorkloadInstanceInfo*, ChildWorkloadInfo*> workload_to_child;
@@ -50,12 +56,13 @@ namespace robotick
 			for (const WorkloadInstanceInfo* child_workload : child_workloads)
 			{
 				ChildWorkloadInfo& info = children.emplace_back();
-				info.workload = child_workload;
+				info.workload_info = child_workload;
+				info.workload_ptr = child_workload->get_ptr(*engine);
 				workload_to_child[child_workload] = &info;
 
-				if (info.workload && info.workload->type && info.workload->type->set_children_fn)
+				if (info.workload_info && info.workload_info->type && info.workload_info->type->set_children_fn)
 				{
-					info.workload->type->set_children_fn(info.workload->ptr, info.workload->children, pending_connections);
+					info.workload_info->type->set_children_fn(info.workload_ptr, info.workload_info->children, pending_connections);
 				}
 			}
 
@@ -77,8 +84,8 @@ namespace robotick
 
 			for (auto& child : children)
 			{
-				if (child.workload == nullptr || child.workload->type == nullptr || child.workload->type->tick_fn == nullptr ||
-					child.workload->tick_rate_hz == 0.0)
+				if (child.workload_info == nullptr || child.workload_info->type == nullptr || child.workload_info->type->tick_fn == nullptr ||
+					child.workload_info->tick_rate_hz == 0.0)
 				{
 					continue; // don't spawn threads for children that can't / dont need to need
 				}
@@ -127,8 +134,8 @@ namespace robotick
 		// Runs on its own thread for each child
 		void child_tick_loop(ChildWorkloadInfo& child_info)
 		{
-			assert(child_info.workload != nullptr); // calling code should have verified this
-			const auto& child = *child_info.workload;
+			assert(child_info.workload_info != nullptr); // calling code should have verified this
+			const auto& child = *child_info.workload_info;
 
 			assert(child.type != nullptr && child.type->tick_fn != nullptr && child.tick_rate_hz > 0.0); // calling code should have verified these
 
@@ -172,7 +179,7 @@ namespace robotick
 				// ^- Ensures we see all writes from parent before using shared data
 
 				// Tick the workload with real elapsed time
-				child.type->tick_fn(child.ptr, time_delta);
+				child.type->tick_fn(child_info.workload_ptr, time_delta);
 				next_tick_time += tick_interval;
 
 				const auto now_post_tick = steady_clock::now();
@@ -197,6 +204,8 @@ namespace robotick
 			stop();
 			delete impl;
 		}
+
+		void set_engine(const Engine& engine_in) { impl->set_engine(engine_in); }
 
 		void set_children(const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& pending_connections)
 		{

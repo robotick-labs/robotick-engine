@@ -125,18 +125,20 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|All children tick in parallel")
 	engine.load(model);
 
 	const auto& info = EngineInspector::get_instance_info(engine, group.index);
-	REQUIRE(info.ptr != nullptr);
+	auto* group_ptr = info.get_ptr(engine);
 
-	info.type->start_fn(info.ptr, tick_rate_hz);
+	REQUIRE(group_ptr != nullptr);
+
+	info.type->start_fn(group_ptr, tick_rate_hz);
 
 	const auto& child_a = EngineInspector::get_instance_info(engine, a.index);
 	const auto& child_b = EngineInspector::get_instance_info(engine, b.index);
-	auto* wa = static_cast<CountingWrapper*>((void*)child_a.ptr);
-	auto* wb = static_cast<CountingWrapper*>((void*)child_b.ptr);
+	auto* wa = static_cast<CountingWrapper*>((void*)child_a.get_ptr(engine));
+	auto* wb = static_cast<CountingWrapper*>((void*)child_b.get_ptr(engine));
 
 	for (int i = 0; i < tick_count; ++i)
 	{
-		info.type->tick_fn(info.ptr, tick_interval);
+		info.type->tick_fn(group_ptr, tick_interval);
 
 		std::this_thread::sleep_for(std::chrono::duration<double>(tick_interval));
 
@@ -145,7 +147,7 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|All children tick in parallel")
 		CHECK(wb->impl->tick_count == i + 1);
 	}
 
-	info.type->stop_fn(info.ptr);
+	info.type->stop_fn(group_ptr);
 }
 
 TEST_CASE("Unit|Workloads|SyncedGroupWorkload|Child busy flags skip ticks")
@@ -166,22 +168,24 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|Child busy flags skip ticks")
 	engine.load(model);
 
 	const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
-	REQUIRE(group_info.ptr != nullptr);
+	auto* group_ptr = group_info.get_ptr(engine);
 
-	group_info.type->start_fn(group_info.ptr, tick_rate_hz);
+	REQUIRE(group_ptr != nullptr);
+
+	group_info.type->start_fn(group_ptr, tick_rate_hz);
 
 	for (int i = 0; i < num_ticks; ++i)
 	{
-		group_info.type->tick_fn(group_info.ptr, tick_interval.count());
+		group_info.type->tick_fn(group_ptr, tick_interval.count());
 		std::this_thread::sleep_for(10ms); // Let threads get through, but not enough for all to finish
 	}
 
-	group_info.type->stop_fn(group_info.ptr);
+	group_info.type->stop_fn(group_ptr);
 
 	const auto& s1_info = EngineInspector::get_instance_info(engine, s1.index);
 	const auto& s2_info = EngineInspector::get_instance_info(engine, s2.index);
-	const auto* w1 = static_cast<SlowWrapper*>((void*)s1_info.ptr);
-	const auto* w2 = static_cast<SlowWrapper*>((void*)s2_info.ptr);
+	auto* w1 = static_cast<SlowWrapper*>((void*)s1_info.get_ptr(engine));
+	auto* w2 = static_cast<SlowWrapper*>((void*)s2_info.get_ptr(engine));
 
 	INFO("Tick count s1: " << w1->impl->tick_count);
 	INFO("Tick count s2: " << w2->impl->tick_count);
@@ -208,20 +212,22 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|tick() passes real time_delta (chi
 
 	const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
 	const auto& child_info = EngineInspector::get_instance_info(engine, h.index);
-	auto* counting = static_cast<CountingWrapper*>((void*)child_info.ptr);
+	auto* counting = static_cast<CountingWrapper*>((void*)child_info.get_ptr(engine));
 
-	group_info.type->start_fn(group_info.ptr, tick_rate_hz);
+	auto* group_ptr = group_info.get_ptr(engine);
+
+	group_info.type->start_fn(group_ptr, tick_rate_hz);
 
 	std::this_thread::sleep_for(20ms);
-	group_info.type->tick_fn(group_info.ptr, tick_interval.count());
+	group_info.type->tick_fn(group_ptr, tick_interval.count());
 
 	std::this_thread::sleep_for(30ms);
 	const double first_dt = counting->impl->last_dt;
 
-	group_info.type->tick_fn(group_info.ptr, tick_interval.count());
+	group_info.type->tick_fn(group_ptr, tick_interval.count());
 
 	std::this_thread::sleep_for(10ms); // give a bit if time for the tick to complete
-	group_info.type->stop_fn(group_info.ptr);
+	group_info.type->stop_fn(group_ptr);
 
 	INFO("First time_delta (expected 0.02): " << first_dt);
 	CHECK_THAT(first_dt, Catch::Matchers::WithinAbs(0.02, 0.005)); // allow ±5ms - since we're not allowing for code-duration when sleeping above

@@ -17,6 +17,7 @@ namespace robotick
 {
 
 	class WorkloadInstanceInfo;
+	struct WorkloadsBuffer;
 
 	struct DataConnectionSeed
 	{
@@ -69,7 +70,7 @@ namespace robotick
 	{
 	  public:
 		static std::vector<DataConnectionInfo> create(
-			const std::vector<DataConnectionSeed>& seeds, const std::vector<WorkloadInstanceInfo>& instances);
+			WorkloadsBuffer& workloads_buffer, const std::vector<DataConnectionSeed>& seeds, const std::vector<WorkloadInstanceInfo>& instances);
 	};
 
 } // namespace robotick

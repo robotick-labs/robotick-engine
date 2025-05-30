@@ -57,10 +57,10 @@ namespace robotick::test
 		const auto& workload_infos = EngineInspector::get_all_instance_info(engine);
 		REQUIRE(workload_infos.size() == 1);
 
-		const auto& workloads_buf = EngineInspector::get_workloads_buffer_readonly(engine);
+		const auto& workloads_buf = EngineInspector::get_workloads_buffer(engine);
 
 		// Set known values in workload memory
-		auto* workload_ptr = reinterpret_cast<SimpleWorkload*>(workload_infos[0].ptr);
+		auto* workload_ptr = reinterpret_cast<SimpleWorkload*>(workload_infos[0].get_ptr(engine));
 		workload_ptr->inputs.input_value = 42;
 		workload_ptr->outputs.output_value = 123;
 
@@ -102,7 +102,7 @@ namespace robotick::test
 		engine.load(model);
 
 		// const auto& original = EngineInspector::get_all_instance_info(engine);
-		const auto& original_buf = EngineInspector::get_workloads_buffer_readonly(engine);
+		const auto& original_buf = EngineInspector::get_workloads_buffer(engine);
 
 		WorkloadsBuffer mirror_buf(original_buf.get_size());
 		std::memcpy(mirror_buf.raw_ptr(), original_buf.raw_ptr(), original_buf.get_size());

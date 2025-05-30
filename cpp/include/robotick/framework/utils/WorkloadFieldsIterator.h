@@ -30,7 +30,7 @@ namespace robotick
 	struct WorkloadFieldsIterator
 	{
 		static inline void for_each_workload_field(
-			const Engine& engine, const WorkloadsBuffer* workloads_override, std::function<void(const WorkloadFieldView&)> callback)
+			const Engine& engine, WorkloadsBuffer* workloads_override, std::function<void(const WorkloadFieldView&)> callback)
 		{
 			for_each_workload_field_impl(engine, workloads_override, std::move(callback));
 		}
@@ -42,7 +42,7 @@ namespace robotick
 
 	  private:
 		static void for_each_workload_field_impl(
-			const Engine& engine, const WorkloadsBuffer* workloads_override, std::function<void(const WorkloadFieldView&)> callback);
+			const Engine& engine, WorkloadsBuffer* workloads_override, std::function<void(const WorkloadFieldView&)> callback);
 	};
 
 } // namespace robotick

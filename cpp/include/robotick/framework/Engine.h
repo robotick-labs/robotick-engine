@@ -19,6 +19,7 @@ namespace robotick
 	struct StructRegistryEntry;
 	struct TelemetryCollector;
 	struct WorkloadFieldsIterator;
+	struct WorkloadInstanceInfo;
 	struct WorkloadRegistryEntry;
 
 	namespace test
@@ -31,6 +32,7 @@ namespace robotick
 		friend struct robotick::test::EngineInspector;
 		friend struct robotick::TelemetryCollector;
 		friend struct robotick::WorkloadFieldsIterator;
+		friend struct robotick::WorkloadInstanceInfo;
 
 	  public:
 		Engine();
@@ -43,13 +45,15 @@ namespace robotick
 
 		void run(const std::atomic<bool>&&) = delete; // cause compile-error if a temporary is used
 
+		bool is_running() const;
+
 	  protected:
 		const WorkloadInstanceInfo* get_root_instance_info() const;
 		const WorkloadInstanceInfo& get_instance_info(size_t index) const;
 		const std::vector<WorkloadInstanceInfo>& get_all_instance_info() const;
 		const std::vector<DataConnectionInfo>& get_all_data_connections() const;
 
-		const WorkloadsBuffer& get_workloads_buffer_readonly() const;
+		WorkloadsBuffer& get_workloads_buffer() const;
 
 	  private:
 		void bind_blackboards_in_struct(

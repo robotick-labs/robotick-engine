@@ -83,7 +83,8 @@ namespace robotick::test
 			{"A.outputs.y", "B.inputs.y"},
 		};
 
-		std::vector<DataConnectionInfo> resolved = DataConnectionsFactory::create(seeds, EngineInspector::get_all_instance_info(engine));
+		std::vector<DataConnectionInfo> resolved =
+			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine));
 
 		REQUIRE(resolved.size() == 2);
 
@@ -118,7 +119,8 @@ namespace robotick::test
 			{"A.outputs.y", "B.inputs.in_blackboard.y"},
 		};
 
-		std::vector<DataConnectionInfo> resolved = DataConnectionsFactory::create(seeds, EngineInspector::get_all_instance_info(engine));
+		std::vector<DataConnectionInfo> resolved =
+			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine));
 		REQUIRE(resolved.size() == 2);
 
 		const DummyB* b = EngineInspector::get_instance<DummyB>(engine, handle_b.index);
@@ -153,7 +155,8 @@ namespace robotick::test
 			{"A.outputs.out_blackboard.y", "B.inputs.y"},
 		};
 
-		std::vector<DataConnectionInfo> resolved = DataConnectionsFactory::create(seeds, EngineInspector::get_all_instance_info(engine));
+		std::vector<DataConnectionInfo> resolved =
+			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine));
 
 		REQUIRE(resolved.size() == 2);
 
@@ -188,7 +191,8 @@ namespace robotick::test
 			{"A.outputs.out_blackboard.y", "B.inputs.in_blackboard.y"},
 		};
 
-		std::vector<DataConnectionInfo> resolved = DataConnectionsFactory::create(seeds, EngineInspector::get_all_instance_info(engine));
+		std::vector<DataConnectionInfo> resolved =
+			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine));
 
 		REQUIRE(resolved.size() == 2);
 
@@ -218,31 +222,36 @@ namespace robotick::test
 		SECTION("Invalid workload name")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"Z.outputs.x", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(seeds, infos), Catch::Matchers::ContainsSubstring("Z"));
+			REQUIRE_THROWS_WITH(
+				DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), Catch::Matchers::ContainsSubstring("Z"));
 		}
 
 		SECTION("Invalid section")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.wrong.x", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(seeds, infos), Catch::Matchers::ContainsSubstring("Invalid section"));
+			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
+				Catch::Matchers::ContainsSubstring("Invalid section"));
 		}
 
 		SECTION("Missing field")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.outputs.missing", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(seeds, infos), Catch::Matchers::ContainsSubstring("field"));
+			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
+				Catch::Matchers::ContainsSubstring("field"));
 		}
 
 		SECTION("Mismatched types")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.outputs.x", "B.inputs.y"}}; // int -> double
-			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(seeds, infos), Catch::Matchers::ContainsSubstring("Type mismatch"));
+			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
+				Catch::Matchers::ContainsSubstring("Type mismatch"));
 		}
 
 		SECTION("Duplicate destination")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.outputs.x", "B.inputs.x"}, {"A.outputs.x", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(seeds, infos), Catch::Matchers::ContainsSubstring("Duplicate"));
+			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
+				Catch::Matchers::ContainsSubstring("Duplicate"));
 		}
 	}
 

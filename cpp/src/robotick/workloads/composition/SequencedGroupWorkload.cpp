@@ -20,13 +20,20 @@ namespace robotick
 		struct ChildWorkloadInfo
 		{
 			const WorkloadInstanceInfo* workload_info = nullptr;
+			void* workload_ptr = nullptr;
+
 			std::vector<const DataConnectionInfo*> connections_in;
 		};
 
+		const Engine* engine = nullptr;
 		std::vector<ChildWorkloadInfo> children;
+
+		void set_engine(const Engine& engine_in) { engine = &engine_in; }
 
 		void set_children(const std::vector<const WorkloadInstanceInfo*>& child_workloads, std::vector<DataConnectionInfo*>& pending_connections)
 		{
+			assert(engine != nullptr && "Engine should have been set by now");
+
 			// map from workload_info pointer to its ChildWorkloadInfo (for fast lookup)
 			children.reserve(child_workloads.size()); // <- reserve so we don't keep reallocating children during population
 			std::unordered_map<const WorkloadInstanceInfo*, ChildWorkloadInfo*> workload_to_child;
@@ -36,11 +43,13 @@ namespace robotick
 			{
 				ChildWorkloadInfo& info = children.emplace_back();
 				info.workload_info = child_workload;
+				info.workload_ptr = child_workload->get_ptr(*engine);
+
 				workload_to_child[child_workload] = &info;
 
 				if (info.workload_info && info.workload_info->type && info.workload_info->type->set_children_fn)
 				{
-					info.workload_info->type->set_children_fn(info.workload_info->ptr, info.workload_info->children, pending_connections);
+					info.workload_info->type->set_children_fn(info.workload_ptr, info.workload_info->children, pending_connections);
 				}
 			}
 
@@ -89,7 +98,7 @@ namespace robotick
 					}
 
 					// tick the child:
-					child_info.workload_info->type->tick_fn(child_info.workload_info->ptr, time_delta);
+					child_info.workload_info->type->tick_fn(child_info.workload_ptr, time_delta);
 
 					const auto now_post_tick = std::chrono::steady_clock::now();
 					child_info.workload_info->mutable_stats.last_tick_duration = std::chrono::duration<double>(now_post_tick - now_pre_tick).count();
@@ -119,6 +128,8 @@ namespace robotick
 			stop();
 			delete impl;
 		}
+
+		void set_engine(const Engine& engine_in) { impl->set_engine(engine_in); }
 
 		void set_children(const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& pending_connections)
 		{

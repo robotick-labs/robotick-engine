@@ -30,6 +30,7 @@ namespace robotick
 	struct Engine::State
 	{
 		Model m_loaded_model;
+		bool is_running = false;
 
 		WorkloadsBuffer workloads_buffer;
 
@@ -48,7 +49,9 @@ namespace robotick
 		for (auto& instance : state->instances)
 		{
 			if (instance.type->destruct)
-				instance.type->destruct(instance.ptr);
+			{
+				instance.type->destruct(instance.get_ptr(*this));
+			}
 		}
 	}
 
@@ -72,7 +75,7 @@ namespace robotick
 		return state->data_connections_all;
 	}
 
-	const WorkloadsBuffer& Engine::get_workloads_buffer_readonly() const
+	WorkloadsBuffer& Engine::get_workloads_buffer() const
 	{
 		return state->workloads_buffer;
 	}
@@ -89,10 +92,15 @@ namespace robotick
 			if (!type)
 				continue;
 
-			auto accumulate = [&](void* instance_ptr, const StructRegistryEntry* struct_info)
+			void* instance_ptr = instance.get_ptr(*this);
+			assert(instance_ptr != nullptr && "Engine should never have null instances at this point");
+
+			auto accumulate = [&](const StructRegistryEntry* struct_info)
 			{
 				if (!struct_info)
+				{
 					return;
+				}
 
 				const size_t struct_offset = struct_info->offset;
 
@@ -110,9 +118,9 @@ namespace robotick
 				}
 			};
 
-			accumulate(instance.ptr, type->config_struct);
-			accumulate(instance.ptr, type->input_struct);
-			accumulate(instance.ptr, type->output_struct);
+			accumulate(type->config_struct);
+			accumulate(type->input_struct);
+			accumulate(type->output_struct);
 		}
 
 		return total;
@@ -122,15 +130,15 @@ namespace robotick
 		WorkloadInstanceInfo& workload_instance_info, const StructRegistryEntry& struct_entry, size_t& blackboard_storage_offset)
 	{
 		// note - this function is not recursive, since we don't expect to have nested blackboards
-		const size_t struct_offset = struct_entry.offset;
 
 		for (const FieldInfo& field : struct_entry.fields)
 		{
 			if (field.type == typeid(Blackboard))
 			{
-				auto* blackboard = reinterpret_cast<Blackboard*>(workload_instance_info.ptr + struct_offset + field.offset);
-				blackboard->bind(blackboard_storage_offset);
-				blackboard_storage_offset += blackboard->get_info()->total_datablock_size;
+				Blackboard& blackboard = field.get_data<Blackboard>(state->workloads_buffer, workload_instance_info, struct_entry);
+				blackboard.bind(blackboard_storage_offset);
+
+				blackboard_storage_offset += blackboard.get_info()->total_datablock_size;
 			}
 		}
 	}
@@ -208,7 +216,9 @@ namespace robotick
 		{
 			const auto& workload_seed = workload_seeds[i];
 			const auto* type = WorkloadRegistry::get().find(workload_seed.type);
-			uint8_t* instance_ptr = workloads_buffer_ptr + aligned_offsets[i];
+
+			const size_t instance_offset = aligned_offsets[i];
+			uint8_t* instance_ptr = workloads_buffer_ptr + instance_offset;
 
 			preload_futures.push_back(std::async(std::launch::async,
 				[=]() -> WorkloadInstanceInfo
@@ -221,14 +231,13 @@ namespace robotick
 
 					if (type->config_struct)
 					{
-						apply_struct_fields(
-							static_cast<uint8_t*>(instance_ptr) + type->config_struct->offset, *type->config_struct, workload_seed.config);
+						apply_struct_fields(instance_ptr + type->config_struct->offset, *type->config_struct, workload_seed.config);
 					}
 
 					if (type->pre_load_fn)
 						type->pre_load_fn(instance_ptr);
 
-					return WorkloadInstanceInfo{instance_ptr, type, workload_seed.name, workload_seed.tick_rate_hz, {}, WorkloadInstanceStats{}};
+					return WorkloadInstanceInfo{instance_offset, type, workload_seed.name, workload_seed.tick_rate_hz, {}, WorkloadInstanceStats{}};
 				}));
 		}
 
@@ -259,7 +268,7 @@ namespace robotick
 
 		for (size_t i = 0; i < workload_seeds.size(); ++i)
 		{
-			void* instance_ptr = state->instances[i].ptr;
+			void* instance_ptr = state->instances[i].get_ptr(*this);
 			const auto* type = state->instances[i].type;
 
 			load_futures.push_back(std::async(std::launch::async,
@@ -279,7 +288,7 @@ namespace robotick
 		// Setup data connections from the model and store them in the engine state.
 		// We also collect pointers to all connections that still need to be acquired
 		// by a workload (typically handled by Grouped Workloads via set_children_fn() below).
-		state->data_connections_all = DataConnectionsFactory::create(model.get_data_connection_seeds(), state->instances);
+		state->data_connections_all = DataConnectionsFactory::create(state->workloads_buffer, model.get_data_connection_seeds(), state->instances);
 		std::vector<DataConnectionInfo*> data_connections_pending_acquisition;
 		for (auto& conn : state->data_connections_all)
 		{
@@ -312,7 +321,7 @@ namespace robotick
 
 		if (root_instance && root_instance->type && root_instance->type->set_children_fn)
 		{
-			root_instance->type->set_children_fn(root_instance->ptr, root_instance->children, data_connections_pending_acquisition);
+			root_instance->type->set_children_fn(root_instance->get_ptr(*this), root_instance->children, data_connections_pending_acquisition);
 		}
 
 		// acquire any pending data_connections have been requested for engine-handling - these should be all that remain:
@@ -347,11 +356,16 @@ namespace robotick
 		for (auto& instance : state->instances)
 		{
 			if (instance.type->setup_fn)
-				instance.type->setup_fn(instance.ptr);
+				instance.type->setup_fn(instance.get_ptr(*this));
 		}
 
 		state->root_instance = root_instance;
 		assert(state->root_instance != nullptr);
+	}
+
+	bool Engine::is_running() const
+	{
+		return state != nullptr && state->is_running;
 	}
 
 	void Engine::run(const std::atomic<bool>& stop_after_next_tick_flag)
@@ -363,8 +377,9 @@ namespace robotick
 			throw std::runtime_error("Invalid root workload handle");
 
 		const auto& root_info = state->instances[root_handle.index];
+		void* root_ptr = root_info.get_ptr(*this);
 
-		if (root_info.tick_rate_hz <= 0 || !root_info.type->tick_fn || !root_info.ptr)
+		if (root_info.tick_rate_hz <= 0 || !root_info.type->tick_fn || !root_ptr)
 			throw std::runtime_error("Root workload must have valid tick_rate_hz and tick()");
 
 		// call start() on all workloads
@@ -372,9 +387,11 @@ namespace robotick
 		{
 			if (inst.type->start_fn)
 			{
-				inst.type->start_fn(inst.ptr, inst.tick_rate_hz);
+				inst.type->start_fn(inst.get_ptr(*this), inst.tick_rate_hz);
 			}
 		}
+
+		state->is_running = true; // flag that we're running - e.g. allows this to be seen in telemetry / asserts (e.g. )
 
 		const auto tick_interval_sec = duration<double>(1.0 / root_info.tick_rate_hz);
 		const auto tick_interval = duration_cast<steady_clock::duration>(tick_interval_sec);
@@ -398,7 +415,7 @@ namespace robotick
 			std::atomic_thread_fence(std::memory_order_release);
 
 			// tick root (will cause children to tick recursively)
-			root_info.type->tick_fn(root_info.ptr, time_delta);
+			root_info.type->tick_fn(root_ptr, time_delta);
 
 			const auto now_post_tick = steady_clock::now();
 			root_info.mutable_stats.last_tick_duration = duration<double>(now_post_tick - now_pre_tick).count();
@@ -415,7 +432,7 @@ namespace robotick
 		{
 			if (inst.type->stop_fn)
 			{
-				inst.type->stop_fn(inst.ptr);
+				inst.type->stop_fn(inst.get_ptr(state->workloads_buffer));
 			}
 		}
 	}
