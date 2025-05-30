@@ -30,7 +30,7 @@ namespace
 	{
 		DummyTickingWorkload* impl = new DummyTickingWorkload();
 		~DummyTickingWrapper() { delete impl; }
-		void tick(double dt) { impl->tick(dt); }
+		void tick(double time_delta) { impl->tick(time_delta); }
 	};
 
 	struct DummyTickingRegister
@@ -46,10 +46,10 @@ namespace
 				{
 					static_cast<DummyTickingWrapper*>(p)->~DummyTickingWrapper();
 				},
-				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr,
-				[](void* p, double dt)
+				nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+				[](void* p, double time_delta)
 				{
-					static_cast<DummyTickingWrapper*>(p)->tick(dt);
+					static_cast<DummyTickingWrapper*>(p)->tick(time_delta);
 				},
 				nullptr};
 
@@ -68,7 +68,7 @@ namespace
 	struct SlowWrapper
 	{
 		SlowTickWorkload impl;
-		void tick(double dt) { impl.tick(dt); }
+		void tick(double time_delta) { impl.tick(time_delta); }
 	};
 
 	struct SlowTickRegister
@@ -84,10 +84,10 @@ namespace
 				{
 					static_cast<SlowWrapper*>(p)->~SlowWrapper();
 				},
-				nullptr, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr,
-				[](void* p, double dt)
+				nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+				[](void* p, double time_delta)
 				{
-					static_cast<SlowWrapper*>(p)->tick(dt);
+					static_cast<SlowWrapper*>(p)->tick(time_delta);
 				},
 				nullptr};
 
@@ -111,11 +111,12 @@ TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Child ticks are invoked in sequ
 	engine.load(model);
 
 	const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
-	REQUIRE(group_info.ptr != nullptr);
+	auto* group_ptr = group_info.get_ptr(engine);
+	REQUIRE(group_ptr != nullptr);
 
-	REQUIRE_NOTHROW(group_info.type->start_fn(group_info.ptr, 50.0));
-	REQUIRE_NOTHROW(group_info.type->tick_fn(group_info.ptr, 0.01));
-	REQUIRE_NOTHROW(group_info.type->stop_fn(group_info.ptr));
+	REQUIRE_NOTHROW(group_info.type->start_fn(group_ptr, 50.0));
+	REQUIRE_NOTHROW(group_info.type->tick_fn(group_ptr, 0.01));
+	REQUIRE_NOTHROW(group_info.type->stop_fn(group_ptr));
 
 	CHECK(DummyTickingWorkload::tick_count == 2);
 }
@@ -131,5 +132,5 @@ TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Overrun logs if exceeded")
 	engine.load(model);
 
 	const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
-	REQUIRE_NOTHROW(group_info.type->tick_fn(group_info.ptr, 0.001)); // 1ms budget, expect warning log
+	REQUIRE_NOTHROW(group_info.type->tick_fn(group_info.get_ptr(engine), 0.001)); // 1ms budget, expect warning log
 }

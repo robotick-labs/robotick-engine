@@ -4,6 +4,7 @@
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
+#include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/Thread.h"
 
@@ -13,6 +14,7 @@
 #include <cstdio>
 #include <mutex>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 using namespace std::chrono;
@@ -22,25 +24,56 @@ namespace robotick
 
 	struct SyncedGroupWorkloadImpl
 	{
-		std::vector<const WorkloadInstanceInfo*> children;
-		std::vector<std::thread> child_threads;
+		struct ChildWorkloadInfo
+		{
+			std::thread thread;
+			std::shared_ptr<std::atomic<uint32_t>> tick_counter = std::make_shared<std::atomic<uint32_t>>(0);
+			const WorkloadInstanceInfo* workload_info = nullptr;
+			void* workload_ptr = nullptr;
+		};
+
+		const Engine* engine = nullptr;
+		std::vector<ChildWorkloadInfo> children;
 
 		std::condition_variable tick_cv;
 		std::mutex tick_mutex;
-		std::vector<std::atomic<uint32_t>> tick_counters;
 
 		bool running = false;
 		double tick_interval_sec = 0.0;
 
-		// Called once by engine before tick loop begins
-		void set_children(const std::vector<const WorkloadInstanceInfo*>& child_workloads)
-		{
-			children = child_workloads;
+		void set_engine(const Engine& engine_in) { engine = &engine_in; }
 
-			tick_counters = std::vector<std::atomic<uint32_t>>(children.size());
-			for (auto& tick_counter : tick_counters)
+		// Called once by engine before tick loop begins
+		void set_children(const std::vector<const WorkloadInstanceInfo*>& child_workloads, std::vector<DataConnectionInfo*>& pending_connections)
+		{
+			assert(engine != nullptr && "Engine should have been set by now");
+
+			// map from workload pointer to its ChildWorkloadInfo (for fast lookup)
+			children.reserve(child_workloads.size());
+			std::unordered_map<const WorkloadInstanceInfo*, ChildWorkloadInfo*> workload_to_child;
+
+			// add child workloads and call set_children_fn on each, if present:
+			for (const WorkloadInstanceInfo* child_workload : child_workloads)
 			{
-				tick_counter = 0;
+				ChildWorkloadInfo& info = children.emplace_back();
+				info.workload_info = child_workload;
+				info.workload_ptr = child_workload->get_ptr(*engine);
+				workload_to_child[child_workload] = &info;
+
+				if (info.workload_info && info.workload_info->type && info.workload_info->type->set_children_fn)
+				{
+					info.workload_info->type->set_children_fn(info.workload_ptr, info.workload_info->children, pending_connections);
+				}
+			}
+
+			// classify relevant pending-connections
+			for (DataConnectionInfo* conn : pending_connections)
+			{
+				const bool dst_is_local = workload_to_child.count(conn->dest_workload);
+				if (dst_is_local)
+				{
+					conn->expected_handler = DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine;
+				}
 			}
 		}
 
@@ -49,19 +82,19 @@ namespace robotick
 			tick_interval_sec = 1.0 / tick_rate_hz;
 			running = true;
 
-			for (size_t i = 0; i < children.size(); ++i)
+			for (auto& child : children)
 			{
-				const auto* child = children[i];
-
-				if (child == nullptr || child->type == nullptr || child->type->tick_fn == nullptr || child->tick_rate_hz == 0.0)
+				if (child.workload_info == nullptr || child.workload_info->type == nullptr || child.workload_info->type->tick_fn == nullptr ||
+					child.workload_info->tick_rate_hz == 0.0)
 				{
 					continue; // don't spawn threads for children that can't / dont need to need
 				}
 
-				child_threads.emplace_back(
-					[this, i, child]()
+				ChildWorkloadInfo* child_ptr = &child;
+				child.thread = std::thread(
+					[this, child_ptr]()
 					{
-						child_tick_loop(i, *child);
+						child_tick_loop(*child_ptr);
 					});
 			}
 		}
@@ -70,11 +103,15 @@ namespace robotick
 		{
 			tick_interval_sec = time_delta; // update latest interval
 
-			// Notify all child threads: time to tick (if they're ready)
+			// Notify all running child threads: time to tick (if they're ready)
 			// (increment tick-counter too - as their signal)
-			for (auto& tick_counter : tick_counters)
+
+			for (auto& child : children)
 			{
-				++tick_counter;
+				if (child.thread.joinable()) // only signal running children
+				{
+					child.tick_counter->fetch_add(1);
+				}
 			}
 
 			std::lock_guard<std::mutex> lock(tick_mutex);
@@ -85,18 +122,22 @@ namespace robotick
 		{
 			running = false;
 			tick_cv.notify_all();
-			for (auto& t : child_threads)
+			for (auto& child : children)
 			{
-				if (t.joinable())
-					t.join();
+				if (child.thread.joinable())
+				{
+					child.thread.join();
+				}
 			}
 		}
 
 		// Runs on its own thread for each child
-		void child_tick_loop(size_t child_index, const WorkloadInstanceInfo& child)
+		void child_tick_loop(ChildWorkloadInfo& child_info)
 		{
-			assert(children.size() == tick_counters.size());
-			assert(child.type != nullptr && child.type->tick_fn != nullptr && child.tick_rate_hz > 0.0);
+			assert(child_info.workload_info != nullptr); // calling code should have verified this
+			const auto& child = *child_info.workload_info;
+
+			assert(child.type != nullptr && child.type->tick_fn != nullptr && child.tick_rate_hz > 0.0); // calling code should have verified these
 
 			uint32_t last_tick = 0;
 			auto next_tick_time = steady_clock::now();
@@ -120,23 +161,31 @@ namespace robotick
 					tick_cv.wait(lock,
 						[&]()
 						{
-							return tick_counters[child_index] > last_tick || !running;
+							return child_info.tick_counter->load() > last_tick || !running;
 						});
 
-					last_tick = tick_counters[child_index];
+					last_tick = child_info.tick_counter->load();
 				}
 
 				if (!running)
 					return;
 
 				// Calculate time since last tick for this child (will be larger than tick_interval_sec if we've missed some ticks)
-				auto now = steady_clock::now();
-				double time_delta = duration<double>(now - last_tick_time).count();
-				last_tick_time = now;
+				auto now_pre_tick = steady_clock::now();
+				double time_delta = duration<double>(now_pre_tick - last_tick_time).count();
+				last_tick_time = now_pre_tick;
+
+				std::atomic_thread_fence(std::memory_order_acquire);
+				// ^- Ensures we see all writes from parent before using shared data
 
 				// Tick the workload with real elapsed time
-				child.type->tick_fn(child.ptr, time_delta);
+				child.type->tick_fn(child_info.workload_ptr, time_delta);
 				next_tick_time += tick_interval;
+
+				const auto now_post_tick = steady_clock::now();
+				child.mutable_stats.last_tick_duration = duration<double>(now_post_tick - now_pre_tick).count();
+
+				child.mutable_stats.last_time_delta = time_delta;
 
 				// ensure that we honour the desired tick-rate of every child (even if some slower than this SyncedGroup's tick-rate - just let them
 				// fall back into step when ready):
@@ -156,7 +205,12 @@ namespace robotick
 			delete impl;
 		}
 
-		void set_children(const std::vector<const WorkloadInstanceInfo*>& children) { impl->set_children(children); }
+		void set_engine(const Engine& engine_in) { impl->set_engine(engine_in); }
+
+		void set_children(const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& pending_connections)
+		{
+			impl->set_children(children, pending_connections);
+		}
 		void start(double tick_rate_hz) { impl->start(tick_rate_hz); }
 		void tick(double time_delta) { impl->tick(time_delta); }
 		void stop() { impl->stop(); }

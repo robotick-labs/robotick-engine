@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/data/Buffer.h"
+#include "robotick/framework/data/WorkloadsBuffer.h"
 
 #include <catch2/catch_all.hpp>
 #include <cstring>
 
 using namespace robotick;
 
-TEST_CASE("RawBuffer supports basic access and bounds checking", "[buffer]")
+TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer supports basic access and bounds checking", "[buffer]")
 {
 	RawBuffer buffer(32);
 	REQUIRE(buffer.get_size() == 32);
@@ -27,7 +27,7 @@ TEST_CASE("RawBuffer supports basic access and bounds checking", "[buffer]")
 	}
 }
 
-TEST_CASE("RawBuffer clones data correctly", "[buffer][clone]")
+TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer clones data correctly", "[buffer][clone]")
 {
 	RawBuffer original(64);
 	std::memset(original.raw_ptr(), 0xAB, 64);
@@ -41,7 +41,7 @@ TEST_CASE("RawBuffer clones data correctly", "[buffer][clone]")
 	REQUIRE(clone.raw_ptr()[0] == static_cast<uint8_t>(0xAB));
 }
 
-TEST_CASE("RawBuffer mirror_from validates size and performs copy", "[buffer][mirror]")
+TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer mirror_from validates size and performs copy", "[buffer][mirror]")
 {
 	RawBuffer a(16);
 	RawBuffer b(16);

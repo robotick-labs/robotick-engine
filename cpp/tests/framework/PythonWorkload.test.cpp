@@ -40,12 +40,13 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Python tick executes")
 	Engine engine;
 	engine.load(model);
 	const auto& info = EngineInspector::get_instance_info(engine, handle.index);
+	auto* inst_ptr = info.get_ptr(engine);
 
-	REQUIRE(info.ptr != nullptr);
+	REQUIRE(inst_ptr);
 	REQUIRE(info.type != nullptr);
 	REQUIRE(info.type->tick_fn != nullptr);
 
-	REQUIRE_NOTHROW(info.type->tick_fn(info.ptr, 0.01));
+	REQUIRE_NOTHROW(info.type->tick_fn(inst_ptr, 0.01));
 }
 
 TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
@@ -59,25 +60,28 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	engine.load(model);
 
 	const auto& info = EngineInspector::get_instance_info(engine, handle.index);
-	REQUIRE(info.ptr != nullptr);
+	auto* inst_ptr = info.get_ptr(engine);
+	REQUIRE(inst_ptr != nullptr);
 	REQUIRE(info.type != nullptr);
 	REQUIRE(info.type->tick_fn != nullptr);
 
 	// Execute tick
-	info.type->tick_fn(info.ptr, 0.01);
+	info.type->tick_fn(inst_ptr, 0.01);
 
 	// === Find the output blackboard ===
 	const auto* output_struct = info.type->output_struct;
 	REQUIRE(output_struct != nullptr);
 
-	const void* output_base = static_cast<const uint8_t*>(info.ptr) + info.type->output_offset;
+	const void* output_base = static_cast<const uint8_t*>(inst_ptr) + output_struct->offset_within_workload;
 
 	const robotick::Blackboard* output_blackboard = nullptr;
 	for (const auto& field : output_struct->fields)
 	{
 		if (field.name == "blackboard")
 		{
-			const void* field_ptr = static_cast<const uint8_t*>(output_base) + field.offset;
+			assert(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+
+			const void* field_ptr = static_cast<const uint8_t*>(output_base) + field.offset_within_struct;
 			output_blackboard = static_cast<const robotick::Blackboard*>(field_ptr);
 			break;
 		}
@@ -107,15 +111,17 @@ TEST_CASE("Unit|Workloads|PythonWorkload|start/stop hooks are optional and safe"
 	engine.load(model);
 
 	const auto& info = EngineInspector::get_instance_info(engine, handle.index);
-	REQUIRE(info.ptr != nullptr);
+	auto* inst_ptr = info.get_ptr(engine);
+
+	REQUIRE(inst_ptr != nullptr);
 	REQUIRE(info.type != nullptr);
 
 	if (info.type->start_fn)
 	{
-		REQUIRE_NOTHROW(info.type->start_fn(info.ptr, 10.0));
+		REQUIRE_NOTHROW(info.type->start_fn(inst_ptr, 10.0));
 	}
 	if (info.type->stop_fn)
 	{
-		REQUIRE_NOTHROW(info.type->stop_fn(info.ptr));
+		REQUIRE_NOTHROW(info.type->stop_fn(inst_ptr));
 	}
 }

@@ -23,7 +23,7 @@ namespace robotick::test
 			Blackboard out_blackboard;
 
 			DummyAOutput()
-				: out_blackboard({BlackboardField("x", std::type_index(typeid(int))), BlackboardField("y", std::type_index(typeid(double)))})
+				: out_blackboard({BlackboardFieldInfo("x", std::type_index(typeid(int))), BlackboardFieldInfo("y", std::type_index(typeid(double)))})
 			{
 			}
 		};
@@ -39,7 +39,8 @@ namespace robotick::test
 			double y = 0.0;
 			int x = 0;
 
-			DummyBInput() : in_blackboard({BlackboardField("x", std::type_index(typeid(int))), BlackboardField("y", std::type_index(typeid(double)))})
+			DummyBInput()
+				: in_blackboard({BlackboardFieldInfo("x", std::type_index(typeid(int))), BlackboardFieldInfo("y", std::type_index(typeid(double)))})
 			{
 			}
 		};
@@ -62,7 +63,7 @@ namespace robotick::test
 		ROBOTICK_DEFINE_WORKLOAD(DummyB)
 	} // namespace
 
-	TEST_CASE("Unit|Framework|DataConnection|Resolves non-blackboard to non-blackboard")
+	TEST_CASE("Unit|Framework|Data|Connection|Resolves non-blackboard to non-blackboard")
 	{
 		Model model;
 		const WorkloadHandle handle_a = model.add("DummyA", "A", 1.0);
@@ -82,14 +83,15 @@ namespace robotick::test
 			{"A.outputs.y", "B.inputs.y"},
 		};
 
-		std::vector<DataConnectionInfo> resolved = DataConnectionResolver::resolve(seeds, EngineInspector::get_all_instance_info(engine));
+		std::vector<DataConnectionInfo> resolved =
+			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine));
 
 		REQUIRE(resolved.size() == 2);
 
 		// Execute copy
 		for (const auto& conn : resolved)
 		{
-			conn.copy_data();
+			conn.do_data_copy();
 		}
 
 		const DummyB* b = EngineInspector::get_instance<DummyB>(engine, handle_b.index);
@@ -97,7 +99,7 @@ namespace robotick::test
 		REQUIRE(b->inputs.y == Catch::Approx(3.14));
 	}
 
-	TEST_CASE("Unit|Framework|DataConnection|Resolves non-blackboard to blackboard")
+	TEST_CASE("Unit|Framework|Data|Connection|Resolves non-blackboard to blackboard")
 	{
 		Model model;
 		const WorkloadHandle handle_a = model.add("DummyA", "A", 1.0);
@@ -117,7 +119,8 @@ namespace robotick::test
 			{"A.outputs.y", "B.inputs.in_blackboard.y"},
 		};
 
-		std::vector<DataConnectionInfo> resolved = DataConnectionResolver::resolve(seeds, EngineInspector::get_all_instance_info(engine));
+		std::vector<DataConnectionInfo> resolved =
+			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine));
 		REQUIRE(resolved.size() == 2);
 
 		const DummyB* b = EngineInspector::get_instance<DummyB>(engine, handle_b.index);
@@ -125,14 +128,14 @@ namespace robotick::test
 		// Execute copy
 		for (const auto& conn : resolved)
 		{
-			conn.copy_data();
+			conn.do_data_copy();
 		}
 
 		REQUIRE(b->inputs.in_blackboard.get<int>("x") == 42);
 		REQUIRE(b->inputs.in_blackboard.get<double>("y") == Catch::Approx(3.14));
 	}
 
-	TEST_CASE("Unit|Framework|DataConnection|Resolves blackboard to non-blackboard")
+	TEST_CASE("Unit|Framework|Data|Connection|Resolves blackboard to non-blackboard")
 	{
 		Model model;
 		model.add("DummyA", "A", 1.0);
@@ -152,14 +155,15 @@ namespace robotick::test
 			{"A.outputs.out_blackboard.y", "B.inputs.y"},
 		};
 
-		std::vector<DataConnectionInfo> resolved = DataConnectionResolver::resolve(seeds, EngineInspector::get_all_instance_info(engine));
+		std::vector<DataConnectionInfo> resolved =
+			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine));
 
 		REQUIRE(resolved.size() == 2);
 
 		// Execute copy
 		for (const auto& conn : resolved)
 		{
-			conn.copy_data();
+			conn.do_data_copy();
 		}
 
 		const DummyB* b = EngineInspector::get_instance<DummyB>(engine, 1);
@@ -167,7 +171,7 @@ namespace robotick::test
 		REQUIRE(b->inputs.y == Catch::Approx(3.14));
 	}
 
-	TEST_CASE("Unit|Framework|DataConnection|Resolves blackboard to blackboard")
+	TEST_CASE("Unit|Framework|Data|Connection|Resolves blackboard to blackboard")
 	{
 		Model model;
 		model.add("DummyA", "A", 1.0);
@@ -187,14 +191,15 @@ namespace robotick::test
 			{"A.outputs.out_blackboard.y", "B.inputs.in_blackboard.y"},
 		};
 
-		std::vector<DataConnectionInfo> resolved = DataConnectionResolver::resolve(seeds, EngineInspector::get_all_instance_info(engine));
+		std::vector<DataConnectionInfo> resolved =
+			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine));
 
 		REQUIRE(resolved.size() == 2);
 
 		// Execute copy
 		for (const auto& conn : resolved)
 		{
-			conn.copy_data();
+			conn.do_data_copy();
 		}
 
 		const DummyB* b = EngineInspector::get_instance<DummyB>(engine, 1);
@@ -203,7 +208,7 @@ namespace robotick::test
 		REQUIRE(b->inputs.in_blackboard.get<double>("y") == Catch::Approx(3.14));
 	}
 
-	TEST_CASE("Unit|Framework|DataConnection|Errors on invalid connections")
+	TEST_CASE("Unit|Framework|Data|Connection|Errors on invalid connections")
 	{
 		Model model;
 		model.add("DummyA", "A", 1.0);
@@ -217,36 +222,107 @@ namespace robotick::test
 		SECTION("Invalid workload name")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"Z.outputs.x", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(DataConnectionResolver::resolve(seeds, infos), Catch::Matchers::ContainsSubstring("Z"));
+			REQUIRE_THROWS_WITH(
+				DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), Catch::Matchers::ContainsSubstring("Z"));
 		}
 
 		SECTION("Invalid section")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.wrong.x", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(DataConnectionResolver::resolve(seeds, infos), Catch::Matchers::ContainsSubstring("Invalid section"));
+			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
+				Catch::Matchers::ContainsSubstring("Invalid section"));
 		}
 
 		SECTION("Missing field")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.outputs.missing", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(DataConnectionResolver::resolve(seeds, infos), Catch::Matchers::ContainsSubstring("field"));
+			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
+				Catch::Matchers::ContainsSubstring("field"));
 		}
 
 		SECTION("Mismatched types")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.outputs.x", "B.inputs.y"}}; // int -> double
-			REQUIRE_THROWS_WITH(DataConnectionResolver::resolve(seeds, infos), Catch::Matchers::ContainsSubstring("Type mismatch"));
+			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
+				Catch::Matchers::ContainsSubstring("Type mismatch"));
 		}
 
 		SECTION("Duplicate destination")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.outputs.x", "B.inputs.x"}, {"A.outputs.x", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(DataConnectionResolver::resolve(seeds, infos), Catch::Matchers::ContainsSubstring("Duplicate"));
+			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
+				Catch::Matchers::ContainsSubstring("Duplicate"));
 		}
 	}
 
-	TEST_CASE("Unit|Framework|DataConnection|Blackboard support pending")
+	TEST_CASE("Unit|Framework|Data|Connection|Blackboard support pending")
 	{
 		SUCCEED("Will be added once Blackboard field path support is implemented");
 	}
+
+	TEST_CASE("Unit|Framework|Data|Connection|Unidirectional copy")
+	{
+		Model model;
+		const WorkloadHandle handle_a = model.add("DummyA", "A", 1.0);
+		const WorkloadHandle handle_b = model.add("DummyB", "B", 1.0);
+		model_helpers::wrap_all_in_sequenced_group(model);
+
+		Engine engine;
+		engine.load(model);
+
+		auto* a = EngineInspector::get_instance<DummyA>(engine, handle_a.index);
+		auto* b = EngineInspector::get_instance<DummyB>(engine, handle_b.index);
+
+		a->outputs.x = 123;
+		b->inputs.x = 999; // Should get overwritten
+
+		std::vector<DataConnectionSeed> seeds = {{"A.outputs.x", "B.inputs.x"}};
+		std::vector<DataConnectionInfo> resolved =
+			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine));
+
+		REQUIRE(resolved.size() == 1);
+		resolved[0].do_data_copy();
+
+		REQUIRE(b->inputs.x == 123);
+		REQUIRE(a->outputs.x == 123); // Confirm unmodified
+	}
+
+	TEST_CASE("Unit|Framework|Data|Connection|Throws for blackboard subfield not found")
+	{
+		Model model;
+		model.add("DummyA", "A", 1.0);
+		model.add("DummyB", "B", 1.0);
+		model_helpers::wrap_all_in_sequenced_group(model);
+
+		Engine engine;
+		engine.load(model);
+
+		std::vector<DataConnectionSeed> seeds = {{"A.outputs.out_blackboard.missing", "B.inputs.in_blackboard.x"}};
+
+		REQUIRE_THROWS_WITH(
+			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine)),
+			Catch::Matchers::ContainsSubstring("subfield"));
+	}
+
+	TEST_CASE("Unit|Framework|Data|Connection|Different subfields allowed")
+	{
+		Model model;
+		model.add("DummyA", "A", 1.0);
+		model.add("DummyB", "B", 1.0);
+		model_helpers::wrap_all_in_sequenced_group(model);
+
+		Engine engine;
+		engine.load(model);
+
+		std::vector<DataConnectionSeed> seeds = {
+			{"A.outputs.out_blackboard.x", "B.inputs.in_blackboard.x"},
+			{"A.outputs.out_blackboard.y", "B.inputs.in_blackboard.y"},
+		};
+
+		std::vector<DataConnectionInfo> resolved =
+			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine));
+
+		REQUIRE(resolved.size() == 2);
+	}
+
 } // namespace robotick::test
