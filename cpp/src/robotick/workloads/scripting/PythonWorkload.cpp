@@ -78,9 +78,9 @@ namespace robotick
 		PythonWorkload(PythonWorkload&&) noexcept = default;
 		PythonWorkload& operator=(PythonWorkload&&) noexcept = default;
 
-		std::vector<BlackboardField> parse_blackboard_schema(const py::dict& desc_dict)
+		std::vector<BlackboardFieldInfo> parse_blackboard_schema(const py::dict& desc_dict)
 		{
-			std::vector<BlackboardField> fields;
+			std::vector<BlackboardFieldInfo> fields;
 
 			for (auto item : desc_dict)
 			{
@@ -213,7 +213,7 @@ namespace robotick
 
 					const auto& schema = outputs.blackboard.get_schema();
 					auto it = std::find_if(schema.begin(), schema.end(),
-						[&](const BlackboardField& f)
+						[&](const BlackboardFieldInfo& f)
 						{
 							return key == f.name.c_str();
 						});

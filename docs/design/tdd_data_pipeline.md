@@ -223,7 +223,7 @@ No dedicated snapshot struct is needed — the registry provides a complete, run
 const void* buffer = get_cloned_snapshot(); // From synced group
 for (const WorkloadInstanceInfo& inst : model.workloads) {
     const auto* reg = inst.registry_entry;
-    const uint8_t* base = reinterpret_cast<const uint8_t*>(buffer) + inst.offset;
+    const uint8_t* base = static_cast<const uint8_t*>(buffer) + inst.offset;
 
     for (const auto& field : reg->output_fields) {
         const void* data_ptr = base + field.offset;

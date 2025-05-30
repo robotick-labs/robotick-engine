@@ -32,11 +32,11 @@ namespace robotick
 		{
 			if (this != &other)
 			{
-				size = other.size;
 				if (size != other.size)
 				{
 					data = std::make_unique<uint8_t[]>(other.size);
 				}
+				size = other.size;
 				std::memcpy(data.get(), other.data.get(), size);
 			}
 			return *this;
@@ -45,6 +45,16 @@ namespace robotick
 		uint8_t* raw_ptr() { return data.get(); }
 		const uint8_t* raw_ptr() const { return data.get(); }
 		size_t get_size() const { return size; }
+
+		bool is_within_buffer(const uint8_t* query_ptr, const size_t query_size) const
+		{
+			const uint8_t* buffer_start = raw_ptr();
+			const uint8_t* buffer_end = raw_ptr() + get_size();
+
+			return (query_ptr >= buffer_start) && (query_ptr + query_size < buffer_end);
+		}
+
+		bool is_within_buffer(void* query_ptr, const size_t query_size) const { return is_within_buffer((uint8_t*)query_ptr, query_size); };
 
 		void mirror_from(const RawBuffer& source)
 		{
@@ -59,7 +69,8 @@ namespace robotick
 				throw std::out_of_range("RawBuffer::as<T>: Offset out of range");
 
 			uint8_t* ptr = data.get() + offset;
-			assert(reinterpret_cast<std::uintptr_t>(ptr) % alignof(T) == 0 && "Misaligned field offset for type T");
+			assert(reinterpret_cast<std::uintptr_t>(static_cast<const void*>(ptr)) % alignof(T) == 0 && "Misaligned field offset for type T");
+
 			return std::launder(reinterpret_cast<T*>(ptr));
 		}
 
@@ -68,8 +79,9 @@ namespace robotick
 			if (offset + sizeof(T) > size)
 				throw std::out_of_range("RawBuffer::as<T>: Offset out of range");
 
-			uint8_t* ptr = data.get() + offset;
-			assert(reinterpret_cast<std::uintptr_t>(ptr) % alignof(T) == 0 && "Misaligned field offset for type T");
+			const uint8_t* ptr = data.get() + offset;
+			assert(reinterpret_cast<std::uintptr_t>(static_cast<const void*>(ptr)) % alignof(T) == 0 && "Misaligned field offset for type T");
+
 			return std::launder(reinterpret_cast<T*>(ptr));
 		}
 
@@ -78,32 +90,10 @@ namespace robotick
 		std::unique_ptr<uint8_t[]> data;
 	};
 
-	class BlackboardsBuffer : public RawBuffer
-	{
-	  public:
-		using RawBuffer::RawBuffer;
-
-		static BlackboardsBuffer& get_source();
-		static void set_source(BlackboardsBuffer* buffer);
-
-		void mirror_from_source();
-
-	  private:
-		static thread_local BlackboardsBuffer local_instance;
-		static BlackboardsBuffer* source_buffer;
-	};
-
 	class WorkloadsBuffer : public RawBuffer
 	{
 	  public:
-		using RawBuffer::RawBuffer;
-
-		static WorkloadsBuffer& get_source();
-		static void set_source(WorkloadsBuffer* buffer);
-
-		void mirror_from_source();
-
-	  private:
-		static WorkloadsBuffer* source_buffer;
+		using RawBuffer::RawBuffer; // inherit base-class constructors
 	};
+
 } // namespace robotick

@@ -73,7 +73,7 @@ namespace robotick::test
 		runner.join();
 
 		const auto& receiver_info = EngineInspector::get_instance_info(engine, receiver.index);
-		const auto* receiver_workload = static_cast<const ReceiverWorkload*>((void*)receiver_info.ptr);
+		auto* receiver_workload = static_cast<ReceiverWorkload*>((void*)receiver_info.get_ptr(engine));
 
 		REQUIRE(receiver_workload->received.size() > 10);
 

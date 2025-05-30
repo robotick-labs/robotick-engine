@@ -30,9 +30,11 @@ namespace robotick::test
 				throw std::runtime_error("Type mismatch: expected " + expected_type + ", got " + info.type->name);
 			}
 
-			return static_cast<T*>((void*)info.ptr);
+			return static_cast<T*>((void*)info.get_ptr(engine));
 		}
 
 		static const std::vector<DataConnectionInfo>& get_all_data_connections(const Engine& engine) { return engine.get_all_data_connections(); }
+
+		static WorkloadsBuffer& get_workloads_buffer(const Engine& engine) { return engine.get_workloads_buffer(); }
 	};
 } // namespace robotick::test

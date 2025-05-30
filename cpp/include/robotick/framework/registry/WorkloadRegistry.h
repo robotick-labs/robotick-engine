@@ -22,6 +22,7 @@ namespace robotick
 {
 
 	// Forward declaration(s)
+	class Engine;
 	struct DataConnectionInfo;
 	struct WorkloadInstanceInfo;
 
@@ -38,6 +39,14 @@ namespace robotick
 	template <typename T>
 	struct has_set_children<T, std::void_t<decltype(std::declval<T>().set_children(std::declval<const std::vector<const WorkloadInstanceInfo*>&>(),
 								   std::declval<std::vector<DataConnectionInfo*>&>()))>> : std::true_type
+	{
+	};
+
+	template <typename, typename = std::void_t<>> struct has_set_engine : std::false_type
+	{
+	};
+	template <typename T>
+	struct has_set_engine<T, std::void_t<decltype(std::declval<T>().set_engine(std::declval<const Engine&>()))>> : std::true_type
 	{
 	};
 
@@ -157,15 +166,11 @@ namespace robotick
 		void (*destruct)(void*);
 
 		const StructRegistryEntry* config_struct;
-		size_t config_offset;
-
 		const StructRegistryEntry* input_struct;
-		size_t input_offset;
-
 		const StructRegistryEntry* output_struct;
-		size_t output_offset;
 
 		void (*set_children_fn)(void*, const std::vector<const WorkloadInstanceInfo*>&, std::vector<DataConnectionInfo*>&);
+		void (*set_engine_fn)(void*, const Engine&);
 		void (*pre_load_fn)(void*);
 		void (*load_fn)(void*);
 		void (*setup_fn)(void*);
@@ -192,6 +197,7 @@ namespace robotick
 	{
 		// Pointers initialized to nullptr
 		void (*set_children_fn)(void*, const std::vector<const WorkloadInstanceInfo*>&, std::vector<DataConnectionInfo*>&) = nullptr;
+		void (*set_engine_fn)(void*, const Engine&) = nullptr;
 		void (*pre_load_fn)(void*) = nullptr;
 		void (*load_fn)(void*) = nullptr;
 		void (*setup_fn)(void*) = nullptr;
@@ -205,6 +211,11 @@ namespace robotick
 				+[](void* i, const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& pending_connections)
 			{
 				static_cast<Type*>(i)->set_children(children, pending_connections);
+			};
+		if constexpr (has_set_engine<Type>::value)
+			set_engine_fn = +[](void* i, const Engine& engine)
+			{
+				static_cast<Type*>(i)->set_engine(engine);
 			};
 		if constexpr (has_pre_load<Type>::value)
 			pre_load_fn = +[](void* i)
@@ -241,22 +252,21 @@ namespace robotick
 		const StructRegistryEntry* cfg_struct = nullptr;
 		const StructRegistryEntry* in_struct = nullptr;
 		const StructRegistryEntry* out_struct = nullptr;
-		size_t cfg_offset = 0, in_offset = 0, out_offset = 0;
 
 		if constexpr (!is_void_v<ConfigType>)
 		{
-			cfg_struct = FieldRegistry::get().register_struct(get_clean_typename(typeid(ConfigType)), sizeof(ConfigType), {});
-			cfg_offset = offsetof(Type, config);
+			cfg_struct = FieldRegistry::get().register_struct(
+				get_clean_typename(typeid(ConfigType)), sizeof(ConfigType), typeid(ConfigType), offsetof(Type, config), {});
 		}
 		if constexpr (!is_void_v<InputType>)
 		{
-			in_struct = FieldRegistry::get().register_struct(get_clean_typename(typeid(InputType)), sizeof(InputType), {});
-			in_offset = offsetof(Type, inputs);
+			in_struct = FieldRegistry::get().register_struct(
+				get_clean_typename(typeid(InputType)), sizeof(InputType), typeid(InputType), offsetof(Type, inputs), {});
 		}
 		if constexpr (!is_void_v<OutputType>)
 		{
-			out_struct = FieldRegistry::get().register_struct(get_clean_typename(typeid(OutputType)), sizeof(OutputType), {});
-			out_offset = offsetof(Type, outputs);
+			out_struct = FieldRegistry::get().register_struct(
+				get_clean_typename(typeid(OutputType)), sizeof(OutputType), typeid(OutputType), offsetof(Type, outputs), {});
 		}
 
 		// Create/register the static entry
@@ -269,8 +279,7 @@ namespace robotick
 			{
 				static_cast<Type*>(ptr)->~Type();
 			},
-			cfg_struct, cfg_offset, in_struct, in_offset, out_struct, out_offset, set_children_fn, pre_load_fn, load_fn, setup_fn, start_fn, tick_fn,
-			stop_fn};
+			cfg_struct, in_struct, out_struct, set_children_fn, set_engine_fn, pre_load_fn, load_fn, setup_fn, start_fn, tick_fn, stop_fn};
 
 		WorkloadRegistry::get().register_entry(entry);
 	}
