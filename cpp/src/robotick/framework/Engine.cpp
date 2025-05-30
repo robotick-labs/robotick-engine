@@ -116,7 +116,7 @@ namespace robotick
 						assert(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
 						const auto* blackboard_raw_ptr = struct_ptr + field.offset_within_struct;
-						const auto* blackboard = static_cast<const Blackboard*>(blackboard_raw_ptr);
+						const auto* blackboard = reinterpret_cast<const Blackboard*>(blackboard_raw_ptr);
 
 						total += blackboard->get_info()->total_datablock_size;
 					}

@@ -109,7 +109,7 @@ namespace robotick::test
 		WorkloadsBuffer mirror_buf(original_buf.get_size());
 		std::memcpy(mirror_buf.raw_ptr(), original_buf.raw_ptr(), original_buf.get_size());
 
-		auto* mirror_workload = static_cast<SimpleWorkload*>(mirror_buf.raw_ptr());
+		auto* mirror_workload = reinterpret_cast<SimpleWorkload*>(mirror_buf.raw_ptr());
 		mirror_workload->inputs.input_value = 99;
 		mirror_workload->outputs.output_value = 888;
 

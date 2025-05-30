@@ -69,8 +69,9 @@ namespace robotick
 				throw std::out_of_range("RawBuffer::as<T>: Offset out of range");
 
 			uint8_t* ptr = data.get() + offset;
-			assert(static_cast<std::uintptr_t>(ptr) % alignof(T) == 0 && "Misaligned field offset for type T");
-			return std::launder(static_cast<T*>(ptr));
+			assert(reinterpret_cast<std::uintptr_t>(static_cast<const void*>(ptr)) % alignof(T) == 0 && "Misaligned field offset for type T");
+
+			return std::launder(reinterpret_cast<T*>(ptr));
 		}
 
 		template <typename T> const T* as(size_t offset = 0) const
@@ -79,8 +80,9 @@ namespace robotick
 				throw std::out_of_range("RawBuffer::as<T>: Offset out of range");
 
 			const uint8_t* ptr = data.get() + offset;
-			assert(static_cast<std::uintptr_t>(ptr) % alignof(T) == 0 && "Misaligned field offset for type T");
-			return std::launder(static_cast<T*>(ptr));
+			assert(reinterpret_cast<std::uintptr_t>(static_cast<const void*>(ptr)) % alignof(T) == 0 && "Misaligned field offset for type T");
+
+			return std::launder(reinterpret_cast<T*>(ptr));
 		}
 
 	  private:

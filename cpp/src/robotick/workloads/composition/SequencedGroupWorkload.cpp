@@ -114,8 +114,6 @@ namespace robotick
 				std::printf("[Sequenced] Overrun: tick took %.3fms (budget %.3fms)\n", elapsed * 1000.0, time_delta * 1000.0);
 			}
 		}
-
-		void stop() {} // nothing to do
 	};
 
 	struct SequencedGroupWorkload
@@ -136,11 +134,11 @@ namespace robotick
 			impl->set_children(children, pending_connections);
 		}
 
-		void start(double tick_rate_hz) { impl->start(tick_rate_hz); }
+		void start(double) { /* placeholder for consistency with SequencedGroup*/ }
 
 		void tick(double time_delta) { impl->tick(time_delta); }
 
-		void stop() { impl->stop(); }
+		void stop() { /* placeholder for consistency with SequencedGroup*/ }
 	};
 
 	static WorkloadAutoRegister<SequencedGroupWorkload> s_auto_register;

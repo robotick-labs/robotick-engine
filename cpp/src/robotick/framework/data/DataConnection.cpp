@@ -216,7 +216,7 @@ namespace robotick
 					throw std::runtime_error("Dest subfield not found: " + seed.dest_field_path);
 				}
 
-				auto* blackboard = static_cast<Blackboard*>(dst_ptr);
+				auto* blackboard = reinterpret_cast<Blackboard*>(dst_ptr);
 				dst_ptr = dst_ptr + blackboard->get_datablock_offset() + dst_blackboard_field->offset_from_datablock;
 				dst_type = dst_blackboard_field->type;
 				dst_size = dst_blackboard_field->size;

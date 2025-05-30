@@ -52,7 +52,7 @@ namespace robotick
 			throw std::runtime_error("Blackboard is not bound");
 
 		const auto& field = schema[it->second];
-		uint8_t* base = static_cast<uint8_t*>(bb);
+		uint8_t* base = static_cast<uint8_t*>((void*)bb);
 		return base + datablock_offset_from_blackboard + field.offset_from_datablock;
 	}
 
