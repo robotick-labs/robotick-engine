@@ -6,7 +6,7 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/framework/data/Buffer.h"
+#include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 #include "utils/EngineInspector.h"
 
@@ -58,7 +58,6 @@ namespace robotick::test
 		REQUIRE(workload_infos.size() == 1);
 
 		const auto& workloads_buf = EngineInspector::get_workloads_buffer_readonly(engine);
-		// const auto& blackboards_buf = EngineInspector::get_blackboards_buffer_readonly(engine);
 
 		// Set known values in workload memory
 		auto* workload_ptr = reinterpret_cast<SimpleWorkload*>(workload_infos[0].ptr);
@@ -68,7 +67,7 @@ namespace robotick::test
 		bool found_input = false;
 		bool found_output = false;
 
-		WorkloadFieldsIterator::for_each_workload_field(engine, nullptr, nullptr,
+		WorkloadFieldsIterator::for_each_workload_field(engine, nullptr,
 			[&](const WorkloadFieldView& view)
 			{
 				CHECK(view.instance->unique_name == "W");
@@ -115,7 +114,7 @@ namespace robotick::test
 		bool found_input = false;
 		bool found_output = false;
 
-		WorkloadFieldsIterator::for_each_workload_field(engine, &mirror_buf, nullptr,
+		WorkloadFieldsIterator::for_each_workload_field(engine, &mirror_buf,
 			[&](const WorkloadFieldView& view)
 			{
 				CHECK(view.instance->unique_name == "W");

@@ -17,12 +17,19 @@
 
 namespace robotick
 {
+	class WorkloadsBuffer;
+	struct WorkloadInstanceInfo;
+	struct StructRegistryEntry;
+
 	struct FieldInfo
 	{
 		std::string name;
 		size_t offset = 0;
 		std::type_index type = typeid(void);
 		size_t size = 0;
+
+		uint8_t* get_data_ptr(
+			const WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& instance, const StructRegistryEntry& struct_info) const;
 	};
 
 	struct StructRegistryEntry

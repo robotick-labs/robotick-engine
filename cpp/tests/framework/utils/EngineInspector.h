@@ -36,7 +36,5 @@ namespace robotick::test
 		static const std::vector<DataConnectionInfo>& get_all_data_connections(const Engine& engine) { return engine.get_all_data_connections(); }
 
 		static const WorkloadsBuffer& get_workloads_buffer_readonly(const Engine& engine) { return engine.get_workloads_buffer_readonly(); }
-
-		static const BlackboardsBuffer& get_blackboards_buffer_readonly(const Engine& engine) { return engine.get_blackboards_buffer_readonly(); }
 	};
 } // namespace robotick::test

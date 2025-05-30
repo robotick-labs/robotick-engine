@@ -3,131 +3,64 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/framework/data/Buffer.h"
 #include <cstring>
 #include <stdexcept>
-#include <typeindex>
-#include <typeinfo>
 
 namespace robotick
 {
-
-	Blackboard::Blackboard(const std::vector<BlackboardField>& source_schema)
+	uint8_t* BlackboardFieldInfo::get_data_ptr(Blackboard& blackboard) const
 	{
-		schema.reserve(source_schema.size());
-		size_t offset = 0;
-
-		size_t index = 0;
-
-		for (const auto& field : source_schema)
-		{
-			BlackboardField& field_copy = schema.emplace_back(field); // invokes copy constructor
-
-			const std::type_index& type = field_copy.type;
-			const size_t align = type_align(type);
-			const size_t size = type_size(type);
-
-			// Align offset
-			offset = (offset + align - 1) & ~(align - 1);
-			field_copy.offset = offset;
-			field_copy.size = size;
-
-			offset += size;
-
-			// Store into schema and map
-			schema_index_by_name[field_copy.name.c_str()] = index;
-			index++;
-		}
-
-		total_size = offset;
+		void* blackboard_ptr = static_cast<void*>(&blackboard);
+		return static_cast<uint8_t*>(blackboard_ptr) + blackboard.get_datablock_offset() + this->offset_from_datablock;
 	}
 
-	void Blackboard::bind(const size_t buffer_offset_in)
+	const uint8_t* BlackboardFieldInfo::get_data_ptr(const Blackboard& blackboard) const
 	{
-		buffer_offset = buffer_offset_in;
+		const void* blackboard_ptr = static_cast<const void*>(&blackboard);
+		return static_cast<const uint8_t*>(blackboard_ptr) + blackboard.get_datablock_offset() + this->offset_from_datablock;
 	}
 
-	const uint8_t* Blackboard::get_base_ptr() const
-	{
-		if (buffer_offset == UNBOUND_OFFSET)
-			throw std::runtime_error("Blackboard::get_base_ptr: blackboard is not bound to a buffer");
-
-		BlackboardsBuffer& buffer = BlackboardsBuffer::get_source();
-		return buffer.raw_ptr() + buffer_offset;
-	}
-
-	uint8_t* Blackboard::get_base_ptr()
-	{
-		if (buffer_offset == UNBOUND_OFFSET)
-			throw std::runtime_error("Blackboard::get_base_ptr: blackboard is not bound to a buffer");
-
-		BlackboardsBuffer& buffer = BlackboardsBuffer::get_source();
-		return buffer.raw_ptr() + buffer_offset;
-	}
-
-	size_t Blackboard::required_size() const
-	{
-		return total_size;
-	}
-
-	const std::vector<BlackboardField>& Blackboard::get_schema() const
-	{
-		return schema;
-	}
-
-	const BlackboardField* Blackboard::get_schema_field(const std::string& key) const
-	{
-		auto it = schema_index_by_name.find(key);
-		if (it == schema_index_by_name.end())
-		{
-			return nullptr;
-		}
-
-		return &schema[schema_index_by_name.at(key)];
-	}
-
-	bool Blackboard::has(const std::string& key) const
+	bool BlackboardInfo::has_field(const std::string& key) const
 	{
 		return schema_index_by_name.count(key) > 0;
 	}
 
-	void* Blackboard::get_ptr(const std::string& key)
-	{
-		uint8_t* base_ptr = get_base_ptr();
-
-		auto it = schema_index_by_name.find(key);
-		if (it == schema_index_by_name.end() || base_ptr == nullptr)
-			throw std::runtime_error("Blackboard::get_ptr failed for key: " + key);
-
-		const BlackboardField& field = schema[schema_index_by_name.at(key)];
-		return base_ptr + field.offset;
-	}
-
-	const void* Blackboard::get_ptr(const std::string& key) const
-	{
-		const uint8_t* base_ptr = get_base_ptr();
-
-		auto it = schema_index_by_name.find(key);
-		if (it == schema_index_by_name.end() || base_ptr == nullptr)
-			throw std::runtime_error("Blackboard::get_ptr failed for key: " + key);
-
-		const BlackboardField& field = schema[schema_index_by_name.at(key)];
-		return base_ptr + field.offset;
-	}
-
-	void Blackboard::verify_type(const std::string& key, std::type_index expected) const
+	const BlackboardFieldInfo* BlackboardInfo::find_field(const std::string& key) const
 	{
 		auto it = schema_index_by_name.find(key);
 		if (it == schema_index_by_name.end())
+			return nullptr;
+		return &schema[it->second];
+	}
+
+	void BlackboardInfo::verify_type(const std::string& key, std::type_index expected) const
+	{
+		const auto* field = find_field(key);
+		if (!field)
 			throw std::runtime_error("Blackboard::verify_type failed, missing key: " + key);
-
-		const BlackboardField& field = schema[it->second];
-
-		if (field.type != expected)
+		if (field->type != expected)
 			throw std::runtime_error("Blackboard::verify_type failed, type mismatch for key: " + key);
 	}
 
-	size_t Blackboard::type_size(std::type_index type) const
+	void* BlackboardInfo::get_field_ptr(Blackboard* bb, const std::string& key) const
+	{
+		auto it = schema_index_by_name.find(key);
+		if (it == schema_index_by_name.end())
+			throw std::runtime_error("BlackboardInfo::get_field_ptr failed for key: " + key);
+		if (datablock_offset_from_blackboard == std::numeric_limits<size_t>::max())
+			throw std::runtime_error("Blackboard is not bound");
+
+		const auto& field = schema[it->second];
+		uint8_t* base = reinterpret_cast<uint8_t*>(bb);
+		return base + datablock_offset_from_blackboard + field.offset_from_datablock;
+	}
+
+	const void* BlackboardInfo::get_field_ptr(const Blackboard* bb, const std::string& key) const
+	{
+		return const_cast<BlackboardInfo*>(this)->get_field_ptr(const_cast<Blackboard*>(bb), key);
+	}
+
+	size_t BlackboardInfo::type_size(std::type_index type)
 	{
 		if (type == typeid(int))
 			return sizeof(int);
@@ -137,10 +70,10 @@ namespace robotick
 			return sizeof(FixedString64);
 		if (type == typeid(FixedString128))
 			return sizeof(FixedString128);
-		throw std::runtime_error("Unsupported type in Blackboard::type_size");
+		throw std::runtime_error("Unsupported type in BlackboardInfo::type_size");
 	}
 
-	size_t Blackboard::type_align(std::type_index type) const
+	size_t BlackboardInfo::type_align(std::type_index type)
 	{
 		if (type == typeid(int))
 			return alignof(int);
@@ -150,28 +83,89 @@ namespace robotick
 			return alignof(FixedString64);
 		if (type == typeid(FixedString128))
 			return alignof(FixedString128);
-		throw std::runtime_error("Unsupported type in Blackboard::type_align");
+		throw std::runtime_error("Unsupported type in BlackboardInfo::type_align");
+	}
+
+	Blackboard::Blackboard(const std::vector<BlackboardFieldInfo>& source_schema)
+	{
+		info = std::make_shared<BlackboardInfo>();
+		info->schema.reserve(source_schema.size());
+
+		size_t offset = 0;
+		for (size_t i = 0; i < source_schema.size(); ++i)
+		{
+			BlackboardFieldInfo field = source_schema[i];
+			size_t align = BlackboardInfo::type_align(field.type);
+			size_t size = BlackboardInfo::type_size(field.type);
+			offset = (offset + align - 1) & ~(align - 1);
+			field.offset_from_datablock = offset;
+			field.size = size;
+
+			info->schema_index_by_name[field.name.c_str()] = i;
+			info->schema.push_back(field);
+			offset += size;
+		}
+		info->total_datablock_size = offset;
+	}
+
+	void Blackboard::bind(size_t datablock_offset)
+	{
+		if (info)
+			info->datablock_offset_from_blackboard = datablock_offset;
+		else
+			throw std::runtime_error("Blackboard::bind called on uninitialized Blackboard");
+	}
+
+	size_t Blackboard::get_datablock_offset() const
+	{
+		if (!info)
+			throw std::runtime_error("Blackboard::get_datablock_offset called on uninitialized Blackboard");
+		return info->datablock_offset_from_blackboard;
+	}
+
+	const std::vector<BlackboardFieldInfo>& Blackboard::get_schema() const
+	{
+		if (!info)
+			throw std::runtime_error("Blackboard::get_schema called on uninitialized Blackboard");
+
+		return info->schema;
+	}
+
+	const BlackboardInfo* Blackboard::get_info() const
+	{
+		if (!info)
+			throw std::runtime_error("Blackboard::get_info called on uninitialized Blackboard");
+
+		return info.get();
+	}
+
+	const BlackboardFieldInfo* Blackboard::get_field_info(const std::string& key) const
+	{
+		if (!info)
+			throw std::runtime_error("Blackboard::get_field_info called on uninitialized Blackboard");
+
+		return info->find_field(key);
 	}
 
 	template <typename T> void Blackboard::set(const std::string& key, const T& value)
 	{
 		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
-		verify_type(key, typeid(T));
-		void* field_data_ptr = get_ptr(key);
-		std::memcpy(field_data_ptr, &value, sizeof(T));
+		info->verify_type(key, typeid(T));
+		void* ptr = info->get_field_ptr(this, key);
+		std::memcpy(ptr, &value, sizeof(T));
 	}
 
 	template <typename T> T Blackboard::get(const std::string& key) const
 	{
-		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
-		verify_type(key, typeid(T));
+		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::get only supports trivially-copyable types");
+		info->verify_type(key, typeid(T));
+		const void* ptr = info->get_field_ptr(this, key);
 		T out;
-		const void* field_data_ptr = get_ptr(key);
-		std::memcpy(&out, field_data_ptr, sizeof(T));
+		std::memcpy(&out, ptr, sizeof(T));
 		return out;
 	}
 
-	// Explicit instantiations
+	// Explicit template instantiations
 	template void Blackboard::set<int>(const std::string&, const int&);
 	template void Blackboard::set<double>(const std::string&, const double&);
 	template void Blackboard::set<FixedString64>(const std::string&, const FixedString64&);

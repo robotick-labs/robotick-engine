@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
+
+#include "robotick/config/PlatformDefaults.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/framework/data/Buffer.h"
+#include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -25,13 +27,11 @@
 
 namespace robotick
 {
-
 	struct Engine::State
 	{
 		Model m_loaded_model;
 
 		WorkloadsBuffer workloads_buffer;
-		BlackboardsBuffer blackboards_buffer;
 
 		const WorkloadInstanceInfo* root_instance = nullptr;
 		std::vector<WorkloadInstanceInfo> instances;
@@ -77,11 +77,6 @@ namespace robotick
 		return state->workloads_buffer;
 	}
 
-	const BlackboardsBuffer& Engine::get_blackboards_buffer_readonly() const
-	{
-		return state->blackboards_buffer;
-	}
-
 	size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances)
 	{
 		// note - this function is not recursive, since we don't expect to have nested blackboards
@@ -110,10 +105,7 @@ namespace robotick
 						const auto* blackboard_raw_ptr = struct_ptr + field.offset;
 						const auto* blackboard = reinterpret_cast<const Blackboard*>(blackboard_raw_ptr);
 
-						if (blackboard && !blackboard->get_schema().empty())
-						{
-							total += blackboard->required_size();
-						}
+						total += blackboard->get_info()->total_datablock_size;
 					}
 				}
 			};
@@ -137,11 +129,8 @@ namespace robotick
 			if (field.type == typeid(Blackboard))
 			{
 				auto* blackboard = reinterpret_cast<Blackboard*>(workload_instance_info.ptr + struct_offset + field.offset);
-				if (blackboard && !blackboard->get_schema().empty())
-				{
-					blackboard->bind(blackboard_storage_offset);
-					blackboard_storage_offset += blackboard->required_size();
-				}
+				blackboard->bind(blackboard_storage_offset);
+				blackboard_storage_offset += blackboard->get_info()->total_datablock_size;
 			}
 		}
 	}
@@ -205,8 +194,10 @@ namespace robotick
 			offset += type->size;
 		}
 
-		// Primary workloads buffer allocation:
-		state->workloads_buffer = WorkloadsBuffer(offset);
+		const size_t all_workloads_size = offset;
+
+		// Workloads buffer allocation (add on over-estimate of further size needed for any blackboards-data):
+		state->workloads_buffer = WorkloadsBuffer(all_workloads_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
 		uint8_t* workloads_buffer_ptr = state->workloads_buffer.raw_ptr();
 
 		std::vector<std::future<WorkloadInstanceInfo>> preload_futures;
@@ -250,8 +241,15 @@ namespace robotick
 
 		// Blackboards memory allocation and buffer-binding (at least 1 byte to please all platforms):
 		const size_t blackboards_buffer_size = std::max<size_t>(1, compute_blackboard_memory_requirements(state->instances));
-		state->blackboards_buffer = BlackboardsBuffer(blackboards_buffer_size);
-		BlackboardsBuffer::set_source(&state->blackboards_buffer);
+		if (blackboards_buffer_size > robotick::DEFAULT_MAX_BLACKBOARDS_BYTES)
+		{
+			std::ostringstream msg;
+			msg << "[Engine::load] Required blackboard memory (" << blackboards_buffer_size << " bytes) exceeds platform default maximum ("
+				<< robotick::DEFAULT_MAX_BLACKBOARDS_BYTES << " bytes).\n"
+				<< "Increase DEFAULT_MAX_BLACKBOARDS_BYTES or allocate explicitly for your platform.";
+
+			throw std::runtime_error(msg.str());
+		}
 
 		bind_blackboards_for_instances(state->instances);
 

@@ -103,7 +103,7 @@ namespace robotick
 		return nullptr;
 	}
 
-	const robotick::BlackboardField* resolve_blackboard_field_ptr(const robotick::WorkloadInstanceInfo& inst,
+	const robotick::BlackboardFieldInfo* resolve_blackboard_field_ptr(const robotick::WorkloadInstanceInfo& inst,
 		const robotick::FieldInfo& blackboard_field, const std::string& blackboard_subfield_name, size_t struct_offset)
 	{
 		if (blackboard_field.type != std::type_index(typeid(robotick::Blackboard)))
@@ -117,7 +117,7 @@ namespace robotick
 			return nullptr;
 		}
 
-		return blackboard->get_schema_field(blackboard_subfield_name);
+		return blackboard->get_field_info(blackboard_subfield_name);
 	}
 
 	std::vector<DataConnectionInfo> DataConnectionsFactory::create(
@@ -167,7 +167,7 @@ namespace robotick
 
 			if (src.field_path.size() == 2)
 			{
-				const BlackboardField* src_blackboard_field =
+				const BlackboardFieldInfo* src_blackboard_field =
 					resolve_blackboard_field_ptr(*src_inst, *src_field, src.field_path[1].c_str(), src_offset);
 
 				if (!src_blackboard_field)
@@ -176,8 +176,10 @@ namespace robotick
 				}
 
 				const auto* blackboard = reinterpret_cast<const Blackboard*>(src_ptr);
-				src_ptr = blackboard->get_base_ptr() + src_blackboard_field->offset;
-				src_type = src_blackboard_field->type;
+				src_ptr = src_ptr + blackboard->get_datablock_offset() + src_blackboard_field->offset_from_datablock;
+				src_type = src_blackboard_field->type; // ^- TODO - decide whether we're happy for data-connections to be absolute pointers - perhaps
+													   // 	 fine - they can be associated with a specific WorkloadBuffer?  They'll likely only need
+													   // 	 to update the source one anyway
 				src_size = src_blackboard_field->size;
 			}
 
@@ -196,7 +198,7 @@ namespace robotick
 
 			if (dst.field_path.size() == 2)
 			{
-				const BlackboardField* dst_blackboard_field =
+				const BlackboardFieldInfo* dst_blackboard_field =
 					resolve_blackboard_field_ptr(*dst_inst, *dst_field, dst.field_path[1].c_str(), dst_offset);
 
 				if (!dst_blackboard_field)
@@ -205,7 +207,7 @@ namespace robotick
 				}
 
 				auto* blackboard = reinterpret_cast<Blackboard*>(dst_ptr);
-				dst_ptr = blackboard->get_base_ptr() + dst_blackboard_field->offset;
+				dst_ptr = dst_ptr + blackboard->get_datablock_offset() + dst_blackboard_field->offset_from_datablock;
 				dst_type = dst_blackboard_field->type;
 				dst_size = dst_blackboard_field->size;
 			}

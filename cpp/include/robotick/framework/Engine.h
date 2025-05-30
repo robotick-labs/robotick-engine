@@ -15,7 +15,6 @@
 namespace robotick
 {
 	class WorkloadsBuffer;
-	class BlackboardsBuffer;
 	struct DataConnectionInfo;
 	struct WorkloadRegistryEntry;
 	struct TelemetryCollector;
@@ -50,7 +49,6 @@ namespace robotick
 		const std::vector<DataConnectionInfo>& get_all_data_connections() const;
 
 		const WorkloadsBuffer& get_workloads_buffer_readonly() const;
-		const BlackboardsBuffer& get_blackboards_buffer_readonly() const;
 
 	  private:
 		struct State;

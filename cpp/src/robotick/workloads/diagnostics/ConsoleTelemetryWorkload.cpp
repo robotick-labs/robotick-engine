@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/data/Buffer.h"
+#include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/ConsoleTelemetryTable.h"
 #include "robotick/framework/utils/TelemetryCollector.h"

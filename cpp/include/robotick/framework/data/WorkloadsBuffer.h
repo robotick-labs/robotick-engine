@@ -82,32 +82,10 @@ namespace robotick
 		std::unique_ptr<uint8_t[]> data;
 	};
 
-	class BlackboardsBuffer : public RawBuffer
-	{
-	  public:
-		using RawBuffer::RawBuffer;
-
-		static BlackboardsBuffer& get_source();
-		static void set_source(BlackboardsBuffer* buffer);
-
-		void mirror_from_source();
-
-	  private:
-		static thread_local BlackboardsBuffer local_instance;
-		static BlackboardsBuffer* source_buffer;
-	};
-
 	class WorkloadsBuffer : public RawBuffer
 	{
 	  public:
-		using RawBuffer::RawBuffer;
-
-		static WorkloadsBuffer& get_source();
-		static void set_source(WorkloadsBuffer* buffer);
-
-		void mirror_from_source();
-
-	  private:
-		static WorkloadsBuffer* source_buffer;
+		using RawBuffer::RawBuffer; // inherit base-class constructors
 	};
+
 } // namespace robotick

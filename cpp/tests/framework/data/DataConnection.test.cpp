@@ -23,7 +23,7 @@ namespace robotick::test
 			Blackboard out_blackboard;
 
 			DummyAOutput()
-				: out_blackboard({BlackboardField("x", std::type_index(typeid(int))), BlackboardField("y", std::type_index(typeid(double)))})
+				: out_blackboard({BlackboardFieldInfo("x", std::type_index(typeid(int))), BlackboardFieldInfo("y", std::type_index(typeid(double)))})
 			{
 			}
 		};
@@ -39,7 +39,8 @@ namespace robotick::test
 			double y = 0.0;
 			int x = 0;
 
-			DummyBInput() : in_blackboard({BlackboardField("x", std::type_index(typeid(int))), BlackboardField("y", std::type_index(typeid(double)))})
+			DummyBInput()
+				: in_blackboard({BlackboardFieldInfo("x", std::type_index(typeid(int))), BlackboardFieldInfo("y", std::type_index(typeid(double)))})
 			{
 			}
 		};
