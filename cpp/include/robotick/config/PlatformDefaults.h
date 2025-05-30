@@ -25,6 +25,8 @@ namespace robotick
 
 #if defined(ROBOTICK_PLATFORM_DESKTOP)
 	constexpr size_t DEFAULT_MAX_BLACKBOARDS_BYTES = 128 * 1024; // 128 KB
+#elif defined(ROBOTICK_PLATFORM_MOBILE)
+	constexpr size_t DEFAULT_MAX_BLACKBOARDS_BYTES = 64 * 1024; // 64 KB
 #elif defined(ROBOTICK_PLATFORM_EMBEDDED)
 	constexpr size_t DEFAULT_MAX_BLACKBOARDS_BYTES = 8 * 1024; // 8 KB
 #else

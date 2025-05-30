@@ -187,9 +187,9 @@ namespace robotick
 				src_ptr = src_ptr + blackboard_datablock_offset + src_blackboard_field->offset_from_datablock;
 				src_type = src_blackboard_field->type;
 				src_size = src_blackboard_field->size;
-
-				assert(workloads_buffer.is_within_buffer(src_ptr, src_size) && "Blackboard field pointer should be within supplied workloads-buffer");
 			}
+
+			assert(workloads_buffer.is_within_buffer(src_ptr, src_size) && "Source Field pointer should be within supplied workloads-buffer");
 
 			// Lookup struct + field for dest
 			size_t dst_struct_offset = OFFSET_UNBOUND;
@@ -216,11 +216,13 @@ namespace robotick
 					throw std::runtime_error("Dest subfield not found: " + seed.dest_field_path);
 				}
 
-				auto* blackboard = reinterpret_cast<Blackboard*>(dst_ptr);
+				auto* blackboard = static_cast<Blackboard*>(dst_ptr);
 				dst_ptr = dst_ptr + blackboard->get_datablock_offset() + dst_blackboard_field->offset_from_datablock;
 				dst_type = dst_blackboard_field->type;
 				dst_size = dst_blackboard_field->size;
 			}
+
+			assert(workloads_buffer.is_within_buffer(dst_ptr, dst_size) && "Destination Field pointer should be within supplied workloads-buffer");
 
 			// Validate type match
 			if (src_type != dst_type)

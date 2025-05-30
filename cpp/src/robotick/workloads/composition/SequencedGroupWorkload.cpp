@@ -79,10 +79,10 @@ namespace robotick
 			pending_connections.swap(remaining);
 		}
 
-		void start(double) { /* nothing needed */ }
-
 		void tick(double time_delta)
 		{
+			assert(engine != nullptr && "Engine should have been set by now");
+
 			auto start_time = std::chrono::steady_clock::now();
 
 			for (auto& child_info : children)

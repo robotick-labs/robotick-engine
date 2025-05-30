@@ -1,7 +1,3 @@
-// Copyright Robotick Labs
-//
-// SPDX-License-Identifier: Apache-2.0
-
 #pragma once
 
 #include <functional>
@@ -9,7 +5,6 @@
 
 namespace robotick
 {
-	// Forward declarations
 	struct WorkloadInstanceInfo;
 	struct StructRegistryEntry;
 	struct FieldInfo;
@@ -17,7 +12,6 @@ namespace robotick
 	class Engine;
 	class WorkloadsBuffer;
 
-	// View describing a single field in a workload, for use in iterator results (not to be confused with FieldInfo)
 	struct WorkloadFieldView
 	{
 		const WorkloadInstanceInfo* instance = nullptr;
@@ -29,20 +23,24 @@ namespace robotick
 
 	struct WorkloadFieldsIterator
 	{
+		static void for_each_workload(const Engine& engine, std::function<void(const WorkloadInstanceInfo&)> callback);
+
+		static void for_each_field_in_workload(const Engine& engine, const WorkloadInstanceInfo& instance, WorkloadsBuffer* workloads_override,
+			std::function<void(const WorkloadFieldView&)> callback);
+
 		static inline void for_each_workload_field(
 			const Engine& engine, WorkloadsBuffer* workloads_override, std::function<void(const WorkloadFieldView&)> callback)
 		{
-			for_each_workload_field_impl(engine, workloads_override, std::move(callback));
+			for_each_workload(engine,
+				[&](const WorkloadInstanceInfo& instance)
+				{
+					for_each_field_in_workload(engine, instance, workloads_override, callback);
+				});
 		}
 
 		static inline void for_each_workload_field(const Engine& engine, std::function<void(const WorkloadFieldView&)> callback)
 		{
-			for_each_workload_field_impl(engine, nullptr, std::move(callback));
+			for_each_workload_field(engine, nullptr, std::move(callback));
 		}
-
-	  private:
-		static void for_each_workload_field_impl(
-			const Engine& engine, WorkloadsBuffer* workloads_override, std::function<void(const WorkloadFieldView&)> callback);
 	};
-
 } // namespace robotick

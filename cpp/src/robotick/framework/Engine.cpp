@@ -116,7 +116,7 @@ namespace robotick
 						assert(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
 						const auto* blackboard_raw_ptr = struct_ptr + field.offset_within_struct;
-						const auto* blackboard = reinterpret_cast<const Blackboard*>(blackboard_raw_ptr);
+						const auto* blackboard = static_cast<const Blackboard*>(blackboard_raw_ptr);
 
 						total += blackboard->get_info()->total_datablock_size;
 					}
@@ -212,8 +212,6 @@ namespace robotick
 
 		// TODO: [#88] Temporary allocation strategy: pre-allocates workloads and an overestimated blackboards size.
 		// This will be replaced with a multi-stripe allocation model as outlined in ticket #88
-		state->workloads_buffer = WorkloadsBuffer(all_workloads_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
-
 		state->workloads_buffer = WorkloadsBuffer(all_workloads_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
 		uint8_t* workloads_buffer_ptr = state->workloads_buffer.raw_ptr();
 
