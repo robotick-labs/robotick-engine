@@ -5,6 +5,8 @@
 #pragma once
 
 #include "robotick/framework/utils/Constants.h"
+
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -17,8 +19,8 @@ namespace robotick
 
 	struct WorkloadInstanceStats
 	{
-		double last_tick_duration = 0.0;
-		double last_time_delta = 0.0;
+		double last_tick_duration{0.0};
+		double last_time_delta{0.0};
 	};
 
 	struct WorkloadInstanceInfo

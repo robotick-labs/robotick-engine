@@ -5,6 +5,7 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/utils/Constants.h"
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -41,7 +42,7 @@ namespace robotick
 		std::unordered_map<std::string, size_t> schema_index_by_name;
 
 		size_t total_datablock_size = 0;
-		size_t datablock_offset_from_blackboard = std::numeric_limits<size_t>::max();
+		size_t datablock_offset_from_blackboard = OFFSET_UNBOUND;
 
 		bool has_field(const std::string& key) const;
 		const BlackboardFieldInfo* find_field(const std::string& key) const;
@@ -49,8 +50,7 @@ namespace robotick
 		void* get_field_ptr(Blackboard* bb, const std::string& key) const;
 		const void* get_field_ptr(const Blackboard* bb, const std::string& key) const;
 
-		static size_t type_size(std::type_index type);
-		static size_t type_align(std::type_index type);
+		static std::pair<size_t, size_t> type_size_and_align(std::type_index type);
 	};
 
 	class Blackboard

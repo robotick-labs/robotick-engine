@@ -32,9 +32,16 @@ namespace robotick
 
 		entry.type = type;
 
+		// first valid registration populates fields:
 		if (entry.fields.empty() && !fields.empty())
 		{
-			entry.fields = std::move(fields); // first valid registration populates fields
+			entry.fields = std::move(fields);
+
+			// Populate field_from_name map
+			for (auto& field : entry.fields)
+			{
+				entry.field_from_name.emplace(field.name, &field);
+			}
 		}
 		// else: retain existing field definitions
 		// (first registration call may actually come from Workload registration code, since static execution is

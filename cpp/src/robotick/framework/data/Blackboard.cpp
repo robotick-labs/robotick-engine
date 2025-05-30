@@ -48,7 +48,7 @@ namespace robotick
 		auto it = schema_index_by_name.find(key);
 		if (it == schema_index_by_name.end())
 			throw std::runtime_error("BlackboardInfo::get_field_ptr failed for key: " + key);
-		if (datablock_offset_from_blackboard == std::numeric_limits<size_t>::max())
+		if (datablock_offset_from_blackboard == OFFSET_UNBOUND)
 			throw std::runtime_error("Blackboard is not bound");
 
 		const auto& field = schema[it->second];
@@ -61,30 +61,18 @@ namespace robotick
 		return const_cast<BlackboardInfo*>(this)->get_field_ptr(const_cast<Blackboard*>(bb), key);
 	}
 
-	size_t BlackboardInfo::type_size(std::type_index type)
+	std::pair<size_t, size_t> BlackboardInfo::type_size_and_align(std::type_index type)
 	{
 		if (type == typeid(int))
-			return sizeof(int);
+			return {sizeof(int), alignof(int)};
 		if (type == typeid(double))
-			return sizeof(double);
+			return {sizeof(double), alignof(double)};
 		if (type == typeid(FixedString64))
-			return sizeof(FixedString64);
+			return {sizeof(FixedString64), alignof(FixedString64)};
 		if (type == typeid(FixedString128))
-			return sizeof(FixedString128);
-		throw std::runtime_error("Unsupported type in BlackboardInfo::type_size");
-	}
+			return {sizeof(FixedString128), alignof(FixedString128)};
 
-	size_t BlackboardInfo::type_align(std::type_index type)
-	{
-		if (type == typeid(int))
-			return alignof(int);
-		if (type == typeid(double))
-			return alignof(double);
-		if (type == typeid(FixedString64))
-			return alignof(FixedString64);
-		if (type == typeid(FixedString128))
-			return alignof(FixedString128);
-		throw std::runtime_error("Unsupported type in BlackboardInfo::type_align");
+		throw std::runtime_error("Unsupported type in BlackboardInfo::type_size_and_align");
 	}
 
 	Blackboard::Blackboard(const std::vector<BlackboardFieldInfo>& source_schema)
@@ -96,8 +84,7 @@ namespace robotick
 		for (size_t i = 0; i < source_schema.size(); ++i)
 		{
 			BlackboardFieldInfo field = source_schema[i];
-			size_t align = BlackboardInfo::type_align(field.type);
-			size_t size = BlackboardInfo::type_size(field.type);
+			auto [size, align] = BlackboardInfo::type_size_and_align(field.type);
 			offset = (offset + align - 1) & ~(align - 1);
 			field.offset_from_datablock = offset;
 			field.size = size;
@@ -119,8 +106,11 @@ namespace robotick
 
 	size_t Blackboard::get_datablock_offset() const
 	{
-		if (!info || info->datablock_offset_from_blackboard == OFFSET_UNBOUND)
+		if (!info)
 			throw std::runtime_error("Blackboard::get_datablock_offset called on uninitialized Blackboard");
+
+		if (info->datablock_offset_from_blackboard == OFFSET_UNBOUND)
+			throw std::runtime_error("Blackboard::get_datablock_offset called on Blackboard before datablock_offset has been set");
 
 		return info->datablock_offset_from_blackboard;
 	}

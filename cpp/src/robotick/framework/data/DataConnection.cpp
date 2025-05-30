@@ -4,6 +4,7 @@
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include <cstdint>
@@ -67,17 +68,17 @@ namespace robotick
 
 			const StructRegistryEntry* result = nullptr;
 
-			if (section == "inputs")
+			if (section == "inputs" && type->input_struct != nullptr)
 			{
 				out_offset = type->input_struct->offset_within_workload;
 				result = type->input_struct;
 			}
-			else if (section == "outputs")
+			else if (section == "outputs" && type->output_struct != nullptr)
 			{
 				out_offset = type->output_struct->offset_within_workload;
 				result = type->output_struct;
 			}
-			else if (section == "config")
+			else if (section == "config" && type->config_struct != nullptr)
 			{
 				out_offset = type->config_struct->offset_within_workload;
 				result = type->config_struct;
@@ -98,15 +99,14 @@ namespace robotick
 				return nullptr;
 			}
 
-			for (const auto& field : struct_entry->fields)
+			const auto& it_found = struct_entry->field_from_name.find(field_name);
+			if (it_found == struct_entry->field_from_name.end())
 			{
-				if (field.name == field_name)
-				{
-					return &field;
-				}
+				return nullptr;
 			}
 
-			return nullptr;
+			const FieldInfo* found_field = it_found->second;
+			return found_field;
 		}
 
 		static const BlackboardFieldInfo* resolve_blackboard_field_ptr(WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& inst,
@@ -177,12 +177,18 @@ namespace robotick
 					throw std::runtime_error("Source subfield not found: " + seed.source_field_path);
 				}
 
-				const auto* blackboard = reinterpret_cast<const Blackboard*>(src_ptr);
-				src_ptr = src_ptr + blackboard->get_datablock_offset() + src_blackboard_field->offset_from_datablock;
-				src_type = src_blackboard_field->type; // ^- TODO - decide whether we're happy for data-connections to be absolute pointers -
-													   // perhaps 	 fine - they can be associated with a specific WorkloadBuffer?  They'll likely
-													   // only need 	 to update the source one anyway
+				assert(workloads_buffer.is_within_buffer(src_ptr, src_size) && "Blackboard should be within supplied workloads-buffer");
+
+				const Blackboard* blackboard = static_cast<const Blackboard*>((void*)src_ptr);
+				const size_t blackboard_datablock_offset = blackboard->get_datablock_offset();
+
+				assert(blackboard_datablock_offset != OFFSET_UNBOUND && "Blackboard data-block offset should have been set by now");
+
+				src_ptr = src_ptr + blackboard_datablock_offset + src_blackboard_field->offset_from_datablock;
+				src_type = src_blackboard_field->type;
 				src_size = src_blackboard_field->size;
+
+				assert(workloads_buffer.is_within_buffer(src_ptr, src_size) && "Blackboard field pointer should be within supplied workloads-buffer");
 			}
 
 			// Lookup struct + field for dest

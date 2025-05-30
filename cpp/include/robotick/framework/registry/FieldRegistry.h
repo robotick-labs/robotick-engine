@@ -8,6 +8,7 @@
 #include "robotick/framework/utils/Typename.h"
 
 #include <cstddef> // for size_t
+#include <map>
 #include <mutex>
 #include <stdexcept> // for std::runtime_error
 #include <string>	 // for std::string
@@ -57,6 +58,7 @@ namespace robotick
 		std::type_index type = typeid(void);
 		size_t offset_within_workload = OFFSET_UNBOUND;
 		std::vector<FieldInfo> fields;
+		std::map<std::string, FieldInfo*> field_from_name;
 	};
 
 	class FieldRegistry

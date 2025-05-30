@@ -6,6 +6,7 @@
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
+#include "robotick/framework/registry/WorkloadRegistry.h"
 
 #include <cassert>
 
@@ -23,7 +24,8 @@ namespace robotick
 
 		uint8_t* ptr = workloads_buffer.raw_ptr() + this->offset_in_workloads_buffer;
 
-		assert(workloads_buffer.is_within_buffer(ptr) && "WorkloadInstanceInfo computed should be within the workloads-buffer provided");
+		assert(workloads_buffer.is_within_buffer(ptr, this->type->size) &&
+			   "WorkloadInstanceInfo computed should be within the workloads-buffer provided");
 
 		return ptr;
 	}

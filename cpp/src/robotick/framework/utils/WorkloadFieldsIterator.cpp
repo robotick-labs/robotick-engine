@@ -29,7 +29,12 @@ namespace robotick
 				{
 					void* base_ptr = field.get_data_ptr(workloads_buffer, instance, *struct_info);
 
-					if (base_ptr != nullptr && field.type == typeid(Blackboard))
+					if (base_ptr == nullptr)
+					{
+						continue; // nothing to report for an absent field
+					}
+
+					if (field.type == typeid(Blackboard))
 					{
 						Blackboard& blackboard = *static_cast<Blackboard*>(base_ptr);
 

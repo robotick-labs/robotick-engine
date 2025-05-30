@@ -210,7 +210,10 @@ namespace robotick
 
 		const size_t all_workloads_size = workloads_buffer_cursor;
 
-		// Workloads buffer allocation (add on over-estimate of further size needed for any blackboards-data):
+		// TODO: [#88] Temporary allocation strategy: pre-allocates workloads and an overestimated blackboards size.
+		// This will be replaced with a multi-stripe allocation model as outlined in ticket #88
+		state->workloads_buffer = WorkloadsBuffer(all_workloads_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
+
 		state->workloads_buffer = WorkloadsBuffer(all_workloads_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
 		uint8_t* workloads_buffer_ptr = state->workloads_buffer.raw_ptr();
 
@@ -412,7 +415,7 @@ namespace robotick
 			}
 		}
 
-		state->is_running = true; // flag that we're running - e.g. allows this to be seen in telemetry / asserts (e.g. )
+		state->is_running = true; // flag that we're running - e.g. allows this to be seen in telemetry / asserts
 
 		const auto tick_interval_sec = duration<double>(1.0 / root_info.tick_rate_hz);
 		const auto tick_interval = duration_cast<steady_clock::duration>(tick_interval_sec);
@@ -448,12 +451,14 @@ namespace robotick
 
 		} while (!stop_after_next_tick_flag);
 
+		state->is_running = false; // flag that we're no longer running - e.g. allows this to be seen in telemetry / asserts
+
 		// call stop() on all children (do it safely here, rather than relying on stop() to propagate through hierarchy)
 		for (auto& inst : state->instances)
 		{
 			if (inst.type->stop_fn)
 			{
-				inst.type->stop_fn(inst.get_ptr(state->workloads_buffer));
+				inst.type->stop_fn(inst.get_ptr(*this));
 			}
 		}
 	}
