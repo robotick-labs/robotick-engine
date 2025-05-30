@@ -14,7 +14,7 @@ namespace robotick
 	{
 		const std::vector<std::string> headers = {"Type", "Name", "Inputs", "Outputs", "dT (ms)", "Goal (ms)", "dT %", "Time (ms)", "Time %"};
 
-		const std::vector<size_t> widths = {28, 24, 20, 20, 10, 10, 8, 10, 8};
+		const std::vector<size_t> widths = {32, 24, 32, 32, 10, 10, 8, 10, 8};
 
 		std::vector<ConsoleTableRow> table_rows;
 		table_rows.reserve(rows.size());
