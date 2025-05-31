@@ -9,6 +9,7 @@
             "name": "ubuntu-x64-base",
             "hidden": true,
             "generator": "Ninja",
+            "description": "Base preset for Ubuntu x64 CI builds (common compiler & generator settings)",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "/usr/bin/gcc",

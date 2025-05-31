@@ -1,9 +1,9 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
+set -euo pipefail
 set -e
 
 if [ -z "$1" ]; then
-  echo "Usage: ./reset-feature.sh <feature-name>"
+  echo "Usage: $(basename "$0") <feature-name>"
   exit 1
 fi
 
