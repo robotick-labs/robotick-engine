@@ -46,7 +46,7 @@ namespace robotick
 		// Called once by engine before tick loop begins
 		void set_children(const std::vector<const WorkloadInstanceInfo*>& child_workloads, std::vector<DataConnectionInfo*>& pending_connections)
 		{
-			assert(engine != nullptr && "Engine should have been set by now");
+			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set by now");
 
 			// map from workload pointer to its ChildWorkloadInfo (for fast lookup)
 			children.reserve(child_workloads.size());
@@ -134,10 +134,11 @@ namespace robotick
 		// Runs on its own thread for each child
 		void child_tick_loop(ChildWorkloadInfo& child_info)
 		{
-			assert(child_info.workload_info != nullptr); // calling code should have verified this
+			ROBOTICK_ASSERT(child_info.workload_info != nullptr); // calling code should have verified this
 			const auto& child = *child_info.workload_info;
 
-			assert(child.type != nullptr && child.type->tick_fn != nullptr && child.tick_rate_hz > 0.0); // calling code should have verified these
+			ROBOTICK_ASSERT(
+				child.type != nullptr && child.type->tick_fn != nullptr && child.tick_rate_hz > 0.0); // calling code should have verified these
 
 			uint32_t last_tick = 0;
 			auto next_tick_time = steady_clock::now();

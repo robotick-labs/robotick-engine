@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/api.h"
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/registry/FieldRegistry.h"
@@ -86,17 +87,20 @@ namespace robotick
 			{
 				std::string name = py::str(item.first);
 				std::string type_str = py::str(item.second);
-				std::transform(type_str.begin(), type_str.end(), type_str.begin(),
-					[](unsigned char c)
-					{
-						return static_cast<char>(std::tolower(c));
-					});
+				std::transform(type_str.begin(), type_str.end(), type_str.begin(), ::tolower);
 
-				std::type_index type = (type_str == "int")				? std::type_index(typeid(int))
-									   : (type_str == "double")			? std::type_index(typeid(double))
-									   : (type_str == "fixedstring64")	? std::type_index(typeid(FixedString64))
-									   : (type_str == "fixedstring128") ? std::type_index(typeid(FixedString128))
-																		: throw std::runtime_error("Unsupported field type: " + type_str);
+				std::type_index type(typeid(void));
+
+				if (type_str == "int")
+					type = std::type_index(typeid(int));
+				else if (type_str == "double")
+					type = std::type_index(typeid(double));
+				else if (type_str == "fixedstring64")
+					type = std::type_index(typeid(FixedString64));
+				else if (type_str == "fixedstring128")
+					type = std::type_index(typeid(FixedString128));
+				else
+					ROBOTICK_ERROR("Unsupported field type: %s", type_str.c_str());
 
 				fields.emplace_back(FixedString64(name.c_str()), type);
 			}
@@ -107,7 +111,6 @@ namespace robotick
 		void initialize_blackboards(py::object& py_class)
 		{
 			py::dict desc = py_class.attr("describe")();
-
 			config.blackboard = Blackboard(parse_blackboard_schema(desc["config"]));
 			inputs.blackboard = Blackboard(parse_blackboard_schema(desc["inputs"]));
 			outputs.blackboard = Blackboard(parse_blackboard_schema(desc["outputs"]));
@@ -115,132 +118,92 @@ namespace robotick
 
 		void pre_load()
 		{
-			try
-			{
-				if (config.script_name.empty() || config.class_name.empty())
-					throw std::runtime_error("PythonWorkload config must specify script_name and class_name");
+			if (config.script_name.empty() || config.class_name.empty())
+				ROBOTICK_ERROR("PythonWorkload config must specify script_name and class_name");
 
-				robotick::ensure_python_runtime();
-				py::gil_scoped_acquire gil;
+			robotick::ensure_python_runtime();
+			py::gil_scoped_acquire gil;
 
-				internal_state->py_module = py::module_::import(config.script_name.c_str());
-				internal_state->py_class = internal_state->py_module.attr(config.class_name.c_str());
+			internal_state->py_module = py::module_::import(config.script_name.c_str());
+			internal_state->py_class = internal_state->py_module.attr(config.class_name.c_str());
 
-				initialize_blackboards(internal_state->py_class);
-			}
-			catch (const py::error_already_set& e)
-			{
-				std::cerr << "[Python ERROR] Failed to preload workload: " << e.what() << std::endl;
-				throw;
-			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "[ERROR] Exception during Python workload preload(): " << e.what() << std::endl;
-				throw;
-			}
+			initialize_blackboards(internal_state->py_class);
 		}
 
 		void load()
 		{
-			try
-			{
-				robotick::ensure_python_runtime();
-				py::gil_scoped_acquire gil;
-				py::dict py_cfg;
+			robotick::ensure_python_runtime();
+			py::gil_scoped_acquire gil;
 
-				for (const auto& field : config.blackboard.get_schema())
-				{
-					const std::string key = field.name.c_str();
-					const auto& type = field.type;
-
-					if (type == typeid(int))
-						py_cfg[key.c_str()] = config.blackboard.get<int>(key);
-					else if (type == typeid(double))
-						py_cfg[key.c_str()] = config.blackboard.get<double>(key);
-					else if (type == typeid(FixedString64))
-						py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString64>(key).c_str());
-					else if (type == typeid(FixedString128))
-						py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString128>(key).c_str());
-					else
-						throw std::runtime_error("Unsupported config field type for key '" + key + "' in PythonWorkload");
-				}
-
-				internal_state->py_instance = internal_state->py_class(py_cfg);
-			}
-			catch (const py::error_already_set& e)
+			py::dict py_cfg;
+			for (const auto& field : config.blackboard.get_schema())
 			{
-				std::cerr << "[Python ERROR] Failed to load workload: " << e.what() << std::endl;
-				throw;
+				const std::string key = field.name.c_str();
+				const auto& type = field.type;
+
+				if (type == typeid(int))
+					py_cfg[key.c_str()] = config.blackboard.get<int>(key);
+				else if (type == typeid(double))
+					py_cfg[key.c_str()] = config.blackboard.get<double>(key);
+				else if (type == typeid(FixedString64))
+					py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString64>(key).c_str());
+				else if (type == typeid(FixedString128))
+					py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString128>(key).c_str());
+				else
+					ROBOTICK_ERROR("Unsupported config field type for key '%s' in PythonWorkload", key.c_str());
 			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "[ERROR] Exception during Python workload load(): " << e.what() << std::endl;
-				throw;
-			}
+
+			internal_state->py_instance = internal_state->py_class(py_cfg);
 		}
 
 		void tick(double time_delta)
 		{
-			try
+			if (!internal_state->py_instance)
+				return;
+
+			py::gil_scoped_acquire gil;
+
+			py::dict py_in;
+			for (const auto& field : inputs.blackboard.get_schema())
 			{
-				if (!internal_state->py_instance)
-					return;
-				py::gil_scoped_acquire gil;
+				const std::string key = field.name.c_str();
+				const auto& type = field.type;
 
-				py::dict py_in;
-				for (const auto& field : inputs.blackboard.get_schema())
-				{
-					const std::string key = field.name.c_str();
-					const auto& type = field.type;
-
-					if (type == typeid(int))
-						py_in[key.c_str()] = inputs.blackboard.get<int>(key);
-					else if (type == typeid(double))
-						py_in[key.c_str()] = inputs.blackboard.get<double>(key);
-					else if (type == typeid(FixedString64))
-						py_in[key.c_str()] = std::string(inputs.blackboard.get<FixedString64>(key).c_str());
-					else if (type == typeid(FixedString128))
-						py_in[key.c_str()] = std::string(inputs.blackboard.get<FixedString128>(key).c_str());
-				}
-
-				py::dict py_out;
-				internal_state->py_instance.attr("tick")(time_delta, py_in, py_out);
-
-				for (auto item : py_out)
-				{
-					std::string key = py::str(item.first);
-					auto val = item.second;
-
-					const auto& schema = outputs.blackboard.get_schema();
-					auto it = std::find_if(schema.begin(), schema.end(),
-						[&](const BlackboardFieldInfo& f)
-						{
-							return key == f.name.c_str();
-						});
-					if (it == schema.end())
-						continue;
-
-					if (it->type == typeid(int))
-						outputs.blackboard.set<int>(key, val.cast<int>());
-					else if (it->type == typeid(double))
-						outputs.blackboard.set<double>(key, val.cast<double>());
-					else if (it->type == typeid(FixedString64))
-					{
-						const std::string tmp = val.cast<std::string>();
-						FixedString64 fs64(tmp.c_str());
-						outputs.blackboard.set<FixedString64>(key, fs64);
-					}
-					else if (it->type == typeid(FixedString128))
-					{
-						const std::string tmp = val.cast<std::string>();
-						FixedString128 fs128(tmp.c_str());
-						outputs.blackboard.set<FixedString128>(key, fs128);
-					}
-				}
+				if (type == typeid(int))
+					py_in[key.c_str()] = inputs.blackboard.get<int>(key);
+				else if (type == typeid(double))
+					py_in[key.c_str()] = inputs.blackboard.get<double>(key);
+				else if (type == typeid(FixedString64))
+					py_in[key.c_str()] = std::string(inputs.blackboard.get<FixedString64>(key).c_str());
+				else if (type == typeid(FixedString128))
+					py_in[key.c_str()] = std::string(inputs.blackboard.get<FixedString128>(key).c_str());
 			}
-			catch (const py::error_already_set& e)
+
+			py::dict py_out;
+			internal_state->py_instance.attr("tick")(time_delta, py_in, py_out);
+
+			for (auto item : py_out)
 			{
-				std::cerr << "[Python ERROR] " << e.what() << std::endl;
+				std::string key = py::str(item.first);
+				auto val = item.second;
+
+				const auto& schema = outputs.blackboard.get_schema();
+				auto it = std::find_if(schema.begin(), schema.end(),
+					[&](const BlackboardFieldInfo& f)
+					{
+						return key == f.name.c_str();
+					});
+				if (it == schema.end())
+					continue;
+
+				if (it->type == typeid(int))
+					outputs.blackboard.set<int>(key, val.cast<int>());
+				else if (it->type == typeid(double))
+					outputs.blackboard.set<double>(key, val.cast<double>());
+				else if (it->type == typeid(FixedString64))
+					outputs.blackboard.set<FixedString64>(key, FixedString64(val.cast<std::string>().c_str()));
+				else if (it->type == typeid(FixedString128))
+					outputs.blackboard.set<FixedString128>(key, FixedString128(val.cast<std::string>().c_str()));
 			}
 		}
 	};

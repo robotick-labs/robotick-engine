@@ -23,7 +23,18 @@ FetchContent_Declare(
   GIT_TAG        v3.4.0
 )
 
+# Disable -Werror inside Catch2 (even if it tries to re-enable it)
+set(CATCH_WARNINGS_AS_ERRORS OFF CACHE BOOL "" FORCE)
+set(CATCH_ENABLE_WERROR OFF CACHE BOOL "" FORCE)
+
 FetchContent_MakeAvailable(Catch2)
+
+# Manually remove -Werror from Catch2 targets if needed
+get_target_property(_catch2_opts Catch2 COMPILE_OPTIONS)
+if(_catch2_opts)
+  list(REMOVE_ITEM _catch2_opts "-Werror")
+  set_target_properties(Catch2 PROPERTIES COMPILE_OPTIONS "${_catch2_opts}")
+endif()
 
 # Avoid clang-tidy warnings inside Catch2 (external lib)
 set_target_properties(Catch2 PROPERTIES CXX_CLANG_TIDY "")
@@ -56,6 +67,9 @@ target_link_libraries(robotick_tests
     robotick_framework
     Catch2::Catch2WithMain
 )
+
+# ✅ Re-enable exceptions just for test target
+target_compile_options(robotick_tests PRIVATE -fexceptions)
 
 # Discover Catch2 TEST_CASEs automatically
 include(Catch)

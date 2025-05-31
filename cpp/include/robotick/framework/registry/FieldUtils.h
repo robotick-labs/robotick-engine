@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "robotick/api.h"
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/utils/Typename.h"
@@ -18,7 +19,7 @@
 template <typename T> T& any_cast_ref(std::any& val)
 {
 	if (!val.has_value())
-		throw std::runtime_error("Missing config value");
+		ROBOTICK_ERROR("Missing config value");
 	return std::any_cast<T&>(val);
 }
 
@@ -58,7 +59,7 @@ namespace robotick
 			if (it == config.end())
 				continue;
 
-			assert(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+			ROBOTICK_ASSERT(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
 			void* field_ptr = static_cast<uint8_t*>(struct_ptr) + field.offset_within_struct;
 
@@ -88,7 +89,7 @@ namespace robotick
 							 }
 							 else
 							 {
-								 throw std::runtime_error("Invalid type for FixedString field: " + field.name);
+								 ROBOTICK_ERROR("Invalid type for FixedString field: %s", field.name.c_str());
 							 }
 							 return true;
 						 }))
@@ -97,7 +98,7 @@ namespace robotick
 			}
 			else
 			{
-				throw std::runtime_error("Unsupported config type: " + get_clean_typename(field.type) + " for field: " + field.name);
+				ROBOTICK_ERROR("Unsupported config type: %s for field: %s", get_clean_typename(field.type).c_str(), field.name.c_str());
 			}
 		}
 	}

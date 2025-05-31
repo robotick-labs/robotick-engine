@@ -4,10 +4,20 @@
     "cmake.sourceDirectory": "${workspaceFolder}",
     "cmake.buildDirectory": "${workspaceFolder}/build",
     "terminal.integrated.defaultProfile.linux": "bash",
+    // ✅ Use correct compile_commands.json for dev-gcc preset
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/dev-gcc/compile_commands.json",
+    // ✅ Enable clang-tidy (with one disabled check)
     "C_Cpp.codeAnalysis.clangTidy.enabled": true,
     "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
         "modernize-use-trailing-return-type"
     ],
+    // ✅ Enable TestMate (Catch2 test explorer)
+    "catch2TestExplorer.enableTestExplorer": true,
+    "catch2TestExplorer.useCTest": false,
+    "catch2TestExplorer.executables": [
+        "**/robotick_tests"
+    ],
+    // ✅ File type associations (unchanged)
     "files.associations": {
         "any": "cpp",
         "array": "cpp",

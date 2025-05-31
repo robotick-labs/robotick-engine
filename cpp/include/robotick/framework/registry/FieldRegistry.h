@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "robotick/api.h"
 #include "robotick/framework/utils/Constants.h"
 #include "robotick/framework/utils/Typename.h"
 
@@ -38,13 +39,13 @@ namespace robotick
 		{
 			if (type != std::type_index(typeid(T)))
 			{
-				throw std::runtime_error("FieldInfo::get<T>() type mismatch for field '" + name + "'");
+				ROBOTICK_ERROR("FieldInfo::get<T>() type mismatch for field '%s'", name.c_str());
 			}
 
 			uint8_t* ptr = get_data_ptr(workloads_buffer, instance, struct_info);
 			if (!ptr)
 			{
-				throw std::runtime_error("FieldInfo::get<T>() null pointer access for field '" + name + "'");
+				ROBOTICK_ERROR("FieldInfo::get<T>() null pointer access for field '%s'", name.c_str());
 			}
 
 			return *static_cast<T*>((void*)ptr);

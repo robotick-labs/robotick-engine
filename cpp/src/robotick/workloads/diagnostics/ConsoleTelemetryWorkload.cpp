@@ -52,8 +52,8 @@ namespace robotick
 				return rows;
 			}
 
-			assert(rows.capacity() == engine->get_all_instance_info().size() &&
-				   "Correct storage for rows should have been reserved when engine was set. Workload-count is fixed after startup.");
+			ROBOTICK_ASSERT(rows.capacity() == engine->get_all_instance_info().size() &&
+							"Correct storage for rows should have been reserved when engine was set. Workload-count is fixed after startup.");
 
 			const WorkloadInstanceInfo* root = engine->get_root_instance_info();
 			if (!root)
@@ -103,7 +103,7 @@ namespace robotick
 			std::vector<std::string> input_entries;
 			std::vector<std::string> output_entries;
 
-			assert(engine != nullptr && "Engine should have been set and checked by now");
+			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set and checked by now");
 
 			WorkloadFieldsIterator::for_each_field_in_workload(*engine, info, &mirror_buffer,
 				[&](const WorkloadFieldView& view)
@@ -121,7 +121,7 @@ namespace robotick
 
 					if (view.subfield)
 					{
-						assert(mirror_buffer.contains_object(view.field_ptr, view.subfield->size));
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.subfield->size));
 
 						const std::type_index& type = view.subfield->type;
 						if (type == typeid(int))
@@ -137,7 +137,7 @@ namespace robotick
 					}
 					else
 					{
-						assert(mirror_buffer.contains_object(view.field_ptr, view.field->size));
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.field->size));
 
 						// fallback for top-level (non-blackboard) fields
 						const std::type_index& type = view.field->type;
@@ -232,7 +232,7 @@ namespace robotick
 			// This avoids overwhelming stdout and dominating frame time, even without pretty printing.
 			// To help mitigate this, printing is built as a single string and flushed once per tick.
 
-			assert(collector.get_engine() != nullptr && "ConsoleTelemetryWorkload - engine should never be null during tick");
+			ROBOTICK_ASSERT(collector.get_engine() != nullptr && "ConsoleTelemetryWorkload - engine should never be null during tick");
 			// ^- we should never reach the point of ticking without set_engine having been called.
 			//  - we also assume that any given workload-instance can only ever be part of a single
 			//    engine, and that the lifespan of the engine is longer than the workloads that are

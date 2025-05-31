@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/DataConnection.h"
+
+#include "robotick/api.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
@@ -34,19 +36,19 @@ namespace robotick
 			{
 				if (token.empty())
 				{
-					throw FieldPathParseError("Empty segment in field path: " + raw);
+					ROBOTICK_ERROR("Empty segment in field path: %s", raw.c_str());
 				}
 				tokens.push_back(token);
 			}
 
 			if (tokens.size() < 3 || tokens.size() > 4)
 			{
-				throw FieldPathParseError("Expected format <workload>.<section>.<field> or <workload>.<section>.<field>.<subfield>: " + raw);
+				ROBOTICK_ERROR("Expected format <workload>.<section>.<field> or <workload>.<section>.<field>.<subfield>: %s", raw.c_str());
 			}
 
 			if (!is_valid_section(tokens[1]))
 			{
-				throw FieldPathParseError("Invalid section '" + tokens[1] + "' in path: " + raw);
+				ROBOTICK_ERROR("Invalid section '%s' in path: %s", tokens[1].c_str(), raw.c_str());
 			}
 
 			const bool has_subfield = tokens.size() == 4;
@@ -63,7 +65,7 @@ namespace robotick
 			const auto* type = instance.type;
 			if (!type)
 			{
-				throw std::runtime_error("Missing type info for workload: " + instance.unique_name);
+				ROBOTICK_ERROR("Missing type info for workload: %s", instance.unique_name.c_str());
 			}
 
 			const StructRegistryEntry* result = nullptr;
@@ -85,10 +87,10 @@ namespace robotick
 			}
 			else
 			{
-				throw std::runtime_error("Invalid section: " + section);
+				ROBOTICK_ERROR("Invalid section: %s", section.c_str());
 			}
 
-			assert((result == nullptr || out_offset != OFFSET_UNBOUND) && "StructRegistryEntry with unbound offset should not exist");
+			ROBOTICK_ASSERT((result == nullptr || out_offset != OFFSET_UNBOUND) && "StructRegistryEntry with unbound offset should not exist");
 			return result;
 		}
 
@@ -144,12 +146,12 @@ namespace robotick
 
 			if (!src_inst)
 			{
-				throw std::runtime_error("Unknown source workload: " + std::string(src.workload_name.c_str()));
+				ROBOTICK_ERROR("Unknown source workload: %s", src.workload_name.c_str());
 			}
 
 			if (!dst_inst)
 			{
-				throw std::runtime_error("Unknown destination workload: " + std::string(dst.workload_name.c_str()));
+				ROBOTICK_ERROR("Unknown destination workload: %s", dst.workload_name.c_str());
 			}
 
 			// Lookup struct + field for source
@@ -158,10 +160,10 @@ namespace robotick
 			const FieldInfo* src_field = DataConnectionUtils::find_field(src_struct, src.field_path[0].c_str());
 			if (!src_field)
 			{
-				throw std::runtime_error("Source field not found: " + seed.source_field_path);
+				ROBOTICK_ERROR("Source field not found: %s", seed.source_field_path.c_str());
 			}
 
-			assert(src_struct_offset != OFFSET_UNBOUND && "Src struct offset should have definitely been set by now");
+			ROBOTICK_ASSERT(src_struct_offset != OFFSET_UNBOUND && "Src struct offset should have definitely been set by now");
 
 			const uint8_t* src_ptr = src_field->get_data_ptr(workloads_buffer, *src_inst, *src_struct);
 			std::type_index src_type = src_field->type;
@@ -174,22 +176,22 @@ namespace robotick
 
 				if (!src_blackboard_field)
 				{
-					throw std::runtime_error("Source subfield not found: " + seed.source_field_path);
+					ROBOTICK_ERROR("Source subfield not found: %s", seed.source_field_path.c_str());
 				}
 
-				assert(workloads_buffer.contains_object(src_ptr, src_size) && "Blackboard should be within supplied workloads-buffer");
+				ROBOTICK_ASSERT(workloads_buffer.contains_object(src_ptr, src_size) && "Blackboard should be within supplied workloads-buffer");
 
 				const Blackboard* blackboard = static_cast<const Blackboard*>((void*)src_ptr);
 				const size_t blackboard_datablock_offset = blackboard->get_datablock_offset();
 
-				assert(blackboard_datablock_offset != OFFSET_UNBOUND && "Blackboard data-block offset should have been set by now");
+				ROBOTICK_ASSERT(blackboard_datablock_offset != OFFSET_UNBOUND && "Blackboard data-block offset should have been set by now");
 
 				src_ptr = src_ptr + blackboard_datablock_offset + src_blackboard_field->offset_from_datablock;
 				src_type = src_blackboard_field->type;
 				src_size = src_blackboard_field->size;
 			}
 
-			assert(workloads_buffer.contains_object(src_ptr, src_size) && "Source Field pointer should be within supplied workloads-buffer");
+			ROBOTICK_ASSERT(workloads_buffer.contains_object(src_ptr, src_size) && "Source Field pointer should be within supplied workloads-buffer");
 
 			// Lookup struct + field for dest
 			size_t dst_struct_offset = OFFSET_UNBOUND;
@@ -197,10 +199,10 @@ namespace robotick
 			const FieldInfo* dst_field = DataConnectionUtils::find_field(dst_struct, dst.field_path[0].c_str());
 			if (!dst_field || dst_struct_offset == OFFSET_UNBOUND)
 			{
-				throw std::runtime_error("Destination field not found: " + seed.dest_field_path);
+				ROBOTICK_ERROR("Destination field not found: %s", seed.dest_field_path.c_str());
 			}
 
-			assert(dst_struct_offset != OFFSET_UNBOUND && "Dest struct offset should have definitely been set by now");
+			ROBOTICK_ASSERT(dst_struct_offset != OFFSET_UNBOUND && "Dest struct offset should have definitely been set by now");
 
 			uint8_t* dst_ptr = dst_field->get_data_ptr(workloads_buffer, *dst_inst, *dst_struct);
 			std::type_index dst_type = dst_field->type;
@@ -213,7 +215,7 @@ namespace robotick
 
 				if (!dst_blackboard_field)
 				{
-					throw std::runtime_error("Dest subfield not found: " + seed.dest_field_path);
+					ROBOTICK_ERROR("Dest subfield not found: %s", seed.dest_field_path.c_str());
 				}
 
 				auto* blackboard = reinterpret_cast<Blackboard*>(dst_ptr);
@@ -222,21 +224,20 @@ namespace robotick
 				dst_size = dst_blackboard_field->size;
 			}
 
-			assert(workloads_buffer.contains_object(dst_ptr, dst_size) && "Destination Field pointer should be within supplied workloads-buffer");
+			ROBOTICK_ASSERT(
+				workloads_buffer.contains_object(dst_ptr, dst_size) && "Destination Field pointer should be within supplied workloads-buffer");
 
 			// Validate type match
 			if (src_type != dst_type)
 			{
-				throw std::runtime_error("Type mismatch between source and dest: " + seed.source_field_path + " vs. " + seed.dest_field_path);
+				ROBOTICK_ERROR("Type mismatch between source and dest: %s vs. %s", seed.source_field_path.c_str(), seed.dest_field_path.c_str());
 			}
 
 			// Validate size match
 			if (src_size != dst_size)
 			{
-				std::ostringstream oss;
-				oss << "Size mismatch (" << src_size << " vs " << dst_size << ") between " << seed.source_field_path << " and "
-					<< seed.dest_field_path;
-				throw std::runtime_error(oss.str());
+				ROBOTICK_ERROR(
+					"Size mismatch (%zu vs %zu) between %s and %s", src_size, dst_size, seed.source_field_path.c_str(), seed.dest_field_path.c_str());
 			}
 
 			std::string dst_key = std::string(dst.workload_name.c_str()) + "." + dst.section_name.c_str() + "." + dst.field_path[0].c_str();
@@ -247,10 +248,9 @@ namespace robotick
 
 			if (!seen_destinations.insert(dst_key).second)
 			{
-				throw std::runtime_error("Duplicate destination field: " + dst_key);
+				ROBOTICK_ERROR("Duplicate destination field: %s", dst_key.c_str());
 			}
 
-			// results.push_back(DataConnectionInfo{src_ptr, dst_ptr, src_field->size, src_field->type});
 			results.push_back(DataConnectionInfo{seed, src_ptr, dst_ptr, src_inst, dst_inst, src_size, src_type});
 		}
 

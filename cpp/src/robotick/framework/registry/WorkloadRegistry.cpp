@@ -1,6 +1,8 @@
 // Copyright Robotick Labs
 #include "robotick/framework/registry/WorkloadRegistry.h"
 
+#include "robotick/api.h"
+
 #include <memory>
 #include <stdexcept>
 
@@ -18,7 +20,7 @@ namespace robotick
 
 		if (entries.find(entry.name) != entries.end())
 		{
-			throw std::runtime_error("WorkloadRegistry: entry with name '" + entry.name + "' already exists.");
+			ROBOTICK_ERROR("WorkloadRegistry: entry with name '%s' already exists.", entry.name.c_str());
 		}
 
 		entries[entry.name] = std::make_unique<WorkloadRegistryEntry>(entry);

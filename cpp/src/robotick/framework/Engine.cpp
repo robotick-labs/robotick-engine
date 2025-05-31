@@ -4,6 +4,7 @@
 
 #include "robotick/framework/Engine.h"
 
+#include "robotick/api.h"
 #include "robotick/config/PlatformDefaults.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/data/Blackboard.h"
@@ -51,7 +52,7 @@ namespace robotick
 			if (instance.type->destruct)
 			{
 				void* instance_ptr = instance.get_ptr(*this);
-				assert(instance_ptr != nullptr && "Workload pointer should not be null at this point");
+				ROBOTICK_ASSERT(instance_ptr != nullptr && "Workload pointer should not be null at this point");
 
 				instance.type->destruct(instance_ptr);
 			}
@@ -96,7 +97,7 @@ namespace robotick
 				continue;
 
 			void* instance_ptr = instance.get_ptr(*this);
-			assert(instance_ptr != nullptr && "Engine should never have null instances at this point");
+			ROBOTICK_ASSERT(instance_ptr != nullptr && "Engine should never have null instances at this point");
 
 			auto accumulate = [&](const StructRegistryEntry* struct_info)
 			{
@@ -113,7 +114,7 @@ namespace robotick
 				{
 					if (field.type == typeid(Blackboard))
 					{
-						assert(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+						ROBOTICK_ASSERT(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
 						const auto* blackboard_raw_ptr = struct_ptr + field.offset_within_struct;
 						const auto* blackboard = reinterpret_cast<const Blackboard*>(blackboard_raw_ptr);
@@ -181,7 +182,7 @@ namespace robotick
 	{
 		if (!model.get_root().is_valid())
 		{
-			throw std::runtime_error("Model has no root workload set via model.set_root(...)");
+			ROBOTICK_ERROR("Model has no root workload set via model.set_root(...)");
 		}
 
 		state->instances.clear();
@@ -200,7 +201,7 @@ namespace robotick
 		{
 			const auto* type = WorkloadRegistry::get().find(workload_seed.type);
 			if (!type)
-				throw std::runtime_error("Unknown workload type: " + workload_seed.type);
+				ROBOTICK_ERROR("Unknown workload type: %s", workload_seed.type.c_str());
 
 			const size_t alignment = std::max<size_t>(type->alignment, alignof(std::max_align_t));
 			workloads_buffer_cursor = (workloads_buffer_cursor + alignment - 1) & ~(alignment - 1);
@@ -265,12 +266,9 @@ namespace robotick
 		const size_t blackboards_buffer_size = compute_blackboard_memory_requirements(state->instances);
 		if (blackboards_buffer_size > robotick::DEFAULT_MAX_BLACKBOARDS_BYTES)
 		{
-			std::ostringstream msg;
-			msg << "[Engine::load] Required blackboard memory (" << blackboards_buffer_size << " bytes) exceeds platform default maximum ("
-				<< robotick::DEFAULT_MAX_BLACKBOARDS_BYTES << " bytes).\n"
-				<< "Increase DEFAULT_MAX_BLACKBOARDS_BYTES or allocate explicitly for your platform.";
-
-			throw std::runtime_error(msg.str());
+			ROBOTICK_ERROR("[Engine::load] Required blackboard memory (%zu bytes) exceeds platform default maximum (%zu bytes).\n"
+						   "Increase DEFAULT_MAX_BLACKBOARDS_BYTES or allocate explicitly for your platform.",
+				blackboards_buffer_size, robotick::DEFAULT_MAX_BLACKBOARDS_BYTES);
 		}
 
 		if (blackboards_buffer_size > 0)
@@ -278,7 +276,8 @@ namespace robotick
 			const size_t blackboards_data_start_offset = workloads_buffer_cursor;
 			workloads_buffer_cursor += blackboards_buffer_size;
 
-			assert(blackboards_data_start_offset >= all_workloads_size && "Blackboards data should all appear after workloads-data in buffer");
+			ROBOTICK_ASSERT(
+				blackboards_data_start_offset >= all_workloads_size && "Blackboards data should all appear after workloads-data in buffer");
 
 			bind_blackboards_for_instances(state->instances, blackboards_data_start_offset);
 		}
@@ -322,8 +321,10 @@ namespace robotick
 			const auto& workload_seed = workload_seeds[i];
 			auto& instance = state->instances[i];
 
-			assert(instance.unique_name == workload_seed.name && "[Engine] Workload instances should be in same order as seeds (different names)");
-			assert(instance.type->name == workload_seed.type && "[Engine] Workload instances should be in same order as seeds (different types");
+			ROBOTICK_ASSERT(
+				instance.unique_name == workload_seed.name && "[Engine] Workload instances should be in same order as seeds (different names)");
+			ROBOTICK_ASSERT(
+				instance.type->name == workload_seed.type && "[Engine] Workload instances should be in same order as seeds (different types");
 
 			if (instance.type->set_children_fn)
 			{
@@ -338,7 +339,7 @@ namespace robotick
 		// call set_children_fn on root-instance - we expect that to recursively do so for any children
 		// allowing them to set up their children, acquire responsibility for data-connections, etc as needed.
 		const WorkloadInstanceInfo* root_instance = &get_instance_info(model.get_root().index);
-		assert(root_instance != nullptr);
+		ROBOTICK_ASSERT(root_instance != nullptr);
 
 		if (root_instance && root_instance->type && root_instance->type->set_children_fn)
 		{
@@ -361,16 +362,11 @@ namespace robotick
 		// validate that all pending data_connections have been acquired by workloads:
 		if (!data_connections_pending_acquisition.empty())
 		{
-			std::ostringstream msg;
-			msg << "Error: Not all data connections were acquired by workloads or engine.\n";
-			msg << "Unclaimed connections (" << data_connections_pending_acquisition.size() << "):\n";
+			const auto* conn = data_connections_pending_acquisition.front();
 
-			for (const DataConnectionInfo* conn : data_connections_pending_acquisition)
-			{
-				msg << "  - " << conn->seed.source_field_path << " -> " << conn->seed.dest_field_path << '\n';
-			}
-
-			throw std::runtime_error(msg.str());
+			ROBOTICK_ERROR("Error: Not all data connections were acquired by workloads or engine.\n"
+						   "Unclaimed connections (%zu). First: %s -> %s",
+				data_connections_pending_acquisition.size(), conn->seed.source_field_path.c_str(), conn->seed.dest_field_path.c_str());
 		}
 
 		// setup each instance
@@ -379,14 +375,14 @@ namespace robotick
 			if (instance.type->setup_fn)
 			{
 				void* instance_ptr = instance.get_ptr(*this);
-				assert(instance_ptr != nullptr && "Workload pointer should not be null at this point");
+				ROBOTICK_ASSERT(instance_ptr != nullptr && "Workload pointer should not be null at this point");
 
 				instance.type->setup_fn(instance_ptr);
 			}
 		}
 
 		state->root_instance = root_instance;
-		assert(state->root_instance != nullptr);
+		ROBOTICK_ASSERT(state->root_instance != nullptr);
 	}
 
 	bool Engine::is_running() const
@@ -400,13 +396,13 @@ namespace robotick
 
 		const WorkloadHandle root_handle = state->m_loaded_model.get_root();
 		if (root_handle.index >= state->instances.size())
-			throw std::runtime_error("Invalid root workload handle");
+			ROBOTICK_ERROR("Invalid root workload handle");
 
 		const auto& root_info = state->instances[root_handle.index];
 		void* root_ptr = root_info.get_ptr(*this);
 
 		if (root_info.tick_rate_hz <= 0 || !root_info.type->tick_fn || !root_ptr)
-			throw std::runtime_error("Root workload must have valid tick_rate_hz and tick()");
+			ROBOTICK_ERROR("Root workload must have valid tick_rate_hz and tick()");
 
 		// call start() on all workloads
 		for (auto& inst : state->instances)

@@ -62,9 +62,10 @@ namespace robotick
 	uint8_t* FieldInfo::get_data_ptr(
 		WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& instance, const StructRegistryEntry& struct_info) const
 	{
-		assert(instance.offset_in_workloads_buffer != OFFSET_UNBOUND && "Workload object instance offset should have been correctly set by now");
-		assert(struct_info.offset_within_workload != OFFSET_UNBOUND && "struct offset should have been correctly set by now");
-		assert(this->offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+		ROBOTICK_ASSERT(
+			instance.offset_in_workloads_buffer != OFFSET_UNBOUND && "Workload object instance offset should have been correctly set by now");
+		ROBOTICK_ASSERT(struct_info.offset_within_workload != OFFSET_UNBOUND && "struct offset should have been correctly set by now");
+		ROBOTICK_ASSERT(this->offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
 		uint8_t* base_ptr = workloads_buffer.raw_ptr();
 		uint8_t* instance_ptr = base_ptr + instance.offset_in_workloads_buffer;

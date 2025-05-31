@@ -79,7 +79,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	{
 		if (field.name == "blackboard")
 		{
-			assert(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+			ROBOTICK_ASSERT(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
 			const void* field_ptr = static_cast<const uint8_t*>(output_base) + field.offset_within_struct;
 			output_blackboard = static_cast<const robotick::Blackboard*>(field_ptr);

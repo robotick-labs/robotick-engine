@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "robotick/api.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/Typename.h"
@@ -27,7 +28,7 @@ namespace robotick::test
 
 			if (info.type->name != expected_type)
 			{
-				throw std::runtime_error("Type mismatch: expected " + expected_type + ", got " + info.type->name);
+				ROBOTICK_ERROR("Type mismatch: expected %s, got %s", expected_type.c_str(), info.type->name.c_str());
 			}
 
 			return static_cast<T*>((void*)info.get_ptr(engine));

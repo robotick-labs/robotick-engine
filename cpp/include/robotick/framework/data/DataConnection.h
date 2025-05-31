@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "robotick/api.h"
 #include "robotick/framework/common/FixedString.h"
 
 #include <cassert>
@@ -45,9 +46,9 @@ namespace robotick
 
 		void do_data_copy() const noexcept
 		{
-			assert(source_ptr != nullptr && dest_ptr != nullptr && size > 0);
+			ROBOTICK_ASSERT(source_ptr != nullptr && dest_ptr != nullptr && size > 0);
 			static_assert(std::is_trivially_copyable_v<std::byte>, "do_data_copy() assumes trivially-copyable payloads");
-			assert(source_ptr != dest_ptr && "Source and destination pointers are the same - this should have been caught in fixup");
+			ROBOTICK_ASSERT(source_ptr != dest_ptr && "Source and destination pointers are the same - this should have been caught in fixup");
 
 			// If aliasing is possible, use std::memmove instead.
 			std::memcpy(dest_ptr, source_ptr, size);
