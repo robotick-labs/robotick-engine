@@ -226,11 +226,13 @@ namespace robotick
 			const size_t instance_offset = aligned_offsets[i];
 			uint8_t* instance_ptr = workloads_buffer_ptr + instance_offset;
 
-			if (type->construct)
-				type->construct(instance_ptr);
-
-			state->instances.push_back(
+			state->instances.emplace_back(
 				WorkloadInstanceInfo{instance_offset, type, workload_seed.name, workload_seed.tick_rate_hz, {}, WorkloadInstanceStats{}});
+
+			if (type->construct)
+			{
+				type->construct(instance_ptr); // safe: entry already present
+			}
 		}
 
 		// configure and pre-load in parallel
@@ -243,18 +245,13 @@ namespace robotick
 			const auto* type = state->instances[i].type;
 			uint8_t* instance_ptr = workloads_buffer_ptr + state->instances[i].offset_in_workloads_buffer;
 
-			preload_futures.push_back(std::async(std::launch::async,
-				[=, this]()
+			preload_futures.emplace_back(std::async(std::launch::async,
+				[this, type, instance_ptr, config = workload_seed.config]()
 				{
 					if (type->set_engine_fn)
 						type->set_engine_fn(instance_ptr, *this);
-
 					if (type->config_struct)
-					{
-						assert(type->config_struct->offset_within_workload != OFFSET_UNBOUND && "Struct offset not initialized");
-						apply_struct_fields(instance_ptr + type->config_struct->offset_within_workload, *type->config_struct, workload_seed.config);
-					}
-
+						apply_struct_fields(instance_ptr + type->config_struct->offset_within_workload, *type->config_struct, config);
 					if (type->pre_load_fn)
 						type->pre_load_fn(instance_ptr);
 				}));

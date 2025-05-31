@@ -14,10 +14,10 @@
 
 namespace robotick
 {
+	class ConsoleTelemetryCollector;
 	class WorkloadsBuffer;
 	struct DataConnectionInfo;
 	struct StructRegistryEntry;
-	struct ConsoleTelemetryCollector;
 	struct WorkloadFieldsIterator;
 	struct WorkloadInstanceInfo;
 	struct WorkloadRegistryEntry;

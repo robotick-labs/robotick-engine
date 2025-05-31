@@ -38,7 +38,7 @@ namespace robotick
 			engine = &engine_in;
 			rows.reserve(engine->get_all_instance_info().size());
 
-			mirror_buffer = WorkloadsBuffer(engine->get_workloads_buffer()); // copy our workloads buffer right away
+			mirror_buffer.create_mirror_from(engine->get_workloads_buffer());
 		}
 
 		const Engine* get_engine() const { return engine; };
@@ -53,7 +53,7 @@ namespace robotick
 			}
 
 			assert(rows.capacity() == engine->get_all_instance_info().size() &&
-				   "Correct storage for rows should have been reserved when engine was set");
+				   "Correct storage for rows should have been reserved when engine was set. Workload-count is fixed after startup.");
 
 			const WorkloadInstanceInfo* root = engine->get_root_instance_info();
 			if (!root)
@@ -61,7 +61,7 @@ namespace robotick
 				return rows; // nothing to show if no root has been set - don't assume this is an accident
 			}
 
-			mirror_buffer.mirror_from(engine->get_workloads_buffer());
+			mirror_buffer.update_mirror_from(engine->get_workloads_buffer());
 
 			visit_all(*root, 0, rows);
 			return rows;
@@ -184,9 +184,9 @@ namespace robotick
 
 		const Engine* engine = nullptr;
 		WorkloadsBuffer mirror_buffer; // Provides a local copy of the engine's WorkloadsBuffer to reduce temporal aliasing.
-									   // Note: aliasing may still occur if other threads are modifying the source buffer
-									   // at high frequency during the mirror_from() copy. For console logging purposes,
-									   // this should be "good enough", but not guaranteed to be perfectly atomic.
+									   // THREADING: The update_mirror_from() operation is not atomic. Race conditions may occur
+									   // if other threads modify the source buffer during copying. This is acceptable
+									   // for diagnostic telemetry but should not be relied upon for critical operations.
 	};
 
 	struct ConsoleTelemetryWorkload
@@ -236,7 +236,7 @@ namespace robotick
 			// ^- we should never reach the point of ticking without set_engine having been called.
 			//  - we also assume that any given workload-instance can only ever be part of a single
 			//    engine, and that the lifespan of the engine is longer than the workloads that are
-			//    owned and created/destroyed by the engine->
+			//    owned and created/destroyed by the engine.
 
 			auto rows = config.enable_demo ? collect_console_telemetry_rows_demo(*collector.get_engine()) : collector.collect_rows();
 
