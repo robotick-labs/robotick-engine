@@ -3,10 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
+#include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/ConsoleTelemetryTable.h"
-#include "robotick/framework/utils/TelemetryCollector.h"
+#include "robotick/framework/utils/WorkloadFieldsIterator.h"
 
 #include <cassert> // assert
 #include <random>  // std::random_device, std::mt19937, std::uniform_real_distribution
@@ -29,11 +30,169 @@ namespace robotick
 	ROBOTICK_FIELD(ConsoleTelemetryConfig, enable_demo)
 	ROBOTICK_END_FIELDS()
 
+	class ConsoleTelemetryCollector
+	{
+	  public:
+		void set_engine(const Engine& engine_in)
+		{
+			engine = &engine_in;
+			rows.reserve(engine->get_all_instance_info().size());
+
+			mirror_buffer = WorkloadsBuffer(engine->get_workloads_buffer()); // copy our workloads buffer right away
+		}
+
+		const Engine* get_engine() const { return engine; };
+
+		std::vector<ConsoleTelemetryRow> collect_rows()
+		{
+			rows.clear(); // clear every time we're called (else we'll keep accumulating rows)
+
+			if (!engine)
+			{
+				return rows;
+			}
+
+			assert(rows.capacity() == engine->get_all_instance_info().size() &&
+				   "Correct storage for rows should have been reserved when engine was set");
+
+			const WorkloadInstanceInfo* root = engine->get_root_instance_info();
+			if (!root)
+			{
+				return rows; // nothing to show if no root has been set - don't assume this is an accident
+			}
+
+			mirror_buffer.mirror_from(engine->get_workloads_buffer());
+
+			visit_all(*root, 0, rows);
+			return rows;
+		}
+
+	  private:
+		void visit_all(const WorkloadInstanceInfo& info, size_t depth, std::vector<ConsoleTelemetryRow>& rows)
+		{
+			auto& row = rows.emplace_back();
+			populate_row(row, depth, info);
+			for (auto* child : info.children)
+			{
+				if (child)
+				{
+					visit_all(*child, depth + 1, rows);
+				}
+			}
+		}
+
+		static inline std::string join(const std::vector<std::string>& parts, const std::string& delim)
+		{
+			if (parts.empty())
+				return {};
+
+			std::ostringstream result;
+			result << parts[0];
+			for (size_t i = 1; i < parts.size(); ++i)
+			{
+				result << delim << parts[i];
+			}
+			return result.str();
+		}
+
+		void populate_row(ConsoleTelemetryRow& row, size_t depth, const WorkloadInstanceInfo& info)
+		{
+			row.type = depth_prefix(depth, info.type->name);
+			row.name = info.unique_name;
+
+			std::vector<std::string> input_entries;
+			std::vector<std::string> output_entries;
+
+			assert(engine != nullptr && "Engine should have been set and checked by now");
+
+			WorkloadFieldsIterator::for_each_field_in_workload(*engine, info, &mirror_buffer,
+				[&](const WorkloadFieldView& view)
+				{
+					if (view.struct_info == view.instance->type->config_struct)
+						return; // skip config
+
+					std::ostringstream entry;
+					entry << view.field->name.c_str();
+
+					if (view.subfield)
+						entry << "." << view.subfield->name.c_str();
+
+					entry << "=";
+
+					if (view.subfield)
+					{
+						assert(mirror_buffer.contains_object(view.field_ptr, view.subfield->size));
+
+						const std::type_index& type = view.subfield->type;
+						if (type == typeid(int))
+							entry << *static_cast<const int*>(view.field_ptr);
+						else if (type == typeid(double))
+							entry << *static_cast<const double*>(view.field_ptr);
+						else if (type == typeid(FixedString64))
+							entry << "\"" << static_cast<const FixedString64*>(view.field_ptr)->c_str() << "\"";
+						else if (type == typeid(FixedString128))
+							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
+						else
+							entry << "<unsupported>";
+					}
+					else
+					{
+						assert(mirror_buffer.contains_object(view.field_ptr, view.field->size));
+
+						// fallback for top-level (non-blackboard) fields
+						const std::type_index& type = view.field->type;
+						if (type == typeid(int))
+							entry << *static_cast<const int*>(view.field_ptr);
+						else if (type == typeid(double))
+							entry << *static_cast<const double*>(view.field_ptr);
+						else if (type == typeid(FixedString64))
+							entry << "\"" << static_cast<const FixedString64*>(view.field_ptr)->c_str() << "\"";
+						else if (type == typeid(FixedString128))
+							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
+						else
+							entry << "<unsupported>";
+					}
+
+					if (view.struct_info == view.instance->type->input_struct)
+						input_entries.push_back(entry.str());
+					else
+						output_entries.push_back(entry.str());
+				});
+
+			row.inputs = input_entries.empty() ? "-" : join(input_entries, "\n");
+			row.outputs = output_entries.empty() ? "-" : join(output_entries, "\n");
+
+			row.tick_duration_ms = info.mutable_stats.last_tick_duration * 1000.0;
+			row.tick_delta_ms = info.mutable_stats.last_time_delta * 1000.0;
+			row.goal_interval_ms = info.tick_rate_hz > 0.0 ? 1000.0 / info.tick_rate_hz : -1.0;
+		}
+
+		static std::string depth_prefix(size_t depth, const std::string& name)
+		{
+			if (depth == 0)
+				return name;
+			std::ostringstream oss;
+			oss << "|";
+			for (size_t i = 1; i < depth; ++i)
+				oss << "  ";
+			oss << "--" << name;
+			return oss.str();
+		}
+
+	  private:
+		std::vector<ConsoleTelemetryRow> rows;
+
+		const Engine* engine = nullptr;
+		WorkloadsBuffer mirror_buffer; // Provides a local copy of the engine's WorkloadsBuffer to reduce temporal aliasing.
+									   // Note: aliasing may still occur if other threads are modifying the source buffer
+									   // at high frequency during the mirror_from() copy. For console logging purposes,
+									   // this should be "good enough", but not guaranteed to be perfectly atomic.
+	};
+
 	struct ConsoleTelemetryWorkload
 	{
 		ConsoleTelemetryConfig config;
-
-		const Engine* engine = nullptr;
+		ConsoleTelemetryCollector collector;
 
 		static std::vector<ConsoleTelemetryRow> collect_console_telemetry_rows_demo(const Engine&)
 		{
@@ -65,7 +224,7 @@ namespace robotick
 			return rows;
 		}
 
-		void set_engine(const Engine& engine_in) { engine = &engine_in; }
+		void set_engine(const Engine& engine) { collector.set_engine(engine); }
 
 		void tick(double)
 		{
@@ -73,13 +232,13 @@ namespace robotick
 			// This avoids overwhelming stdout and dominating frame time, even without pretty printing.
 			// To help mitigate this, printing is built as a single string and flushed once per tick.
 
-			assert(engine != nullptr && "ConsoleTelemetryWorkload - engine should never be null during tick");
+			assert(collector.get_engine() != nullptr && "ConsoleTelemetryWorkload - engine should never be null during tick");
 			// ^- we should never reach the point of ticking without set_engine having been called.
 			//  - we also assume that any given workload-instance can only ever be part of a single
 			//    engine, and that the lifespan of the engine is longer than the workloads that are
-			//    owned and created/destroyed by the engine.
+			//    owned and created/destroyed by the engine->
 
-			auto rows = config.enable_demo ? collect_console_telemetry_rows_demo(*engine) : TelemetryCollector{*engine}.collect_rows();
+			auto rows = config.enable_demo ? collect_console_telemetry_rows_demo(*collector.get_engine()) : collector.collect_rows();
 
 			print_console_telemetry_table(rows, config.enable_pretty_print, config.enable_unicode);
 		}

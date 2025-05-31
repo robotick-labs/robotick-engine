@@ -46,7 +46,7 @@ namespace robotick
 		const uint8_t* raw_ptr() const { return data.get(); }
 		size_t get_size() const { return size; }
 
-		bool is_within_buffer(const uint8_t* query_ptr, const size_t query_size) const
+		bool contains_object(const uint8_t* query_ptr, const size_t query_size) const
 		{
 			const uint8_t* buffer_start = raw_ptr();
 			const uint8_t* buffer_end = raw_ptr() + get_size();
@@ -54,7 +54,7 @@ namespace robotick
 			return (query_ptr >= buffer_start) && (query_ptr + query_size < buffer_end);
 		}
 
-		bool is_within_buffer(void* query_ptr, const size_t query_size) const { return is_within_buffer((uint8_t*)query_ptr, query_size); };
+		bool contains_object(void* query_ptr, const size_t query_size) const { return contains_object((uint8_t*)query_ptr, query_size); };
 
 		void mirror_from(const RawBuffer& source)
 		{

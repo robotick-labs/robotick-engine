@@ -143,7 +143,7 @@ namespace robotick
 						double val = 0.0;
 						try
 						{
-							val = std::stod(cell);
+							val = cell.empty() ? 0.0 : std::stod(cell);
 						}
 						catch (...)
 						{

@@ -215,10 +215,9 @@ namespace robotick
 		state->workloads_buffer = WorkloadsBuffer(all_workloads_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
 		uint8_t* workloads_buffer_ptr = state->workloads_buffer.raw_ptr();
 
-		std::vector<std::future<WorkloadInstanceInfo>> preload_futures;
-		preload_futures.reserve(workload_seeds.size());
+		// construct and add instances
+		state->instances.reserve(workload_seeds.size());
 
-		// construct + apply config + call pre_load_fn (multi-threaded):
 		for (size_t i = 0; i < workload_seeds.size(); ++i)
 		{
 			const auto& workload_seed = workload_seeds[i];
@@ -227,35 +226,43 @@ namespace robotick
 			const size_t instance_offset = aligned_offsets[i];
 			uint8_t* instance_ptr = workloads_buffer_ptr + instance_offset;
 
-			preload_futures.push_back(std::async(std::launch::async,
-				[=]() -> WorkloadInstanceInfo
-				{
-					if (type->construct)
-						type->construct(instance_ptr);
+			if (type->construct)
+				type->construct(instance_ptr);
 
+			state->instances.push_back(
+				WorkloadInstanceInfo{instance_offset, type, workload_seed.name, workload_seed.tick_rate_hz, {}, WorkloadInstanceStats{}});
+		}
+
+		// configure and pre-load in parallel
+		std::vector<std::future<void>> preload_futures;
+		preload_futures.reserve(workload_seeds.size());
+
+		for (size_t i = 0; i < workload_seeds.size(); ++i)
+		{
+			const auto& workload_seed = workload_seeds[i];
+			const auto* type = state->instances[i].type;
+			uint8_t* instance_ptr = workloads_buffer_ptr + state->instances[i].offset_in_workloads_buffer;
+
+			preload_futures.push_back(std::async(std::launch::async,
+				[=, this]()
+				{
 					if (type->set_engine_fn)
 						type->set_engine_fn(instance_ptr, *this);
 
 					if (type->config_struct)
 					{
 						assert(type->config_struct->offset_within_workload != OFFSET_UNBOUND && "Struct offset not initialized");
-
 						apply_struct_fields(instance_ptr + type->config_struct->offset_within_workload, *type->config_struct, workload_seed.config);
 					}
 
 					if (type->pre_load_fn)
 						type->pre_load_fn(instance_ptr);
-
-					return WorkloadInstanceInfo{instance_offset, type, workload_seed.name, workload_seed.tick_rate_hz, {}, WorkloadInstanceStats{}};
 				}));
 		}
 
-		// wait for "pre_load" futures to complete and collect results:
-		state->instances.reserve(workload_seeds.size());
+		// Wait for all parallel setup work to finish
 		for (auto& fut : preload_futures)
-		{
-			state->instances.push_back(fut.get());
-		}
+			fut.get();
 
 		// Blackboards memory allocation and buffer-binding:
 		const size_t blackboards_buffer_size = compute_blackboard_memory_requirements(state->instances);
