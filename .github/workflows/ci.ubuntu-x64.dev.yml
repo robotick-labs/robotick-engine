@@ -23,7 +23,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.docker-cache
-          key: docker-${{ runner.os }}-${{ runner.os-version }}-${{ hashFiles('.devcontainer/Docker.ubuntu-x64.dev') }}
+          key: docker-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.devcontainer/Docker.ubuntu-x64.dev') }}
           restore-keys: |
             docker-${{ runner.os }}-
 
@@ -45,7 +45,7 @@ jobs:
           mkdir -p /tmp/.docker-cache
           docker save robotick-ci > /tmp/.docker-cache/image.tar
 
-      - name: Run CMake Build & Test in Docker
+      - name: Run CMake Build in Docker
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
@@ -55,7 +55,16 @@ jobs:
               set -e
               cmake --preset ${{ matrix.preset }} &&
               cmake --build --preset ${{ matrix.preset }} -j$(nproc)
-              if [ '${{ matrix.preset }}' = 'ubuntu-x64-debug' ]; then
-                ctest --test-dir build/ubuntu-x64-debug --output-on-failure --timeout 10
-              fi
+            "
+
+      - name: Run CTest in Docker (Debug Only)
+        if: matrix.preset == 'ubuntu-x64-debug'
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            robotick-ci \
+            bash -c "
+              set -e
+              ctest --test-dir build/ubuntu-x64-debug --output-on-failure --timeout 10
             "
