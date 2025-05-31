@@ -1,15 +1,63 @@
 {
-    "version": 8,
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21
+    },
     "configurePresets": [
         {
-            "name": "debug",
-            "displayName": "Debug Build",
+            "name": "ubuntu-x64-base",
+            "hidden": true,
             "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build",
+            "description": "Base preset for Ubuntu x64 CI builds (common compiler & generator settings)",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "/usr/bin/gcc",
+                "CMAKE_CXX_COMPILER": "/usr/bin/g++"
+            }
+        },
+        {
+            "name": "ubuntu-x64-debug",
+            "inherits": "ubuntu-x64-base",
+            "description": "Ubuntu Debug build (no optimizations, full asserts)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install"
+                "ROBOTICK_BUILD_CONFIG_DEBUG": "ON",
+                "ROBOTICK_OPTIMIZE_OFF": "ON"
             }
+        },
+        {
+            "name": "ubuntu-x64-development",
+            "inherits": "ubuntu-x64-base",
+            "description": "Ubuntu Development build (optimized with probes)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "ROBOTICK_BUILD_CONFIG_DEVELOPMENT": "ON"
+            }
+        },
+        {
+            "name": "ubuntu-x64-release",
+            "inherits": "ubuntu-x64-base",
+            "description": "Ubuntu Release build (stripped, fastest)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
+                "ROBOTICK_STRIP_PROBES": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "ubuntu-x64-debug",
+            "configurePreset": "ubuntu-x64-debug"
+        },
+        {
+            "name": "ubuntu-x64-development",
+            "configurePreset": "ubuntu-x64-development"
+        },
+        {
+            "name": "ubuntu-x64-release",
+            "configurePreset": "ubuntu-x64-release"
         }
     ]
 }
