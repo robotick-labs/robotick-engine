@@ -76,7 +76,7 @@ namespace robotick::test
 				const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
 				// Verify pointer lies within workloads buffer
-				CHECK(workloads_buf.is_within_buffer(field_ptr, view.field->size));
+				CHECK(workloads_buf.contains_object(field_ptr, view.field->size));
 
 				if (view.field->name == "input_value")
 				{
@@ -122,7 +122,7 @@ namespace robotick::test
 				CHECK(view.instance->unique_name == "W");
 				const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
-				CHECK(mirror_buf.is_within_buffer(field_ptr, view.field->size));
+				CHECK(mirror_buf.contains_object(field_ptr, view.field->size));
 
 				if (view.field->name == "input_value")
 				{
