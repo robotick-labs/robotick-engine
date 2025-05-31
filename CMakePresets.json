@@ -44,6 +44,43 @@
                 "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
                 "ROBOTICK_STRIP_PROBES": "ON"
             }
+        },
+        {
+            "name": "esp32s3-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_NAME": "Generic",
+                "CMAKE_SYSTEM_PROCESSOR": "xtensa",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-esp32s3.cmake"
+            }
+        },
+        {
+            "name": "esp32s3-debug",
+            "inherits": "esp32s3-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "ROBOTICK_BUILD_CONFIG_DEBUG": "ON",
+                "ROBOTICK_OPTIMIZE_OFF": "ON"
+            }
+        },
+        {
+            "name": "esp32s3-development",
+            "inherits": "esp32s3-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "MinSizeRel",
+                "ROBOTICK_BUILD_CONFIG_DEVELOPMENT": "ON"
+            }
+        },
+        {
+            "name": "esp32s3-release",
+            "inherits": "esp32s3-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
+                "ROBOTICK_STRIP_PROBES": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -58,6 +95,18 @@
         {
             "name": "ubuntu-x64-release",
             "configurePreset": "ubuntu-x64-release"
+        },
+        {
+            "name": "esp32s3-debug",
+            "configurePreset": "esp32s3-debug"
+        },
+        {
+            "name": "esp32s3-development",
+            "configurePreset": "esp32s3-development"
+        },
+        {
+            "name": "esp32s3-release",
+            "configurePreset": "esp32s3-release"
         }
     ]
 }

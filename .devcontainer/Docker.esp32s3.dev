@@ -1,0 +1,4 @@
+FROM espressif/idf:release-v5.1
+
+# Optional: Install Ninja, CMake, etc. (if needed)
+RUN apt-get update && apt-get install -y cmake ninja-build
