@@ -52,7 +52,10 @@ jobs:
             -w /workspace \
             robotick-ci \
             bash -c "
+              set -e
               cmake --preset ${{ matrix.preset }} &&
               cmake --build --preset ${{ matrix.preset }} -j$(nproc)
-              $(if [ '${{ matrix.preset }}' = 'ubuntu-x64-debug' ]; then echo '&& ctest --test-dir build/ubuntu-x64-debug --output-on-failure --timeout 10'; fi)
+              if [ '${{ matrix.preset }}' = 'ubuntu-x64-debug' ]; then
+                ctest --test-dir build/ubuntu-x64-debug --output-on-failure --timeout 10
+              fi
             "
