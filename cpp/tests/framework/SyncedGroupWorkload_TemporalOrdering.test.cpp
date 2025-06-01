@@ -18,7 +18,7 @@ namespace robotick::test
 			int output = 0;
 		};
 		ROBOTICK_BEGIN_FIELDS(SenderOut)
-		ROBOTICK_FIELD(SenderOut, output)
+		ROBOTICK_FIELD(SenderOut, int, output)
 		ROBOTICK_END_FIELDS()
 
 		struct ReceiverIn
@@ -26,7 +26,7 @@ namespace robotick::test
 			int input = 0;
 		};
 		ROBOTICK_BEGIN_FIELDS(ReceiverIn)
-		ROBOTICK_FIELD(ReceiverIn, input)
+		ROBOTICK_FIELD(ReceiverIn, int, input)
 		ROBOTICK_END_FIELDS()
 
 		struct SenderWorkload

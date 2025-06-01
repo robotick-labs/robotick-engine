@@ -25,9 +25,9 @@ namespace robotick
 	};
 
 	ROBOTICK_BEGIN_FIELDS(ConsoleTelemetryConfig)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, enable_pretty_print)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, enable_unicode)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, enable_demo)
+	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_pretty_print)
+	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_unicode)
+	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_demo)
 	ROBOTICK_END_FIELDS()
 
 	class ConsoleTelemetryCollector

@@ -80,8 +80,8 @@ namespace robotick
 	[[maybe_unused]] static const robotick::StructRegistryEntry* s_robotick_fields_##StructType = robotick::FieldRegistry::get().register_struct(                     \
 		#StructType, sizeof(StructType), GET_TYPE_ID(StructType), robotick::OFFSET_UNBOUND, {
 
-#define ROBOTICK_FIELD(StructType, FieldName)                                                                                                        \
-	{#FieldName, offsetof(StructType, FieldName), GET_TYPE_ID(decltype(StructType::FieldName)), sizeof(decltype(StructType::FieldName))},
+#define ROBOTICK_FIELD(StructType, FieldType, FieldName)                                                                                             \
+	{#FieldName, offsetof(StructType, FieldName), GET_TYPE_ID(FieldType), sizeof(decltype(StructType::FieldName))},
 
 #define ROBOTICK_END_FIELDS()                                                                                                                        \
 	});                                                                                                                                              \

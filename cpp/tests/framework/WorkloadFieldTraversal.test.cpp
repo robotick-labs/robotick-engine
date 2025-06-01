@@ -25,7 +25,7 @@ namespace robotick::test
 		};
 
 		ROBOTICK_BEGIN_FIELDS(SimpleInputs)
-		ROBOTICK_FIELD(SimpleInputs, input_value)
+		ROBOTICK_FIELD(SimpleInputs, int, input_value)
 		ROBOTICK_END_FIELDS()
 
 		struct SimpleOutputs
@@ -34,7 +34,7 @@ namespace robotick::test
 		};
 
 		ROBOTICK_BEGIN_FIELDS(SimpleOutputs)
-		ROBOTICK_FIELD(SimpleOutputs, output_value)
+		ROBOTICK_FIELD(SimpleOutputs, int, output_value)
 		ROBOTICK_END_FIELDS()
 
 		struct SimpleWorkload
@@ -194,7 +194,7 @@ namespace robotick::test
 			BBInputs() : blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))}) {}
 		};
 		ROBOTICK_BEGIN_FIELDS(BBInputs)
-		ROBOTICK_FIELD(BBInputs, blackboard)
+		ROBOTICK_FIELD(BBInputs, Blackboard, blackboard)
 		ROBOTICK_END_FIELDS()
 
 		struct BBWorkload

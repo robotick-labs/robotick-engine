@@ -19,7 +19,7 @@ namespace robotick::test
 		};
 
 		ROBOTICK_BEGIN_FIELDS(RegistryTestInputs)
-		ROBOTICK_FIELD(RegistryTestInputs, input_value)
+		ROBOTICK_FIELD(RegistryTestInputs, int, input_value)
 		ROBOTICK_END_FIELDS()
 
 		struct RegistryTestOutputs
@@ -29,8 +29,8 @@ namespace robotick::test
 		};
 
 		ROBOTICK_BEGIN_FIELDS(RegistryTestOutputs)
-		ROBOTICK_FIELD(RegistryTestOutputs, output_value_1)
-		ROBOTICK_FIELD(RegistryTestOutputs, output_value_2)
+		ROBOTICK_FIELD(RegistryTestOutputs, int, output_value_1)
+		ROBOTICK_FIELD(RegistryTestOutputs, int, output_value_2)
 		ROBOTICK_END_FIELDS()
 
 		struct RegistryTestWorkload

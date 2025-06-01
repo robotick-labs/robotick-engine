@@ -31,9 +31,9 @@ namespace robotick
 		Blackboard blackboard;
 	};
 	ROBOTICK_BEGIN_FIELDS(PythonConfig)
-	ROBOTICK_FIELD(PythonConfig, script_name)
-	ROBOTICK_FIELD(PythonConfig, class_name)
-	ROBOTICK_FIELD(PythonConfig, blackboard)
+	ROBOTICK_FIELD(PythonConfig, FixedString128, script_name)
+	ROBOTICK_FIELD(PythonConfig, FixedString64, class_name)
+	ROBOTICK_FIELD(PythonConfig, Blackboard, blackboard)
 	ROBOTICK_END_FIELDS()
 
 	struct PythonInputs
@@ -41,7 +41,7 @@ namespace robotick
 		Blackboard blackboard;
 	};
 	ROBOTICK_BEGIN_FIELDS(PythonInputs)
-	ROBOTICK_FIELD(PythonInputs, blackboard)
+	ROBOTICK_FIELD(PythonInputs, Blackboard, blackboard)
 	ROBOTICK_END_FIELDS()
 
 	struct PythonOutputs
@@ -49,7 +49,7 @@ namespace robotick
 		Blackboard blackboard;
 	};
 	ROBOTICK_BEGIN_FIELDS(PythonOutputs)
-	ROBOTICK_FIELD(PythonOutputs, blackboard)
+	ROBOTICK_FIELD(PythonOutputs, Blackboard, blackboard)
 	ROBOTICK_END_FIELDS()
 
 	struct __attribute__((visibility("hidden"))) PythonInternalState

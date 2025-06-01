@@ -21,7 +21,7 @@ namespace robotick::test
 		};
 
 		ROBOTICK_BEGIN_FIELDS(CountingDataConnInputs)
-		ROBOTICK_FIELD(CountingDataConnInputs, input_value)
+		ROBOTICK_FIELD(CountingDataConnInputs, int, input_value)
 		ROBOTICK_END_FIELDS()
 
 		struct CountingDataConnOutputs
@@ -30,7 +30,7 @@ namespace robotick::test
 		};
 
 		ROBOTICK_BEGIN_FIELDS(CountingDataConnOutputs)
-		ROBOTICK_FIELD(CountingDataConnOutputs, output_value)
+		ROBOTICK_FIELD(CountingDataConnOutputs, int, output_value)
 		ROBOTICK_END_FIELDS()
 
 		struct CountingDataConnWorkload

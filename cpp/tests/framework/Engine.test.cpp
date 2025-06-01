@@ -26,7 +26,7 @@ namespace robotick::test
 			int value = 0;
 		};
 		ROBOTICK_BEGIN_FIELDS(DummyConfig)
-		ROBOTICK_FIELD(DummyConfig, value)
+		ROBOTICK_FIELD(DummyConfig, int, value)
 		ROBOTICK_END_FIELDS()
 
 		struct DummyWorkload
