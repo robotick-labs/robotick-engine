@@ -159,6 +159,7 @@ namespace robotick
 	struct WorkloadRegistryEntry
 	{
 		std::string name;
+		TypeId type_id;
 		size_t size;
 		size_t alignment;
 		void (*construct)(void*);
@@ -269,7 +270,7 @@ namespace robotick
 		}
 
 		// Create/register the static entry
-		const WorkloadRegistryEntry entry = {get_registered_type_name<Type>(), sizeof(Type), alignof(Type),
+		const WorkloadRegistryEntry entry = {get_registered_type_name<Type>(), get_type_id<Type>(), sizeof(Type), alignof(Type),
 			[](void* ptr)
 			{
 				new (ptr) Type();

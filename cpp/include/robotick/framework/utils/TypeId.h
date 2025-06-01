@@ -8,57 +8,42 @@
 
 namespace robotick
 {
+	// Compile-time FNV-1a hash (32-bit)
+	constexpr uint32_t fnv1a_32(const char* str, uint32_t hash = 0x811C9DC5)
+	{
+		return (*str) ? fnv1a_32(str + 1, (hash ^ static_cast<uint32_t>(*str)) * 0x01000193) : hash;
+	}
 
-	// Lightweight type-safe identifier for types, replacing std::type_index
 	struct TypeId
 	{
-		constexpr explicit TypeId(uint32_t v = 0) : value(v) {}
+		// The only allowed constructor: from string
+		constexpr explicit TypeId(const char* type_name)
+			: value(fnv1a_32(type_name))
+#ifdef ROBOTICK_DEBUG_TYPEID_NAMES
+			  ,
+			  name(type_name)
+#endif
+		{
+		}
 
 		constexpr bool operator==(TypeId other) const { return value == other.value; }
 		constexpr bool operator!=(TypeId other) const { return value != other.value; }
 		constexpr operator uint32_t() const { return value; }
 
-		static constexpr TypeId invalid() { return TypeId{0}; }
+		static constexpr TypeId invalid() { return TypeId{"<invalid>"}; }
 		constexpr bool is_valid() const { return value != 0; }
 
 		uint32_t value;
+
+#ifdef ROBOTICK_DEBUG_TYPEID_NAMES
+		const char* name;
+#endif
 	};
 
-	// Default fallback: unregistered type returns 0
-	template <typename T> constexpr TypeId get_type_id()
-	{
-		return TypeId{0};
-	}
-
-// Helper macro to register a type with a fixed numeric ID
-// (In future, replace with constexpr hash if desired)
-#define ROBOTICK_DEFINE_TYPE_ID(Type, Id)                                                                                                            \
-	namespace robotick                                                                                                                               \
+#define GET_TYPE_ID(Type)                                                                                                                            \
+	::robotick::TypeId                                                                                                                               \
 	{                                                                                                                                                \
-		template <> constexpr TypeId get_type_id<Type>()                                                                                             \
-		{                                                                                                                                            \
-			return TypeId{Id};                                                                                                                       \
-		}                                                                                                                                            \
+		#Type                                                                                                                                        \
 	}
-
-	// Optional: also register stringified name alongside ID
-	template <typename T> constexpr const char* get_registered_type_name()
-	{
-		return "<unknown>";
-	}
-
-#define ROBOTICK_DEFINE_TYPENAME(Type, Name)                                                                                                         \
-	namespace robotick                                                                                                                               \
-	{                                                                                                                                                \
-		template <> constexpr const char* get_registered_type_name<Type>()                                                                           \
-		{                                                                                                                                            \
-			return Name;                                                                                                                             \
-		}                                                                                                                                            \
-	}
-
-// Combined macro for convenience
-#define ROBOTICK_REGISTER_TYPE(Type, Name, Id)                                                                                                       \
-	ROBOTICK_DEFINE_TYPENAME(Type, Name)                                                                                                             \
-	ROBOTICK_DEFINE_TYPE_ID(Type, Id)
 
 } // namespace robotick

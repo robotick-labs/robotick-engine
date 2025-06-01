@@ -67,7 +67,7 @@ namespace robotick::test
 	TEST_CASE("Unit|Framework|Engine|DummyWorkload config is loaded via load()")
 	{
 		Model model;
-		auto handle = model.add("DummyWorkload", "A", 1.0, {{"value", 42}});
+		auto handle = model.add("DummyWorkload", "A", 1.0, {{"value", "42"}});
 		model.set_root(handle);
 
 		Engine engine;
@@ -90,8 +90,8 @@ namespace robotick::test
 	TEST_CASE("Unit|Framework|Engine|Multiple workloads supported")
 	{
 		Model model;
-		model.add("DummyWorkload", "one", 1.0, {{"value", 1}});
-		model.add("DummyWorkload", "two", 2.0, {{"value", 2}});
+		model.add("DummyWorkload", "one", 1.0, {{"value", "1"}});
+		model.add("DummyWorkload", "two", 2.0, {{"value", "2"}});
 		model_helpers::wrap_all_in_sequenced_group(model);
 
 		Engine engine;

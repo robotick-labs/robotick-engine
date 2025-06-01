@@ -5,6 +5,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include <cassert>
 #include <cstddef>
@@ -34,7 +35,7 @@ namespace robotick
 		const WorkloadInstanceInfo* source_workload = nullptr;
 		const WorkloadInstanceInfo* dest_workload = nullptr;
 		size_t size = 0;
-		std::type_index type;
+		TypeId type;
 
 		enum class ExpectedHandler
 		{

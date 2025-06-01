@@ -6,6 +6,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/utils/Constants.h"
+#include "robotick/framework/utils/TypeId.h"
 #include <cstring>
 #include <stdexcept>
 
@@ -36,7 +37,7 @@ namespace robotick
 		return &schema[it->second];
 	}
 
-	void BlackboardInfo::verify_type(const std::string& key, std::type_index expected) const
+	void BlackboardInfo::verify_type(const std::string& key, TypeId expected) const
 	{
 		const auto* field = find_field(key);
 		if (!field)
@@ -63,15 +64,15 @@ namespace robotick
 		return const_cast<BlackboardInfo*>(this)->get_field_ptr(const_cast<Blackboard*>(bb), key);
 	}
 
-	std::pair<size_t, size_t> BlackboardInfo::type_size_and_align(std::type_index type)
+	std::pair<size_t, size_t> BlackboardInfo::type_size_and_align(TypeId type)
 	{
-		if (type == typeid(int))
+		if (type == get_type_id<int>())
 			return {sizeof(int), alignof(int)};
-		if (type == typeid(double))
+		if (type == get_type_id<double>())
 			return {sizeof(double), alignof(double)};
-		if (type == typeid(FixedString64))
+		if (type == get_type_id<FixedString64>())
 			return {sizeof(FixedString64), alignof(FixedString64)};
-		if (type == typeid(FixedString128))
+		if (type == get_type_id<FixedString128>())
 			return {sizeof(FixedString128), alignof(FixedString128)};
 
 		ROBOTICK_ERROR("Unsupported type in BlackboardInfo::type_size_and_align");
@@ -145,7 +146,7 @@ namespace robotick
 	template <typename T> void Blackboard::set(const std::string& key, const T& value)
 	{
 		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
-		info->verify_type(key, typeid(T));
+		info->verify_type(key, get_type_id<T>());
 		void* ptr = info->get_field_ptr(this, key);
 		std::memcpy(ptr, &value, sizeof(T));
 	}
@@ -153,7 +154,7 @@ namespace robotick
 	template <typename T> T Blackboard::get(const std::string& key) const
 	{
 		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::get only supports trivially-copyable types");
-		info->verify_type(key, typeid(T));
+		info->verify_type(key, get_type_id<T>());
 		const void* ptr = info->get_field_ptr(this, key);
 		T out;
 		std::memcpy(&out, ptr, sizeof(T));

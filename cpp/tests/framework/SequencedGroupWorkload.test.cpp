@@ -5,6 +5,7 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/framework/utils/TypeId.h"
 #include "utils/EngineInspector.h"
 
 #include <atomic>
@@ -37,7 +38,8 @@ namespace
 	{
 		DummyTickingRegister()
 		{
-			const WorkloadRegistryEntry entry = {"DummyTickingWorkload", sizeof(DummyTickingWrapper), alignof(DummyTickingWrapper),
+			const WorkloadRegistryEntry entry = {"DummyTickingWorkload", get_type_id<DummyTickingWrapper>(), sizeof(DummyTickingWrapper),
+				alignof(DummyTickingWrapper),
 				[](void* p)
 				{
 					new (p) DummyTickingWrapper();
@@ -75,7 +77,7 @@ namespace
 	{
 		SlowTickRegister()
 		{
-			const WorkloadRegistryEntry entry = {"SlowTickWorkload", sizeof(SlowWrapper), alignof(SlowWrapper),
+			const WorkloadRegistryEntry entry = {"SlowTickWorkload", get_type_id<SlowTickWorkload>(), sizeof(SlowWrapper), alignof(SlowWrapper),
 				[](void* p)
 				{
 					new (p) SlowWrapper();

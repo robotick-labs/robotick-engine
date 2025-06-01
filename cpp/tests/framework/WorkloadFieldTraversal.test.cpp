@@ -9,6 +9,7 @@
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/framework/utils/TypeId.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 #include "utils/EngineInspector.h"
 
@@ -191,7 +192,8 @@ namespace robotick::test
 			Blackboard blackboard;
 
 			BBInputs()
-				: blackboard({BlackboardFieldInfo("x", std::type_index(typeid(int))), BlackboardFieldInfo("y", std::type_index(typeid(double)))})
+				: blackboard({BlackboardFieldInfo("x", TypeId(get_type_id<int>())),
+					  BlackboardFieldInfo("y", TypeId(get_type_id<double>()))})
 			{
 			}
 		};

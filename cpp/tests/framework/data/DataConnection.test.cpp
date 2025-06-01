@@ -10,6 +10,7 @@
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/framework/utils/TypeId.h"
 #include <catch2/catch_all.hpp>
 #include <cstring>
 
@@ -24,7 +25,8 @@ namespace robotick::test
 			Blackboard out_blackboard;
 
 			DummyAOutput()
-				: out_blackboard({BlackboardFieldInfo("x", std::type_index(typeid(int))), BlackboardFieldInfo("y", std::type_index(typeid(double)))})
+				: out_blackboard({BlackboardFieldInfo("x", TypeId(get_type_id<int>())),
+					  BlackboardFieldInfo("y", TypeId(get_type_id<double>()))})
 			{
 			}
 		};
@@ -41,7 +43,8 @@ namespace robotick::test
 			int x = 0;
 
 			DummyBInput()
-				: in_blackboard({BlackboardFieldInfo("x", std::type_index(typeid(int))), BlackboardFieldInfo("y", std::type_index(typeid(double)))})
+				: in_blackboard({BlackboardFieldInfo("x", TypeId(get_type_id<int>())),
+					  BlackboardFieldInfo("y", TypeId(get_type_id<double>()))})
 			{
 			}
 		};

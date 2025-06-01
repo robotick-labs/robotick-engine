@@ -5,6 +5,7 @@
 #include "robotick/api.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include <catch2/catch_all.hpp>
 
@@ -21,8 +22,8 @@ namespace robotick::test
 		{
 			DummyRegister()
 			{
-				const WorkloadRegistryEntry entry = {"DummyModelDataConnWorkload", sizeof(DummyModelDataConnWorkload),
-					alignof(DummyModelDataConnWorkload),
+				const WorkloadRegistryEntry entry = {"DummyModelDataConnWorkload", get_type_id<DummyModelDataConnWorkload>(),
+					sizeof(DummyModelDataConnWorkload), alignof(DummyModelDataConnWorkload),
 					[](void* p)
 					{
 						new (p) DummyModelDataConnWorkload();

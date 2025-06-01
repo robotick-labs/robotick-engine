@@ -6,6 +6,8 @@
 
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/utils/Constants.h"
+#include "robotick/framework/utils/TypeId.h"
+
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -26,14 +28,14 @@ namespace robotick
 	struct BlackboardFieldInfo
 	{
 		FixedString64 name;
-		std::type_index type;
+		TypeId type;
 		size_t offset_from_datablock = 0;
 		size_t size = 0;
 
 		uint8_t* get_data_ptr(Blackboard& blackboard) const;
 		const uint8_t* get_data_ptr(const Blackboard& blackboard) const;
 
-		BlackboardFieldInfo(const FixedString64& name, std::type_index type) : name(name), type(type) {}
+		BlackboardFieldInfo(const FixedString64& name, TypeId type) : name(name), type(type) {}
 	};
 
 	struct BlackboardInfo
@@ -46,11 +48,11 @@ namespace robotick
 
 		bool has_field(const std::string& key) const;
 		const BlackboardFieldInfo* find_field(const std::string& key) const;
-		void verify_type(const std::string& key, std::type_index expected) const;
+		void verify_type(const std::string& key, TypeId expected) const;
 		void* get_field_ptr(Blackboard* bb, const std::string& key) const;
 		const void* get_field_ptr(const Blackboard* bb, const std::string& key) const;
 
-		static std::pair<size_t, size_t> type_size_and_align(std::type_index type);
+		static std::pair<size_t, size_t> type_size_and_align(TypeId type);
 	};
 
 	class Blackboard

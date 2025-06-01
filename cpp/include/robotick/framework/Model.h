@@ -35,11 +35,11 @@ namespace robotick
 			std::string name;
 			double tick_rate_hz;
 			std::vector<WorkloadHandle> children;
-			std::map<std::string, std::any> config;
+			std::map<std::string, std::string> config;
 		};
 
 		WorkloadHandle add(const std::string& type, const std::string& name, double tick_rate_hz = TICK_RATE_FROM_PARENT,
-			const std::map<std::string, std::any>& config = {})
+			const std::map<std::string, std::string>& config = {})
 		{
 			if (root_workload.is_valid())
 				ROBOTICK_ERROR("Cannot add workloads after root has been set. Model root must be set last.");
@@ -50,7 +50,7 @@ namespace robotick
 		}
 
 		WorkloadHandle add(const std::string& type, const std::string& name, const std::vector<WorkloadHandle>& children,
-			double tick_rate_hz = TICK_RATE_FROM_PARENT, const std::map<std::string, std::any>& config = {})
+			double tick_rate_hz = TICK_RATE_FROM_PARENT, const std::map<std::string, std::string>& config = {})
 		{
 			if (root_workload.is_valid())
 				ROBOTICK_ERROR("Cannot add workloads after root has been set. Model root must be set last.");

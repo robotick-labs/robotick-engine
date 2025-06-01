@@ -5,6 +5,7 @@
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/api.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include <catch2/catch_all.hpp>
 #include <cstring>
@@ -35,8 +36,8 @@ namespace robotick
 
 	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard basic construction and memory layout", "[blackboard]")
 	{
-		std::vector<BlackboardFieldInfo> schema = {
-			{"age", std::type_index(typeid(int))}, {"score", std::type_index(typeid(double))}, {"name", std::type_index(typeid(FixedString64))}};
+		std::vector<BlackboardFieldInfo> schema = {{"age", TypeId(get_type_id<int>())}, {"score", TypeId(get_type_id<double>())},
+			{"name", TypeId(get_type_id<FixedString64>())}};
 
 		auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
 
@@ -51,8 +52,8 @@ namespace robotick
 
 	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard binds to WorkloadsBuffer and performs typed access", "[blackboard][buffer]")
 	{
-		std::vector<BlackboardFieldInfo> schema = {
-			{"age", std::type_index(typeid(int))}, {"score", std::type_index(typeid(double))}, {"name", std::type_index(typeid(FixedString64))}};
+		std::vector<BlackboardFieldInfo> schema = {{"age", TypeId(get_type_id<int>())}, {"score", TypeId(get_type_id<double>())},
+			{"name", TypeId(get_type_id<FixedString64>())}};
 
 		auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
 
@@ -78,7 +79,7 @@ namespace robotick
 
 	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard throws on missing keys or unbound source", "[blackboard][errors]")
 	{
-		std::vector<BlackboardFieldInfo> schema = {{"alpha", std::type_index(typeid(int))}};
+		std::vector<BlackboardFieldInfo> schema = {{"alpha", TypeId(get_type_id<int>())}};
 
 		SECTION("Throws on unbound field offset")
 		{
@@ -101,7 +102,7 @@ namespace robotick
 	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard alignment and offset consistency", "[blackboard][layout]")
 	{
 		std::vector<BlackboardFieldInfo> schema = {
-			{"a", std::type_index(typeid(int))}, {"b", std::type_index(typeid(double))}, {"c", std::type_index(typeid(int))}};
+			{"a", TypeId(get_type_id<int>())}, {"b", TypeId(get_type_id<double>())}, {"c", TypeId(get_type_id<int>())}};
 
 		auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
 

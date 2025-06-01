@@ -7,6 +7,7 @@
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include "utils/EngineInspector.h"
 
@@ -61,7 +62,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 {
 	Model model;
 	const auto handle = model.add("PythonWorkload", "py", 1.0,
-		{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}, {"example_in", 21.0}});
+		{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}, {"example_in", "21.0"}});
 	model.set_root(handle);
 
 	Engine engine;
