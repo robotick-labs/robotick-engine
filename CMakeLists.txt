@@ -9,11 +9,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_compile_options(-Wall -Wextra -Werror)
 
-# Disable exceptions globally unless overridden
+# Disable exceptions globally unless overridden (e.g. test-suite enables them to catch errors, which it overrides to throw)
 add_compile_options(-fno-exceptions)
-
-# Enable/disable Python workloads
-option(ROBOTICK_ENABLE_PYTHON "Enable Python workloads and pybind11" ON)
 
 # =========================
 # ✅ Public Include Path
@@ -30,8 +27,15 @@ file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
 )
 
 set(CORE_SOURCES "")
+set(PYTHON_SOURCES "")  # 👈 Track these for per-file flag overrides
+
 foreach(file ${ALL_CPP_SOURCES})
-    if(NOT file MATCHES ".*/PythonRuntime.cpp$" AND NOT file MATCHES ".*/PythonWorkload.cpp$")
+    if(file MATCHES ".*/PythonRuntime.cpp$" OR file MATCHES ".*/PythonWorkload.cpp$")
+        if(ROBOTICK_ENABLE_PYTHON)
+            list(APPEND CORE_SOURCES ${file})
+            list(APPEND PYTHON_SOURCES ${file})  # 👈 Save for later
+        endif()
+    else()
         list(APPEND CORE_SOURCES ${file})
     endif()
 endforeach()
@@ -53,8 +57,9 @@ endif()
 # =========================
 
 if(ROBOTICK_ENABLE_PYTHON)
-    message(STATUS "✅ Python Workloads ENABLED")
+    message(STATUS "✅ ROBOTICK_ENABLE_PYTHON - ON")
 
+    # Ensure pybind11 and Python3 are available
     include(FetchContent)
     FetchContent_Declare(
         pybind11
@@ -65,23 +70,16 @@ if(ROBOTICK_ENABLE_PYTHON)
 
     find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
-    add_library(robotick_python SHARED
-        cpp/src/robotick/framework/utils/PythonRuntime.cpp
-        cpp/src/robotick/workloads/scripting/PythonWorkload.cpp
-    )
+    target_compile_definitions(robotick_framework PUBLIC ROBOTICK_ENABLE_PYTHON=1)
+    target_link_libraries(robotick_framework PUBLIC pybind11::embed ${Python3_LIBRARIES})
 
-    target_compile_options(robotick_python PRIVATE -fexceptions)
-    target_compile_definitions(robotick_python PRIVATE ROBOTICK_ENABLE_PYTHON=1)
-    target_include_directories(robotick_python PRIVATE
-        ${pybind11_SOURCE_DIR}/include
-        ${Python3_INCLUDE_DIRS}
-    )
-    target_link_libraries(robotick_python PRIVATE pybind11::embed ${Python3_LIBRARIES})
-
-    target_link_libraries(robotick_framework PRIVATE robotick_python)
+    # 👇 Enable exceptions only on Python-related sources
+    foreach(source_file IN LISTS PYTHON_SOURCES)
+        set_source_files_properties(${source_file} PROPERTIES COMPILE_FLAGS "-fexceptions")
+    endforeach()
 
 else()
-    message(STATUS "❌ Python Workloads DISABLED")
+    message(STATUS "❌ ROBOTICK_ENABLE_PYTHON - OFF")
 endif()
 
 # =========================
@@ -106,9 +104,10 @@ endforeach()
 # ✅ Unit Tests via Catch2
 # =========================
 
-option(ROBOTICK_BUILD_TESTS "Build Robotick tests" ON)
-
 if (ROBOTICK_BUILD_TESTS)
+
+    message(STATUS "✅ ROBOTICK_BUILD_TESTS - ON")
+
     enable_testing()
     add_subdirectory(cpp/tests)
 
@@ -123,6 +122,8 @@ if (ROBOTICK_BUILD_TESTS)
             $<TARGET_FILE:robotick_framework>
             ${CMAKE_BINARY_DIR}/Debug
     )
+else()
+    message(STATUS "❌ ROBOTICK_BUILD_TESTS - OFF")
 endif()
 
 # =========================

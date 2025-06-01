@@ -1,8 +1,9 @@
 #pragma once
 
-#include "robotick/config/FeatureFlags.h"
+#include <functional>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 
 // =====================================================================
 // 🚨 BREAKPOINT + LOGGING
@@ -23,6 +24,37 @@
 #endif
 
 #define ROBOTICK_INTERNAL_LOG(level, fmt, ...) fprintf(stderr, "[%s] %s:%d: " fmt "\n", level, __FILE__, __LINE__, ##__VA_ARGS__)
+
+// =====================================================================
+// ✅ TEST ERROR HANDLER
+// =====================================================================
+
+namespace robotick
+{
+#if defined(ROBOTICK_TEST_MODE)
+	class TestError : public std::exception
+	{
+	  public:
+		explicit TestError(std::string message) : msg(std::move(message)) {}
+		const char* what() const noexcept override { return msg.c_str(); }
+
+	  private:
+		std::string msg;
+	};
+
+	inline void report_error(const std::string& message)
+	{
+		throw TestError(message);
+	}
+#else
+	inline void report_error(const std::string& message)
+	{
+		ROBOTICK_BREAKPOINT();
+		fprintf(stderr, "[ERROR] %s\n", message.c_str());
+		exit(1);
+	}
+#endif
+} // namespace robotick
 
 // =====================================================================
 // ✅ ASSERTIONS (hard / soft)
@@ -77,9 +109,9 @@
 #define ROBOTICK_ERROR(...)                                                                                                                          \
 	do                                                                                                                                               \
 	{                                                                                                                                                \
-		ROBOTICK_BREAKPOINT();                                                                                                                       \
-		ROBOTICK_INTERNAL_LOG("ERROR", __VA_ARGS__);                                                                                                 \
-		exit(1);                                                                                                                                     \
+		char __robotick_error_buf[1024];                                                                                                             \
+		snprintf(__robotick_error_buf, sizeof(__robotick_error_buf), __VA_ARGS__);                                                                   \
+		robotick::report_error(__robotick_error_buf);                                                                                                \
 	} while (0)
 
 #define ROBOTICK_WARNING(...)                                                                                                                        \
@@ -88,3 +120,12 @@
 		ROBOTICK_BREAKPOINT();                                                                                                                       \
 		ROBOTICK_INTERNAL_LOG("WARN", __VA_ARGS__);                                                                                                  \
 	} while (0)
+
+// =====================================================================
+// ✅ TEST MACROS
+// =====================================================================
+
+#if defined(ROBOTICK_TEST_MODE)
+#include <catch2/catch_all.hpp>
+#define ROBOTICK_REQUIRE_ERROR(expr, matcher) REQUIRE_THROWS_AS(expr, robotick::TestError)
+#endif

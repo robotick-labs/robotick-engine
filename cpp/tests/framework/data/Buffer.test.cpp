@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/api.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 
 #include <catch2/catch_all.hpp>
@@ -23,7 +24,7 @@ TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer supports basic access and bounds
 
 	SECTION("Out-of-bounds access throws")
 	{
-		REQUIRE_THROWS_AS(buffer.as<int>(32), std::out_of_range);
+		ROBOTICK_REQUIRE_ERROR(buffer.as<int>(32), "");
 	}
 }
 
@@ -52,7 +53,7 @@ TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer update_mirror_from validates siz
 	REQUIRE(std::memcmp(a.raw_ptr(), b.raw_ptr(), 16) == 0);
 
 	RawBuffer c(32);
-	REQUIRE_THROWS_WITH(a.update_mirror_from(c), Catch::Matchers::ContainsSubstring("size mismatch"));
+	ROBOTICK_REQUIRE_ERROR(a.update_mirror_from(c), ("size mismatch"));
 }
 
 TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer prevents duplicate create_mirror_from", "[buffer][mirror][lifecycle]")
@@ -61,7 +62,7 @@ TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer prevents duplicate create_mirror
 	RawBuffer mirror;
 	mirror.create_mirror_from(source);
 
-	REQUIRE_THROWS_WITH(mirror.create_mirror_from(source), Catch::Matchers::ContainsSubstring("already allocated"));
+	ROBOTICK_REQUIRE_ERROR(mirror.create_mirror_from(source), ("already allocated"));
 }
 
 TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer throws if update_mirror_from used before allocation", "[buffer][mirror][invalid]")
@@ -69,7 +70,7 @@ TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer throws if update_mirror_from use
 	RawBuffer source(8);
 	RawBuffer mirror; // not allocated
 
-	REQUIRE_THROWS_WITH(mirror.update_mirror_from(source), Catch::Matchers::ContainsSubstring("not initialized"));
+	ROBOTICK_REQUIRE_ERROR(mirror.update_mirror_from(source), ("not initialized"));
 }
 
 TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer contains_object checks bounds", "[buffer][bounds]")
@@ -105,15 +106,7 @@ TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer handles alignment correctly in a
 		{
 			RawBuffer bad_buffer(size + 1);
 
-			try
-			{
-				bad_buffer.as<Aligned>(1);
-				FAIL("Expected std::invalid_argument to be thrown");
-			}
-			catch (const std::invalid_argument& ex)
-			{
-				REQUIRE_THAT(std::string{ex.what()}, Catch::Matchers::ContainsSubstring("Offset is not properly aligned"));
-			}
+			ROBOTICK_REQUIRE_ERROR(bad_buffer.as<Aligned>(1), "Offset is not properly aligned");
 		}
 	}
 }

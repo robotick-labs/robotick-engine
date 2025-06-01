@@ -15,6 +15,14 @@
 using namespace robotick;
 using namespace robotick::test;
 
+#ifndef ROBOTICK_ENABLE_PYTHON
+#error "ROBOTICK_ENABLE_PYTHON must be defined (expected value: 1)"
+#endif
+
+#if ROBOTICK_ENABLE_PYTHON != 1
+#error "ROBOTICK_ENABLE_PYTHON must be set to 1"
+#endif
+
 TEST_CASE("Unit|Workloads|PythonWorkload|Metadata is registered correctly")
 {
 	const auto* cfg = FieldRegistry::get().get_struct("PythonConfig");

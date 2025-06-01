@@ -71,6 +71,9 @@ target_link_libraries(robotick_tests
 # ✅ Re-enable exceptions just for test target
 target_compile_options(robotick_tests PRIVATE -fexceptions)
 
+target_compile_definitions(robotick_tests PRIVATE ROBOTICK_ENABLE_PYTHON=1)
+target_compile_definitions(robotick_tests PRIVATE ROBOTICK_TEST_MODE=1)
+
 # Discover Catch2 TEST_CASEs automatically
 include(Catch)
 catch_discover_tests(robotick_tests)

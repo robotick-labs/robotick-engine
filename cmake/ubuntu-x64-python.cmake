@@ -1,6 +1,0 @@
-set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSTEM_PROCESSOR x86_64)
-
-set(ROBOTICK_BUILD_TESTS ON CACHE BOOL "Enable Catch2 Test Suite")
-set(ROBOTICK_ENABLE_PYTHON ON CACHE BOOL "Enable Python workloads")
-set(ROBOTICK_PLATFORM_UBUNTU ON CACHE BOOL "Use Ubuntu platform macros")

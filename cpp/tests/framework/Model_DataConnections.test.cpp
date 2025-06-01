@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/api.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+
 #include <catch2/catch_all.hpp>
 
 namespace robotick::test
@@ -61,7 +63,7 @@ namespace robotick::test
 		model.add("DummyModelDataConnWorkload", "C", 10.0);
 
 		model.connect("A.output", "C.input");
-		REQUIRE_THROWS_WITH(model.connect("B.output", "C.input"), Catch::Matchers::ContainsSubstring("already has an incoming connection"));
+		ROBOTICK_REQUIRE_ERROR(model.connect("B.output", "C.input"), ("already has an incoming connection"));
 	}
 
 	TEST_CASE("Unit|Framework|DataConnections|Seeds are preserved for engine use")

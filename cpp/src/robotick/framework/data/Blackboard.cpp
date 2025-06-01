@@ -75,6 +75,7 @@ namespace robotick
 			return {sizeof(FixedString128), alignof(FixedString128)};
 
 		ROBOTICK_ERROR("Unsupported type in BlackboardInfo::type_size_and_align");
+		return {0, 0};
 	}
 
 	Blackboard::Blackboard(const std::vector<BlackboardFieldInfo>& source_schema)

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/Blackboard.h"
+#include "robotick/api.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 
 #include <catch2/catch_all.hpp>
@@ -86,14 +87,14 @@ namespace robotick
 
 			auto* blackboard_ptr = buffer.as<Blackboard>(0);
 			new (blackboard_ptr) Blackboard(schema); // not bound
-			REQUIRE_THROWS_WITH(blackboard_ptr->get<int>("alpha"), Catch::Matchers::ContainsSubstring("Blackboard"));
+			ROBOTICK_REQUIRE_ERROR(blackboard_ptr->get<int>("alpha"), ("Blackboard"));
 		}
 
 		SECTION("Throws on missing field")
 		{
 			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
 
-			REQUIRE_THROWS_WITH(blackboard->get<int>("nonexistent"), Catch::Matchers::ContainsSubstring("Blackboard"));
+			ROBOTICK_REQUIRE_ERROR(blackboard->get<int>("nonexistent"), ("Blackboard"));
 		}
 	}
 
