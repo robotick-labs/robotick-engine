@@ -14,9 +14,9 @@ namespace robotick
 {
 	void ensure_workloads()
 	{
-		ROBOTICK_KEEP_WORKLOAD(ConsoleTelemetryWorkload)
-		ROBOTICK_KEEP_WORKLOAD(TimingDiagnosticsWorkload)
-		ROBOTICK_KEEP_WORKLOAD(SyncedGroupWorkload)
+		ROBOTICK_KEEP_WORKLOAD(ConsoleTelemetryWorkload);
+		ROBOTICK_KEEP_WORKLOAD(TimingDiagnosticsWorkload);
+		ROBOTICK_KEEP_WORKLOAD(SyncedGroupWorkload);
 	}
 } // namespace robotick
 
