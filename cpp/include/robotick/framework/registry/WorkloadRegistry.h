@@ -5,7 +5,7 @@
 #pragma once
 
 #include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/utils/Typename.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include <cstddef>
 #include <map>
@@ -14,7 +14,6 @@
 #include <new>
 #include <string>
 #include <type_traits>
-#include <typeinfo>
 #include <utility>
 #include <vector>
 
@@ -256,21 +255,21 @@ namespace robotick
 		if constexpr (!is_void_v<ConfigType>)
 		{
 			cfg_struct = FieldRegistry::get().register_struct(
-				get_clean_typename(typeid(ConfigType)), sizeof(ConfigType), typeid(ConfigType), offsetof(Type, config), {});
+				get_registered_type_name<ConfigType>(), sizeof(ConfigType), get_type_id<ConfigType>(), offsetof(Type, config), {});
 		}
 		if constexpr (!is_void_v<InputType>)
 		{
 			in_struct = FieldRegistry::get().register_struct(
-				get_clean_typename(typeid(InputType)), sizeof(InputType), typeid(InputType), offsetof(Type, inputs), {});
+				get_registered_type_name<InputType>(), sizeof(InputType), get_type_id<InputType>(), offsetof(Type, inputs), {});
 		}
 		if constexpr (!is_void_v<OutputType>)
 		{
 			out_struct = FieldRegistry::get().register_struct(
-				get_clean_typename(typeid(OutputType)), sizeof(OutputType), typeid(OutputType), offsetof(Type, outputs), {});
+				get_registered_type_name<OutputType>(), sizeof(OutputType), get_type_id<OutputType>(), offsetof(Type, outputs), {});
 		}
 
 		// Create/register the static entry
-		const WorkloadRegistryEntry entry = {get_clean_typename(typeid(Type)), sizeof(Type), alignof(Type),
+		const WorkloadRegistryEntry entry = {get_registered_type_name<Type>(), sizeof(Type), alignof(Type),
 			[](void* ptr)
 			{
 				new (ptr) Type();

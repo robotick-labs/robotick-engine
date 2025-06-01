@@ -8,4 +8,4 @@ set(CMAKE_CXX_COMPILER ${ESP32_TOOLCHAIN}/bin/xtensa-esp32s3-elf-g++)
 set(CMAKE_AR           ${ESP32_TOOLCHAIN}/bin/xtensa-esp32s3-elf-ar)
 set(CMAKE_OBJCOPY      ${ESP32_TOOLCHAIN}/bin/xtensa-esp32s3-elf-objcopy)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DROBOTICK_PLATFORM_ESP32 -fno-exceptions -fno-rtti")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DROBOTICK_PLATFORM_ESP32")

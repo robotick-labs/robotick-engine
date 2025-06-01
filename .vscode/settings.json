@@ -14,5 +14,8 @@
     "catch2TestExplorer.useCTest": false,
     "catch2TestExplorer.executables": [
         "**/robotick_tests"
-    ]
+    ],
+    "files.associations": {
+        "type_traits": "cpp"
+    }
 }

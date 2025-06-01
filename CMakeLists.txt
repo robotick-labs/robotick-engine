@@ -12,6 +12,9 @@ add_compile_options(-Wall -Wextra -Werror)
 # Disable exceptions globally unless overridden (e.g. test-suite enables them to catch errors, which it overrides to throw)
 add_compile_options(-fno-exceptions)
 
+# Disable rtti globally (too expensive for our purposes - we've rolled our own simplified equivalent)
+# add_compile_options(-fno-rtti)
+
 # =========================
 # ✅ Public Include Path
 # =========================

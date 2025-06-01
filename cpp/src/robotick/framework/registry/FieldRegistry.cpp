@@ -1,6 +1,7 @@
 // Copyright Robotick Labs
 //
 // SPDX-License-Identifier: Apache-2.0
+
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
@@ -14,7 +15,7 @@ namespace robotick
 	}
 
 	const StructRegistryEntry* FieldRegistry::register_struct(
-		const std::string& name, size_t size, const std::type_index& type, size_t offset, std::vector<FieldInfo> fields)
+		const std::string& name, size_t size, TypeId type, size_t offset, std::vector<FieldInfo> fields)
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 
