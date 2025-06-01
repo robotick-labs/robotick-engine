@@ -44,7 +44,7 @@ namespace
 	{
 		CountingRegister()
 		{
-			const WorkloadRegistryEntry entry = {"CountingWorkload", get_type_id<CountingWorkload>(), sizeof(CountingWrapper),
+			const WorkloadRegistryEntry entry = {"CountingWorkload", GET_TYPE_ID(CountingWorkload), sizeof(CountingWrapper),
 				alignof(CountingWrapper),
 				[](void* p)
 				{
@@ -89,7 +89,7 @@ namespace
 	{
 		SlowRegister()
 		{
-			const WorkloadRegistryEntry entry = {"SlowWorkload", get_type_id<SlowWorkload>(), sizeof(SlowWrapper), alignof(SlowWrapper),
+			const WorkloadRegistryEntry entry = {"SlowWorkload", GET_TYPE_ID(SlowWorkload), sizeof(SlowWrapper), alignof(SlowWrapper),
 				[](void* p)
 				{
 					new (p) SlowWrapper();

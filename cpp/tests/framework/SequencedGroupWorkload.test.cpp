@@ -38,7 +38,7 @@ namespace
 	{
 		DummyTickingRegister()
 		{
-			const WorkloadRegistryEntry entry = {"DummyTickingWorkload", get_type_id<DummyTickingWrapper>(), sizeof(DummyTickingWrapper),
+			const WorkloadRegistryEntry entry = {"DummyTickingWorkload", GET_TYPE_ID(DummyTickingWrapper), sizeof(DummyTickingWrapper),
 				alignof(DummyTickingWrapper),
 				[](void* p)
 				{
@@ -77,7 +77,7 @@ namespace
 	{
 		SlowTickRegister()
 		{
-			const WorkloadRegistryEntry entry = {"SlowTickWorkload", get_type_id<SlowTickWorkload>(), sizeof(SlowWrapper), alignof(SlowWrapper),
+			const WorkloadRegistryEntry entry = {"SlowTickWorkload", GET_TYPE_ID(SlowTickWorkload), sizeof(SlowWrapper), alignof(SlowWrapper),
 				[](void* p)
 				{
 					new (p) SlowWrapper();

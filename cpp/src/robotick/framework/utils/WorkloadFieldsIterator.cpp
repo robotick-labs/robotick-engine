@@ -36,7 +36,7 @@ namespace robotick
 				if (!base_ptr)
 					continue;
 
-				if (field.type == get_type_id<Blackboard>())
+				if (field.type == GET_TYPE_ID(Blackboard))
 				{
 					Blackboard& blackboard = *static_cast<Blackboard*>(base_ptr);
 

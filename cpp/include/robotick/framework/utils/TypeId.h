@@ -6,6 +6,8 @@
 
 #include <cstdint>
 
+#define ROBOTICK_DEBUG_TYPEID_NAMES
+
 namespace robotick
 {
 	// Compile-time FNV-1a hash (32-bit)
@@ -45,5 +47,7 @@ namespace robotick
 	{                                                                                                                                                \
 		#Type                                                                                                                                        \
 	}
+
+#define GET_TYPE_NAME(Type) #Type
 
 } // namespace robotick

@@ -44,13 +44,14 @@ namespace robotick
 
 	inline void report_error(const std::string& message)
 	{
+		fprintf(stderr, "\033[1;31m[ERROR] %s\033[0m\n", message.c_str());
 		throw TestError(message);
 	}
 #else
 	inline void report_error(const std::string& message)
 	{
 		ROBOTICK_BREAKPOINT();
-		fprintf(stderr, "[ERROR] %s\n", message.c_str());
+		fprintf(stderr, "\033[1;31m[ERROR] %s\033[0m\n", message.c_str());
 		exit(1);
 	}
 #endif

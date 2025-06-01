@@ -22,7 +22,7 @@ namespace robotick::test
 		{
 			DummyRegister()
 			{
-				const WorkloadRegistryEntry entry = {"DummyModelDataConnWorkload", get_type_id<DummyModelDataConnWorkload>(),
+				const WorkloadRegistryEntry entry = {"DummyModelDataConnWorkload", GET_TYPE_ID(DummyModelDataConnWorkload),
 					sizeof(DummyModelDataConnWorkload), alignof(DummyModelDataConnWorkload),
 					[](void* p)
 					{

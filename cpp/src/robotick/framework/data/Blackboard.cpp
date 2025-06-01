@@ -37,13 +37,15 @@ namespace robotick
 		return &schema[it->second];
 	}
 
-	void BlackboardInfo::verify_type(const std::string& key, TypeId expected) const
+	void BlackboardInfo::verify_type_by_size(const std::string& key, size_t expected_size) const
 	{
 		const auto* field = find_field(key);
+
 		if (!field)
-			ROBOTICK_ERROR("Blackboard::verify_type failed, missing key: %s", key.c_str());
-		if (field->type != expected)
-			ROBOTICK_ERROR("Blackboard::verify_type failed, type mismatch for key: %s", key.c_str());
+			ROBOTICK_ERROR("Blackboard::verify_type_by_size failed, missing key: %s", key.c_str());
+
+		if (field->size != expected_size)
+			ROBOTICK_ERROR("Blackboard::verify_type_by_size failed, type mismatch for key: %s", key.c_str());
 	}
 
 	void* BlackboardInfo::get_field_ptr(Blackboard* bb, const std::string& key) const
@@ -66,13 +68,13 @@ namespace robotick
 
 	std::pair<size_t, size_t> BlackboardInfo::type_size_and_align(TypeId type)
 	{
-		if (type == get_type_id<int>())
+		if (type == GET_TYPE_ID(int))
 			return {sizeof(int), alignof(int)};
-		if (type == get_type_id<double>())
+		if (type == GET_TYPE_ID(double))
 			return {sizeof(double), alignof(double)};
-		if (type == get_type_id<FixedString64>())
+		if (type == GET_TYPE_ID(FixedString64))
 			return {sizeof(FixedString64), alignof(FixedString64)};
-		if (type == get_type_id<FixedString128>())
+		if (type == GET_TYPE_ID(FixedString128))
 			return {sizeof(FixedString128), alignof(FixedString128)};
 
 		ROBOTICK_ERROR("Unsupported type in BlackboardInfo::type_size_and_align");
@@ -146,7 +148,7 @@ namespace robotick
 	template <typename T> void Blackboard::set(const std::string& key, const T& value)
 	{
 		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
-		info->verify_type(key, get_type_id<T>());
+		info->verify_type_by_size(key, sizeof(T));
 		void* ptr = info->get_field_ptr(this, key);
 		std::memcpy(ptr, &value, sizeof(T));
 	}
@@ -154,7 +156,7 @@ namespace robotick
 	template <typename T> T Blackboard::get(const std::string& key) const
 	{
 		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::get only supports trivially-copyable types");
-		info->verify_type(key, get_type_id<T>());
+		info->verify_type_by_size(key, sizeof(T));
 		const void* ptr = info->get_field_ptr(this, key);
 		T out;
 		std::memcpy(&out, ptr, sizeof(T));

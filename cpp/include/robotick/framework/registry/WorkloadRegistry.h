@@ -19,7 +19,6 @@
 
 namespace robotick
 {
-
 	// Forward declaration(s)
 	class Engine;
 	struct DataConnectionInfo;
@@ -193,9 +192,10 @@ namespace robotick
 
 	// ——————————————————————————————————————————————————————————————————
 	// 5) Core templates (definitions in header) …
-	template <typename Type, typename ConfigType = void, typename InputType = void, typename OutputType = void> void register_workload()
+	template <typename Type, typename ConfigType = void, typename InputType = void, typename OutputType = void>
+	void register_workload(const char* workload_name, const char* config_name, const char* input_name, const char* output_name)
 	{
-		// Pointers initialized to nullptr
+		// Function pointers...
 		void (*set_children_fn)(void*, const std::vector<const WorkloadInstanceInfo*>&, std::vector<DataConnectionInfo*>&) = nullptr;
 		void (*set_engine_fn)(void*, const Engine&) = nullptr;
 		void (*pre_load_fn)(void*) = nullptr;
@@ -205,17 +205,15 @@ namespace robotick
 		void (*tick_fn)(void*, double) = nullptr;
 		void (*stop_fn)(void*) = nullptr;
 
-		// Bind methods if present
 		if constexpr (has_set_children<Type>::value)
-			set_children_fn =
-				+[](void* i, const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& pending_connections)
+			set_children_fn = +[](void* i, const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& pending)
 			{
-				static_cast<Type*>(i)->set_children(children, pending_connections);
+				static_cast<Type*>(i)->set_children(children, pending);
 			};
 		if constexpr (has_set_engine<Type>::value)
-			set_engine_fn = +[](void* i, const Engine& engine)
+			set_engine_fn = +[](void* i, const Engine& e)
 			{
-				static_cast<Type*>(i)->set_engine(engine);
+				static_cast<Type*>(i)->set_engine(e);
 			};
 		if constexpr (has_pre_load<Type>::value)
 			pre_load_fn = +[](void* i)
@@ -238,9 +236,9 @@ namespace robotick
 				static_cast<Type*>(i)->start(d);
 			};
 		if constexpr (has_tick<Type>::value)
-			tick_fn = +[](void* i, double time_delta)
+			tick_fn = +[](void* i, double dt)
 			{
-				static_cast<Type*>(i)->tick(time_delta);
+				static_cast<Type*>(i)->tick(dt);
 			};
 		if constexpr (has_stop<Type>::value)
 			stop_fn = +[](void* i)
@@ -254,23 +252,13 @@ namespace robotick
 		const StructRegistryEntry* out_struct = nullptr;
 
 		if constexpr (!is_void_v<ConfigType>)
-		{
-			cfg_struct = FieldRegistry::get().register_struct(
-				get_registered_type_name<ConfigType>(), sizeof(ConfigType), get_type_id<ConfigType>(), offsetof(Type, config), {});
-		}
+			cfg_struct = FieldRegistry::get().register_struct(config_name, sizeof(ConfigType), TypeId{config_name}, offsetof(Type, config), {});
 		if constexpr (!is_void_v<InputType>)
-		{
-			in_struct = FieldRegistry::get().register_struct(
-				get_registered_type_name<InputType>(), sizeof(InputType), get_type_id<InputType>(), offsetof(Type, inputs), {});
-		}
+			in_struct = FieldRegistry::get().register_struct(input_name, sizeof(InputType), TypeId{input_name}, offsetof(Type, inputs), {});
 		if constexpr (!is_void_v<OutputType>)
-		{
-			out_struct = FieldRegistry::get().register_struct(
-				get_registered_type_name<OutputType>(), sizeof(OutputType), get_type_id<OutputType>(), offsetof(Type, outputs), {});
-		}
+			out_struct = FieldRegistry::get().register_struct(output_name, sizeof(OutputType), TypeId{output_name}, offsetof(Type, outputs), {});
 
-		// Create/register the static entry
-		const WorkloadRegistryEntry entry = {get_registered_type_name<Type>(), get_type_id<Type>(), sizeof(Type), alignof(Type),
+		const WorkloadRegistryEntry entry = {workload_name, TypeId{workload_name}, sizeof(Type), alignof(Type),
 			[](void* ptr)
 			{
 				new (ptr) Type();
@@ -284,20 +272,31 @@ namespace robotick
 		WorkloadRegistry::get().register_entry(entry);
 	}
 
-	template <typename T, typename Config = void, typename Inputs = void, typename Outputs = void> struct WorkloadAutoRegister
+	template <typename T, typename Config, typename Inputs, typename Outputs> struct WorkloadAutoRegister
 	{
-		WorkloadAutoRegister()
+		explicit WorkloadAutoRegister(const char* workload_name, const char* config_name, const char* input_name, const char* output_name)
 		{
 			static_assert(std::is_standard_layout<T>::value, "Workloads must be standard layout");
-			register_workload<T, Config, Inputs, Outputs>();
+			register_workload<T, Config, Inputs, Outputs>(workload_name, config_name, input_name, output_name);
 		}
 	};
 
-	// ——————————————————————————————————————————————————————————————————
-	// 6) One-line macro for optional fields
-	// ——————————————————————————————————————————————————————————————————
+#define ROBOTICK_DEFINE_WORKLOAD_1(Type)                                                                                                             \
+	ROBOTICK_DEFINE_WORKLOAD_4(Type, robotick::config_t<Type>, robotick::inputs_t<Type>, robotick::outputs_t<Type>)
 
-#define ROBOTICK_DEFINE_WORKLOAD(Type)                                                                                                               \
-	static robotick::WorkloadAutoRegister<Type, robotick::config_t<Type>, robotick::inputs_t<Type>, robotick::outputs_t<Type>> s_auto_register_##Type;
+#define ROBOTICK_DEFINE_WORKLOAD_2(Type, Config) ROBOTICK_DEFINE_WORKLOAD_4(Type, Config, void, void)
+
+#define ROBOTICK_DEFINE_WORKLOAD_3(Type, Config, Inputs) ROBOTICK_DEFINE_WORKLOAD_4(Type, Config, Inputs, void)
+
+#define ROBOTICK_DEFINE_WORKLOAD_4(Type, Config, Inputs, Outputs)                                                                                    \
+	static robotick::WorkloadAutoRegister<Type, Config, Inputs, Outputs> s_auto_register_##Type                                                      \
+	{                                                                                                                                                \
+		#Type, #Config, #Inputs, #Outputs                                                                                                            \
+	}
+#define GET_WORKLOAD_DEFINE_MACRO(_1, _2, _3, _4, NAME, ...) NAME
+
+#define ROBOTICK_DEFINE_WORKLOAD(...)                                                                                                                \
+	GET_WORKLOAD_DEFINE_MACRO(                                                                                                                       \
+		__VA_ARGS__, ROBOTICK_DEFINE_WORKLOAD_4, ROBOTICK_DEFINE_WORKLOAD_3, ROBOTICK_DEFINE_WORKLOAD_2, ROBOTICK_DEFINE_WORKLOAD_1)(__VA_ARGS__)
 
 } // namespace robotick

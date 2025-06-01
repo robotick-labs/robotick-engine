@@ -25,7 +25,7 @@ namespace
 	{
 		DummyModelWorkloadRegister()
 		{
-			const WorkloadRegistryEntry entry = {"DummyModelWorkload", get_type_id<DummyModelWorkload>(), sizeof(DummyModelWorkload),
+			const WorkloadRegistryEntry entry = {"DummyModelWorkload", GET_TYPE_ID(DummyModelWorkload), sizeof(DummyModelWorkload),
 				alignof(DummyModelWorkload),
 				[](void* p)
 				{

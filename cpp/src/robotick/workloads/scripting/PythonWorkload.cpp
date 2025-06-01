@@ -90,16 +90,16 @@ namespace robotick
 				std::string type_str = py::str(item.second);
 				std::transform(type_str.begin(), type_str.end(), type_str.begin(), ::tolower);
 
-				TypeId type(get_type_id<void>());
+				TypeId type(GET_TYPE_ID(void));
 
 				if (type_str == "int")
-					type = TypeId(get_type_id<int>());
+					type = TypeId(GET_TYPE_ID(int));
 				else if (type_str == "double")
-					type = TypeId(get_type_id<double>());
+					type = TypeId(GET_TYPE_ID(double));
 				else if (type_str == "fixedstring64")
-					type = TypeId(get_type_id<FixedString64>());
+					type = TypeId(GET_TYPE_ID(FixedString64));
 				else if (type_str == "fixedstring128")
-					type = TypeId(get_type_id<FixedString128>());
+					type = TypeId(GET_TYPE_ID(FixedString128));
 				else
 					ROBOTICK_ERROR("Unsupported field type: %s", type_str.c_str());
 
@@ -142,13 +142,13 @@ namespace robotick
 				const std::string key = field.name.c_str();
 				const auto& type = field.type;
 
-				if (type == get_type_id<int>())
+				if (type == GET_TYPE_ID(int))
 					py_cfg[key.c_str()] = config.blackboard.get<int>(key);
-				else if (type == get_type_id<double>())
+				else if (type == GET_TYPE_ID(double))
 					py_cfg[key.c_str()] = config.blackboard.get<double>(key);
-				else if (type == get_type_id<FixedString64>())
+				else if (type == GET_TYPE_ID(FixedString64))
 					py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString64>(key).c_str());
-				else if (type == get_type_id<FixedString128>())
+				else if (type == GET_TYPE_ID(FixedString128))
 					py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString128>(key).c_str());
 				else
 					ROBOTICK_ERROR("Unsupported config field type for key '%s' in PythonWorkload", key.c_str());
@@ -170,13 +170,13 @@ namespace robotick
 				const std::string key = field.name.c_str();
 				const auto& type = field.type;
 
-				if (type == get_type_id<int>())
+				if (type == GET_TYPE_ID(int))
 					py_in[key.c_str()] = inputs.blackboard.get<int>(key);
-				else if (type == get_type_id<double>())
+				else if (type == GET_TYPE_ID(double))
 					py_in[key.c_str()] = inputs.blackboard.get<double>(key);
-				else if (type == get_type_id<FixedString64>())
+				else if (type == GET_TYPE_ID(FixedString64))
 					py_in[key.c_str()] = std::string(inputs.blackboard.get<FixedString64>(key).c_str());
-				else if (type == get_type_id<FixedString128>())
+				else if (type == GET_TYPE_ID(FixedString128))
 					py_in[key.c_str()] = std::string(inputs.blackboard.get<FixedString128>(key).c_str());
 			}
 
@@ -197,13 +197,13 @@ namespace robotick
 				if (it == schema.end())
 					continue;
 
-				if (it->type == get_type_id<int>())
+				if (it->type == GET_TYPE_ID(int))
 					outputs.blackboard.set<int>(key, val.cast<int>());
-				else if (it->type == get_type_id<double>())
+				else if (it->type == GET_TYPE_ID(double))
 					outputs.blackboard.set<double>(key, val.cast<double>());
-				else if (it->type == get_type_id<FixedString64>())
+				else if (it->type == GET_TYPE_ID(FixedString64))
 					outputs.blackboard.set<FixedString64>(key, FixedString64(val.cast<std::string>().c_str()));
-				else if (it->type == get_type_id<FixedString128>())
+				else if (it->type == GET_TYPE_ID(FixedString128))
 					outputs.blackboard.set<FixedString128>(key, FixedString128(val.cast<std::string>().c_str()));
 			}
 		}

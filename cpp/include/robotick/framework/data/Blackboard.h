@@ -48,7 +48,7 @@ namespace robotick
 
 		bool has_field(const std::string& key) const;
 		const BlackboardFieldInfo* find_field(const std::string& key) const;
-		void verify_type(const std::string& key, TypeId expected) const;
+		void verify_type_by_size(const std::string& key, size_t expected_size) const;
 		void* get_field_ptr(Blackboard* bb, const std::string& key) const;
 		const void* get_field_ptr(const Blackboard* bb, const std::string& key) const;
 

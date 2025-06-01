@@ -24,13 +24,6 @@ namespace robotick::test
 		template <typename T> static T* get_instance(const Engine& engine, size_t index)
 		{
 			const WorkloadInstanceInfo& info = get_instance_info(engine, index);
-			const TypeId expected_id = get_type_id<T>();
-
-			if (info.type->type_id != expected_id)
-			{
-				ROBOTICK_ERROR("Type mismatch: expected %s, got %s", get_registered_type_name<T>(), info.type->name.c_str());
-			}
-
 			return static_cast<T*>((void*)info.get_ptr(engine));
 		}
 

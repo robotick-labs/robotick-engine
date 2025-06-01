@@ -113,7 +113,7 @@ namespace robotick
 
 				for (const FieldInfo& field : struct_info->fields)
 				{
-					if (field.type == get_type_id<Blackboard>())
+					if (field.type == GET_TYPE_ID(Blackboard))
 					{
 						ROBOTICK_ASSERT(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
@@ -140,7 +140,7 @@ namespace robotick
 
 		for (const FieldInfo& field : struct_entry.fields)
 		{
-			if (field.type == get_type_id<Blackboard>())
+			if (field.type == GET_TYPE_ID(Blackboard))
 			{
 				Blackboard& blackboard = field.get_data<Blackboard>(state->workloads_buffer, workload_instance_info, struct_entry);
 				blackboard.bind(blackboard_storage_offset);

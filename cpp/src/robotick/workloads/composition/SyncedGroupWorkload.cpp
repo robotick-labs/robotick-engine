@@ -217,6 +217,6 @@ namespace robotick
 		void stop() { impl->stop(); }
 	};
 
-	static WorkloadAutoRegister<SyncedGroupWorkload> s_auto_register;
+	ROBOTICK_DEFINE_WORKLOAD(SyncedGroupWorkload)
 
 } // namespace robotick

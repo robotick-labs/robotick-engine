@@ -192,8 +192,8 @@ namespace robotick::test
 			Blackboard blackboard;
 
 			BBInputs()
-				: blackboard({BlackboardFieldInfo("x", TypeId(get_type_id<int>())),
-					  BlackboardFieldInfo("y", TypeId(get_type_id<double>()))})
+				: blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))),
+					  BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))})
 			{
 			}
 		};

@@ -114,7 +114,7 @@ namespace robotick
 		static const BlackboardFieldInfo* resolve_blackboard_field_ptr(WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& inst,
 			const StructRegistryEntry& struct_info, const FieldInfo& blackboard_field, const std::string& blackboard_subfield_name)
 		{
-			if (blackboard_field.type != get_type_id<Blackboard>())
+			if (blackboard_field.type != GET_TYPE_ID(Blackboard))
 			{
 				return nullptr;
 			}

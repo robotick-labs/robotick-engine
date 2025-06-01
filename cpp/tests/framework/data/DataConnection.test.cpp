@@ -25,8 +25,8 @@ namespace robotick::test
 			Blackboard out_blackboard;
 
 			DummyAOutput()
-				: out_blackboard({BlackboardFieldInfo("x", TypeId(get_type_id<int>())),
-					  BlackboardFieldInfo("y", TypeId(get_type_id<double>()))})
+				: out_blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))),
+					  BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))})
 			{
 			}
 		};
@@ -43,8 +43,8 @@ namespace robotick::test
 			int x = 0;
 
 			DummyBInput()
-				: in_blackboard({BlackboardFieldInfo("x", TypeId(get_type_id<int>())),
-					  BlackboardFieldInfo("y", TypeId(get_type_id<double>()))})
+				: in_blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))),
+					  BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))})
 			{
 			}
 		};

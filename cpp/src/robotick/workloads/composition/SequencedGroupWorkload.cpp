@@ -141,6 +141,6 @@ namespace robotick
 		void stop() { /* placeholder for consistency with SequencedGroup*/ }
 	};
 
-	static WorkloadAutoRegister<SequencedGroupWorkload> s_auto_register;
+	ROBOTICK_DEFINE_WORKLOAD(SequencedGroupWorkload)
 
 } // namespace robotick

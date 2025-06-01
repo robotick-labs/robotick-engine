@@ -34,21 +34,21 @@ namespace robotick
 
 	template <typename Func> inline bool dispatch_fixed_string(const TypeId& type, Func&& fn)
 	{
-		if (type == get_type_id<FixedString8>())
+		if (type == GET_TYPE_ID(FixedString8))
 			return fn(type_identity<FixedString8>{});
-		if (type == get_type_id<FixedString16>())
+		if (type == GET_TYPE_ID(FixedString16))
 			return fn(type_identity<FixedString16>{});
-		if (type == get_type_id<FixedString32>())
+		if (type == GET_TYPE_ID(FixedString32))
 			return fn(type_identity<FixedString32>{});
-		if (type == get_type_id<FixedString64>())
+		if (type == GET_TYPE_ID(FixedString64))
 			return fn(type_identity<FixedString64>{});
-		if (type == get_type_id<FixedString128>())
+		if (type == GET_TYPE_ID(FixedString128))
 			return fn(type_identity<FixedString128>{});
-		if (type == get_type_id<FixedString256>())
+		if (type == GET_TYPE_ID(FixedString256))
 			return fn(type_identity<FixedString256>{});
-		if (type == get_type_id<FixedString512>())
+		if (type == GET_TYPE_ID(FixedString512))
 			return fn(type_identity<FixedString512>{});
-		if (type == get_type_id<FixedString1024>())
+		if (type == GET_TYPE_ID(FixedString1024))
 			return fn(type_identity<FixedString1024>{});
 		return false;
 	}
@@ -66,11 +66,11 @@ namespace robotick
 			void* field_ptr = static_cast<uint8_t*>(struct_ptr) + field.offset_within_struct;
 			const std::string& value = it->second;
 
-			if (field.type == get_type_id<std::string>())
+			if (field.type == GET_TYPE_ID(std::string))
 			{
 				*static_cast<std::string*>(field_ptr) = value;
 			}
-			else if (field.type == get_type_id<double>())
+			else if (field.type == GET_TYPE_ID(double))
 			{
 				double parsed = 0.0;
 				auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);
@@ -80,7 +80,7 @@ namespace robotick
 				}
 				*static_cast<double*>(field_ptr) = parsed;
 			}
-			else if (field.type == get_type_id<int>())
+			else if (field.type == GET_TYPE_ID(int))
 			{
 				int parsed = 0;
 				auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);

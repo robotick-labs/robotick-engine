@@ -4,17 +4,20 @@
     "cmake.buildPreset": "ubuntu-x64-debug",
     "cmake.sourceDirectory": "${workspaceFolder}",
     "cmake.buildDirectory": "${workspaceFolder}/build",
-    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/ubuntu-x64-debug/compile_commands.json",
-    "terminal.integrated.defaultProfile.linux": "bash",
-    "C_Cpp.codeAnalysis.clangTidy.enabled": true,
-    "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
-        "modernize-use-trailing-return-type"
-    ],
-    "catch2TestExplorer.enableTestExplorer": true,
+    "cmake.ctestEnabled": false,
+    "cmake.enableTestExplorer": false,
+    "testMate.cpp.testFramework": "catch2",
+    "testMate.cpp.enableTestDiscovery": true,
     "catch2TestExplorer.useCTest": false,
     "catch2TestExplorer.executables": [
         "**/robotick_tests"
     ],
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/ubuntu-x64-debug/compile_commands.json",
+    "C_Cpp.codeAnalysis.clangTidy.enabled": true,
+    "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
+        "modernize-use-trailing-return-type"
+    ],
+    "terminal.integrated.defaultProfile.linux": "bash",
     "files.associations": {
         "type_traits": "cpp",
         "any": "cpp",
@@ -32,6 +35,7 @@
         "complex": "cpp",
         "concepts": "cpp",
         "condition_variable": "cpp",
+        "csignal": "cpp",
         "cstdarg": "cpp",
         "cstddef": "cpp",
         "cstdint": "cpp",
@@ -89,8 +93,6 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "valarray": "cpp",
-        "variant": "cpp",
-        "csignal": "cpp",
-        "cassert": "cpp"
+        "variant": "cpp"
     }
 }

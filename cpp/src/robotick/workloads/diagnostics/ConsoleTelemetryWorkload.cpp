@@ -124,13 +124,13 @@ namespace robotick
 						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.subfield->size));
 
 						const TypeId& type = view.subfield->type;
-						if (type == get_type_id<int>())
+						if (type == GET_TYPE_ID(int))
 							entry << *static_cast<const int*>(view.field_ptr);
-						else if (type == get_type_id<double>())
+						else if (type == GET_TYPE_ID(double))
 							entry << *static_cast<const double*>(view.field_ptr);
-						else if (type == get_type_id<FixedString64>())
+						else if (type == GET_TYPE_ID(FixedString64))
 							entry << "\"" << static_cast<const FixedString64*>(view.field_ptr)->c_str() << "\"";
-						else if (type == get_type_id<FixedString128>())
+						else if (type == GET_TYPE_ID(FixedString128))
 							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
 						else
 							entry << "<unsupported>";
@@ -141,13 +141,13 @@ namespace robotick
 
 						// fallback for top-level (non-blackboard) fields
 						const TypeId& type = view.field->type;
-						if (type == get_type_id<int>())
+						if (type == GET_TYPE_ID(int))
 							entry << *static_cast<const int*>(view.field_ptr);
-						else if (type == get_type_id<double>())
+						else if (type == GET_TYPE_ID(double))
 							entry << *static_cast<const double*>(view.field_ptr);
-						else if (type == get_type_id<FixedString64>())
+						else if (type == GET_TYPE_ID(FixedString64))
 							entry << "\"" << static_cast<const FixedString64*>(view.field_ptr)->c_str() << "\"";
-						else if (type == get_type_id<FixedString128>())
+						else if (type == GET_TYPE_ID(FixedString128))
 							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
 						else
 							entry << "<unsupported>";
