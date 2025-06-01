@@ -11,3 +11,4 @@ cpp/build/*
 *_LOG.TXT
 out/*
 my_git_config.sh
+examples/cpp/esp32-blink/build/*
