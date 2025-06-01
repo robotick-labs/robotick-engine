@@ -17,6 +17,5 @@ idf_component_register(
         src/robotick/workloads/diagnostics/TimingDiagnosticsWorkload.cpp
         # Add other minimal ESP32-safe files only
 
-    INCLUDE_DIRS
-        include
+    INCLUDE_DIRS include
 )
