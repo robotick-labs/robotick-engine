@@ -252,6 +252,15 @@ namespace robotick
 		const StructRegistryEntry* in_struct = nullptr;
 		const StructRegistryEntry* out_struct = nullptr;
 
+		static_assert((is_void_v<ConfigType> && !has_member_config<Type>::value) || (!is_void_v<ConfigType> && has_member_config<Type>::value),
+			"Inconsistent config: type vs member presence mismatch on Workload registration");
+
+		static_assert((is_void_v<InputType> && !has_member_inputs<Type>::value) || (!is_void_v<InputType> && has_member_inputs<Type>::value),
+			"Inconsistent inputs: type vs member presence mismatch on Workload registration");
+
+		static_assert((is_void_v<OutputType> && !has_member_outputs<Type>::value) || (!is_void_v<OutputType> && has_member_outputs<Type>::value),
+			"Inconsistent outputs: type vs member presence mismatch on Workload registration");
+
 		if constexpr (!is_void_v<ConfigType>)
 			cfg_struct = FieldRegistry::get().register_struct(config_name, sizeof(ConfigType), TypeId{config_name}, offsetof(Type, config), {});
 		if constexpr (!is_void_v<InputType>)
@@ -282,8 +291,7 @@ namespace robotick
 		}
 	};
 
-#define ROBOTICK_DEFINE_WORKLOAD_1(Type)                                                                                                             \
-	ROBOTICK_DEFINE_WORKLOAD_4(Type, robotick::config_t<Type>, robotick::inputs_t<Type>, robotick::outputs_t<Type>)
+#define ROBOTICK_DEFINE_WORKLOAD_1(Type) ROBOTICK_DEFINE_WORKLOAD_4(Type, void, void, void)
 
 #define ROBOTICK_DEFINE_WORKLOAD_2(Type, Config) ROBOTICK_DEFINE_WORKLOAD_4(Type, Config, void, void)
 

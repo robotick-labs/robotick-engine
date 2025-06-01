@@ -209,6 +209,6 @@ namespace robotick
 		}
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(PythonWorkload)
+	ROBOTICK_DEFINE_WORKLOAD(PythonWorkload, PythonConfig, PythonInputs, PythonOutputs)
 
 } // namespace robotick

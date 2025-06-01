@@ -49,7 +49,7 @@ namespace robotick::test
 		ROBOTICK_DEFINE_WORKLOAD(CountingDataConnWorkload, void, CountingDataConnInputs, CountingDataConnOutputs)
 	} // namespace
 
-	TEST_CASE("Unit|Framework|DataConnections|ExpectedHandler set for synced group children")
+	TEST_CASE("Unit|Framework|Data|Connection|ExpectedHandler set for synced group children")
 	{
 		Model model;
 		auto a = model.add("CountingDataConnWorkload", "A", 10.0);
@@ -75,7 +75,7 @@ namespace robotick::test
 		REQUIRE(found);
 	}
 
-	TEST_CASE("Unit|Framework|DataConnections|ExpectedHandler set for external connections")
+	TEST_CASE("Unit|Framework|Data|Connection|ExpectedHandler set for external connections")
 	{
 		Model model;
 		auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
@@ -101,7 +101,7 @@ namespace robotick::test
 		REQUIRE(found);
 	}
 
-	TEST_CASE("Unit|Framework|DataConnections|ExpectedHandler set to SequencedGroupWorkload for internal connections")
+	TEST_CASE("Unit|Framework|Data|Connection|ExpectedHandler set to SequencedGroupWorkload for internal connections")
 	{
 		Model model;
 		auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);

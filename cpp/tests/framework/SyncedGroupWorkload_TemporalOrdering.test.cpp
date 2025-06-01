@@ -34,7 +34,7 @@ namespace robotick::test
 			SenderOut outputs;
 			void tick(double) { outputs.output++; }
 		};
-		ROBOTICK_DEFINE_WORKLOAD(SenderWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(SenderWorkload, void, void, SenderOut)
 
 		struct ReceiverWorkload
 		{
@@ -42,7 +42,7 @@ namespace robotick::test
 			std::vector<int> received;
 			void tick(double) { received.push_back(inputs.input); }
 		};
-		ROBOTICK_DEFINE_WORKLOAD(ReceiverWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(ReceiverWorkload, void, ReceiverIn)
 	} // namespace
 
 	TEST_CASE("Unit|Framework|Data|Connection|Data connections are propagated correctly")

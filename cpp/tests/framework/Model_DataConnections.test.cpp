@@ -40,7 +40,7 @@ namespace robotick::test
 		static DummyRegister s_register;
 	} // namespace
 
-	TEST_CASE("Unit|Framework|DataConnections|Allows connecting input between valid workloads")
+	TEST_CASE("Unit|Framework|Data|Connection|Allows connecting input between valid workloads")
 	{
 		Model model;
 
@@ -55,7 +55,7 @@ namespace robotick::test
 		REQUIRE_NOTHROW(model.finalize());
 	}
 
-	TEST_CASE("Unit|Framework|DataConnections|Duplicate inputs throw with clear error")
+	TEST_CASE("Unit|Framework|Data|Connection|Duplicate inputs throw with clear error")
 	{
 		Model model;
 
@@ -67,7 +67,7 @@ namespace robotick::test
 		ROBOTICK_REQUIRE_ERROR(model.connect("B.output", "C.input"), ("already has an incoming connection"));
 	}
 
-	TEST_CASE("Unit|Framework|DataConnections|Seeds are preserved for engine use")
+	TEST_CASE("Unit|Framework|Data|Connection|Seeds are preserved for engine use")
 	{
 		Model model;
 

@@ -1,8 +1,6 @@
-import os
 import re
 from pathlib import Path
 
-# Path to your /cpp directory
 CPP_ROOT = Path("cpp")
 
 # Regex patterns
@@ -10,8 +8,7 @@ begin_fields_re = re.compile(r"ROBOTICK_BEGIN_FIELDS\((\w+)\)")
 define_workload_re = re.compile(r"ROBOTICK_DEFINE_WORKLOAD(?:_[1-4])?\(([^)]*)\)")
 workload_struct_re = re.compile(r"struct\s+(\w+Workload)\b")
 
-# Classifier helper
-def classify_struct(name: str):
+def classify_field_type(name: str):
     lname = name.lower()
     if "config" in lname:
         return "config"
@@ -21,55 +18,34 @@ def classify_struct(name: str):
         return "outputs"
     return None
 
-# Main loop
-for cpp_file in CPP_ROOT.rglob("*.cpp"):
-    with open(cpp_file, "r", encoding="utf-8") as f:
-        content = f.read()
+def main():
+    for cpp_file in CPP_ROOT.rglob("*.cpp"):
+        content = cpp_file.read_text(encoding="utf-8")
 
-    original_content = content  # Keep for later comparison
+        # Find defined structs
+        field_structs = begin_fields_re.findall(content)
+        workload_structs = workload_struct_re.findall(content)
+        define_macros = define_workload_re.findall(content)
 
-    # Extract all the things
-    structs = begin_fields_re.findall(content)
-    workload_names = workload_struct_re.findall(content)
-    workload_macros = define_workload_re.findall(content)
+        # Classify config/input/output by naming
+        role_map = {}
+        for typename in field_structs:
+            role = classify_field_type(typename)
+            if role:
+                role_map[role] = typename
 
-    # Classify fields by role
-    role_map = {}
-    for s in structs:
-        role = classify_struct(s)
-        if role:
-            role_map[role] = s
+        if not role_map:
+            continue  # no known roles to match
 
-    if not workload_names or not workload_macros:
-        continue
+        for macro in define_macros:
+            args = [arg.strip() for arg in macro.split(",")]
+            if len(args) == 1 and args[0] in workload_structs:
+                print(f"[MISSING TYPES] {cpp_file}")
+                print(f"  Workload: {args[0]}")
+                suggested = [args[0]]
+                for role in ("config", "inputs", "outputs"):
+                    suggested.append(role_map.get(role, "void"))
+                print(f"  Suggest replacing with: ROBOTICK_DEFINE_WORKLOAD({', '.join(suggested)})\n")
 
-    print(f"\n📄 Processing: {cpp_file.relative_to(CPP_ROOT.parent)}")
-
-    # Rewrite each defined workload
-    for workload in workload_names:
-        for full_macro in workload_macros:
-            if workload not in full_macro:
-                continue  # skip mismatches
-
-            # Determine args
-            config = role_map.get("config", "void")
-            inputs = role_map.get("inputs", "void")
-            outputs = role_map.get("outputs", "void")
-
-            args = [workload]
-            if config != "void":
-                args.append(config)
-            if inputs != "void":
-                args.append(inputs)
-            if outputs != "void":
-                args.append(outputs)
-
-            new_macro = f"ROBOTICK_DEFINE_WORKLOAD({', '.join(args)})"
-            old_macro = f"ROBOTICK_DEFINE_WORKLOAD({full_macro})"
-            content = content.replace(old_macro, new_macro)
-            print(f"  ✔ Replaced: {old_macro} → {new_macro}")
-
-    # Save file only if changed
-    if content != original_content:
-        with open(cpp_file, "w", encoding="utf-8") as f:
-            f.write(content)
+if __name__ == "__main__":
+    main()

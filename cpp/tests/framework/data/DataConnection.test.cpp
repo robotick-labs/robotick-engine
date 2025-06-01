@@ -55,13 +55,13 @@ namespace robotick::test
 		{
 			DummyAOutput outputs;
 		};
-		ROBOTICK_DEFINE_WORKLOAD(DummyA)
+		ROBOTICK_DEFINE_WORKLOAD(DummyA, void, void, DummyAOutput)
 
 		struct DummyB
 		{
 			DummyBInput inputs;
 		};
-		ROBOTICK_DEFINE_WORKLOAD(DummyB)
+		ROBOTICK_DEFINE_WORKLOAD(DummyB, void, DummyBInput)
 	} // namespace
 
 	TEST_CASE("Unit|Framework|Data|Connection|Resolves non-blackboard to non-blackboard")
