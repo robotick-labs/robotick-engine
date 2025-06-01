@@ -19,3 +19,11 @@ idf_component_register(
 
     INCLUDE_DIRS include
 )
+
+
+target_link_options(${COMPONENT_LIB} PRIVATE "-Wl,--gc-sections")
+set_property(TARGET ${COMPONENT_LIB} APPEND PROPERTY LINK_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/robotick_linker_patch.ld")
+target_link_options(${COMPONENT_LIB} PRIVATE
+  "-T${CMAKE_CURRENT_SOURCE_DIR}/robotick_linker_patch.ld")
+  

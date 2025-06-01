@@ -4,30 +4,41 @@
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
+#include "robotick/framework/registry/WorkloadRegistry.h"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-using namespace robotick;
+namespace robotick
+{
+	void ensure_workloads()
+	{
+		ROBOTICK_KEEP_WORKLOAD(ConsoleTelemetryWorkload)
+		ROBOTICK_KEEP_WORKLOAD(TimingDiagnosticsWorkload)
+		ROBOTICK_KEEP_WORKLOAD(SyncedGroupWorkload)
+	}
+} // namespace robotick
 
 extern "C" void app_main(void)
 {
+	robotick::ensure_workloads();
+
 	ESP_LOGI("Robotick", "Starting Robotick ESP32 engine...");
 
 	ESP_LOGI("Robotick", "std::atomic<bool> is lock-free? %s", std::atomic<bool>().is_lock_free() ? "yes" : "no");
 
-	Model model;
+	robotick::Model model;
 
 	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0); // lower rate to reduce UART spam
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "timing_diag");
 
-	std::vector<WorkloadHandle> children = {console, test_state_1};
+	std::vector<robotick::WorkloadHandle> children = {console, test_state_1};
 
 	auto root = model.add("SyncedGroupWorkload", "root", children, 100.0);
 	model.set_root(root);
 
-	Engine engine;
+	robotick::Engine engine;
 	engine.load(model);
 
 	static std::atomic<bool> g_stop_flag{false};

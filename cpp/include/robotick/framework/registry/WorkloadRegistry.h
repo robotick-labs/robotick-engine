@@ -298,11 +298,17 @@ namespace robotick
 #define ROBOTICK_DEFINE_WORKLOAD_3(Type, Config, Inputs) ROBOTICK_DEFINE_WORKLOAD_4(Type, Config, Inputs, void)
 
 #define ROBOTICK_DEFINE_WORKLOAD_4(Type, Config, Inputs, Outputs)                                                                                    \
-	static robotick::WorkloadAutoRegister<Type, Config, Inputs, Outputs> s_auto_register_##Type{#Type, #Config, #Inputs, #Outputs};
+	__attribute__((used)) robotick::WorkloadAutoRegister<Type, Config, Inputs, Outputs> s_auto_register_##Type{#Type, #Config, #Inputs, #Outputs};   \
+	__attribute__((used)) bool g_##Type##_NoDeadStrip = false;
+
 #define GET_WORKLOAD_DEFINE_MACRO(_1, _2, _3, _4, NAME, ...) NAME
 
 #define ROBOTICK_DEFINE_WORKLOAD(...)                                                                                                                \
 	GET_WORKLOAD_DEFINE_MACRO(                                                                                                                       \
 		__VA_ARGS__, ROBOTICK_DEFINE_WORKLOAD_4, ROBOTICK_DEFINE_WORKLOAD_3, ROBOTICK_DEFINE_WORKLOAD_2, ROBOTICK_DEFINE_WORKLOAD_1)(__VA_ARGS__)
+
+#define ROBOTICK_KEEP_WORKLOAD(Type)                                                                                                                 \
+	extern bool g_##Type##_NoDeadStrip;                                                                                                              \
+	g_##Type##_NoDeadStrip = true;
 
 } // namespace robotick

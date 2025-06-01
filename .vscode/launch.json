@@ -63,6 +63,22 @@
                     "ignoreFailures": true
                 }
             ]
+        },
+        {
+            "name": "Debug ESP32-S3",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+            "cwd": "${workspaceFolder}/examples/cpp/esp32-blink",
+            "executable": "${workspaceFolder}/examples/cpp/esp32-blink/build/esp32-blink.elf",
+            "configFiles": [
+                "interface/esp_usb_jtag.cfg",
+                "target/esp32s3.cfg"
+            ],
+            "svdFile": "${env:IDF_PATH}/tools/svd/esp32s3.svd",
+            "runToMain": true,
+            "preLaunchTask": "build",
+            "gdbPath": "C:/Espressif/tools/xtensa-esp-elf-gdb/14.2_20240403/xtensa-esp-elf-gdb/bin/xtensa-esp32s3-elf-gdb.exe"
         }
     ]
 }
