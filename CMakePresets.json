@@ -65,11 +65,19 @@
         },
         {
             "name": "esp32s3-debug",
-            "inherits": "esp32s3-base",
+            "generator": "Ninja",
+            "description": "ESP32-S3 Debug build (no optimization, no python, IDF toolchain)",
+            "binaryDir": "build/esp32s3-debug",
             "cacheVariables": {
+                "CMAKE_SYSTEM_NAME": "Generic",
+                "CMAKE_SYSTEM_PROCESSOR": "xtensa",
                 "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "cmake/toolchain-esp32s3.cmake",
+                "IDF_PATH": "/esp-idf",
+                "ROBOTICK_ENABLE_PYTHON": "OFF",
                 "ROBOTICK_BUILD_CONFIG_DEBUG": "ON",
-                "ROBOTICK_OPTIMIZE_OFF": "ON"
+                "ROBOTICK_OPTIMIZE_OFF": "ON",
+                "ROBOTICK_BUILD_TESTS": "OFF"
             }
         },
         {

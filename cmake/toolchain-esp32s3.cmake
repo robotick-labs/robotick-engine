@@ -9,3 +9,25 @@ set(CMAKE_AR           ${ESP32_TOOLCHAIN}/bin/xtensa-esp32s3-elf-ar)
 set(CMAKE_OBJCOPY      ${ESP32_TOOLCHAIN}/bin/xtensa-esp32s3-elf-objcopy)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DROBOTICK_PLATFORM_ESP32")
+
+# Use IDF_PATH from environment
+set(IDF_PATH "$ENV{IDF_PATH}" CACHE PATH "Path to ESP-IDF")
+message(STATUS "Using ESP-IDF path: ${IDF_PATH}")
+
+include_directories(
+    ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/include
+    ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/xtensa/include
+    ${IDF_PATH}/components/freertos/port/xtensa/include/freertos
+    ${IDF_PATH}/components/freertos/port/xtensa/include/freertos/xtensa
+    ${IDF_PATH}/components/freertos/port/xtensa/include
+    
+    ${ESP32_TOOLCHAIN}/xtensa-esp32s3-elf/include
+
+    ${IDF_PATH}/components/newlib/platform_include
+    ${IDF_PATH}/components/esp_common/include
+    ${IDF_PATH}/components/esp_system/include
+    ${IDF_PATH}/components/esp_hw_support/include
+
+    /workspaces/robotick/esp-idf-dummy
+)
+

@@ -93,6 +93,24 @@ add_executable(robotick_main ${CMAKE_SOURCE_DIR}/examples/cpp/robotick_main.cpp)
 target_link_libraries(robotick_main PRIVATE robotick_framework)
 
 # =========================
+# ✅ ESP32 libs (if needed)
+# =========================
+
+if(ROBOTICK_PLATFORM_ESP32)
+    target_include_directories(robotick_main PRIVATE
+        ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/include
+        ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/xtensa/include
+        ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos
+
+        ${IDF_PATH}/components/newlib/platform_include
+        ${IDF_PATH}/components/esp_common/include
+        ${IDF_PATH}/components/esp_system/include
+
+        ${PROJECT_SOURCE_DIR}/esp-idf-dummy
+    )
+endif()
+
+# =========================
 # ✅ Plugin Auto-Building
 # =========================
 
