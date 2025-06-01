@@ -200,7 +200,7 @@ namespace robotick
 		std::vector<size_t> aligned_offsets;
 		for (const auto& workload_seed : workload_seeds)
 		{
-			const auto* type = WorkloadRegistry::get().find(workload_seed.type);
+			const auto* type = WorkloadRegistry::get().find(workload_seed.type.c_str());
 			if (!type)
 				ROBOTICK_ERROR("Unknown workload type: %s", workload_seed.type.c_str());
 
@@ -223,7 +223,7 @@ namespace robotick
 		for (size_t i = 0; i < workload_seeds.size(); ++i)
 		{
 			const auto& workload_seed = workload_seeds[i];
-			const auto* type = WorkloadRegistry::get().find(workload_seed.type);
+			const auto* type = WorkloadRegistry::get().find(workload_seed.type.c_str());
 
 			const size_t instance_offset = aligned_offsets[i];
 			uint8_t* instance_ptr = workloads_buffer_ptr + instance_offset;

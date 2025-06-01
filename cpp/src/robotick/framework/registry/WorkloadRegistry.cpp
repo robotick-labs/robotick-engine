@@ -26,10 +26,10 @@ namespace robotick
 		entries[entry.name] = std::make_unique<WorkloadRegistryEntry>(entry);
 	}
 
-	const WorkloadRegistryEntry* WorkloadRegistry::find(const std::string& name) const
+	const WorkloadRegistryEntry* WorkloadRegistry::find(const char* name) const
 	{
 		std::scoped_lock lock(mutex);
-		auto it_entries = entries.find(name);
+		auto it_entries = entries.find(FixedString64(name));
 		return it_entries != entries.end() ? it_entries->second.get() : nullptr;
 	}
 

@@ -45,7 +45,7 @@ namespace robotick::test
 			void tick(double) { outputs.output_value = inputs.input_value + 1; }
 		};
 
-		ROBOTICK_DEFINE_WORKLOAD(SimpleWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(SimpleWorkload, void, SimpleInputs, SimpleOutputs)
 	} // namespace
 
 	TEST_CASE("Unit|Framework|FieldWalker|Field pointers match expected values and buffers")
@@ -191,11 +191,7 @@ namespace robotick::test
 		{
 			Blackboard blackboard;
 
-			BBInputs()
-				: blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))),
-					  BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))})
-			{
-			}
+			BBInputs() : blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))}) {}
 		};
 		ROBOTICK_BEGIN_FIELDS(BBInputs)
 		ROBOTICK_FIELD(BBInputs, blackboard)
@@ -206,7 +202,7 @@ namespace robotick::test
 			BBInputs inputs;
 			void tick(double) {}
 		};
-		ROBOTICK_DEFINE_WORKLOAD(BBWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(BBWorkload, void, BBInputs, void)
 
 		Model model;
 		auto handle = model.add("BBWorkload", "BB", 10.0);

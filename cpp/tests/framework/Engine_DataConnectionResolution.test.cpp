@@ -46,7 +46,7 @@ namespace robotick::test
 			}
 		};
 
-		ROBOTICK_DEFINE_WORKLOAD(CountingDataConnWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(CountingDataConnWorkload, void, CountingDataConnInputs, CountingDataConnOutputs)
 	} // namespace
 
 	TEST_CASE("Unit|Framework|DataConnections|ExpectedHandler set for synced group children")

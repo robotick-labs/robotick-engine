@@ -36,7 +36,7 @@ namespace robotick::test
 
 			void load() { loaded_value = config.value; }
 		};
-		ROBOTICK_DEFINE_WORKLOAD(DummyWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(DummyWorkload, DummyConfig)
 
 		// === TickCounterWorkload ===
 

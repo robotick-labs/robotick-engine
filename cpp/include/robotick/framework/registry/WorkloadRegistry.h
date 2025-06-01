@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
 
@@ -157,7 +158,7 @@ namespace robotick
 
 	struct WorkloadRegistryEntry
 	{
-		std::string name;
+		FixedString64 name;
 		TypeId type_id;
 		size_t size;
 		size_t alignment;
@@ -182,12 +183,12 @@ namespace robotick
 	{
 	  public:
 		static WorkloadRegistry& get();
-		const WorkloadRegistryEntry* find(const std::string& name) const;
+		const WorkloadRegistryEntry* find(const char* name) const;
 		void register_entry(const WorkloadRegistryEntry& entry);
 
 	  private:
 		mutable std::mutex mutex;
-		std::map<std::string, std::unique_ptr<WorkloadRegistryEntry>> entries;
+		std::unordered_map<FixedString64, std::unique_ptr<WorkloadRegistryEntry>> entries;
 	};
 
 	// ——————————————————————————————————————————————————————————————————
@@ -289,10 +290,7 @@ namespace robotick
 #define ROBOTICK_DEFINE_WORKLOAD_3(Type, Config, Inputs) ROBOTICK_DEFINE_WORKLOAD_4(Type, Config, Inputs, void)
 
 #define ROBOTICK_DEFINE_WORKLOAD_4(Type, Config, Inputs, Outputs)                                                                                    \
-	static robotick::WorkloadAutoRegister<Type, Config, Inputs, Outputs> s_auto_register_##Type                                                      \
-	{                                                                                                                                                \
-		#Type, #Config, #Inputs, #Outputs                                                                                                            \
-	}
+	static robotick::WorkloadAutoRegister<Type, Config, Inputs, Outputs> s_auto_register_##Type{#Type, #Config, #Inputs, #Outputs};
 #define GET_WORKLOAD_DEFINE_MACRO(_1, _2, _3, _4, NAME, ...) NAME
 
 #define ROBOTICK_DEFINE_WORKLOAD(...)                                                                                                                \

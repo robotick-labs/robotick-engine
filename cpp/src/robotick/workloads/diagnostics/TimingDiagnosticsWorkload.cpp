@@ -110,5 +110,5 @@ namespace robotick
 
 	// === Auto-registration ===
 
-	ROBOTICK_DEFINE_WORKLOAD(TimingDiagnosticsWorkload)
+	ROBOTICK_DEFINE_WORKLOAD(TimingDiagnosticsWorkload, TimingDiagnosticsConfig, TimingDiagnosticsInputs, TimingDiagnosticsOutputs)
 } // namespace robotick

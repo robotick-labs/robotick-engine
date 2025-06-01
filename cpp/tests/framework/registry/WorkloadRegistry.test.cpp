@@ -30,6 +30,7 @@ namespace robotick::test
 
 		ROBOTICK_BEGIN_FIELDS(RegistryTestOutputs)
 		ROBOTICK_FIELD(RegistryTestOutputs, output_value_1)
+		ROBOTICK_FIELD(RegistryTestOutputs, output_value_2)
 		ROBOTICK_END_FIELDS()
 
 		struct RegistryTestWorkload
@@ -40,7 +41,7 @@ namespace robotick::test
 			void tick(double) { outputs.output_value_1 = inputs.input_value + 1; }
 		};
 
-		ROBOTICK_DEFINE_WORKLOAD(RegistryTestWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(RegistryTestWorkload, void, RegistryTestInputs, RegistryTestOutputs)
 	} // namespace
 
 	TEST_CASE("Unit|Registry|Workload and struct/field registration works")

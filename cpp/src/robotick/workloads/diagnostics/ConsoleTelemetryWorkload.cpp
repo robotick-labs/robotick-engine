@@ -97,7 +97,7 @@ namespace robotick
 
 		void populate_row(ConsoleTelemetryRow& row, size_t depth, const WorkloadInstanceInfo& info)
 		{
-			row.type = depth_prefix(depth, info.type->name);
+			row.type = depth_prefix(depth, info.type->name.c_str());
 			row.name = info.unique_name;
 
 			std::vector<std::string> input_entries;
@@ -244,6 +244,6 @@ namespace robotick
 		}
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(ConsoleTelemetryWorkload);
+	ROBOTICK_DEFINE_WORKLOAD(ConsoleTelemetryWorkload, ConsoleTelemetryConfig);
 
 } // namespace robotick

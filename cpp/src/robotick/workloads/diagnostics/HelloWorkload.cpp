@@ -81,6 +81,6 @@ namespace robotick
 
 	// === Auto-registration ===
 
-	ROBOTICK_DEFINE_WORKLOAD(HelloWorkload)
+	ROBOTICK_DEFINE_WORKLOAD(HelloWorkload, HelloConfig, HelloInputs, HelloOutputs)
 
 } // namespace robotick
