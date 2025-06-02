@@ -77,7 +77,8 @@ namespace
 	{
 		SlowTickRegister()
 		{
-			const WorkloadRegistryEntry entry = {"SlowTickWorkload", GET_TYPE_ID(SlowTickWorkload), sizeof(SlowWrapper), alignof(SlowWrapper),
+			const WorkloadRegistryEntry entry = {"SlowTickWorkload", GET_TYPE_ID(SlowTickWorkload), sizeof(SlowTickWorkload),
+				alignof(SlowTickWorkload),
 				[](void* p)
 				{
 					new (p) SlowWrapper();

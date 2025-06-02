@@ -8,6 +8,7 @@
     "cmake.enableTestExplorer": false,
     "testMate.cpp.testFramework": "catch2",
     "testMate.cpp.enableTestDiscovery": true,
+    "testMate.cpp.debug.config.template": "Debug Robotick Tests (No Leak Check)",
     "catch2TestExplorer.useCTest": false,
     "catch2TestExplorer.executables": [
         "**/robotick_tests"

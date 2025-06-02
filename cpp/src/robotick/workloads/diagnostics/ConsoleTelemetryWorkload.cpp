@@ -192,7 +192,10 @@ namespace robotick
 	struct ConsoleTelemetryWorkload
 	{
 		ConsoleTelemetryConfig config;
-		ConsoleTelemetryCollector collector;
+		std::unique_ptr<ConsoleTelemetryCollector> collector;
+
+		ConsoleTelemetryWorkload() {};
+		~ConsoleTelemetryWorkload() {};
 
 		static std::vector<ConsoleTelemetryRow> collect_console_telemetry_rows_demo(const Engine&)
 		{
@@ -224,7 +227,13 @@ namespace robotick
 			return rows;
 		}
 
-		void set_engine(const Engine& engine) { collector.set_engine(engine); }
+		void set_engine(const Engine& engine)
+		{
+			if (!collector)
+				collector = std::make_unique<ConsoleTelemetryCollector>();
+
+			collector->set_engine(engine);
+		}
 
 		void tick(double)
 		{
@@ -232,13 +241,13 @@ namespace robotick
 			// This avoids overwhelming stdout and dominating frame time, even without pretty printing.
 			// To help mitigate this, printing is built as a single string and flushed once per tick.
 
-			ROBOTICK_ASSERT(collector.get_engine() != nullptr && "ConsoleTelemetryWorkload - engine should never be null during tick");
+			ROBOTICK_ASSERT(collector && collector->get_engine() != nullptr && "ConsoleTelemetryWorkload - engine should never be null during tick");
 			// ^- we should never reach the point of ticking without set_engine having been called.
 			//  - we also assume that any given workload-instance can only ever be part of a single
 			//    engine, and that the lifespan of the engine is longer than the workloads that are
 			//    owned and created/destroyed by the engine.
 
-			auto rows = config.enable_demo ? collect_console_telemetry_rows_demo(*collector.get_engine()) : collector.collect_rows();
+			auto rows = config.enable_demo ? collect_console_telemetry_rows_demo(*collector->get_engine()) : collector->collect_rows();
 
 			print_console_telemetry_table(rows, config.enable_pretty_print, config.enable_unicode);
 		}

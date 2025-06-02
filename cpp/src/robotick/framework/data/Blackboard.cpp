@@ -78,7 +78,7 @@ namespace robotick
 			return {sizeof(FixedString128), alignof(FixedString128)};
 
 		ROBOTICK_ERROR("Unsupported type in BlackboardInfo::type_size_and_align");
-		return {0, 0};
+		return {0, 1};
 	}
 
 	Blackboard::Blackboard(const std::vector<BlackboardFieldInfo>& source_schema)
@@ -90,7 +90,14 @@ namespace robotick
 		for (size_t i = 0; i < source_schema.size(); ++i)
 		{
 			BlackboardFieldInfo field = source_schema[i];
+
 			auto [size, align] = BlackboardInfo::type_size_and_align(field.type);
+			if (align == 0)
+			{
+				ROBOTICK_ERROR("Invalid align (0) while building blackboard schema");
+				continue;
+			}
+
 			offset = (offset + align - 1) & ~(align - 1);
 			field.offset_from_datablock = offset;
 			field.size = size;

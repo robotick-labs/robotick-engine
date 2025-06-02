@@ -112,6 +112,10 @@ namespace robotick
 		void allocate_aligned(size_t alloc_size)
 		{
 			void* ptr = ::operator new(alloc_size, std::align_val_t{alignof(std::max_align_t)});
+
+			std::memset(ptr, 0, alloc_size); // <- Zero entire buffer  before use to ensure deterministic workload construction and avoid
+											 //    undefined behavior from uninitialized memory
+
 			data = std::unique_ptr<uint8_t[], AlignedDeleter>(static_cast<uint8_t*>(ptr));
 		}
 	};

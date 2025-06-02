@@ -24,6 +24,7 @@ FetchContent_Declare(
 )
 
 # Disable -Werror inside Catch2 (even if it tries to re-enable it)
+set(CATCH_ENABLE_EXCEPTIONS ON CACHE BOOL "" FORCE)
 set(CATCH_WARNINGS_AS_ERRORS OFF CACHE BOOL "" FORCE)
 set(CATCH_ENABLE_WERROR OFF CACHE BOOL "" FORCE)
 
@@ -73,6 +74,7 @@ target_compile_options(robotick_tests PRIVATE -fexceptions)
 
 target_compile_definitions(robotick_tests PRIVATE ROBOTICK_ENABLE_PYTHON=1)
 target_compile_definitions(robotick_tests PRIVATE ROBOTICK_TEST_MODE=1)
+target_compile_definitions(robotick_tests PRIVATE CATCH_CONFIG_ENABLE_EXCEPTIONS)
 
 # Discover Catch2 TEST_CASEs automatically
 include(Catch)

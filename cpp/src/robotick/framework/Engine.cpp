@@ -232,9 +232,22 @@ namespace robotick
 			state->instances.emplace_back(
 				WorkloadInstanceInfo{instance_offset, type, workload_seed.name, workload_seed.tick_rate_hz, {}, WorkloadInstanceStats{}});
 
+#if defined(ROBOTICK_DEBUG)
+			{
+				// Assert that the instance memory is fully zero-initialized before placement-new
+				constexpr size_t MAX_WORKLOAD_SIZE = 2048; // Safe upper bound (adjust if needed)
+				ROBOTICK_ASSERT(type->size <= MAX_WORKLOAD_SIZE && "Unexpectedly large workload size");
+
+				alignas(std::max_align_t) static constexpr uint8_t zero_sentinel[MAX_WORKLOAD_SIZE] = {};
+				ROBOTICK_ASSERT(
+					std::memcmp(instance_ptr, zero_sentinel, type->size) == 0 &&
+					"[Engine] Workload memory must be zero-initialized before construction - should have happened on WorkloadBuffer construction");
+			}
+#endif
+
 			if (type->construct)
 			{
-				type->construct(instance_ptr); // safe: entry already present
+				type->construct(instance_ptr);
 			}
 		}
 

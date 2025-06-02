@@ -9,11 +9,24 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_compile_options(-Wall -Wextra -Werror)
 
-# Disable exceptions globally unless overridden (e.g. test-suite enables them to catch errors, which it overrides to throw)
-add_compile_options(-fno-exceptions)
-
 # Disable rtti globally (too expensive for our purposes - we've rolled our own simplified equivalent)
 add_compile_options(-fno-rtti)
+
+# Optional AddressSanitizer support
+option(ROBOTICK_ENABLE_ASAN "Enable AddressSanitizer for runtime memory checks" ON)
+option(ROBOTICK_ASAN_DETECT_LEAKS "Enable ASAN leak detection (not always useful in tests)" OFF)
+
+if(ROBOTICK_ENABLE_ASAN)
+    message(STATUS "✅ ASAN enabled")
+    if(ROBOTICK_ASAN_DETECT_LEAKS)
+        set(ENV{ASAN_OPTIONS} "detect_leaks=1")
+    else()
+        set(ENV{ASAN_OPTIONS} "detect_leaks=0")
+    endif()
+
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address)
+endif()
 
 # =========================
 # ✅ Public Include Path
@@ -50,6 +63,9 @@ endforeach()
 add_library(robotick_framework SHARED ${CORE_SOURCES})
 set_target_properties(robotick_framework PROPERTIES OUTPUT_NAME robotick_framework)
 target_compile_definitions(robotick_framework PRIVATE ROBOTICK_EXPORTS)
+
+# Disable exceptions in this module unless overridden (e.g. test-suite enables them to catch errors, which it overrides to throw)
+target_compile_options(robotick_framework PRIVATE -fno-exceptions)
 
 if(ROBOTICK_PLATFORM_UBUNTU)
     add_compile_definitions(ROBOTICK_PLATFORM_UBUNTU)

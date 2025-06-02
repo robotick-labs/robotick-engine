@@ -1,5 +1,7 @@
 #pragma once
 
+#include "robotick/framework/common/FixedString.h"
+
 #include <functional>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,23 +37,23 @@ namespace robotick
 	class TestError : public std::exception
 	{
 	  public:
-		explicit TestError(std::string message) : msg(std::move(message)) {}
+		explicit TestError(const char* message) : msg(message) {}
 		const char* what() const noexcept override { return msg.c_str(); }
 
 	  private:
-		std::string msg;
+		FixedString256 msg;
 	};
 
-	inline void report_error(const std::string& message)
+	inline void report_error(const char* message)
 	{
-		fprintf(stderr, "\033[1;31m[ERROR] %s\033[0m\n", message.c_str());
+		fprintf(stderr, "\033[1;31m[ERROR] %s\033[0m\n", message);
 		throw TestError(message);
 	}
 #else
-	inline void report_error(const std::string& message)
+	inline void report_error(const char* message)
 	{
 		ROBOTICK_BREAKPOINT();
-		fprintf(stderr, "\033[1;31m[ERROR] %s\033[0m\n", message.c_str());
+		fprintf(stderr, "\033[1;31m[ERROR] %s\033[0m\n", message);
 		exit(1);
 	}
 #endif
@@ -132,7 +134,16 @@ namespace robotick
 // ✅ TEST MACROS
 // =====================================================================
 
-#if defined(ROBOTICK_TEST_MODE)
-#include <catch2/catch_all.hpp>
-#define ROBOTICK_REQUIRE_ERROR(expr, matcher) REQUIRE_THROWS_AS(expr, robotick::TestError)
-#endif
+#define ROBOTICK_REQUIRE_ERROR(expr, substr_literal)                                                                                                 \
+	do                                                                                                                                               \
+	{                                                                                                                                                \
+		try                                                                                                                                          \
+		{                                                                                                                                            \
+			expr;                                                                                                                                    \
+			FAIL("Expected TestError to be thrown");                                                                                                 \
+		}                                                                                                                                            \
+		catch (const robotick::TestError& e)                                                                                                         \
+		{                                                                                                                                            \
+			REQUIRE_THAT(std::string(e.what()), Catch::Matchers::ContainsSubstring(substr_literal));                                                 \
+		}                                                                                                                                            \
+	} while (0)
