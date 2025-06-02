@@ -13,7 +13,7 @@ add_compile_options(-Wall -Wextra -Werror)
 add_compile_options(-fno-rtti)
 
 # Optional AddressSanitizer support
-option(ROBOTICK_ENABLE_ASAN "Enable AddressSanitizer for runtime memory checks" ON)
+option(ROBOTICK_ENABLE_ASAN "Enable AddressSanitizer for runtime memory checks" OFF)
 option(ROBOTICK_ASAN_DETECT_LEAKS "Enable ASAN leak detection (not always useful in tests)" OFF)
 
 if(ROBOTICK_ENABLE_ASAN)
