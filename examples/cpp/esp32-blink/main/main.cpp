@@ -11,6 +11,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+// Constants for engine task configuration
+static constexpr const char* ENGINE_TASK_NAME = "robotick_main";
+static constexpr uint32_t ENGINE_STACK_SIZE = 8192; // in bytes
+static constexpr UBaseType_t ENGINE_TASK_PRIORITY = 5;
+static constexpr BaseType_t ENGINE_CORE_ID = 1;
+
 namespace robotick
 {
 	void ensure_workloads()
@@ -19,11 +25,12 @@ namespace robotick
 		ROBOTICK_KEEP_WORKLOAD(TimingDiagnosticsWorkload)
 		ROBOTICK_KEEP_WORKLOAD(SyncedGroupWorkload)
 	}
+
 } // namespace robotick
 
 void create_threaded_model(robotick::Model& model)
 {
-	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0); // lower rate to reduce UART spam
+	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0);
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "timing_diag");
 
 	std::vector<robotick::WorkloadHandle> children = {console, test_state_1};
@@ -34,7 +41,7 @@ void create_threaded_model(robotick::Model& model)
 
 void create_non_threaded_model(robotick::Model& model)
 {
-	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0); // lower rate to reduce UART spam
+	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0);
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "timing_diag");
 
 	std::vector<robotick::WorkloadHandle> children = {console, test_state_1};
@@ -45,28 +52,45 @@ void create_non_threaded_model(robotick::Model& model)
 
 void create_simple_model(robotick::Model& model)
 {
-	auto root = model.add("TimingDiagnosticsWorkload", "timing_diag", 100.0);
+	auto root = model.add("TimingDiagnosticsWorkload", "timing_diag", 100000.0);
 	model.set_root(root);
 }
 
-extern "C" void app_main(void)
+void run_engine_on_core1(void* param)
 {
-	robotick::ensure_workloads();
+	ESP_LOGI(ENGINE_TASK_NAME, "Running on CPU%d", xPortGetCoreID());
 
-	ESP_LOGI("Robotick", "Starting Robotick engine on ESP32...");
+	esp_task_wdt_add(nullptr); // register current task with watchdog
+
+	auto* engine = static_cast<robotick::Engine*>(param);
 
 	robotick::Model model;
 	// create_threaded_model(model);
 	create_simple_model(model);
 
 	ESP_LOGI("Robotick", "Loading Robotick model...");
+	engine->load(model); // Ensures memory locality on Core 1
 
-	robotick::Engine engine;
-	engine.load(model);
+	ESP_LOGI("Robotick", "Starting tick loop...");
+	robotick::AtomicFlag dummy_flag{false};
+	engine->run(dummy_flag);
 
-	ESP_LOGI("Robotick", "Running Robotick engine...");
+	vTaskDelete(nullptr);
+}
 
-	robotick::AtomicFlag stop_after_next_tick_flag{false};
-	engine.run(stop_after_next_tick_flag);
-	// ^- on MCU g_stop_flag is deliberately never cleared — engine runs forever unless rebooted or halted
+// Optional: could make this static if needed externally
+TaskHandle_t engine_task_handle = nullptr;
+
+extern "C" void app_main(void)
+{
+	ESP_LOGI("main_task", "Started on CPU%d", xPortGetCoreID());
+
+	robotick::ensure_workloads();
+
+	static robotick::Engine engine;
+
+	ESP_LOGI("Robotick", "Launching Robotick engine task on core 1...");
+
+	xTaskCreatePinnedToCore(
+		run_engine_on_core1, ENGINE_TASK_NAME, ENGINE_STACK_SIZE, &engine, ENGINE_TASK_PRIORITY, &engine_task_handle, ENGINE_CORE_ID);
 }

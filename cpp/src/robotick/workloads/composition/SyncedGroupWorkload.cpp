@@ -6,7 +6,6 @@
 #include "robotick/framework/Model.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
-#include "robotick/platform/ThreadSyncGroup.h"
 #include "robotick/platform/Threading.h"
 
 #include <atomic>

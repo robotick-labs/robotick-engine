@@ -24,8 +24,11 @@ namespace robotick
 		void join(); // Desktop only (no-op on ESP32)
 		bool is_joinable() const;
 
+		static void yield();
+
 		static void sleep_ms(uint32_t ms);
 		static void hybrid_sleep_until(std::chrono::steady_clock::time_point target_time);
+
 		static void set_name(const std::string& name);
 		static void set_priority_high();
 		static void set_affinity(int core);

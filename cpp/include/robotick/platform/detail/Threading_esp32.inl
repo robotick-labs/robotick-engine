@@ -2,8 +2,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include "esp_task_wdt.h"
+#include "esp_timer.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
 #include <cstring>
 
 namespace robotick
@@ -78,25 +82,46 @@ namespace robotick
 	{
 	}
 
+	inline void Thread::yield()
+	{
+		vTaskDelay(0);
+	}
+
 	inline void Thread::hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
 	{
-		using namespace std::chrono_literals;
-		constexpr auto safety_margin = 500us;
+		using namespace std::chrono;
+
+		constexpr auto coarse_threshold_us = 2000; // 2 ms
+		constexpr int watchdog_yield_interval = 2000;
+		int spin_counter = 0;
+
+		// Convert target_time to absolute time in microseconds
+		int64_t target_us = duration_cast<microseconds>(target_time.time_since_epoch()).count();
+
+		esp_task_wdt_reset();
 
 		while (true)
 		{
-			auto now = std::chrono::steady_clock::now();
-			if (now >= target_time)
+			int64_t now_us = esp_timer_get_time();
+			int64_t remaining_us = target_us - now_us;
+
+			if (remaining_us <= 0)
 				break;
 
-			auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(target_time - now);
-			if (remaining > safety_margin)
-				vTaskDelay(pdMS_TO_TICKS(remaining.count()));
+			if (remaining_us > coarse_threshold_us)
+			{
+				// Sleep in ~50us chunks to avoid CPU hogging
+				esp_rom_delay_us(50);
+			}
 			else
-				for (volatile int i = 0; i < 100;)
+			{
+				// Tight spin, yield periodically to prevent WDT issues
+				if (++spin_counter % watchdog_yield_interval == 0)
 				{
-					i += 1;
+					taskYIELD();		  // Allow IDLE tasks to run
+					esp_task_wdt_reset(); // Pet the watchdog manually
 				}
+			}
 		}
 	}
 

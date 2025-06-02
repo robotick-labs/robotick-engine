@@ -77,6 +77,11 @@ namespace robotick
 #endif
 	}
 
+	inline void Thread::yield()
+	{
+		std::this_thread::yield();
+	}
+
 	inline void Thread::hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
 	{
 		using namespace std::chrono_literals;

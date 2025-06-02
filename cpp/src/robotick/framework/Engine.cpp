@@ -13,7 +13,6 @@
 #include "robotick/framework/registry/FieldUtils.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
-#include "robotick/platform/ThreadSyncGroup.h"
 #include "robotick/platform/Threading.h"
 
 #include <algorithm>
@@ -295,17 +294,19 @@ namespace robotick
 		return state && state->is_running;
 	}
 
-	void Engine::run(const AtomicFlag& stop_flag)
+	void Engine::run(const AtomicFlag& stop_after_next_tick_flag)
 	{
 		const WorkloadHandle root_handle = state->m_loaded_model.get_root();
 		if (root_handle.index >= state->instances.size())
 			ROBOTICK_ERROR("Invalid root workload handle");
 
-		const auto& root = state->instances[root_handle.index];
-		void* root_ptr = root.get_ptr(*this);
-		if (root.tick_rate_hz <= 0 || !root.type->tick_fn || !root_ptr)
+		const auto& root_info = state->instances[root_handle.index];
+		void* root_ptr = root_info.get_ptr(*this);
+
+		if (root_info.tick_rate_hz <= 0 || !root_info.type->tick_fn || !root_ptr)
 			ROBOTICK_ERROR("Root workload must have valid tick_rate_hz and tick_fn");
 
+		// Start all workloads
 		for (auto& inst : state->instances)
 		{
 			if (inst.type->start_fn)
@@ -314,27 +315,33 @@ namespace robotick
 
 		state->is_running = true;
 
-		ThreadSyncGroup sync;
-		sync.run_loop(
-			[&]()
-			{
-				for (size_t index : state->data_connections_acquired_indices)
-					state->data_connections_all[index].do_data_copy();
+		const std::chrono::duration<double> tick_interval_sec(1.0 / root_info.tick_rate_hz);
+		const std::chrono::steady_clock::duration tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(tick_interval_sec);
 
-				std::atomic_thread_fence(std::memory_order_release);
-				const auto now = std::chrono::steady_clock::now();
+		std::chrono::steady_clock::time_point next_tick_time = std::chrono::steady_clock::now();
+		std::chrono::steady_clock::time_point last_tick_time = next_tick_time;
 
-				static thread_local auto last_tick = now;
-				double delta = std::chrono::duration<double>(now - last_tick).count();
-				last_tick = now;
+		do
+		{
+			const std::chrono::steady_clock::time_point now_pre_tick = std::chrono::steady_clock::now();
+			const double time_delta = std::chrono::duration<double>(now_pre_tick - last_tick_time).count();
+			last_tick_time = now_pre_tick;
 
-				root.type->tick_fn(root_ptr, delta);
+			for (size_t index : state->data_connections_acquired_indices)
+				state->data_connections_all[index].do_data_copy();
 
-				auto end = std::chrono::steady_clock::now();
-				root.mutable_stats.last_tick_duration = std::chrono::duration<double>(end - now).count();
-				root.mutable_stats.last_time_delta = delta;
-			},
-			stop_flag);
+			std::atomic_thread_fence(std::memory_order_release);
+
+			root_info.type->tick_fn(root_ptr, time_delta);
+
+			const std::chrono::steady_clock::time_point now_post_tick = std::chrono::steady_clock::now();
+			root_info.mutable_stats.last_tick_duration = std::chrono::duration<double>(now_post_tick - now_pre_tick).count();
+			root_info.mutable_stats.last_time_delta = time_delta;
+
+			next_tick_time += tick_interval;
+			Thread::hybrid_sleep_until(std::chrono::time_point_cast<std::chrono::steady_clock::duration>(next_tick_time));
+
+		} while (!stop_after_next_tick_flag.is_set());
 
 		state->is_running = false;
 

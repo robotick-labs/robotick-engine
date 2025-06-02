@@ -18,6 +18,8 @@ idf_component_register(
         # Add other minimal ESP32-safe files only
 
     INCLUDE_DIRS include
+    
+    REQUIRES esp_timer
 )
 
 
