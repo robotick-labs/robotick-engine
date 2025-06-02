@@ -8,16 +8,14 @@
 #include "robotick/platform/Signals.h"
 #include "robotick/platform/Threading.h"
 
-using namespace robotick;
-
-AtomicFlag g_stop_flag;
+robotick::AtomicFlag g_stop_flag;
 
 void signal_handler()
 {
 	g_stop_flag.set();
 }
 
-void populate_model(Model& model)
+void populate_model(robotick::Model& model)
 {
 	auto console = model.add("ConsoleTelemetryWorkload", "console", 10.0);
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
@@ -31,12 +29,12 @@ void populate_model(Model& model)
 
 ROBOTICK_ENTRYPOINT
 {
-	setup_exit_handler(signal_handler);
+	robotick::setup_exit_handler(signal_handler);
 
-	Model model;
+	robotick::Model model;
 	populate_model(model);
 
-	Engine engine;
+	robotick::Engine engine;
 	engine.load(model);
 	engine.run(g_stop_flag);
 

@@ -316,6 +316,6 @@ namespace robotick
 
 #define ROBOTICK_KEEP_WORKLOAD(Type)                                                                                                                 \
 	extern volatile bool g_##Type##_NoDeadStrip;                                                                                                     \
-	static auto force_##Type##_retainer = (g_##Type##_NoDeadStrip = true);
+	g_##Type##_NoDeadStrip = true;
 
 } // namespace robotick
