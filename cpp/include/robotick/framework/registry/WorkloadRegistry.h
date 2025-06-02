@@ -297,9 +297,16 @@ namespace robotick
 
 #define ROBOTICK_DEFINE_WORKLOAD_3(Type, Config, Inputs) ROBOTICK_DEFINE_WORKLOAD_4(Type, Config, Inputs, void)
 
+#define ROBOTICK_SUPPRESS_UNUSED_WARNING_START                                                                                                       \
+	_Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wunused-variable\"") _Pragma("GCC diagnostic ignored \"-Wattributes\"")
+
+#define ROBOTICK_SUPPRESS_UNUSED_WARNING_END _Pragma("GCC diagnostic pop")
+
 #define ROBOTICK_DEFINE_WORKLOAD_4(Type, Config, Inputs, Outputs)                                                                                    \
-	__attribute__((used)) robotick::WorkloadAutoRegister<Type, Config, Inputs, Outputs> s_auto_register_##Type{#Type, #Config, #Inputs, #Outputs};   \
-	__attribute__((used)) bool g_##Type##_NoDeadStrip = false;
+	ROBOTICK_SUPPRESS_UNUSED_WARNING_START                                                                                                           \
+	robotick::WorkloadAutoRegister<Type, Config, Inputs, Outputs> s_auto_register_##Type{#Type, #Config, #Inputs, #Outputs};                         \
+	volatile bool g_##Type##_NoDeadStrip = false;                                                                                                    \
+	ROBOTICK_SUPPRESS_UNUSED_WARNING_END
 
 #define GET_WORKLOAD_DEFINE_MACRO(_1, _2, _3, _4, NAME, ...) NAME
 
@@ -308,7 +315,7 @@ namespace robotick
 		__VA_ARGS__, ROBOTICK_DEFINE_WORKLOAD_4, ROBOTICK_DEFINE_WORKLOAD_3, ROBOTICK_DEFINE_WORKLOAD_2, ROBOTICK_DEFINE_WORKLOAD_1)(__VA_ARGS__)
 
 #define ROBOTICK_KEEP_WORKLOAD(Type)                                                                                                                 \
-	extern bool g_##Type##_NoDeadStrip;                                                                                                              \
-	g_##Type##_NoDeadStrip = true;
+	extern volatile bool g_##Type##_NoDeadStrip;                                                                                                     \
+	static auto force_##Type##_retainer = (g_##Type##_NoDeadStrip = true);
 
 } // namespace robotick

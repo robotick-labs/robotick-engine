@@ -14,6 +14,7 @@
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/Thread.h"
 #include "robotick/framework/utils/TypeId.h"
+#include "robotick/platform/Threading.h"
 
 #include <algorithm>
 #include <atomic>
@@ -391,7 +392,7 @@ namespace robotick
 		return state != nullptr && state->is_running;
 	}
 
-	void Engine::run(const std::atomic<bool>& stop_after_next_tick_flag)
+	void Engine::run(const AtomicFlag& stop_after_next_tick_flag)
 	{
 		using namespace std::chrono;
 
@@ -448,7 +449,7 @@ namespace robotick
 
 			hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
 
-		} while (!stop_after_next_tick_flag);
+		} while (!stop_after_next_tick_flag.is_set());
 
 		state->is_running = false; // flag that we're no longer running - e.g. allows this to be seen in telemetry / asserts
 

@@ -13,7 +13,7 @@ add_compile_options(-Wall -Wextra -Werror)
 add_compile_options(-fno-exceptions)
 
 # Disable rtti globally (too expensive for our purposes - we've rolled our own simplified equivalent)
-# add_compile_options(-fno-rtti)
+add_compile_options(-fno-rtti)
 
 # =========================
 # ✅ Public Include Path
@@ -78,7 +78,7 @@ if(ROBOTICK_ENABLE_PYTHON)
 
     # 👇 Enable exceptions only on Python-related sources
     foreach(source_file IN LISTS PYTHON_SOURCES)
-        set_source_files_properties(${source_file} PROPERTIES COMPILE_FLAGS "-fexceptions")
+        set_source_files_properties(${source_file} PROPERTIES COMPILE_FLAGS "-fexceptions -frtti")
     endforeach()
 
 else()
@@ -89,7 +89,7 @@ endif()
 # ✅ Optional Executable
 # =========================
 
-add_executable(robotick_main ${CMAKE_SOURCE_DIR}/examples/cpp/robotick_main.cpp)
+add_executable(robotick_main ${CMAKE_SOURCE_DIR}/examples/cpp/desktop-testbed/robotick_main.cpp)
 target_link_libraries(robotick_main PRIVATE robotick_framework)
 
 # =========================

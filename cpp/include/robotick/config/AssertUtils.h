@@ -122,6 +122,12 @@ namespace robotick
 		ROBOTICK_INTERNAL_LOG("WARN", __VA_ARGS__);                                                                                                  \
 	} while (0)
 
+#define ROBOTICK_INFO(...)                                                                                                                           \
+	do                                                                                                                                               \
+	{                                                                                                                                                \
+		ROBOTICK_BREAKPOINT();                                                                                                                       \
+	} while (0)
+
 // =====================================================================
 // ✅ TEST MACROS
 // =====================================================================

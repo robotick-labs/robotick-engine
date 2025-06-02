@@ -18,11 +18,11 @@ namespace robotick
 	{
 		std::scoped_lock lock(mutex);
 
-		ROBOTICK_WARNING("WorkloadRegistry: entry with name '%s' being registered. :-)", entry.name.c_str());
+		ROBOTICK_INFO("WorkloadRegistry: registering workload '%s'...", entry.name.c_str());
 
 		if (entries.find(entry.name) != entries.end())
 		{
-			ROBOTICK_WARNING("WorkloadRegistry: entry with name '%s' already exists.", entry.name.c_str());
+			ROBOTICK_ERROR("WorkloadRegistry: entry with name '%s' already exists.", entry.name.c_str());
 		}
 
 		entries[entry.name] = std::make_unique<WorkloadRegistryEntry>(entry);

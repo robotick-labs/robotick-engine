@@ -1,0 +1,2 @@
+docker build -f .devcontainer/Docker.ubuntu-x64.dev -t robotick-ubuntu .;
+docker run -it -v "$(pwd)":/workspace -v "$HOME/.robotick-vscode-server":/root/.vscode-server --name robotick-dev robotick-ubuntu;

@@ -41,7 +41,7 @@ extern "C" void app_main(void)
 	robotick::Engine engine;
 	engine.load(model);
 
-	static std::atomic<bool> g_stop_flag{false};
-	engine.run(g_stop_flag);
+	AtomicFlag stop_after_next_tick_flag{false};
+	engine.run(stop_after_next_tick_flag);
 	// ^- on MCU g_stop_flag is deliberately never cleared — engine runs forever unless rebooted or halted
 }

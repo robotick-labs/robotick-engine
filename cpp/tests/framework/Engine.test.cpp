@@ -5,6 +5,7 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/platform/Threading.h"
 
 #include "utils/EngineInspector.h"
 #include "utils/ModelHelper.h"
@@ -113,7 +114,7 @@ namespace robotick::test
 		Engine engine;
 		engine.load(model);
 
-		std::atomic<bool> stop_after_next_tick_flag = true;
+		AtomicFlag stop_after_next_tick_flag{true};
 		engine.run(stop_after_next_tick_flag); // will tick at least once even if stop_after_next_tick_flag is true
 
 		const TickCounterWorkload* ptr = EngineInspector::get_instance<TickCounterWorkload>(engine, 0);
