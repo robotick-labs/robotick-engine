@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "robotick/api.h"
 #include "robotick/framework/data/DataConnection.h"
 
 #include <algorithm>
@@ -34,14 +35,14 @@ namespace robotick
 			std::string name;
 			double tick_rate_hz;
 			std::vector<WorkloadHandle> children;
-			std::map<std::string, std::any> config;
+			std::map<std::string, std::string> config;
 		};
 
 		WorkloadHandle add(const std::string& type, const std::string& name, double tick_rate_hz = TICK_RATE_FROM_PARENT,
-			const std::map<std::string, std::any>& config = {})
+			const std::map<std::string, std::string>& config = {})
 		{
 			if (root_workload.is_valid())
-				throw std::logic_error("Cannot add workloads after root has been set. Model root must be set last.");
+				ROBOTICK_FATAL_EXIT("Cannot add workloads after root has been set. Model root must be set last.");
 
 			const std::vector<WorkloadHandle> children = {};
 			workload_seeds.push_back({type, name, tick_rate_hz, children, config});
@@ -49,15 +50,15 @@ namespace robotick
 		}
 
 		WorkloadHandle add(const std::string& type, const std::string& name, const std::vector<WorkloadHandle>& children,
-			double tick_rate_hz = TICK_RATE_FROM_PARENT, const std::map<std::string, std::any>& config = {})
+			double tick_rate_hz = TICK_RATE_FROM_PARENT, const std::map<std::string, std::string>& config = {})
 		{
 			if (root_workload.is_valid())
-				throw std::logic_error("Cannot add workloads after root has been set. Model root must be set last.");
+				ROBOTICK_FATAL_EXIT("Cannot add workloads after root has been set. Model root must be set last.");
 
 			for (auto child : children)
 			{
 				if (!child.is_valid() || child.index >= workload_seeds.size())
-					throw std::out_of_range("Child handle out of range when adding workload '" + name + "'");
+					ROBOTICK_FATAL_EXIT("Child handle out of range when adding workload '%s'", name.c_str());
 			}
 
 			workload_seeds.push_back({type, name, tick_rate_hz, children, config});

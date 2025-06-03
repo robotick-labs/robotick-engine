@@ -25,9 +25,9 @@ namespace robotick
 	};
 
 	ROBOTICK_BEGIN_FIELDS(ConsoleTelemetryConfig)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, enable_pretty_print)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, enable_unicode)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, enable_demo)
+	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_pretty_print)
+	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_unicode)
+	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_demo)
 	ROBOTICK_END_FIELDS()
 
 	class ConsoleTelemetryCollector
@@ -52,8 +52,8 @@ namespace robotick
 				return rows;
 			}
 
-			assert(rows.capacity() == engine->get_all_instance_info().size() &&
-				   "Correct storage for rows should have been reserved when engine was set. Workload-count is fixed after startup.");
+			ROBOTICK_ASSERT(rows.capacity() == engine->get_all_instance_info().size() &&
+							"Correct storage for rows should have been reserved when engine was set. Workload-count is fixed after startup.");
 
 			const WorkloadInstanceInfo* root = engine->get_root_instance_info();
 			if (!root)
@@ -97,13 +97,13 @@ namespace robotick
 
 		void populate_row(ConsoleTelemetryRow& row, size_t depth, const WorkloadInstanceInfo& info)
 		{
-			row.type = depth_prefix(depth, info.type->name);
+			row.type = depth_prefix(depth, info.type->name.c_str());
 			row.name = info.unique_name;
 
 			std::vector<std::string> input_entries;
 			std::vector<std::string> output_entries;
 
-			assert(engine != nullptr && "Engine should have been set and checked by now");
+			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set and checked by now");
 
 			WorkloadFieldsIterator::for_each_field_in_workload(*engine, info, &mirror_buffer,
 				[&](const WorkloadFieldView& view)
@@ -121,33 +121,33 @@ namespace robotick
 
 					if (view.subfield)
 					{
-						assert(mirror_buffer.contains_object(view.field_ptr, view.subfield->size));
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.subfield->size));
 
-						const std::type_index& type = view.subfield->type;
-						if (type == typeid(int))
+						const TypeId& type = view.subfield->type;
+						if (type == GET_TYPE_ID(int))
 							entry << *static_cast<const int*>(view.field_ptr);
-						else if (type == typeid(double))
+						else if (type == GET_TYPE_ID(double))
 							entry << *static_cast<const double*>(view.field_ptr);
-						else if (type == typeid(FixedString64))
+						else if (type == GET_TYPE_ID(FixedString64))
 							entry << "\"" << static_cast<const FixedString64*>(view.field_ptr)->c_str() << "\"";
-						else if (type == typeid(FixedString128))
+						else if (type == GET_TYPE_ID(FixedString128))
 							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
 						else
 							entry << "<unsupported>";
 					}
 					else
 					{
-						assert(mirror_buffer.contains_object(view.field_ptr, view.field->size));
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.field->size));
 
 						// fallback for top-level (non-blackboard) fields
-						const std::type_index& type = view.field->type;
-						if (type == typeid(int))
+						const TypeId& type = view.field->type;
+						if (type == GET_TYPE_ID(int))
 							entry << *static_cast<const int*>(view.field_ptr);
-						else if (type == typeid(double))
+						else if (type == GET_TYPE_ID(double))
 							entry << *static_cast<const double*>(view.field_ptr);
-						else if (type == typeid(FixedString64))
+						else if (type == GET_TYPE_ID(FixedString64))
 							entry << "\"" << static_cast<const FixedString64*>(view.field_ptr)->c_str() << "\"";
-						else if (type == typeid(FixedString128))
+						else if (type == GET_TYPE_ID(FixedString128))
 							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
 						else
 							entry << "<unsupported>";
@@ -192,7 +192,10 @@ namespace robotick
 	struct ConsoleTelemetryWorkload
 	{
 		ConsoleTelemetryConfig config;
-		ConsoleTelemetryCollector collector;
+		std::unique_ptr<ConsoleTelemetryCollector> collector;
+
+		ConsoleTelemetryWorkload() {};
+		~ConsoleTelemetryWorkload() {};
 
 		static std::vector<ConsoleTelemetryRow> collect_console_telemetry_rows_demo(const Engine&)
 		{
@@ -224,7 +227,13 @@ namespace robotick
 			return rows;
 		}
 
-		void set_engine(const Engine& engine) { collector.set_engine(engine); }
+		void set_engine(const Engine& engine)
+		{
+			if (!collector)
+				collector = std::make_unique<ConsoleTelemetryCollector>();
+
+			collector->set_engine(engine);
+		}
 
 		void tick(double)
 		{
@@ -232,18 +241,18 @@ namespace robotick
 			// This avoids overwhelming stdout and dominating frame time, even without pretty printing.
 			// To help mitigate this, printing is built as a single string and flushed once per tick.
 
-			assert(collector.get_engine() != nullptr && "ConsoleTelemetryWorkload - engine should never be null during tick");
+			ROBOTICK_ASSERT(collector && collector->get_engine() != nullptr && "ConsoleTelemetryWorkload - engine should never be null during tick");
 			// ^- we should never reach the point of ticking without set_engine having been called.
 			//  - we also assume that any given workload-instance can only ever be part of a single
 			//    engine, and that the lifespan of the engine is longer than the workloads that are
 			//    owned and created/destroyed by the engine.
 
-			auto rows = config.enable_demo ? collect_console_telemetry_rows_demo(*collector.get_engine()) : collector.collect_rows();
+			auto rows = config.enable_demo ? collect_console_telemetry_rows_demo(*collector->get_engine()) : collector->collect_rows();
 
 			print_console_telemetry_table(rows, config.enable_pretty_print, config.enable_unicode);
 		}
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(ConsoleTelemetryWorkload);
+	ROBOTICK_DEFINE_WORKLOAD(ConsoleTelemetryWorkload, ConsoleTelemetryConfig);
 
 } // namespace robotick

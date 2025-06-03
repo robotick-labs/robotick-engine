@@ -20,7 +20,7 @@ namespace robotick
 		double multiplier = 1.0;
 	};
 	ROBOTICK_BEGIN_FIELDS(HelloConfig)
-	ROBOTICK_FIELD(HelloConfig, multiplier)
+	ROBOTICK_FIELD(HelloConfig, double, multiplier)
 	ROBOTICK_END_FIELDS()
 
 	struct HelloInputs
@@ -29,8 +29,8 @@ namespace robotick
 		double b = 0.0;
 	};
 	ROBOTICK_BEGIN_FIELDS(HelloInputs)
-	ROBOTICK_FIELD(HelloInputs, a)
-	ROBOTICK_FIELD(HelloInputs, b)
+	ROBOTICK_FIELD(HelloInputs, double, a)
+	ROBOTICK_FIELD(HelloInputs, double, b)
 	ROBOTICK_END_FIELDS()
 
 	enum class HelloStatus
@@ -47,9 +47,9 @@ namespace robotick
 	};
 
 	ROBOTICK_BEGIN_FIELDS(HelloOutputs)
-	ROBOTICK_FIELD(HelloOutputs, sum)
-	ROBOTICK_FIELD(HelloOutputs, message)
-	ROBOTICK_FIELD(HelloOutputs, status)
+	ROBOTICK_FIELD(HelloOutputs, double, sum)
+	ROBOTICK_FIELD(HelloOutputs, FixedString32, message)
+	ROBOTICK_FIELD(HelloOutputs, int, status)
 	ROBOTICK_END_FIELDS()
 
 	// === Workload ===
@@ -81,6 +81,6 @@ namespace robotick
 
 	// === Auto-registration ===
 
-	ROBOTICK_DEFINE_WORKLOAD(HelloWorkload)
+	ROBOTICK_DEFINE_WORKLOAD(HelloWorkload, HelloConfig, HelloInputs, HelloOutputs)
 
 } // namespace robotick

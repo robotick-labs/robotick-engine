@@ -9,6 +9,7 @@
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/framework/utils/TypeId.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 #include "utils/EngineInspector.h"
 
@@ -24,7 +25,7 @@ namespace robotick::test
 		};
 
 		ROBOTICK_BEGIN_FIELDS(SimpleInputs)
-		ROBOTICK_FIELD(SimpleInputs, input_value)
+		ROBOTICK_FIELD(SimpleInputs, int, input_value)
 		ROBOTICK_END_FIELDS()
 
 		struct SimpleOutputs
@@ -33,7 +34,7 @@ namespace robotick::test
 		};
 
 		ROBOTICK_BEGIN_FIELDS(SimpleOutputs)
-		ROBOTICK_FIELD(SimpleOutputs, output_value)
+		ROBOTICK_FIELD(SimpleOutputs, int, output_value)
 		ROBOTICK_END_FIELDS()
 
 		struct SimpleWorkload
@@ -44,7 +45,7 @@ namespace robotick::test
 			void tick(double) { outputs.output_value = inputs.input_value + 1; }
 		};
 
-		ROBOTICK_DEFINE_WORKLOAD(SimpleWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(SimpleWorkload, void, SimpleInputs, SimpleOutputs)
 	} // namespace
 
 	TEST_CASE("Unit|Framework|FieldWalker|Field pointers match expected values and buffers")
@@ -190,13 +191,10 @@ namespace robotick::test
 		{
 			Blackboard blackboard;
 
-			BBInputs()
-				: blackboard({BlackboardFieldInfo("x", std::type_index(typeid(int))), BlackboardFieldInfo("y", std::type_index(typeid(double)))})
-			{
-			}
+			BBInputs() : blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))}) {}
 		};
 		ROBOTICK_BEGIN_FIELDS(BBInputs)
-		ROBOTICK_FIELD(BBInputs, blackboard)
+		ROBOTICK_FIELD(BBInputs, Blackboard, blackboard)
 		ROBOTICK_END_FIELDS()
 
 		struct BBWorkload
@@ -204,7 +202,7 @@ namespace robotick::test
 			BBInputs inputs;
 			void tick(double) {}
 		};
-		ROBOTICK_DEFINE_WORKLOAD(BBWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(BBWorkload, void, BBInputs, void)
 
 		Model model;
 		auto handle = model.add("BBWorkload", "BB", 10.0);

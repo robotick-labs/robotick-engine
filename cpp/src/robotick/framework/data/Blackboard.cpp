@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/Blackboard.h"
+
+#include "robotick/api.h"
 #include "robotick/framework/utils/Constants.h"
+#include "robotick/framework/utils/TypeId.h"
 #include <cstring>
 #include <stdexcept>
 
@@ -34,22 +37,24 @@ namespace robotick
 		return &schema[it->second];
 	}
 
-	void BlackboardInfo::verify_type(const std::string& key, std::type_index expected) const
+	void BlackboardInfo::verify_type_by_size(const std::string& key, size_t expected_size) const
 	{
 		const auto* field = find_field(key);
+
 		if (!field)
-			throw std::runtime_error("Blackboard::verify_type failed, missing key: " + key);
-		if (field->type != expected)
-			throw std::runtime_error("Blackboard::verify_type failed, type mismatch for key: " + key);
+			ROBOTICK_FATAL_EXIT("Blackboard::verify_type_by_size failed, missing key: %s", key.c_str());
+
+		if (field->size != expected_size)
+			ROBOTICK_FATAL_EXIT("Blackboard::verify_type_by_size failed, type mismatch for key: %s", key.c_str());
 	}
 
 	void* BlackboardInfo::get_field_ptr(Blackboard* bb, const std::string& key) const
 	{
 		auto it = schema_index_by_name.find(key);
 		if (it == schema_index_by_name.end())
-			throw std::runtime_error("BlackboardInfo::get_field_ptr failed for key: " + key);
+			ROBOTICK_FATAL_EXIT("BlackboardInfo::get_field_ptr failed for key: %s", key.c_str());
 		if (datablock_offset_from_blackboard == OFFSET_UNBOUND)
-			throw std::runtime_error("Blackboard is not bound");
+			ROBOTICK_FATAL_EXIT("Blackboard is not bound");
 
 		const auto& field = schema[it->second];
 		uint8_t* base = static_cast<uint8_t*>((void*)bb);
@@ -61,18 +66,19 @@ namespace robotick
 		return const_cast<BlackboardInfo*>(this)->get_field_ptr(const_cast<Blackboard*>(bb), key);
 	}
 
-	std::pair<size_t, size_t> BlackboardInfo::type_size_and_align(std::type_index type)
+	std::pair<size_t, size_t> BlackboardInfo::type_size_and_align(TypeId type)
 	{
-		if (type == typeid(int))
+		if (type == GET_TYPE_ID(int))
 			return {sizeof(int), alignof(int)};
-		if (type == typeid(double))
+		if (type == GET_TYPE_ID(double))
 			return {sizeof(double), alignof(double)};
-		if (type == typeid(FixedString64))
+		if (type == GET_TYPE_ID(FixedString64))
 			return {sizeof(FixedString64), alignof(FixedString64)};
-		if (type == typeid(FixedString128))
+		if (type == GET_TYPE_ID(FixedString128))
 			return {sizeof(FixedString128), alignof(FixedString128)};
 
-		throw std::runtime_error("Unsupported type in BlackboardInfo::type_size_and_align");
+		ROBOTICK_FATAL_EXIT("Unsupported type in BlackboardInfo::type_size_and_align");
+		return {0, 1};
 	}
 
 	Blackboard::Blackboard(const std::vector<BlackboardFieldInfo>& source_schema)
@@ -84,7 +90,13 @@ namespace robotick
 		for (size_t i = 0; i < source_schema.size(); ++i)
 		{
 			BlackboardFieldInfo field = source_schema[i];
+
 			auto [size, align] = BlackboardInfo::type_size_and_align(field.type);
+			if (align == 0)
+			{
+				ROBOTICK_FATAL_EXIT("Invalid align (0) while building blackboard schema");
+			}
+
 			offset = (offset + align - 1) & ~(align - 1);
 			field.offset_from_datablock = offset;
 			field.size = size;
@@ -101,16 +113,16 @@ namespace robotick
 		if (info)
 			info->datablock_offset_from_blackboard = datablock_offset;
 		else
-			throw std::runtime_error("Blackboard::bind called on uninitialized Blackboard");
+			ROBOTICK_FATAL_EXIT("Blackboard::bind called on uninitialized Blackboard");
 	}
 
 	size_t Blackboard::get_datablock_offset() const
 	{
 		if (!info)
-			throw std::runtime_error("Blackboard::get_datablock_offset called on uninitialized Blackboard");
+			ROBOTICK_FATAL_EXIT("Blackboard::get_datablock_offset called on uninitialized Blackboard");
 
 		if (info->datablock_offset_from_blackboard == OFFSET_UNBOUND)
-			throw std::runtime_error("Blackboard::get_datablock_offset called on Blackboard before datablock_offset has been set");
+			ROBOTICK_FATAL_EXIT("Blackboard::get_datablock_offset called on Blackboard before datablock_offset has been set");
 
 		return info->datablock_offset_from_blackboard;
 	}
@@ -118,7 +130,7 @@ namespace robotick
 	const std::vector<BlackboardFieldInfo>& Blackboard::get_schema() const
 	{
 		if (!info)
-			throw std::runtime_error("Blackboard::get_schema called on uninitialized Blackboard");
+			ROBOTICK_FATAL_EXIT("Blackboard::get_schema called on uninitialized Blackboard");
 
 		return info->schema;
 	}
@@ -126,7 +138,7 @@ namespace robotick
 	const BlackboardInfo* Blackboard::get_info() const
 	{
 		if (!info)
-			throw std::runtime_error("Blackboard::get_info called on uninitialized Blackboard");
+			ROBOTICK_FATAL_EXIT("Blackboard::get_info called on uninitialized Blackboard");
 
 		return info.get();
 	}
@@ -134,7 +146,7 @@ namespace robotick
 	const BlackboardFieldInfo* Blackboard::get_field_info(const std::string& key) const
 	{
 		if (!info)
-			throw std::runtime_error("Blackboard::get_field_info called on uninitialized Blackboard");
+			ROBOTICK_FATAL_EXIT("Blackboard::get_field_info called on uninitialized Blackboard");
 
 		return info->find_field(key);
 	}
@@ -142,7 +154,7 @@ namespace robotick
 	template <typename T> void Blackboard::set(const std::string& key, const T& value)
 	{
 		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
-		info->verify_type(key, typeid(T));
+		info->verify_type_by_size(key, sizeof(T));
 		void* ptr = info->get_field_ptr(this, key);
 		std::memcpy(ptr, &value, sizeof(T));
 	}
@@ -150,7 +162,7 @@ namespace robotick
 	template <typename T> T Blackboard::get(const std::string& key) const
 	{
 		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::get only supports trivially-copyable types");
-		info->verify_type(key, typeid(T));
+		info->verify_type_by_size(key, sizeof(T));
 		const void* ptr = info->get_field_ptr(this, key);
 		T out;
 		std::memcpy(&out, ptr, sizeof(T));

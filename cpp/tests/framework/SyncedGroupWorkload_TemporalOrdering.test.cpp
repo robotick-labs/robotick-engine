@@ -4,7 +4,9 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/platform/Threading.h"
 #include "utils/EngineInspector.h"
+
 #include <catch2/catch_all.hpp>
 #include <chrono>
 #include <thread>
@@ -18,7 +20,7 @@ namespace robotick::test
 			int output = 0;
 		};
 		ROBOTICK_BEGIN_FIELDS(SenderOut)
-		ROBOTICK_FIELD(SenderOut, output)
+		ROBOTICK_FIELD(SenderOut, int, output)
 		ROBOTICK_END_FIELDS()
 
 		struct ReceiverIn
@@ -26,7 +28,7 @@ namespace robotick::test
 			int input = 0;
 		};
 		ROBOTICK_BEGIN_FIELDS(ReceiverIn)
-		ROBOTICK_FIELD(ReceiverIn, input)
+		ROBOTICK_FIELD(ReceiverIn, int, input)
 		ROBOTICK_END_FIELDS()
 
 		struct SenderWorkload
@@ -34,7 +36,7 @@ namespace robotick::test
 			SenderOut outputs;
 			void tick(double) { outputs.output++; }
 		};
-		ROBOTICK_DEFINE_WORKLOAD(SenderWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(SenderWorkload, void, void, SenderOut)
 
 		struct ReceiverWorkload
 		{
@@ -42,7 +44,7 @@ namespace robotick::test
 			std::vector<int> received;
 			void tick(double) { received.push_back(inputs.input); }
 		};
-		ROBOTICK_DEFINE_WORKLOAD(ReceiverWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(ReceiverWorkload, void, ReceiverIn)
 	} // namespace
 
 	TEST_CASE("Unit|Framework|Data|Connection|Data connections are propagated correctly")
@@ -60,16 +62,16 @@ namespace robotick::test
 		Engine engine;
 		engine.load(model);
 
-		std::atomic<bool> stop_flag{false};
+		AtomicFlag stop_after_next_tick_flag{false};
 
 		std::thread runner(
 			[&]
 			{
-				engine.run(stop_flag);
+				engine.run(stop_after_next_tick_flag);
 			});
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-		stop_flag.store(true);
+		stop_after_next_tick_flag.set(true);
 		runner.join();
 
 		const auto& receiver_info = EngineInspector::get_instance_info(engine, receiver.index);

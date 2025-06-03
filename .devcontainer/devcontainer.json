@@ -1,7 +1,7 @@
 {
-    "name": "Robotick Ubuntu x64 Dev",
+    "name": "Robotick Unified Dev Container",
     "build": {
-        "dockerfile": "Docker.ubuntu-x64.dev",
+        "dockerfile": "Docker.robotick.dev",
         "context": ".."
     },
     "workspaceFolder": "/workspaces/robotick",
@@ -14,7 +14,7 @@
         "matepek.vscode-catch2-test-adapter",
         "coderabbit.coderabbit-vscode"
     ],
-    "postCreateCommand": "pwd && ls && pip install --break-system-packages -e . && cmake --preset dev-gcc",
+    "postCreateCommand": "pwd && ls && pip install --break-system-packages -e . || true",
     "mounts": [
         "source=${env:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
     ]

@@ -4,11 +4,13 @@
 #include "robotick/framework/data/DataConnection.h"
 #include "../utils/EngineInspector.h"
 #include "../utils/ModelHelper.h"
+#include "robotick/api.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/framework/utils/TypeId.h"
 #include <catch2/catch_all.hpp>
 #include <cstring>
 
@@ -23,14 +25,14 @@ namespace robotick::test
 			Blackboard out_blackboard;
 
 			DummyAOutput()
-				: out_blackboard({BlackboardFieldInfo("x", std::type_index(typeid(int))), BlackboardFieldInfo("y", std::type_index(typeid(double)))})
+				: out_blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))})
 			{
 			}
 		};
 		ROBOTICK_BEGIN_FIELDS(DummyAOutput)
-		ROBOTICK_FIELD(DummyAOutput, out_blackboard)
-		ROBOTICK_FIELD(DummyAOutput, x)
-		ROBOTICK_FIELD(DummyAOutput, y)
+		ROBOTICK_FIELD(DummyAOutput, Blackboard, out_blackboard)
+		ROBOTICK_FIELD(DummyAOutput, int, x)
+		ROBOTICK_FIELD(DummyAOutput, double, y)
 		ROBOTICK_END_FIELDS()
 
 		struct DummyBInput
@@ -39,28 +41,27 @@ namespace robotick::test
 			double y = 0.0;
 			int x = 0;
 
-			DummyBInput()
-				: in_blackboard({BlackboardFieldInfo("x", std::type_index(typeid(int))), BlackboardFieldInfo("y", std::type_index(typeid(double)))})
+			DummyBInput() : in_blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))})
 			{
 			}
 		};
 		ROBOTICK_BEGIN_FIELDS(DummyBInput)
-		ROBOTICK_FIELD(DummyBInput, in_blackboard)
-		ROBOTICK_FIELD(DummyBInput, y)
-		ROBOTICK_FIELD(DummyBInput, x)
+		ROBOTICK_FIELD(DummyBInput, Blackboard, in_blackboard)
+		ROBOTICK_FIELD(DummyBInput, double, y)
+		ROBOTICK_FIELD(DummyBInput, int, x)
 		ROBOTICK_END_FIELDS()
 
 		struct DummyA
 		{
 			DummyAOutput outputs;
 		};
-		ROBOTICK_DEFINE_WORKLOAD(DummyA)
+		ROBOTICK_DEFINE_WORKLOAD(DummyA, void, void, DummyAOutput)
 
 		struct DummyB
 		{
 			DummyBInput inputs;
 		};
-		ROBOTICK_DEFINE_WORKLOAD(DummyB)
+		ROBOTICK_DEFINE_WORKLOAD(DummyB, void, DummyBInput)
 	} // namespace
 
 	TEST_CASE("Unit|Framework|Data|Connection|Resolves non-blackboard to non-blackboard")
@@ -222,36 +223,31 @@ namespace robotick::test
 		SECTION("Invalid workload name")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"Z.outputs.x", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(
-				DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), Catch::Matchers::ContainsSubstring("Z"));
+			ROBOTICK_REQUIRE_ERROR(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), ("Z"));
 		}
 
 		SECTION("Invalid section")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.wrong.x", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
-				Catch::Matchers::ContainsSubstring("Invalid section"));
+			ROBOTICK_REQUIRE_ERROR(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), ("Invalid section"));
 		}
 
 		SECTION("Missing field")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.outputs.missing", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
-				Catch::Matchers::ContainsSubstring("field"));
+			ROBOTICK_REQUIRE_ERROR(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), ("field"));
 		}
 
 		SECTION("Mismatched types")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.outputs.x", "B.inputs.y"}}; // int -> double
-			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
-				Catch::Matchers::ContainsSubstring("Type mismatch"));
+			ROBOTICK_REQUIRE_ERROR(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), ("Type mismatch"));
 		}
 
 		SECTION("Duplicate destination")
 		{
 			std::vector<DataConnectionSeed> seeds = {{"A.outputs.x", "B.inputs.x"}, {"A.outputs.x", "B.inputs.x"}};
-			REQUIRE_THROWS_WITH(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos),
-				Catch::Matchers::ContainsSubstring("Duplicate"));
+			ROBOTICK_REQUIRE_ERROR(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), ("Duplicate"));
 		}
 	}
 
@@ -299,9 +295,9 @@ namespace robotick::test
 
 		std::vector<DataConnectionSeed> seeds = {{"A.outputs.out_blackboard.missing", "B.inputs.in_blackboard.x"}};
 
-		REQUIRE_THROWS_WITH(
+		ROBOTICK_REQUIRE_ERROR(
 			DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine)),
-			Catch::Matchers::ContainsSubstring("subfield"));
+			("subfield"));
 	}
 
 	TEST_CASE("Unit|Framework|Data|Connection|Different subfields allowed")

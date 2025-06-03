@@ -19,6 +19,8 @@ class HelloWorkload:
         print("[Python] HelloWorkload __init__")
 
     def tick(self, time_delta, input, output):
+        print("[Python] tick inputs:", dict(input))
+
         if input.get("force_error", 0):
             raise Exception("Simulated failure")
 

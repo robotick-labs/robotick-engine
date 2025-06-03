@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Model.h"
+
+#include "robotick/api.h"
 #include "robotick/framework/data/DataConnection.h"
 
 #include <cassert>
@@ -16,10 +18,10 @@ namespace robotick
 	void Model::connect(const std::string& source_field_path, const std::string& dest_field_path)
 	{
 		if (source_field_path.empty() || dest_field_path.empty())
-			throw std::invalid_argument("Field paths must be non-empty");
+			ROBOTICK_FATAL_EXIT("Field paths must be non-empty");
 
 		if (source_field_path == dest_field_path)
-			throw std::logic_error("Source and destination field paths are identical: " + dest_field_path);
+			ROBOTICK_FATAL_EXIT("Source and destination field paths are identical: %s", dest_field_path.c_str());
 
 		if (std::any_of(data_connection_seeds.begin(), data_connection_seeds.end(),
 				[&](const auto& s)
@@ -27,18 +29,18 @@ namespace robotick
 					return s.dest_field_path == dest_field_path;
 				}))
 		{
-			throw std::logic_error("Destination field already has an incoming connection: " + dest_field_path);
+			ROBOTICK_FATAL_EXIT("Destination field already has an incoming connection: %s", dest_field_path.c_str());
 		}
 
 		if (root_workload.is_valid())
-			throw std::logic_error("Cannot add connections after root has been set. Model root must be set last.");
+			ROBOTICK_FATAL_EXIT("Cannot add connections after root has been set. Model root must be set last.");
 
 		data_connection_seeds.push_back({source_field_path, dest_field_path});
 	}
 
 	void Model::finalize()
 	{
-		assert(root_workload.is_valid() && "Model root must be set before validation");
+		ROBOTICK_ASSERT(root_workload.is_valid() && "Model root must be set before validation");
 
 		std::function<void(WorkloadHandle, double)> validate_recursively = [&](WorkloadHandle handle, double parent_tick_rate)
 		{
@@ -51,7 +53,7 @@ namespace robotick
 			}
 			else if (seed.tick_rate_hz > parent_tick_rate)
 			{
-				throw std::runtime_error("Child workload cannot have faster tick rate than parent");
+				ROBOTICK_FATAL_EXIT("Child workload cannot have faster tick rate than parent");
 			}
 			// Recurse through children
 			for (WorkloadHandle child : seed.children)
@@ -64,7 +66,7 @@ namespace robotick
 		WorkloadSeed& root_seed = workload_seeds[root_workload.index];
 		if (root_seed.tick_rate_hz == TICK_RATE_FROM_PARENT)
 		{
-			throw std::runtime_error("Root workload must have an explicit tick rate");
+			ROBOTICK_FATAL_EXIT("Root workload must have an explicit tick rate");
 		}
 
 		validate_recursively(root_workload, root_seed.tick_rate_hz);
@@ -77,9 +79,10 @@ namespace robotick
 			const bool dest_already_has_connection = connected_inputs.find(data_connection_seed.dest_field_path) != connected_inputs.end();
 			if (dest_already_has_connection)
 			{
-				throw std::runtime_error("Data connection error: destination field '" + data_connection_seed.dest_field_path +
-										 "' already has an incoming connection. Cannot connect from source field '" +
-										 data_connection_seed.source_field_path + "'.\nEach input field may only be connected once.");
+				ROBOTICK_FATAL_EXIT(
+					"Data connection error: destination field '%s' already has an incoming connection. Cannot connect from source field "
+					"'%s'.\nEach input field may only be connected once.",
+					data_connection_seed.dest_field_path.c_str(), data_connection_seed.source_field_path.c_str());
 			}
 			else
 			{

@@ -7,6 +7,7 @@
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include "utils/EngineInspector.h"
 
@@ -14,6 +15,14 @@
 
 using namespace robotick;
 using namespace robotick::test;
+
+#ifndef ROBOTICK_ENABLE_PYTHON
+#error "ROBOTICK_ENABLE_PYTHON must be defined (expected value: 1)"
+#endif
+
+#if ROBOTICK_ENABLE_PYTHON != 1
+#error "ROBOTICK_ENABLE_PYTHON must be set to 1"
+#endif
 
 TEST_CASE("Unit|Workloads|PythonWorkload|Metadata is registered correctly")
 {
@@ -53,7 +62,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 {
 	Model model;
 	const auto handle = model.add("PythonWorkload", "py", 1.0,
-		{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}, {"example_in", 21.0}});
+		{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}, {"example_in", "21.0"}});
 	model.set_root(handle);
 
 	Engine engine;
@@ -79,7 +88,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	{
 		if (field.name == "blackboard")
 		{
-			assert(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+			ROBOTICK_ASSERT(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
 			const void* field_ptr = static_cast<const uint8_t*>(output_base) + field.offset_within_struct;
 			output_blackboard = static_cast<const robotick::Blackboard*>(field_ptr);

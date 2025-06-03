@@ -4,9 +4,10 @@
 
 #pragma once
 
+#include "robotick/api.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
-#include "robotick/framework/utils/Typename.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include <stdexcept>
 #include <string>
@@ -23,13 +24,6 @@ namespace robotick::test
 		template <typename T> static T* get_instance(const Engine& engine, size_t index)
 		{
 			const WorkloadInstanceInfo& info = get_instance_info(engine, index);
-			const std::string expected_type = get_clean_typename(typeid(T));
-
-			if (info.type->name != expected_type)
-			{
-				throw std::runtime_error("Type mismatch: expected " + expected_type + ", got " + info.type->name);
-			}
-
 			return static_cast<T*>((void*)info.get_ptr(engine));
 		}
 

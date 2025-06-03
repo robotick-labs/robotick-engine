@@ -13,7 +13,10 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "/usr/bin/gcc",
-                "CMAKE_CXX_COMPILER": "/usr/bin/g++"
+                "CMAKE_CXX_COMPILER": "/usr/bin/g++",
+                "ROBOTICK_PLATFORM_UBUNTU": "ON",
+                "ROBOTICK_ENABLE_PYTHON": "ON",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-ubuntu-x64.cmake"
             }
         },
         {
@@ -22,8 +25,9 @@
             "description": "Ubuntu Debug build (no optimizations, full asserts)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "ROBOTICK_BUILD_CONFIG_DEBUG": "ON",
-                "ROBOTICK_OPTIMIZE_OFF": "ON"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEBUG",
+                "ROBOTICK_BUILD_TESTS": "ON"
             }
         },
         {
@@ -32,6 +36,7 @@
             "description": "Ubuntu Development build (optimized with probes)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O1 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEV",
                 "ROBOTICK_BUILD_CONFIG_DEVELOPMENT": "ON"
             }
         },
@@ -41,6 +46,7 @@
             "description": "Ubuntu Release build (stripped, fastest)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_FLAGS_DEBUG": "-DNDEBUG -DROBOTICK_RELEASE",
                 "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
                 "ROBOTICK_STRIP_PROBES": "ON"
             }

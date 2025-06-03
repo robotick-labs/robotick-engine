@@ -4,10 +4,13 @@
 
 #pragma once
 
+#include "robotick/api.h"
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/utils/Typename.h"
+#include "robotick/framework/utils/TypeId.h"
+
 #include <any>
+#include <charconv> // for std::from_chars
 #include <cstdint>
 #include <cstring>
 #include <map>
@@ -15,42 +18,42 @@
 #include <string>
 #include <type_traits>
 
-template <typename T> T& any_cast_ref(std::any& val)
-{
-	if (!val.has_value())
-		throw std::runtime_error("Missing config value");
-	return std::any_cast<T&>(val);
-}
-
 namespace robotick
 {
+	template <typename T> T& any_cast_ref(std::any& val)
+	{
+		if (!val.has_value())
+			ROBOTICK_FATAL_EXIT("Missing config value");
+		return std::any_cast<T&>(val);
+	}
+
 	template <typename T> struct type_identity
 	{
 		using type = T;
 	};
 
-	template <typename Func> inline bool dispatch_fixed_string(const std::type_index& type, Func&& fn)
+	template <typename Func> inline bool dispatch_fixed_string(const TypeId& type, Func&& fn)
 	{
-		if (type == typeid(FixedString8))
+		if (type == GET_TYPE_ID(FixedString8))
 			return fn(type_identity<FixedString8>{});
-		if (type == typeid(FixedString16))
+		if (type == GET_TYPE_ID(FixedString16))
 			return fn(type_identity<FixedString16>{});
-		if (type == typeid(FixedString32))
+		if (type == GET_TYPE_ID(FixedString32))
 			return fn(type_identity<FixedString32>{});
-		if (type == typeid(FixedString64))
+		if (type == GET_TYPE_ID(FixedString64))
 			return fn(type_identity<FixedString64>{});
-		if (type == typeid(FixedString128))
+		if (type == GET_TYPE_ID(FixedString128))
 			return fn(type_identity<FixedString128>{});
-		if (type == typeid(FixedString256))
+		if (type == GET_TYPE_ID(FixedString256))
 			return fn(type_identity<FixedString256>{});
-		if (type == typeid(FixedString512))
+		if (type == GET_TYPE_ID(FixedString512))
 			return fn(type_identity<FixedString512>{});
-		if (type == typeid(FixedString1024))
+		if (type == GET_TYPE_ID(FixedString1024))
 			return fn(type_identity<FixedString1024>{});
 		return false;
 	}
 
-	inline void apply_struct_fields(void* struct_ptr, const StructRegistryEntry& info, const std::map<std::string, std::any>& config)
+	inline void apply_struct_fields(void* struct_ptr, const StructRegistryEntry& info, const std::map<std::string, std::string>& config)
 	{
 		for (const auto& field : info.fields)
 		{
@@ -58,38 +61,40 @@ namespace robotick
 			if (it == config.end())
 				continue;
 
-			assert(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+			ROBOTICK_ASSERT(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
 			void* field_ptr = static_cast<uint8_t*>(struct_ptr) + field.offset_within_struct;
+			const std::string& value = it->second;
 
-			if (field.type == typeid(std::string))
+			if (field.type == GET_TYPE_ID(std::string))
 			{
-				*static_cast<std::string*>(field_ptr) = std::any_cast<std::string>(it->second);
+				*static_cast<std::string*>(field_ptr) = value;
 			}
-			else if (field.type == typeid(double))
+			else if (field.type == GET_TYPE_ID(double))
 			{
-				*static_cast<double*>(field_ptr) = std::any_cast<double>(it->second);
+				double parsed = 0.0;
+				auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);
+				if (result.ec != std::errc() || result.ptr != value.data() + value.size())
+				{
+					ROBOTICK_FATAL_EXIT("Failed to parse double config value for field: %s (value: %s)", field.name.c_str(), value.c_str());
+				}
+				*static_cast<double*>(field_ptr) = parsed;
 			}
-			else if (field.type == typeid(int))
+			else if (field.type == GET_TYPE_ID(int))
 			{
-				*static_cast<int*>(field_ptr) = std::any_cast<int>(it->second);
+				int parsed = 0;
+				auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);
+				if (result.ec != std::errc() || result.ptr != value.data() + value.size())
+				{
+					ROBOTICK_FATAL_EXIT("Failed to parse int config value for field: %s (value: %s)", field.name.c_str(), value.c_str());
+				}
+				*static_cast<int*>(field_ptr) = parsed;
 			}
 			else if (dispatch_fixed_string(field.type,
 						 [&](auto T) -> bool
 						 {
 							 using FS = typename decltype(T)::type;
-							 if (it->second.type() == typeid(std::string))
-							 {
-								 *static_cast<FS*>(field_ptr) = std::any_cast<std::string>(it->second).c_str();
-							 }
-							 else if (it->second.type() == typeid(const char*))
-							 {
-								 *static_cast<FS*>(field_ptr) = std::any_cast<const char*>(it->second);
-							 }
-							 else
-							 {
-								 throw std::runtime_error("Invalid type for FixedString field: " + field.name);
-							 }
+							 *static_cast<FS*>(field_ptr) = value.c_str();
 							 return true;
 						 }))
 			{
@@ -97,7 +102,7 @@ namespace robotick
 			}
 			else
 			{
-				throw std::runtime_error("Unsupported config type: " + get_clean_typename(field.type) + " for field: " + field.name);
+				ROBOTICK_FATAL_EXIT("Unsupported config type for field: %s", field.name.c_str());
 			}
 		}
 	}

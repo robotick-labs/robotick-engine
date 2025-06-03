@@ -32,7 +32,7 @@ namespace robotick
 
 		void set_children(const std::vector<const WorkloadInstanceInfo*>& child_workloads, std::vector<DataConnectionInfo*>& pending_connections)
 		{
-			assert(engine != nullptr && "Engine should have been set by now");
+			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set by now");
 
 			// map from workload_info pointer to its ChildWorkloadInfo (for fast lookup)
 			children.reserve(child_workloads.size()); // <- reserve so we don't keep reallocating children during population
@@ -66,7 +66,7 @@ namespace robotick
 				if (src_is_local && dst_is_local)
 				{
 					dst_it->second->connections_in.push_back(conn);
-					assert(conn->expected_handler == DataConnectionInfo::ExpectedHandler::Unassigned);
+					ROBOTICK_ASSERT(conn->expected_handler == DataConnectionInfo::ExpectedHandler::Unassigned);
 					conn->expected_handler = DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload;
 				}
 				else
@@ -81,7 +81,7 @@ namespace robotick
 
 		void tick(double time_delta)
 		{
-			assert(engine != nullptr && "Engine should have been set by now");
+			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set by now");
 
 			auto start_time = std::chrono::steady_clock::now();
 
@@ -141,6 +141,6 @@ namespace robotick
 		void stop() { /* placeholder for consistency with SequencedGroup*/ }
 	};
 
-	static WorkloadAutoRegister<SequencedGroupWorkload> s_auto_register;
+	ROBOTICK_DEFINE_WORKLOAD(SequencedGroupWorkload)
 
 } // namespace robotick

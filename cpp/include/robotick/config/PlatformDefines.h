@@ -4,8 +4,8 @@
 
 #pragma once
 
-// Platform detection - modify these based on your build system
-#if defined(__linux__) || defined(_WIN32) || defined(__APPLE__)
+// Detect core platform type
+#if defined(__linux__) || defined(_WIN32)
 #if defined(__ANDROID__)
 #define ROBOTICK_PLATFORM_MOBILE
 #else
@@ -13,6 +13,11 @@
 #endif
 #else
 #define ROBOTICK_PLATFORM_EMBEDDED
+#endif
+
+// Named embedded platform overrides (ESP32, STM32, etc.)
+#if defined(ESP_PLATFORM)
+#define ROBOTICK_PLATFORM_ESP32
 #endif
 
 // Extendable for more explicit platforms later

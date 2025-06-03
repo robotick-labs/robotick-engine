@@ -3,10 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/utils/ConsoleTable.h"
+
+#include "robotick/api.h"
+
 #include <algorithm>
+#include <charconv> // for std::from_chars
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <vector>
 
 namespace robotick
@@ -141,12 +146,19 @@ namespace robotick
 					{
 						// extract numeric prefix
 						double val = 0.0;
-						try
+						if (!cell.empty())
 						{
-							val = cell.empty() ? 0.0 : std::stod(cell);
-						}
-						catch (...)
-						{
+							const char* str = cell.data();
+							const char* end = str + cell.size();
+
+							std::from_chars_result result = std::from_chars(str, end, val);
+
+							if (result.ec != std::errc())
+							{
+								// Failed to parse — keep val = 0.0
+								// Optional: log a warning here
+								ROBOTICK_WARNING("Invalid double in cell: \"%.*s\"", static_cast<int>(cell.size()), cell.c_str());
+							}
 						}
 
 						const char* color = (val <= 105.0) ? GREEN : (val < 110.0) ? YELLOW : RED;

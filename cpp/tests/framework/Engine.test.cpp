@@ -5,6 +5,7 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/platform/Threading.h"
 
 #include "utils/EngineInspector.h"
 #include "utils/ModelHelper.h"
@@ -26,7 +27,7 @@ namespace robotick::test
 			int value = 0;
 		};
 		ROBOTICK_BEGIN_FIELDS(DummyConfig)
-		ROBOTICK_FIELD(DummyConfig, value)
+		ROBOTICK_FIELD(DummyConfig, int, value)
 		ROBOTICK_END_FIELDS()
 
 		struct DummyWorkload
@@ -36,7 +37,7 @@ namespace robotick::test
 
 			void load() { loaded_value = config.value; }
 		};
-		ROBOTICK_DEFINE_WORKLOAD(DummyWorkload)
+		ROBOTICK_DEFINE_WORKLOAD(DummyWorkload, DummyConfig)
 
 		// === TickCounterWorkload ===
 
@@ -67,7 +68,7 @@ namespace robotick::test
 	TEST_CASE("Unit|Framework|Engine|DummyWorkload config is loaded via load()")
 	{
 		Model model;
-		auto handle = model.add("DummyWorkload", "A", 1.0, {{"value", 42}});
+		auto handle = model.add("DummyWorkload", "A", 1.0, {{"value", "42"}});
 		model.set_root(handle);
 
 		Engine engine;
@@ -90,8 +91,8 @@ namespace robotick::test
 	TEST_CASE("Unit|Framework|Engine|Multiple workloads supported")
 	{
 		Model model;
-		model.add("DummyWorkload", "one", 1.0, {{"value", 1}});
-		model.add("DummyWorkload", "two", 2.0, {{"value", 2}});
+		model.add("DummyWorkload", "one", 1.0, {{"value", "1"}});
+		model.add("DummyWorkload", "two", 2.0, {{"value", "2"}});
 		model_helpers::wrap_all_in_sequenced_group(model);
 
 		Engine engine;
@@ -113,7 +114,7 @@ namespace robotick::test
 		Engine engine;
 		engine.load(model);
 
-		std::atomic<bool> stop_after_next_tick_flag = true;
+		AtomicFlag stop_after_next_tick_flag{true};
 		engine.run(stop_after_next_tick_flag); // will tick at least once even if stop_after_next_tick_flag is true
 
 		const TickCounterWorkload* ptr = EngineInspector::get_instance<TickCounterWorkload>(engine, 0);

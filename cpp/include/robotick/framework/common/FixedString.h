@@ -6,8 +6,10 @@
 
 #include <algorithm>
 #include <cstring>
+#include <functional> // std::hash
 #include <iostream>
 #include <string>
+#include <string_view>
 
 namespace robotick
 {
@@ -50,6 +52,8 @@ namespace robotick
 			return *this;
 		}
 
+		bool operator<(const FixedString<N>& other) const noexcept { return std::strncmp(data, other.data, N) < 0; }
+
 		const char* c_str() const { return data; }
 
 		operator const char*() const { return data; }
@@ -81,3 +85,16 @@ namespace robotick
 	using FixedString1024 = FixedString<1024>;
 
 } // namespace robotick
+
+// Hash function (must be defined outside any namespace)
+namespace std
+{
+	template <size_t N> struct hash<robotick::FixedString<N>>
+	{
+		size_t operator()(const robotick::FixedString<N>& s) const noexcept
+		{
+			// Use the part before the null terminator
+			return std::hash<std::string_view>{}(std::string_view(s.c_str(), std::strlen(s.c_str())));
+		}
+	};
+} // namespace std

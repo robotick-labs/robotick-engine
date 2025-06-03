@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/Blackboard.h"
+#include "robotick/api.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include <catch2/catch_all.hpp>
 #include <cstring>
@@ -34,8 +36,8 @@ namespace robotick
 
 	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard basic construction and memory layout", "[blackboard]")
 	{
-		std::vector<BlackboardFieldInfo> schema = {
-			{"age", std::type_index(typeid(int))}, {"score", std::type_index(typeid(double))}, {"name", std::type_index(typeid(FixedString64))}};
+		std::vector<BlackboardFieldInfo> schema = {{"age", TypeId(GET_TYPE_ID(int))}, {"score", TypeId(GET_TYPE_ID(double))},
+			{"name", TypeId(GET_TYPE_ID(FixedString64))}};
 
 		auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
 
@@ -50,8 +52,8 @@ namespace robotick
 
 	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard binds to WorkloadsBuffer and performs typed access", "[blackboard][buffer]")
 	{
-		std::vector<BlackboardFieldInfo> schema = {
-			{"age", std::type_index(typeid(int))}, {"score", std::type_index(typeid(double))}, {"name", std::type_index(typeid(FixedString64))}};
+		std::vector<BlackboardFieldInfo> schema = {{"age", TypeId(GET_TYPE_ID(int))}, {"score", TypeId(GET_TYPE_ID(double))},
+			{"name", TypeId(GET_TYPE_ID(FixedString64))}};
 
 		auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
 
@@ -77,7 +79,7 @@ namespace robotick
 
 	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard throws on missing keys or unbound source", "[blackboard][errors]")
 	{
-		std::vector<BlackboardFieldInfo> schema = {{"alpha", std::type_index(typeid(int))}};
+		std::vector<BlackboardFieldInfo> schema = {{"alpha", TypeId(GET_TYPE_ID(int))}};
 
 		SECTION("Throws on unbound field offset")
 		{
@@ -86,21 +88,21 @@ namespace robotick
 
 			auto* blackboard_ptr = buffer.as<Blackboard>(0);
 			new (blackboard_ptr) Blackboard(schema); // not bound
-			REQUIRE_THROWS_WITH(blackboard_ptr->get<int>("alpha"), Catch::Matchers::ContainsSubstring("Blackboard"));
+			ROBOTICK_REQUIRE_ERROR(blackboard_ptr->get<int>("alpha"), ("Blackboard"));
 		}
 
 		SECTION("Throws on missing field")
 		{
 			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
 
-			REQUIRE_THROWS_WITH(blackboard->get<int>("nonexistent"), Catch::Matchers::ContainsSubstring("Blackboard"));
+			ROBOTICK_REQUIRE_ERROR(blackboard->get<int>("nonexistent"), ("Blackboard"));
 		}
 	}
 
 	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard alignment and offset consistency", "[blackboard][layout]")
 	{
 		std::vector<BlackboardFieldInfo> schema = {
-			{"a", std::type_index(typeid(int))}, {"b", std::type_index(typeid(double))}, {"c", std::type_index(typeid(int))}};
+			{"a", TypeId(GET_TYPE_ID(int))}, {"b", TypeId(GET_TYPE_ID(double))}, {"c", TypeId(GET_TYPE_ID(int))}};
 
 		auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
 

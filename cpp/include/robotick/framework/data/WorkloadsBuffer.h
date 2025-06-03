@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "robotick/api.h"
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -53,7 +55,7 @@ namespace robotick
 		void create_mirror_from(const RawBuffer& source)
 		{
 			if (data)
-				throw std::logic_error("RawBuffer::create_mirror_from: buffer already allocated");
+				ROBOTICK_FATAL_EXIT("RawBuffer::create_mirror_from: buffer already allocated");
 
 			size = source.size;
 			allocate_aligned(size);
@@ -65,10 +67,10 @@ namespace robotick
 		void update_mirror_from(const RawBuffer& source)
 		{
 			if (!data || size == 0)
-				throw std::runtime_error("RawBuffer::mirror_from: destination buffer not initialized");
+				ROBOTICK_FATAL_EXIT("RawBuffer::mirror_from: destination buffer not initialized");
 
 			if (size != source.size)
-				throw std::runtime_error("RawBuffer::update_mirror_from: size mismatch");
+				ROBOTICK_FATAL_EXIT("RawBuffer::update_mirror_from: size mismatch");
 
 			std::memcpy(data.get(), source.data.get(), size);
 		}
@@ -76,10 +78,10 @@ namespace robotick
 		template <typename T> T* as(size_t offset = 0)
 		{
 			if (offset + sizeof(T) > size)
-				throw std::out_of_range("RawBuffer::as<T>: Offset out of range");
+				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset out of range");
 
 			if (offset % alignof(T) != 0)
-				throw std::invalid_argument("RawBuffer::as<T>: Offset is not properly aligned for type T");
+				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset is not properly aligned for type T");
 
 			uint8_t* ptr = data.get() + offset;
 			return std::launder(reinterpret_cast<T*>(ptr));
@@ -88,10 +90,10 @@ namespace robotick
 		template <typename T> const T* as(size_t offset = 0) const
 		{
 			if (offset + sizeof(T) > size)
-				throw std::out_of_range("RawBuffer::as<T>: Offset out of range");
+				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset out of range");
 
 			if (offset % alignof(T) != 0)
-				throw std::invalid_argument("RawBuffer::as<T>: Offset is not properly aligned for type T");
+				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset is not properly aligned for type T");
 
 			const uint8_t* ptr = data.get() + offset;
 			return std::launder(reinterpret_cast<const T*>(ptr));
@@ -110,6 +112,10 @@ namespace robotick
 		void allocate_aligned(size_t alloc_size)
 		{
 			void* ptr = ::operator new(alloc_size, std::align_val_t{alignof(std::max_align_t)});
+
+			std::memset(ptr, 0, alloc_size); // <- Zero entire buffer  before use to ensure deterministic workload construction and avoid
+											 //    undefined behavior from uninitialized memory
+
 			data = std::unique_ptr<uint8_t[], AlignedDeleter>(static_cast<uint8_t*>(ptr));
 		}
 	};

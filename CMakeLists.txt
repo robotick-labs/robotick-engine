@@ -1,3 +1,6 @@
+# Copyright Robotick Labs
+# SPDX-License-Identifier: Apache-2.0
+
 cmake_minimum_required(VERSION 3.16)
 project(robotick_framework)
 
@@ -6,113 +9,154 @@ project(robotick_framework)
 # =========================
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # Required for shared libs / Python plugins
-
-# Enable strict warnings for quality enforcement
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_compile_options(-Wall -Wextra -Werror)
 
-# Enable clang-tidy if desired
-# set(CMAKE_CXX_CLANG_TIDY "clang-tidy;-p=${CMAKE_BINARY_DIR}")
+# Disable rtti globally (too expensive for our purposes - we've rolled our own simplified equivalent)
+add_compile_options(-fno-rtti)
 
-# =============================
-# ✅ Public Include Path (SDK)
-# =============================
+# Optional AddressSanitizer support
+option(ROBOTICK_ENABLE_ASAN "Enable AddressSanitizer for runtime memory checks" OFF)
+option(ROBOTICK_ASAN_DETECT_LEAKS "Enable ASAN leak detection (not always useful in tests)" OFF)
 
-# NOTE: This is your public API path, used by consumers of the SDK
+if(ROBOTICK_ENABLE_ASAN)
+    message(STATUS "✅ ASAN enabled")
+    if(ROBOTICK_ASAN_DETECT_LEAKS)
+        message(STATUS "ℹ️  Run with: ASAN_OPTIONS=detect_leaks=1 ./your_executable")
+    endif()
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address)
+endif()
+
+# =========================
+# ✅ Public Include Path
+# =========================
+
 include_directories(${CMAKE_SOURCE_DIR}/cpp/include)
 
-# ========================================
-# ✅ Source Files (Core Engine & API)
-# ========================================
+# =========================
+# ✅ Source Collection
+# =========================
 
-# Gather all .cpp and public .h files
-file(GLOB_RECURSE CORE_SOURCES
+file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/cpp/src/robotick/*.cpp
-    ${CMAKE_SOURCE_DIR}/cpp/include/robotick/*.h
 )
 
-# Build shared library for external use (Python / plugin / SDK)
-add_library(robotick_framework SHARED ${CORE_SOURCES})
-set_target_properties(robotick_framework PROPERTIES OUTPUT_NAME robotick_framework)
+set(CORE_SOURCES "")
+set(PYTHON_SOURCES "")
 
-# Define export macro for shared library (ROBOTICK_EXPORTS)
-target_compile_definitions(robotick_framework PRIVATE ROBOTICK_EXPORTS)
-
-# =============================
-# ✅ Optional Main Executable
-# =============================
-
-# Example test app / manual entry point
-add_executable(robotick_main ${CMAKE_SOURCE_DIR}/examples/cpp/robotick_main.cpp)
-target_link_libraries(robotick_main PRIVATE robotick_framework)
-
-# =========================
-# ✅ Plugin Auto-Building
-# =========================
-
-# Dynamically find and build each .cpp plugin as its own shared library
-file(GLOB_RECURSE PLUGIN_SOURCES src/plugins/*.cpp)
-
-foreach(plugin_file ${PLUGIN_SOURCES})
-    get_filename_component(plugin_name ${plugin_file} NAME_WE)
-    add_library(${plugin_name} SHARED ${plugin_file})
-    target_include_directories(${plugin_name} PRIVATE include)
+foreach(file ${ALL_CPP_SOURCES})
+    if(file MATCHES ".*/PythonRuntime.cpp$" OR file MATCHES ".*/PythonWorkload.cpp$")
+        if(ROBOTICK_ENABLE_PYTHON)
+            list(APPEND CORE_SOURCES ${file})
+            list(APPEND PYTHON_SOURCES ${file})
+        endif()
+    else()
+        list(APPEND CORE_SOURCES ${file})
+    endif()
 endforeach()
 
 # =========================
-# ✅ Dependencies
+# ✅ Core Framework Library
 # =========================
 
-include(FetchContent)
+add_library(robotick_framework SHARED ${CORE_SOURCES})
+set_target_properties(robotick_framework PROPERTIES OUTPUT_NAME robotick_framework)
+target_compile_definitions(robotick_framework PRIVATE ROBOTICK_EXPORTS)
 
-# pybind11: for Python bindings (embed mode)
-FetchContent_Declare(
-    pybind11
-    GIT_REPOSITORY https://github.com/pybind/pybind11.git
-    GIT_TAG        v2.11.1
-)
+# Disable exceptions in this module unless overridden (e.g. test-suite enables them to catch errors, which it overrides to throw)
+target_compile_options(robotick_framework PRIVATE -fno-exceptions)
 
-FetchContent_MakeAvailable(pybind11)
+if(ROBOTICK_PLATFORM_UBUNTU)
+    add_compile_definitions(ROBOTICK_PLATFORM_UBUNTU)
+endif()
 
-target_link_libraries(robotick_framework PRIVATE pybind11::embed)
+# =========================
+# ✅ Optional Python Workloads
+# =========================
 
-# Win32 platform-specific libraries
-if (WIN32)
-    target_link_libraries(robotick_framework PRIVATE winmm)
+if(ROBOTICK_ENABLE_PYTHON)
+    message(STATUS "✅ ROBOTICK_ENABLE_PYTHON - ON")
+
+    # Ensure pybind11 and Python3 are available
+    include(FetchContent)
+    FetchContent_Declare(
+        pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG        v2.11.1
+    )
+    FetchContent_MakeAvailable(pybind11)
+
+    find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+    target_compile_definitions(robotick_framework PUBLIC ROBOTICK_ENABLE_PYTHON=1)
+    target_link_libraries(robotick_framework PUBLIC pybind11::embed ${Python3_LIBRARIES})
+
+    # 👇 Enable exceptions only on Python-related sources
+    foreach(source_file IN LISTS PYTHON_SOURCES)
+        set_source_files_properties(${source_file} PROPERTIES COMPILE_FLAGS "-fexceptions -frtti")
+    endforeach()
+else()
+    message(STATUS "❌ ROBOTICK_ENABLE_PYTHON - OFF")
+endif()
+
+# =========================
+# ✅ Optional Executable
+# =========================
+
+add_executable(robotick_main ${CMAKE_SOURCE_DIR}/examples/cpp/desktop-testbed/robotick_main.cpp)
+target_link_libraries(robotick_main PRIVATE robotick_framework)
+
+# =========================
+# ✅ ESP32 libs (if needed)
+# =========================
+
+if(ROBOTICK_PLATFORM_ESP32)
+    target_include_directories(robotick_main PRIVATE
+        ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/include
+        ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/xtensa/include
+        ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos
+        ${IDF_PATH}/components/newlib/platform_include
+        ${IDF_PATH}/components/esp_common/include
+        ${IDF_PATH}/components/esp_system/include
+        ${PROJECT_SOURCE_DIR}/esp-idf-dummy
+    )
 endif()
 
 # =========================
 # ✅ Unit Tests via Catch2
 # =========================
 
-option(ROBOTICK_BUILD_TESTS "Build Robotick tests" ON)
-
 if (ROBOTICK_BUILD_TESTS)
+    message(STATUS "✅ ROBOTICK_BUILD_TESTS - ON")
     enable_testing()
     add_subdirectory(cpp/tests)
 
-    # Copy DLL next to robotick_tests for local testing (CMake time)
     add_custom_command(TARGET robotick_framework POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:robotick_framework>
             ${CMAKE_BINARY_DIR}/cpp/tests/$<CONFIG>
     )
 
-    # Also copy to root-level Debug folder (for VS Code / ctest discovery)
     add_custom_command(TARGET robotick_framework POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:robotick_framework>
             ${CMAKE_BINARY_DIR}/Debug
     )
+else()
+    message(STATUS "❌ ROBOTICK_BUILD_TESTS - OFF")
 endif()
 
-# =========================================
-# ✅ Auto-add License Info to cpp Files:
-# =========================================
+# =========================
+# ✅ Auto-add License Headers
+# =========================
 
-add_custom_target(add_license
-    COMMAND ${CMAKE_COMMAND} -E echo "Adding Apache 2.0 headers..."
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/add_license_header.py ${CMAKE_SOURCE_DIR}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
+if(ROBOTICK_ENABLE_PYTHON)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
+    add_custom_target(add_license
+        COMMAND ${CMAKE_COMMAND} -E echo "Adding Apache 2.0 headers..."
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/add_license_header.py ${CMAKE_SOURCE_DIR}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+endif()

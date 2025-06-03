@@ -14,6 +14,7 @@
 
 namespace robotick
 {
+	class AtomicFlag;
 	class ConsoleTelemetryCollector;
 	class WorkloadsBuffer;
 	struct DataConnectionInfo;
@@ -41,9 +42,9 @@ namespace robotick
 		void load(const Model& model);
 
 		// The stop_flag must outlive this call. Do not pass temporaries.
-		void run(const std::atomic<bool>& stop_after_next_tick_flag);
+		void run(const AtomicFlag& stop_after_next_tick_flag);
 
-		void run(const std::atomic<bool>&&) = delete; // cause compile-error if a temporary is used
+		void run(const AtomicFlag&&) = delete; // cause compile-error if a temporary is used
 
 		bool is_running() const;
 

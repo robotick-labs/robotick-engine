@@ -1,3 +1,7 @@
+// Copyright Robotick Labs
+//
+// SPDX-License-Identifier: Apache-2.0
+
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 
 #include "robotick/framework/Engine.h"
@@ -32,7 +36,7 @@ namespace robotick
 				if (!base_ptr)
 					continue;
 
-				if (field.type == typeid(Blackboard))
+				if (field.type == GET_TYPE_ID(Blackboard))
 				{
 					Blackboard& blackboard = *static_cast<Blackboard*>(base_ptr);
 

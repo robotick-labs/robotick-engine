@@ -4,17 +4,16 @@
 
 #pragma once
 
+#include "robotick/api.h"
 #include "robotick/framework/utils/Constants.h"
-#include "robotick/framework/utils/Typename.h"
+#include "robotick/framework/utils/TypeId.h"
 
-#include <cstddef> // for size_t
+#include <cstddef>
 #include <map>
 #include <mutex>
-#include <stdexcept> // for std::runtime_error
-#include <string>	 // for std::string
+#include <stdexcept>
+#include <string>
 #include <type_traits>
-#include <typeindex> // for std::type_index
-#include <typeinfo>	 // for typeid
 #include <unordered_map>
 #include <vector>
 
@@ -28,7 +27,7 @@ namespace robotick
 	{
 		std::string name;
 		size_t offset_within_struct = OFFSET_UNBOUND;
-		std::type_index type = typeid(void);
+		TypeId type = TypeId::invalid();
 		size_t size = 0;
 
 		uint8_t* get_data_ptr(WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& instance, const StructRegistryEntry& struct_info) const;
@@ -36,15 +35,10 @@ namespace robotick
 		template <typename T>
 		inline T& get_data(WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& instance, const StructRegistryEntry& struct_info) const
 		{
-			if (type != std::type_index(typeid(T)))
-			{
-				throw std::runtime_error("FieldInfo::get<T>() type mismatch for field '" + name + "'");
-			}
-
 			uint8_t* ptr = get_data_ptr(workloads_buffer, instance, struct_info);
 			if (!ptr)
 			{
-				throw std::runtime_error("FieldInfo::get<T>() null pointer access for field '" + name + "'");
+				ROBOTICK_FATAL_EXIT("FieldInfo::get<T>() null pointer access for field '%s'", name.c_str());
 			}
 
 			return *static_cast<T*>((void*)ptr);
@@ -55,7 +49,7 @@ namespace robotick
 	{
 		std::string name;
 		size_t size = 0;
-		std::type_index type = typeid(void);
+		TypeId type = TypeId::invalid();
 		size_t offset_within_workload = OFFSET_UNBOUND;
 		std::vector<FieldInfo> fields;
 		std::map<std::string, FieldInfo*> field_from_name;
@@ -66,8 +60,7 @@ namespace robotick
 	  public:
 		static FieldRegistry& get();
 
-		const StructRegistryEntry* register_struct(
-			const std::string& name, size_t size, const std::type_index& type, size_t offset, std::vector<FieldInfo> fields);
+		const StructRegistryEntry* register_struct(const std::string& name, size_t size, TypeId type, size_t offset, std::vector<FieldInfo> fields);
 
 		const StructRegistryEntry* get_struct(const std::string& name) const;
 
@@ -76,33 +69,20 @@ namespace robotick
 		mutable std::mutex mutex;
 	};
 
-	// 🔍 Reflection helper
-	template <typename StructType> inline const StructRegistryEntry* get_struct_reflection()
-	{
-		return FieldRegistry::get().get_struct(get_clean_typename(typeid(StructType)));
-	}
-
-	template <typename StructType> struct FieldAutoRegister
-	{
-		FieldAutoRegister(std::vector<FieldInfo> fields)
-		{
-			const size_t offset = OFFSET_UNBOUND; // we don't know this as we're not registered with the parent workload yet (TODO - address this
-												  // strange double-register pattern)
-
-			FieldRegistry::get().register_struct(
-				get_clean_typename(typeid(StructType)), sizeof(StructType), typeid(StructType), offset, std::move(fields));
-		}
-	};
-
 } // namespace robotick
+
+// ——————————————————————————————————————————————————————————————————
+// Field registration macros (non-templated)
+// ——————————————————————————————————————————————————————————————————
 
 #define ROBOTICK_BEGIN_FIELDS(StructType)                                                                                                            \
 	static_assert(std::is_standard_layout<StructType>::value, "Structs must be standard layout");                                                    \
-	static robotick::FieldAutoRegister<StructType>                       \
-        s_robotick_fields_##StructType({
+	[[maybe_unused]] static const robotick::StructRegistryEntry* s_robotick_fields_##StructType = robotick::FieldRegistry::get().register_struct(                     \
+		#StructType, sizeof(StructType), GET_TYPE_ID(StructType), robotick::OFFSET_UNBOUND, {
 
-#define ROBOTICK_FIELD(StructType, FieldName)                                                                                                        \
-	{#FieldName, offsetof(StructType, FieldName), typeid(decltype(StructType::FieldName)), sizeof(decltype(StructType::FieldName))},
+#define ROBOTICK_FIELD(StructType, FieldType, FieldName)                                                                                             \
+	{#FieldName, offsetof(StructType, FieldName), GET_TYPE_ID(FieldType), sizeof(decltype(StructType::FieldName))},
 
 #define ROBOTICK_END_FIELDS()                                                                                                                        \
-	});
+	});                                                                                                                                              \
+	/**/
