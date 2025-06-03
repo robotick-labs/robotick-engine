@@ -36,9 +36,9 @@ namespace robotick
 		Thread(Thread&& other) noexcept = default;
 		Thread& operator=(Thread&& other) noexcept = default;
 
-		bool is_joining_supported() const;
+		bool is_joining_supported() const; // call this before either is_joinable() or join() - join() will call ROBOTICK_FATAL_EXIT if not supported
 		bool is_joinable() const;
-		void join(); // Desktop only (no-op on ESP32)
+		void join();
 
 		static void yield();
 		static void sleep_ms(uint32_t ms);

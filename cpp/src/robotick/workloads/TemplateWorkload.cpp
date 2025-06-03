@@ -20,8 +20,9 @@ namespace robotick
 		double gain;
 		int threshold;
 		FixedString32 label;
-		Blackboard blackboard; // you would tend to only use a Blackboard on a scripting Workload where you don't know your fields in advance -
-							   // more indirection means they are a bit slower to use
+		Blackboard blackboard;
+		// ^- you would tend to only use a Blackboard on a scripting Workload where you don't know your fields in advance - more indirection means
+		// they are a bit slower to use
 	};
 	ROBOTICK_BEGIN_FIELDS(TemplateConfig)
 	ROBOTICK_FIELD(TemplateConfig, double, gain)

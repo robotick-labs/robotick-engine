@@ -76,7 +76,7 @@ namespace robotick
 
 	inline bool Thread::is_joining_supported() const
 	{
-		return true; // this platform does NOT support joining threads - we use tasks which delete themselves
+		return false; // this platform does NOT support joining threads - we use tasks which delete themselves
 	}
 
 	inline bool Thread::is_joinable() const

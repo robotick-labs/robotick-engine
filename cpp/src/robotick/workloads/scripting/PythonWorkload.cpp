@@ -166,7 +166,16 @@ namespace robotick
 					ROBOTICK_FATAL_EXIT("Unsupported config field type for key '%s' in PythonWorkload", key.c_str());
 			}
 
-			internal_state->py_instance = internal_state->py_class(py_cfg);
+			// (note - we allow exceptions in PythonWorkload/Runtime only since Python libs require them - so the below is fine even with the wider
+			// engine not supporting exceptions)
+			try
+			{
+				internal_state->py_instance = internal_state->py_class(py_cfg);
+			}
+			catch (const py::error_already_set& e)
+			{
+				ROBOTICK_FATAL_EXIT("Failed to instantiate Python class '%s': %s", config.class_name.c_str(), e.what());
+			}
 		}
 
 		void tick(double time_delta)
