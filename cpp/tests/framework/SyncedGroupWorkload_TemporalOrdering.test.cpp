@@ -71,7 +71,7 @@ namespace robotick::test
 			});
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-		stop_after_next_tick_flag.flag.store(true);
+		stop_after_next_tick_flag.set(true);
 		runner.join();
 
 		const auto& receiver_info = EngineInspector::get_instance_info(engine, receiver.index);

@@ -7,7 +7,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "${workspaceFolder}/build/ubuntu-x64-debug",
+        "${workspaceFolder}/build/${input:buildPreset}",
         "--config",
         "Debug"
       ],

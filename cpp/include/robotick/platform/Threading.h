@@ -10,7 +10,10 @@
 #include <cstdint>
 #include <string>
 
-#if !defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32)
+#include "esp_atomic.h" // <atomic> alternatives for ESP-IDF
+#include "esp_idf_version.h"
+#else
 #include <thread>
 #endif
 
@@ -33,8 +36,9 @@ namespace robotick
 		Thread(Thread&& other) noexcept = default;
 		Thread& operator=(Thread&& other) noexcept = default;
 
-		void join(); // Desktop only (no-op on ESP32)
+		bool is_joining_supported() const;
 		bool is_joinable() const;
+		void join(); // Desktop only (no-op on ESP32)
 
 		static void yield();
 		static void sleep_ms(uint32_t ms);
@@ -52,19 +56,34 @@ namespace robotick
 #endif
 	};
 
+#if defined(ROBOTICK_PLATFORM_ESP32)
 	class AtomicFlag
 	{
 	  public:
-#if defined(ROBOTICK_PLATFORM_ESP32)
-		volatile bool flag = false;
-		void set() { flag = true; }
-		bool is_set() const { return flag; }
-#else
-		std::atomic<bool> flag{false};
-		void set() { flag.store(true); }
-		bool is_set() const { return flag.load(); }
-#endif
+		explicit AtomicFlag(bool initial = false) { atomic_store_u32(&flag, initial ? 1 : 0); }
+
+		void set(bool value = true) { atomic_store_u32(&flag, value ? 1 : 0); }
+
+		bool is_set() const { return atomic_load_u32(&flag) != 0; }
+
+	  private:
+		atomic_uint32_t flag;
 	};
+#else
+	// std::atomic fallback for desktop
+	class AtomicFlag
+	{
+	  public:
+		explicit AtomicFlag(bool initial = false) : flag(initial) {}
+
+		void set(bool value = true) { flag.store(value); }
+		bool is_set() const { return flag.load(); }
+
+	  private:
+		std::atomic<bool> flag{false};
+	};
+#endif
+
 } // namespace robotick
 
 // Platform-specific implementation

@@ -111,7 +111,19 @@ namespace robotick
 
 		void initialize_blackboards(py::object& py_class)
 		{
-			py::dict desc = py_class.attr("describe")();
+			py::dict desc;
+
+			// (note - we allow exceptions in PythonWorkload/Runtime only since Python libs require them - so the below is fine even with the wider
+			// engine not supporting exceptions)
+			try
+			{
+				desc = py_class.attr("describe")();
+			}
+			catch (const py::error_already_set& e)
+			{
+				ROBOTICK_FATAL_EXIT("Python class '%s' describe() failed: %s", config.class_name.c_str(), e.what());
+			}
+
 			config.blackboard = Blackboard(parse_blackboard_schema(desc["config"]));
 			inputs.blackboard = Blackboard(parse_blackboard_schema(desc["inputs"]));
 			outputs.blackboard = Blackboard(parse_blackboard_schema(desc["outputs"]));
@@ -165,6 +177,8 @@ namespace robotick
 			py::gil_scoped_acquire gil;
 
 			py::dict py_in;
+			py::dict py_out;
+
 			for (const auto& field : inputs.blackboard.get_schema())
 			{
 				const std::string key = field.name.c_str();
@@ -180,8 +194,16 @@ namespace robotick
 					py_in[key.c_str()] = std::string(inputs.blackboard.get<FixedString128>(key).c_str());
 			}
 
-			py::dict py_out;
-			internal_state->py_instance.attr("tick")(time_delta, py_in, py_out);
+			// (note - we allow exceptions in PythonWorkload/Runtime only since Python libs require them - so the below is fine even with the wider
+			// engine not supporting exceptions)
+			try
+			{
+				internal_state->py_instance.attr("tick")(time_delta, py_in, py_out);
+			}
+			catch (const py::error_already_set& e)
+			{
+				ROBOTICK_WARNING("Python tick() failed: %s", e.what());
+			}
 
 			for (auto item : py_out)
 			{

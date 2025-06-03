@@ -95,7 +95,6 @@ namespace robotick
 			if (align == 0)
 			{
 				ROBOTICK_FATAL_EXIT("Invalid align (0) while building blackboard schema");
-				continue;
 			}
 
 			offset = (offset + align - 1) & ~(align - 1);

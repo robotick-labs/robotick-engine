@@ -127,7 +127,7 @@ namespace robotick
 #define ROBOTICK_INFO(...)                                                                                                                           \
 	do                                                                                                                                               \
 	{                                                                                                                                                \
-		ROBOTICK_BREAKPOINT();                                                                                                                       \
+		ROBOTICK_INTERNAL_LOG("INFO", __VA_ARGS__);                                                                                                  \
 	} while (0)
 
 // =====================================================================

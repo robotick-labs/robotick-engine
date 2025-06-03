@@ -120,7 +120,7 @@ namespace robotick
 
 			for (auto& child : children)
 			{
-				if (child.thread.is_joinable())
+				if (child.thread.is_joining_supported() && child.thread.is_joinable())
 				{
 					child.thread.join();
 				}

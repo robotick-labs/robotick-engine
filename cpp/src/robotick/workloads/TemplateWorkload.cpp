@@ -30,21 +30,21 @@ namespace robotick
 	ROBOTICK_FIELD(TemplateConfig, Blackboard, blackboard)
 	ROBOTICK_END_FIELDS()
 
-	struct TemplateInput
+	struct TemplateInputs
 	{
 		double angle;
 		int sensor_value;
 		FixedString16 sensor_label;
 		Blackboard blackboard; // (see note on TemplateConfig::blackboard)
 	};
-	ROBOTICK_BEGIN_FIELDS(TemplateInput)
-	ROBOTICK_FIELD(TemplateInput, double, angle)
-	ROBOTICK_FIELD(TemplateInput, int, sensor_value)
-	ROBOTICK_FIELD(TemplateInput, FixedString16, sensor_label)
-	ROBOTICK_FIELD(TemplateInput, Blackboard, blackboard)
+	ROBOTICK_BEGIN_FIELDS(TemplateInputs)
+	ROBOTICK_FIELD(TemplateInputs, double, angle)
+	ROBOTICK_FIELD(TemplateInputs, int, sensor_value)
+	ROBOTICK_FIELD(TemplateInputs, FixedString16, sensor_label)
+	ROBOTICK_FIELD(TemplateInputs, Blackboard, blackboard)
 	ROBOTICK_END_FIELDS()
 
-	struct TemplateOutput
+	struct TemplateOutputs
 	{
 		double command;
 		FixedString64 status;
@@ -59,18 +59,18 @@ namespace robotick
 		bool has_called_tick = false;
 		bool has_called_stop = false;
 	};
-	ROBOTICK_BEGIN_FIELDS(TemplateOutput)
-	ROBOTICK_FIELD(TemplateOutput, double, command)
-	ROBOTICK_FIELD(TemplateOutput, FixedString64, status)
-	ROBOTICK_FIELD(TemplateOutput, Blackboard, status)
-	ROBOTICK_FIELD(TemplateOutput, bool, has_called_set_children)
-	ROBOTICK_FIELD(TemplateOutput, bool, has_called_set_engine)
-	ROBOTICK_FIELD(TemplateOutput, bool, has_called_pre_load)
-	ROBOTICK_FIELD(TemplateOutput, bool, has_called_load)
-	ROBOTICK_FIELD(TemplateOutput, bool, has_called_setup)
-	ROBOTICK_FIELD(TemplateOutput, bool, has_called_start)
-	ROBOTICK_FIELD(TemplateOutput, bool, has_called_tick)
-	ROBOTICK_FIELD(TemplateOutput, bool, has_called_stop)
+	ROBOTICK_BEGIN_FIELDS(TemplateOutputs)
+	ROBOTICK_FIELD(TemplateOutputs, double, command)
+	ROBOTICK_FIELD(TemplateOutputs, FixedString64, status)
+	ROBOTICK_FIELD(TemplateOutputs, Blackboard, blackboard)
+	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_set_children)
+	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_set_engine)
+	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_pre_load)
+	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_load)
+	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_setup)
+	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_start)
+	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_tick)
+	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_stop)
 	ROBOTICK_END_FIELDS()
 
 	//------------------------------------------------------------------------------
@@ -80,8 +80,8 @@ namespace robotick
 	struct TemplateWorkload
 	{
 		TemplateConfig config;
-		TemplateInput inputs;
-		TemplateOutput outputs;
+		TemplateInputs inputs;
+		TemplateOutputs outputs;
 
 		void set_children(const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& connections)
 		{
@@ -153,5 +153,9 @@ namespace robotick
 			outputs.has_called_stop = true; // (for unit-testing of this template - not for illustrating suggested usage!)
 		}
 	};
+
+	// === Auto-registration ===
+
+	ROBOTICK_DEFINE_WORKLOAD(TemplateWorkload, TemplateConfig, TemplateInputs, TemplateOutputs)
 
 } // namespace robotick

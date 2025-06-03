@@ -74,14 +74,19 @@ namespace robotick
 		// Task deletes itself using vTaskDelete(nullptr)
 	}
 
-	inline void Thread::join()
+	inline bool Thread::is_joining_supported() const
 	{
-		// Not supported on ESP32 — FreeRTOS tasks delete themselves
+		return true; // this platform does NOT support joining threads - we use tasks which delete themselves
 	}
 
 	inline bool Thread::is_joinable() const
 	{
 		return false;
+	}
+
+	inline void Thread::join()
+	{
+		ROBOTICK_FATAL_EXIT("Thread::join() not supported on ESP32/FreeRTOS - tasks delete themselves");
 	}
 
 	inline void Thread::sleep_ms(uint32_t ms)

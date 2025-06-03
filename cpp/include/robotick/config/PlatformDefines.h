@@ -5,7 +5,7 @@
 #pragma once
 
 // Detect core platform type
-#if defined(__linux__) || defined(_WIN32) || defined(__APPLE__)
+#if defined(__linux__) || defined(_WIN32)
 #if defined(__ANDROID__)
 #define ROBOTICK_PLATFORM_MOBILE
 #else
