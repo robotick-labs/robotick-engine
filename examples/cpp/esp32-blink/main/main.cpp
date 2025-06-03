@@ -52,7 +52,7 @@ void create_non_threaded_model(robotick::Model& model)
 
 void create_simple_model(robotick::Model& model)
 {
-	auto root = model.add("TimingDiagnosticsWorkload", "timing_diag", 100000.0);
+	auto root = model.add("TimingDiagnosticsWorkload", "timing_diag", 1000.0);
 	model.set_root(root);
 }
 
@@ -78,9 +78,6 @@ void run_engine_on_core1(void* param)
 	vTaskDelete(nullptr);
 }
 
-// Optional: could make this static if needed externally
-TaskHandle_t engine_task_handle = nullptr;
-
 extern "C" void app_main(void)
 {
 	ESP_LOGI("main_task", "Started on CPU%d", xPortGetCoreID());
@@ -91,6 +88,5 @@ extern "C" void app_main(void)
 
 	ESP_LOGI("Robotick", "Launching Robotick engine task on core 1...");
 
-	xTaskCreatePinnedToCore(
-		run_engine_on_core1, ENGINE_TASK_NAME, ENGINE_STACK_SIZE, &engine, ENGINE_TASK_PRIORITY, &engine_task_handle, ENGINE_CORE_ID);
+	xTaskCreatePinnedToCore(run_engine_on_core1, ENGINE_TASK_NAME, ENGINE_STACK_SIZE, &engine, ENGINE_TASK_PRIORITY, nullptr, ENGINE_CORE_ID);
 }

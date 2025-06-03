@@ -339,7 +339,7 @@ namespace robotick
 			root_info.mutable_stats.last_time_delta = time_delta;
 
 			next_tick_time += tick_interval;
-			Thread::hybrid_sleep_until(std::chrono::time_point_cast<std::chrono::steady_clock::duration>(next_tick_time));
+			Thread::hybrid_sleep_until(next_tick_time);
 
 		} while (!stop_after_next_tick_flag.is_set());
 

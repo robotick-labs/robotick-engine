@@ -84,7 +84,7 @@ namespace robotick
 
 	inline void Thread::yield()
 	{
-		vTaskDelay(0);
+		taskYIELD(); // explicit, zero-latency yield
 	}
 
 	inline void Thread::hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
@@ -92,7 +92,7 @@ namespace robotick
 		using namespace std::chrono;
 
 		constexpr auto coarse_threshold_us = 2000; // 2 ms
-		constexpr int watchdog_yield_interval = 2000;
+		constexpr int watchdog_yield_interval = 500;
 		int spin_counter = 0;
 
 		// Convert target_time to absolute time in microseconds
@@ -113,14 +113,12 @@ namespace robotick
 				// Sleep in ~50us chunks to avoid CPU hogging
 				esp_rom_delay_us(50);
 			}
-			else
+
+			// Tight spin, yield periodically to prevent WDT issues
+			if (++spin_counter % watchdog_yield_interval == 0)
 			{
-				// Tight spin, yield periodically to prevent WDT issues
-				if (++spin_counter % watchdog_yield_interval == 0)
-				{
-					taskYIELD();		  // Allow IDLE tasks to run
-					esp_task_wdt_reset(); // Pet the watchdog manually
-				}
+				taskYIELD();		  // Allow IDLE tasks to run
+				esp_task_wdt_reset(); // Pet the watchdog manually
 			}
 		}
 	}
