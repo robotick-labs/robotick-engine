@@ -42,19 +42,19 @@ namespace robotick
 		const auto* field = find_field(key);
 
 		if (!field)
-			ROBOTICK_ERROR("Blackboard::verify_type_by_size failed, missing key: %s", key.c_str());
+			ROBOTICK_FATAL_EXIT("Blackboard::verify_type_by_size failed, missing key: %s", key.c_str());
 
 		if (field->size != expected_size)
-			ROBOTICK_ERROR("Blackboard::verify_type_by_size failed, type mismatch for key: %s", key.c_str());
+			ROBOTICK_FATAL_EXIT("Blackboard::verify_type_by_size failed, type mismatch for key: %s", key.c_str());
 	}
 
 	void* BlackboardInfo::get_field_ptr(Blackboard* bb, const std::string& key) const
 	{
 		auto it = schema_index_by_name.find(key);
 		if (it == schema_index_by_name.end())
-			ROBOTICK_ERROR("BlackboardInfo::get_field_ptr failed for key: %s", key.c_str());
+			ROBOTICK_FATAL_EXIT("BlackboardInfo::get_field_ptr failed for key: %s", key.c_str());
 		if (datablock_offset_from_blackboard == OFFSET_UNBOUND)
-			ROBOTICK_ERROR("Blackboard is not bound");
+			ROBOTICK_FATAL_EXIT("Blackboard is not bound");
 
 		const auto& field = schema[it->second];
 		uint8_t* base = static_cast<uint8_t*>((void*)bb);
@@ -77,7 +77,7 @@ namespace robotick
 		if (type == GET_TYPE_ID(FixedString128))
 			return {sizeof(FixedString128), alignof(FixedString128)};
 
-		ROBOTICK_ERROR("Unsupported type in BlackboardInfo::type_size_and_align");
+		ROBOTICK_FATAL_EXIT("Unsupported type in BlackboardInfo::type_size_and_align");
 		return {0, 1};
 	}
 
@@ -94,7 +94,7 @@ namespace robotick
 			auto [size, align] = BlackboardInfo::type_size_and_align(field.type);
 			if (align == 0)
 			{
-				ROBOTICK_ERROR("Invalid align (0) while building blackboard schema");
+				ROBOTICK_FATAL_EXIT("Invalid align (0) while building blackboard schema");
 				continue;
 			}
 
@@ -114,16 +114,16 @@ namespace robotick
 		if (info)
 			info->datablock_offset_from_blackboard = datablock_offset;
 		else
-			ROBOTICK_ERROR("Blackboard::bind called on uninitialized Blackboard");
+			ROBOTICK_FATAL_EXIT("Blackboard::bind called on uninitialized Blackboard");
 	}
 
 	size_t Blackboard::get_datablock_offset() const
 	{
 		if (!info)
-			ROBOTICK_ERROR("Blackboard::get_datablock_offset called on uninitialized Blackboard");
+			ROBOTICK_FATAL_EXIT("Blackboard::get_datablock_offset called on uninitialized Blackboard");
 
 		if (info->datablock_offset_from_blackboard == OFFSET_UNBOUND)
-			ROBOTICK_ERROR("Blackboard::get_datablock_offset called on Blackboard before datablock_offset has been set");
+			ROBOTICK_FATAL_EXIT("Blackboard::get_datablock_offset called on Blackboard before datablock_offset has been set");
 
 		return info->datablock_offset_from_blackboard;
 	}
@@ -131,7 +131,7 @@ namespace robotick
 	const std::vector<BlackboardFieldInfo>& Blackboard::get_schema() const
 	{
 		if (!info)
-			ROBOTICK_ERROR("Blackboard::get_schema called on uninitialized Blackboard");
+			ROBOTICK_FATAL_EXIT("Blackboard::get_schema called on uninitialized Blackboard");
 
 		return info->schema;
 	}
@@ -139,7 +139,7 @@ namespace robotick
 	const BlackboardInfo* Blackboard::get_info() const
 	{
 		if (!info)
-			ROBOTICK_ERROR("Blackboard::get_info called on uninitialized Blackboard");
+			ROBOTICK_FATAL_EXIT("Blackboard::get_info called on uninitialized Blackboard");
 
 		return info.get();
 	}
@@ -147,7 +147,7 @@ namespace robotick
 	const BlackboardFieldInfo* Blackboard::get_field_info(const std::string& key) const
 	{
 		if (!info)
-			ROBOTICK_ERROR("Blackboard::get_field_info called on uninitialized Blackboard");
+			ROBOTICK_FATAL_EXIT("Blackboard::get_field_info called on uninitialized Blackboard");
 
 		return info->find_field(key);
 	}

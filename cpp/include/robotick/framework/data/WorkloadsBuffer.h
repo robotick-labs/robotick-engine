@@ -55,7 +55,7 @@ namespace robotick
 		void create_mirror_from(const RawBuffer& source)
 		{
 			if (data)
-				ROBOTICK_ERROR("RawBuffer::create_mirror_from: buffer already allocated");
+				ROBOTICK_FATAL_EXIT("RawBuffer::create_mirror_from: buffer already allocated");
 
 			size = source.size;
 			allocate_aligned(size);
@@ -67,10 +67,10 @@ namespace robotick
 		void update_mirror_from(const RawBuffer& source)
 		{
 			if (!data || size == 0)
-				ROBOTICK_ERROR("RawBuffer::mirror_from: destination buffer not initialized");
+				ROBOTICK_FATAL_EXIT("RawBuffer::mirror_from: destination buffer not initialized");
 
 			if (size != source.size)
-				ROBOTICK_ERROR("RawBuffer::update_mirror_from: size mismatch");
+				ROBOTICK_FATAL_EXIT("RawBuffer::update_mirror_from: size mismatch");
 
 			std::memcpy(data.get(), source.data.get(), size);
 		}
@@ -78,10 +78,10 @@ namespace robotick
 		template <typename T> T* as(size_t offset = 0)
 		{
 			if (offset + sizeof(T) > size)
-				ROBOTICK_ERROR("RawBuffer::as<T>: Offset out of range");
+				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset out of range");
 
 			if (offset % alignof(T) != 0)
-				ROBOTICK_ERROR("RawBuffer::as<T>: Offset is not properly aligned for type T");
+				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset is not properly aligned for type T");
 
 			uint8_t* ptr = data.get() + offset;
 			return std::launder(reinterpret_cast<T*>(ptr));
@@ -90,10 +90,10 @@ namespace robotick
 		template <typename T> const T* as(size_t offset = 0) const
 		{
 			if (offset + sizeof(T) > size)
-				ROBOTICK_ERROR("RawBuffer::as<T>: Offset out of range");
+				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset out of range");
 
 			if (offset % alignof(T) != 0)
-				ROBOTICK_ERROR("RawBuffer::as<T>: Offset is not properly aligned for type T");
+				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset is not properly aligned for type T");
 
 			const uint8_t* ptr = data.get() + offset;
 			return std::launder(reinterpret_cast<const T*>(ptr));

@@ -101,7 +101,7 @@ namespace robotick
 				else if (type_str == "fixedstring128")
 					type = TypeId(GET_TYPE_ID(FixedString128));
 				else
-					ROBOTICK_ERROR("Unsupported field type: %s", type_str.c_str());
+					ROBOTICK_FATAL_EXIT("Unsupported field type: %s", type_str.c_str());
 
 				fields.emplace_back(FixedString64(name.c_str()), type);
 			}
@@ -120,7 +120,7 @@ namespace robotick
 		void pre_load()
 		{
 			if (config.script_name.empty() || config.class_name.empty())
-				ROBOTICK_ERROR("PythonWorkload config must specify script_name and class_name");
+				ROBOTICK_FATAL_EXIT("PythonWorkload config must specify script_name and class_name");
 
 			robotick::ensure_python_runtime();
 			py::gil_scoped_acquire gil;
@@ -151,7 +151,7 @@ namespace robotick
 				else if (type == GET_TYPE_ID(FixedString128))
 					py_cfg[key.c_str()] = std::string(config.blackboard.get<FixedString128>(key).c_str());
 				else
-					ROBOTICK_ERROR("Unsupported config field type for key '%s' in PythonWorkload", key.c_str());
+					ROBOTICK_FATAL_EXIT("Unsupported config field type for key '%s' in PythonWorkload", key.c_str());
 			}
 
 			internal_state->py_instance = internal_state->py_class(py_cfg);

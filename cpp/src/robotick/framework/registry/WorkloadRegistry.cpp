@@ -22,7 +22,7 @@ namespace robotick
 
 		if (entries.find(entry.name) != entries.end())
 		{
-			ROBOTICK_ERROR("WorkloadRegistry: entry with name '%s' already exists.", entry.name.c_str());
+			ROBOTICK_FATAL_EXIT("WorkloadRegistry: entry with name '%s' already exists.", entry.name.c_str());
 		}
 
 		entries[entry.name] = std::make_unique<WorkloadRegistryEntry>(entry);

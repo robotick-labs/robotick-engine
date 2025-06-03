@@ -38,7 +38,7 @@ namespace robotick
 			uint8_t* ptr = get_data_ptr(workloads_buffer, instance, struct_info);
 			if (!ptr)
 			{
-				ROBOTICK_ERROR("FieldInfo::get<T>() null pointer access for field '%s'", name.c_str());
+				ROBOTICK_FATAL_EXIT("FieldInfo::get<T>() null pointer access for field '%s'", name.c_str());
 			}
 
 			return *static_cast<T*>((void*)ptr);

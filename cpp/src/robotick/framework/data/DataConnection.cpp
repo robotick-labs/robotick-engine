@@ -36,19 +36,19 @@ namespace robotick
 			{
 				if (token.empty())
 				{
-					ROBOTICK_ERROR("Empty segment in field path: %s", raw.c_str());
+					ROBOTICK_FATAL_EXIT("Empty segment in field path: %s", raw.c_str());
 				}
 				tokens.push_back(token);
 			}
 
 			if (tokens.size() < 3 || tokens.size() > 4)
 			{
-				ROBOTICK_ERROR("Expected format <workload>.<section>.<field> or <workload>.<section>.<field>.<subfield>: %s", raw.c_str());
+				ROBOTICK_FATAL_EXIT("Expected format <workload>.<section>.<field> or <workload>.<section>.<field>.<subfield>: %s", raw.c_str());
 			}
 
 			if (!is_valid_section(tokens[1]))
 			{
-				ROBOTICK_ERROR("Invalid section '%s' in path: %s", tokens[1].c_str(), raw.c_str());
+				ROBOTICK_FATAL_EXIT("Invalid section '%s' in path: %s", tokens[1].c_str(), raw.c_str());
 			}
 
 			const bool has_subfield = tokens.size() == 4;
@@ -65,7 +65,7 @@ namespace robotick
 			const auto* type = instance.type;
 			if (!type)
 			{
-				ROBOTICK_ERROR("Missing type info for workload: %s", instance.unique_name.c_str());
+				ROBOTICK_FATAL_EXIT("Missing type info for workload: %s", instance.unique_name.c_str());
 			}
 
 			const StructRegistryEntry* result = nullptr;
@@ -87,7 +87,7 @@ namespace robotick
 			}
 			else
 			{
-				ROBOTICK_ERROR("Invalid section: %s", section.c_str());
+				ROBOTICK_FATAL_EXIT("Invalid section: %s", section.c_str());
 			}
 
 			ROBOTICK_ASSERT((result == nullptr || out_offset != OFFSET_UNBOUND) && "StructRegistryEntry with unbound offset should not exist");
@@ -146,12 +146,12 @@ namespace robotick
 
 			if (!src_inst)
 			{
-				ROBOTICK_ERROR("Unknown source workload: %s", src.workload_name.c_str());
+				ROBOTICK_FATAL_EXIT("Unknown source workload: %s", src.workload_name.c_str());
 			}
 
 			if (!dst_inst)
 			{
-				ROBOTICK_ERROR("Unknown destination workload: %s", dst.workload_name.c_str());
+				ROBOTICK_FATAL_EXIT("Unknown destination workload: %s", dst.workload_name.c_str());
 			}
 
 			// Lookup struct + field for source
@@ -160,7 +160,7 @@ namespace robotick
 			const FieldInfo* src_field = DataConnectionUtils::find_field(src_struct, src.field_path[0].c_str());
 			if (!src_field)
 			{
-				ROBOTICK_ERROR("Source field not found: %s", seed.source_field_path.c_str());
+				ROBOTICK_FATAL_EXIT("Source field not found: %s", seed.source_field_path.c_str());
 			}
 
 			ROBOTICK_ASSERT(src_struct_offset != OFFSET_UNBOUND && "Src struct offset should have definitely been set by now");
@@ -176,7 +176,7 @@ namespace robotick
 
 				if (!src_blackboard_field)
 				{
-					ROBOTICK_ERROR("Source subfield not found: %s", seed.source_field_path.c_str());
+					ROBOTICK_FATAL_EXIT("Source subfield not found: %s", seed.source_field_path.c_str());
 				}
 
 				ROBOTICK_ASSERT(workloads_buffer.contains_object(src_ptr, src_size) && "Blackboard should be within supplied workloads-buffer");
@@ -199,7 +199,7 @@ namespace robotick
 			const FieldInfo* dst_field = DataConnectionUtils::find_field(dst_struct, dst.field_path[0].c_str());
 			if (!dst_field || dst_struct_offset == OFFSET_UNBOUND)
 			{
-				ROBOTICK_ERROR("Destination field not found: %s", seed.dest_field_path.c_str());
+				ROBOTICK_FATAL_EXIT("Destination field not found: %s", seed.dest_field_path.c_str());
 			}
 
 			ROBOTICK_ASSERT(dst_struct_offset != OFFSET_UNBOUND && "Dest struct offset should have definitely been set by now");
@@ -215,7 +215,7 @@ namespace robotick
 
 				if (!dst_blackboard_field)
 				{
-					ROBOTICK_ERROR("Dest subfield not found: %s", seed.dest_field_path.c_str());
+					ROBOTICK_FATAL_EXIT("Dest subfield not found: %s", seed.dest_field_path.c_str());
 				}
 
 				auto* blackboard = reinterpret_cast<Blackboard*>(dst_ptr);
@@ -230,13 +230,13 @@ namespace robotick
 			// Validate type match
 			if (src_type != dst_type)
 			{
-				ROBOTICK_ERROR("Type mismatch between source and dest: %s vs. %s", seed.source_field_path.c_str(), seed.dest_field_path.c_str());
+				ROBOTICK_FATAL_EXIT("Type mismatch between source and dest: %s vs. %s", seed.source_field_path.c_str(), seed.dest_field_path.c_str());
 			}
 
 			// Validate size match
 			if (src_size != dst_size)
 			{
-				ROBOTICK_ERROR(
+				ROBOTICK_FATAL_EXIT(
 					"Size mismatch (%zu vs %zu) between %s and %s", src_size, dst_size, seed.source_field_path.c_str(), seed.dest_field_path.c_str());
 			}
 
@@ -248,7 +248,7 @@ namespace robotick
 
 			if (!seen_destinations.insert(dst_key).second)
 			{
-				ROBOTICK_ERROR("Duplicate destination field: %s", dst_key.c_str());
+				ROBOTICK_FATAL_EXIT("Duplicate destination field: %s", dst_key.c_str());
 			}
 
 			results.push_back(DataConnectionInfo{seed, src_ptr, dst_ptr, src_inst, dst_inst, src_size, src_type});

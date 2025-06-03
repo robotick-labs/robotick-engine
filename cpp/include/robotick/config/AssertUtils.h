@@ -109,13 +109,13 @@ namespace robotick
 // ✅ ERRORS & WARNINGS (printf or plain string)
 // =====================================================================
 
-#define ROBOTICK_ERROR(...)                                                                                                                          \
+#define ROBOTICK_FATAL_EXIT(...)                                                                                                                     \
 	do                                                                                                                                               \
 	{                                                                                                                                                \
 		char __robotick_error_buf[1024];                                                                                                             \
 		snprintf(__robotick_error_buf, sizeof(__robotick_error_buf), __VA_ARGS__);                                                                   \
 		robotick::report_error(__robotick_error_buf);                                                                                                \
-	} while (0)
+	} while (0) /* @noreturn */
 
 #define ROBOTICK_WARNING(...)                                                                                                                        \
 	do                                                                                                                                               \

@@ -23,7 +23,7 @@ namespace robotick
 	template <typename T> T& any_cast_ref(std::any& val)
 	{
 		if (!val.has_value())
-			ROBOTICK_ERROR("Missing config value");
+			ROBOTICK_FATAL_EXIT("Missing config value");
 		return std::any_cast<T&>(val);
 	}
 
@@ -76,7 +76,7 @@ namespace robotick
 				auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);
 				if (result.ec != std::errc() || result.ptr != value.data() + value.size())
 				{
-					ROBOTICK_ERROR("Failed to parse double config value for field: %s (value: %s)", field.name.c_str(), value.c_str());
+					ROBOTICK_FATAL_EXIT("Failed to parse double config value for field: %s (value: %s)", field.name.c_str(), value.c_str());
 				}
 				*static_cast<double*>(field_ptr) = parsed;
 			}
@@ -86,7 +86,7 @@ namespace robotick
 				auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);
 				if (result.ec != std::errc() || result.ptr != value.data() + value.size())
 				{
-					ROBOTICK_ERROR("Failed to parse int config value for field: %s (value: %s)", field.name.c_str(), value.c_str());
+					ROBOTICK_FATAL_EXIT("Failed to parse int config value for field: %s (value: %s)", field.name.c_str(), value.c_str());
 				}
 				*static_cast<int*>(field_ptr) = parsed;
 			}
@@ -102,7 +102,7 @@ namespace robotick
 			}
 			else
 			{
-				ROBOTICK_ERROR("Unsupported config type for field: %s", field.name.c_str());
+				ROBOTICK_FATAL_EXIT("Unsupported config type for field: %s", field.name.c_str());
 			}
 		}
 	}

@@ -148,7 +148,7 @@ namespace robotick
 	void Engine::load(const Model& model)
 	{
 		if (!model.get_root().is_valid())
-			ROBOTICK_ERROR("Model has no root workload");
+			ROBOTICK_FATAL_EXIT("Model has no root workload");
 
 		state->instances.clear();
 		state->data_connections_all.clear();
@@ -163,7 +163,7 @@ namespace robotick
 		{
 			const auto* type = WorkloadRegistry::get().find(seed.type.c_str());
 			if (!type)
-				ROBOTICK_ERROR("Unknown workload type: %s", seed.type.c_str());
+				ROBOTICK_FATAL_EXIT("Unknown workload type: %s", seed.type.c_str());
 
 			const size_t align = std::max<size_t>(type->alignment, alignof(std::max_align_t));
 			workloads_cursor = (workloads_cursor + align - 1) & ~(align - 1);
@@ -216,7 +216,7 @@ namespace robotick
 
 		size_t blackboard_size = compute_blackboard_memory_requirements(state->instances);
 		if (blackboard_size > DEFAULT_MAX_BLACKBOARDS_BYTES)
-			ROBOTICK_ERROR("Blackboard memory (%zu) exceeds max allowed (%zu)", blackboard_size, DEFAULT_MAX_BLACKBOARDS_BYTES);
+			ROBOTICK_FATAL_EXIT("Blackboard memory (%zu) exceeds max allowed (%zu)", blackboard_size, DEFAULT_MAX_BLACKBOARDS_BYTES);
 
 		if (blackboard_size > 0)
 		{
@@ -277,7 +277,7 @@ namespace robotick
 		if (!pending.empty())
 		{
 			const auto* conn = pending.front();
-			ROBOTICK_ERROR("Unclaimed connection: %s -> %s", conn->seed.source_field_path.c_str(), conn->seed.dest_field_path.c_str());
+			ROBOTICK_FATAL_EXIT("Unclaimed connection: %s -> %s", conn->seed.source_field_path.c_str(), conn->seed.dest_field_path.c_str());
 		}
 
 		for (auto& inst : state->instances)
@@ -298,13 +298,13 @@ namespace robotick
 	{
 		const WorkloadHandle root_handle = state->m_loaded_model.get_root();
 		if (root_handle.index >= state->instances.size())
-			ROBOTICK_ERROR("Invalid root workload handle");
+			ROBOTICK_FATAL_EXIT("Invalid root workload handle");
 
 		const auto& root_info = state->instances[root_handle.index];
 		void* root_ptr = root_info.get_ptr(*this);
 
 		if (root_info.tick_rate_hz <= 0 || !root_info.type->tick_fn || !root_ptr)
-			ROBOTICK_ERROR("Root workload must have valid tick_rate_hz and tick_fn");
+			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_rate_hz and tick_fn");
 
 		// Start all workloads
 		for (auto& inst : state->instances)

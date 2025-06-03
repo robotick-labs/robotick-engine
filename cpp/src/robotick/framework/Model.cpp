@@ -18,10 +18,10 @@ namespace robotick
 	void Model::connect(const std::string& source_field_path, const std::string& dest_field_path)
 	{
 		if (source_field_path.empty() || dest_field_path.empty())
-			ROBOTICK_ERROR("Field paths must be non-empty");
+			ROBOTICK_FATAL_EXIT("Field paths must be non-empty");
 
 		if (source_field_path == dest_field_path)
-			ROBOTICK_ERROR("Source and destination field paths are identical: %s", dest_field_path.c_str());
+			ROBOTICK_FATAL_EXIT("Source and destination field paths are identical: %s", dest_field_path.c_str());
 
 		if (std::any_of(data_connection_seeds.begin(), data_connection_seeds.end(),
 				[&](const auto& s)
@@ -29,11 +29,11 @@ namespace robotick
 					return s.dest_field_path == dest_field_path;
 				}))
 		{
-			ROBOTICK_ERROR("Destination field already has an incoming connection: %s", dest_field_path.c_str());
+			ROBOTICK_FATAL_EXIT("Destination field already has an incoming connection: %s", dest_field_path.c_str());
 		}
 
 		if (root_workload.is_valid())
-			ROBOTICK_ERROR("Cannot add connections after root has been set. Model root must be set last.");
+			ROBOTICK_FATAL_EXIT("Cannot add connections after root has been set. Model root must be set last.");
 
 		data_connection_seeds.push_back({source_field_path, dest_field_path});
 	}
@@ -53,7 +53,7 @@ namespace robotick
 			}
 			else if (seed.tick_rate_hz > parent_tick_rate)
 			{
-				ROBOTICK_ERROR("Child workload cannot have faster tick rate than parent");
+				ROBOTICK_FATAL_EXIT("Child workload cannot have faster tick rate than parent");
 			}
 			// Recurse through children
 			for (WorkloadHandle child : seed.children)
@@ -66,7 +66,7 @@ namespace robotick
 		WorkloadSeed& root_seed = workload_seeds[root_workload.index];
 		if (root_seed.tick_rate_hz == TICK_RATE_FROM_PARENT)
 		{
-			ROBOTICK_ERROR("Root workload must have an explicit tick rate");
+			ROBOTICK_FATAL_EXIT("Root workload must have an explicit tick rate");
 		}
 
 		validate_recursively(root_workload, root_seed.tick_rate_hz);
@@ -79,8 +79,9 @@ namespace robotick
 			const bool dest_already_has_connection = connected_inputs.find(data_connection_seed.dest_field_path) != connected_inputs.end();
 			if (dest_already_has_connection)
 			{
-				ROBOTICK_ERROR("Data connection error: destination field '%s' already has an incoming connection. Cannot connect from source field "
-							   "'%s'.\nEach input field may only be connected once.",
+				ROBOTICK_FATAL_EXIT(
+					"Data connection error: destination field '%s' already has an incoming connection. Cannot connect from source field "
+					"'%s'.\nEach input field may only be connected once.",
 					data_connection_seed.dest_field_path.c_str(), data_connection_seed.source_field_path.c_str());
 			}
 			else
