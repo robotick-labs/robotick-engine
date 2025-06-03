@@ -1,111 +1,30 @@
-{
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Example: Python - mujoco_balancing_robot",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/examples/mujoco_balancing_robot/main.py",
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal"
+"configurations": [
+    {
+        "name": "Example: C++ - robotick_main",
+        "type": "cppdbg",
+        "request": "launch",
+        "program": "${workspaceFolder}/build/ubuntu-x64-debug/robotick_main",
+        "args": [],
+        "stopAtEntry": false,
+        "cwd": "${workspaceFolder}",
+        "environment": [],
+        "externalConsole": false,
+        "MIMode": "gdb",
+        "miDebuggerPath": "/usr/bin/gdb",
+        "setupCommands": [
+            {
+                "description": "Enable pretty-printing",
+                "text": "-enable-pretty-printing",
+                "ignoreFailures": true
+            }
+        ],
+        "logging": {
+            "engineLogging": true
         },
-        {
-            "name": "Example: Python - brickpi_simple_rc",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/examples/brickpi_simple_rc/main.py",
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "Example: C++ - robotick_main",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/robotick_main",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ]
-        },
-        {
-            "name": "Debug PythonWorkload Tests",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/tests/cpp/Debug/robotick_tests.exe", // or your actual test binary
-            "args": [], // optional: pass specific test names/tags here
-            "cwd": "${workspaceFolder}",
-            "stopAtEntry": false,
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb", // for Linux or WSL
-            // "MIMode": "lldb",       // for macOS
-            // "miDebuggerPath": "/usr/bin/gdb", // customize if needed
-            // For Windows with MSVC:
-            "type": "cppvsdbg", // use this instead of cppdbg
-            "preLaunchTask": "build", // optional: hook up to a CMake or build task
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ]
-        },
-        {
-            "name": "Debug Robotick Tests (No Leak Check)",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/ubuntu-x64-debug/cpp/tests/robotick_tests",
-            "args": [
-                "Unit|Workloads|PythonWorkload|Python tick executes"
-            ],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [
-                {
-                    "name": "ASAN_OPTIONS",
-                    "value": "detect_leaks=0"
-                }
-            ],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ]
-        },
-        {
-            "name": "Debug ESP32-S3",
-            "type": "cortex-debug",
-            "request": "launch",
-            "servertype": "openocd",
-            "cwd": "${workspaceFolder}/examples/cpp/esp32-blink",
-            "executable": "${workspaceFolder}/examples/cpp/esp32-blink/build/esp32-blink.elf",
-            "configFiles": [
-                "interface/esp_usb_jtag.cfg",
-                "target/esp32s3.cfg"
-            ],
-            "svdFile": "${env:IDF_PATH}/tools/svd/esp32s3.svd",
-            "runToMain": true,
-            "preLaunchTask": "build",
-            "gdbPath": "C:/Espressif/tools/xtensa-esp-elf-gdb/14.2_20240403/xtensa-esp-elf-gdb/bin/xtensa-esp32s3-elf-gdb.exe"
+        "preLaunchTask": "Build Example: C++ - robotick_main",
+        "additionalSOLibSearchPath": "${workspaceFolder}/build/ubuntu-x64-debug",
+        "sourceFileMap": {
+            "/workspace": "${workspaceFolder}"
         }
-    ]
-}
+    }
+]

@@ -10,6 +10,10 @@
 #include <cstdint>
 #include <string>
 
+#if !defined(ROBOTICK_PLATFORM_ESP32)
+#include <thread>
+#endif
+
 namespace robotick
 {
 	class Thread
@@ -21,11 +25,18 @@ namespace robotick
 		Thread(EntryPoint fn, void* arg, const std::string& name = "", int core = -1, int stack_size = 4096, int priority = 1);
 		~Thread();
 
+		// Non-copyable
+		Thread(const Thread&) = delete;
+		Thread& operator=(const Thread&) = delete;
+
+		// Move-enabled
+		Thread(Thread&& other) noexcept = default;
+		Thread& operator=(Thread&& other) noexcept = default;
+
 		void join(); // Desktop only (no-op on ESP32)
 		bool is_joinable() const;
 
 		static void yield();
-
 		static void sleep_ms(uint32_t ms);
 		static void hybrid_sleep_until(std::chrono::steady_clock::time_point target_time);
 

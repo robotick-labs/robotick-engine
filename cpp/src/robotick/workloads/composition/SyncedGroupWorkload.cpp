@@ -77,18 +77,26 @@ namespace robotick
 			{
 				if (!child.workload_info || !child.workload_info->type || !child.workload_info->type->tick_fn ||
 					child.workload_info->tick_rate_hz == 0.0)
+				{
 					continue;
+				}
 
-				auto* child_ptr = &child;
+				struct ThreadContext
+				{
+					SyncedGroupWorkloadImpl* impl;
+					ChildWorkloadInfo* child;
+				};
+
+				ThreadContext* ctx = new ThreadContext{this, &child};
 
 				child.thread = Thread(
-					[](void* ptr)
+					[](void* raw)
 					{
-						static_cast<SyncedGroupWorkloadImpl*>(ptr)->child_tick_loop(*reinterpret_cast<ChildWorkloadInfo*>(ptr));
+						auto* ctx = static_cast<ThreadContext*>(raw);
+						ctx->impl->child_tick_loop(*ctx->child);
+						delete ctx;
 					},
-					child_ptr, child.workload_info->unique_name.substr(0, 15), // Thread name max length
-					2														   // CPU core
-				);
+					ctx, child.workload_info->unique_name.substr(0, 15), 2);
 			}
 		}
 

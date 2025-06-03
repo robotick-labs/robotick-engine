@@ -9,8 +9,9 @@
 
 #if defined(_WIN32)
 #include <windows.h>
-#else
+#elif defined(__APPLE__) || defined(__linux__)
 #include <pthread.h>
+#include <sched.h>
 #endif
 
 namespace robotick
@@ -50,33 +51,6 @@ namespace robotick
 		std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 	}
 
-	inline void Thread::set_name(const std::string& name)
-	{
-#if defined(_WIN32)
-		std::wstring wname(name.begin(), name.end());
-		SetThreadDescription(GetCurrentThread(), wname.c_str());
-#elif defined(__APPLE__)
-		pthread_setname_np(name.c_str());
-#elif defined(__linux__)
-		pthread_setname_np(pthread_self(), name.c_str());
-#endif
-	}
-
-	inline void Thread::set_priority_high()
-	{
-#if defined(_WIN32)
-		SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
-#endif
-	}
-
-	inline void Thread::set_affinity(int core)
-	{
-#if defined(_WIN32)
-		DWORD_PTR mask = 1 << core;
-		SetThreadAffinityMask(GetCurrentThread(), mask);
-#endif
-	}
-
 	inline void Thread::yield()
 	{
 		std::this_thread::yield();
@@ -102,6 +76,49 @@ namespace robotick
 			{
 			}
 		}
+	}
+
+	inline void Thread::set_name(const std::string& name)
+	{
+#if defined(_WIN32)
+		std::wstring wname(name.begin(), name.end());
+		SetThreadDescription(GetCurrentThread(), wname.c_str());
+#elif defined(__APPLE__)
+		pthread_setname_np(name.c_str());
+#elif defined(__linux__)
+		pthread_setname_np(pthread_self(), name.c_str());
+#endif
+	}
+
+	inline void Thread::set_priority_high()
+	{
+#if defined(_WIN32)
+		SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+#elif defined(__APPLE__) || defined(__linux__)
+		sched_param sch_params;
+		sch_params.sched_priority = sched_get_priority_max(SCHED_FIFO);
+		pthread_setschedparam(pthread_self(), SCHED_FIFO, &sch_params);
+#endif
+	}
+
+	inline void Thread::set_affinity(int core)
+	{
+#if defined(_WIN32)
+		DWORD_PTR mask = 1 << core;
+		SetThreadAffinityMask(GetCurrentThread(), mask);
+#elif defined(__APPLE__)
+		(void)core; // Not supported on macOS
+#elif defined(__linux__)
+		if (core < 0)
+			return;
+
+		cpu_set_t cpuset;
+		CPU_ZERO(&cpuset);
+		CPU_SET(core, &cpuset);
+
+		pthread_t current_thread = pthread_self();
+		pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
+#endif
 	}
 
 } // namespace robotick

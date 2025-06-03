@@ -4,40 +4,18 @@
     {
       "label": "Build Example: C++ - robotick_main",
       "type": "shell",
-      "command": "cmake --build build --config Debug",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "${workspaceFolder}/build/ubuntu-x64-debug",
+        "--config",
+        "Debug"
+      ],
       "group": {
         "kind": "build",
         "isDefault": true
       },
       "problemMatcher": []
-    },
-    {
-      "type": "cmake",
-      "label": "CMake: build",
-      "command": "build",
-      "targets": [
-        "ALL_BUILD"
-      ],
-      "group": "build",
-      "problemMatcher": [],
-      "detail": "CMake template build task"
-    },
-    {
-      "label": "build",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-Command",
-        "& { . ./setup-idf.ps1; idf.py build }"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}/examples/cpp/esp32-blink"
-      },
-      "problemMatcher": [],
-      "group": "build"
     }
   ]
 }

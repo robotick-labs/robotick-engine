@@ -51,13 +51,32 @@ namespace robotick
 		}
 	}
 
+	// Move constructor
+	inline Thread::Thread(Thread&& other) noexcept
+	{
+		handle = other.handle;
+		other.handle = nullptr;
+	}
+
+	// Move assignment
+	inline Thread& Thread::operator=(Thread&& other) noexcept
+	{
+		if (this != &other)
+		{
+			handle = other.handle;
+			other.handle = nullptr;
+		}
+		return *this;
+	}
+
 	inline Thread::~Thread()
 	{
-		// Task deletes itself
+		// Task deletes itself using vTaskDelete(nullptr)
 	}
 
 	inline void Thread::join()
 	{
+		// Not supported on ESP32 — FreeRTOS tasks delete themselves
 	}
 
 	inline bool Thread::is_joinable() const
@@ -72,14 +91,17 @@ namespace robotick
 
 	inline void Thread::set_name(const std::string&)
 	{
+		// Optional: could use vTaskSetTaskName if needed
 	}
 
 	inline void Thread::set_priority_high()
 	{
+		// Optional: could elevate task priority here if needed
 	}
 
 	inline void Thread::set_affinity(int)
 	{
+		// Already handled in constructor (xTaskCreatePinnedToCore)
 	}
 
 	inline void Thread::yield()

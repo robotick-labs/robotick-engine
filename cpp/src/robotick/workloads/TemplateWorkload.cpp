@@ -2,12 +2,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#pragma once
-
 #include "robotick/api.h"
-#include "robotick/framework/Workload.h"
+#include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/framework/data/FixedString.h"
+#include "robotick/framework/registry/FieldRegistry.h"
+#include "robotick/framework/registry/WorkloadRegistry.h"
 
 namespace robotick
 {
@@ -21,13 +20,14 @@ namespace robotick
 		double gain;
 		int threshold;
 		FixedString32 label;
-		Blackboard config_blackboard; // you would tend to only use a Blackboard on a scripting Workload where you don't know your fields in advance -
-									  // more indirection means they are a bit slower to use
+		Blackboard blackboard; // you would tend to only use a Blackboard on a scripting Workload where you don't know your fields in advance -
+							   // more indirection means they are a bit slower to use
 	};
 	ROBOTICK_BEGIN_FIELDS(TemplateConfig)
-	ROBOTICK_FIELD(TemplateConfig, gain)
-	ROBOTICK_FIELD(TemplateConfig, threshold)
-	ROBOTICK_FIELD(TemplateConfig, label)
+	ROBOTICK_FIELD(TemplateConfig, double, gain)
+	ROBOTICK_FIELD(TemplateConfig, int, threshold)
+	ROBOTICK_FIELD(TemplateConfig, FixedString32, label)
+	ROBOTICK_FIELD(TemplateConfig, Blackboard, blackboard)
 	ROBOTICK_END_FIELDS()
 
 	struct TemplateInput
@@ -35,20 +35,20 @@ namespace robotick
 		double angle;
 		int sensor_value;
 		FixedString16 sensor_label;
-		Blackboard input_blackboard; // (see note on TemplateConfig::config_blackboard)
+		Blackboard blackboard; // (see note on TemplateConfig::blackboard)
 	};
 	ROBOTICK_BEGIN_FIELDS(TemplateInput)
 	ROBOTICK_FIELD(TemplateInput, double, angle)
 	ROBOTICK_FIELD(TemplateInput, int, sensor_value)
 	ROBOTICK_FIELD(TemplateInput, FixedString16, sensor_label)
-	ROBOTICK_FIELD(TemplateInput, Blackboard, input_blackboard)
+	ROBOTICK_FIELD(TemplateInput, Blackboard, blackboard)
 	ROBOTICK_END_FIELDS()
 
 	struct TemplateOutput
 	{
 		double command;
 		FixedString64 status;
-		Blackboard output_blackboard; // (see note on TemplateConfig::config_blackboard)
+		Blackboard blackboard; // (see note on TemplateConfig::blackboard)
 
 		bool has_called_set_children = false;
 		bool has_called_set_engine = false;
@@ -63,6 +63,14 @@ namespace robotick
 	ROBOTICK_FIELD(TemplateOutput, double, command)
 	ROBOTICK_FIELD(TemplateOutput, FixedString64, status)
 	ROBOTICK_FIELD(TemplateOutput, Blackboard, status)
+	ROBOTICK_FIELD(TemplateOutput, bool, has_called_set_children)
+	ROBOTICK_FIELD(TemplateOutput, bool, has_called_set_engine)
+	ROBOTICK_FIELD(TemplateOutput, bool, has_called_pre_load)
+	ROBOTICK_FIELD(TemplateOutput, bool, has_called_load)
+	ROBOTICK_FIELD(TemplateOutput, bool, has_called_setup)
+	ROBOTICK_FIELD(TemplateOutput, bool, has_called_start)
+	ROBOTICK_FIELD(TemplateOutput, bool, has_called_tick)
+	ROBOTICK_FIELD(TemplateOutput, bool, has_called_stop)
 	ROBOTICK_END_FIELDS()
 
 	//------------------------------------------------------------------------------
@@ -81,6 +89,8 @@ namespace robotick
 			// e.g. AsyncPairWorkload, SyncedGroupWorkloads, SequencedGroupWorkload)
 
 			outputs.has_called_set_children = true; // (for unit-testing of this template - not for illustrating suggested usage!)
+			(void)children;
+			(void)connections; // (just to stop compiler warning is about unused args)
 		}
 
 		void set_engine(const Engine& engine)
@@ -88,6 +98,7 @@ namespace robotick
 			// Access engine if needed (avoid unless you know what you're doing - typically only used on telemetry- and compositional workloads)
 
 			outputs.has_called_set_engine = true; // (for unit-testing of this template - not for illustrating suggested usage!)
+			(void)engine;						  // (just to stop compiler warning is about unused args)
 		}
 
 		void pre_load()
@@ -95,36 +106,51 @@ namespace robotick
 			// Called before blackboards or memory allocated...
 
 			// ... meaning it is the correct place to set the schema for each of our blackboards, for example:
-			config.blackboard = Blackboard({BlackboardFieldInfo("my_config_double", "double")});
-			inputs.blackboard = Blackboard({BlackboardFieldInfo("my_config_int", "int"), BlackboardFieldInfo("my_config_string", "FixedString64")});
-			outputs.blackboard = Blackboard({BlackboardFieldInfo("my_config_string", "FixedString64")});
+			config.blackboard = Blackboard({BlackboardFieldInfo("my_config_double", GET_TYPE_ID(double))});
 
-			outputs.has_called_preload = true; // (for unit-testing of this template - not for illustrating suggested usage!)
+			inputs.blackboard = Blackboard(
+				{BlackboardFieldInfo("my_config_int", GET_TYPE_ID(int)), BlackboardFieldInfo("my_config_string", GET_TYPE_ID(FixedString64))});
+
+			outputs.blackboard = Blackboard({BlackboardFieldInfo("my_config_string", GET_TYPE_ID(FixedString64))});
+
+			outputs.has_called_pre_load = true; // (for unit-testing of this template - not for illustrating suggested usage!)
 		}
 
 		void load()
 		{
 			// Called after blackboards allocated, safe to inspect config/inputs/outputs
+
+			outputs.has_called_load = true; // (for unit-testing of this template - not for illustrating suggested usage!)
 		}
 
 		void setup()
 		{
 			// Called once before first tick
+
+			outputs.has_called_setup = true; // (for unit-testing of this template - not for illustrating suggested usage!)
 		}
 
 		void start(double time_now)
 		{
 			// Called once when ticking begins
+
+			outputs.has_called_start = true; // (for unit-testing of this template - not for illustrating suggested usage!)
+			(void)time_now;					 // (just to stop compiler warning is about unused args)
 		}
 
 		void tick(double delta_time)
 		{
 			// Main tick loop
+
+			outputs.has_called_tick = true; // (for unit-testing of this template - not for illustrating suggested usage!)
+			(void)delta_time;				// (just to stop compiler warning is about unused args)
 		}
 
 		void stop()
 		{
 			// Called after ticking has stopped
+
+			outputs.has_called_stop = true; // (for unit-testing of this template - not for illustrating suggested usage!)
 		}
 	};
 

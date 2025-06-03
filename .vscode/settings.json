@@ -4,8 +4,6 @@
     "cmake.buildPreset": "ubuntu-x64-debug",
     "cmake.sourceDirectory": "${workspaceFolder}",
     "cmake.buildDirectory": "${workspaceFolder}/build",
-    "cmake.ctestEnabled": false,
-    "cmake.enableTestExplorer": false,
     "testMate.cpp.testFramework": "catch2",
     "testMate.cpp.enableTestDiscovery": true,
     "testMate.cpp.debug.config.template": "Debug Robotick Tests (No Leak Check)",
@@ -13,11 +11,6 @@
     "catch2TestExplorer.executables": [
         "**/robotick_tests"
     ],
-    "cortex-debug.objdumpPath": "C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32s3-elf-objdump.exe",
-    "cortex-debug.nmPath": "C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32s3-elf-nm.exe",
-    "cortex-debug.gdbPath": "C:/Espressif/tools/xtensa-esp32s3-elf/esp-14.2.0_20241119/xtensa-esp32s3-elf/bin/xtensa-esp32s3-elf-gdb.exe",
-    "cortex-debug.openocdPath": "C:/Espressif/tools/openocd-esp32/v0.12.0-esp32-20241016/openocd-esp32/bin/openocd.exe",
-    "cortex-debug.armToolchainPath": "C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin",
     "C_Cpp.default.compileCommands": "${workspaceFolder}/build/ubuntu-x64-debug/compile_commands.json",
     "C_Cpp.codeAnalysis.clangTidy.enabled": true,
     "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
@@ -119,6 +112,5 @@
         "xtr1common": "cpp",
         "xtree": "cpp",
         "xutility": "cpp"
-    },
-    "idf.pythonInstallPath": "C:\\Espressif\\tools\\idf-python\\3.11.2\\python.exe"
+    }
 }

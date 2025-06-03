@@ -22,7 +22,7 @@ void populate_model(robotick::Model& model)
 	auto test_state_2 = model.add(
 		"PythonWorkload", "test_state_2", 1.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
 
-	std::vector<WorkloadHandle> children = {console, test_state_1, test_state_2};
+	std::vector<robotick::WorkloadHandle> children = {console, test_state_1, test_state_2};
 	auto root = model.add("SyncedGroupWorkload", "root_group", children, 1000.0);
 	model.set_root(root);
 }
