@@ -10,16 +10,18 @@ idf_component_register(
         src/robotick/framework/utils/ConsoleTable.cpp
         src/robotick/framework/utils/ConsoleTelemetryTable.cpp
         src/robotick/framework/utils/WorkloadFieldsIterator.cpp
+        # workloads
         src/robotick/workloads/composition/SequencedGroupWorkload.cpp
         src/robotick/workloads/composition/SyncedGroupWorkload.cpp
         src/robotick/workloads/diagnostics/ConsoleTelemetryWorkload.cpp
         src/robotick/workloads/diagnostics/HelloWorkload.cpp
         src/robotick/workloads/diagnostics/TimingDiagnosticsWorkload.cpp
+        src/robotick/workloads/ui/HeartbeatDisplayWorkload.cpp
         # Add other minimal ESP32-safe files only
 
     INCLUDE_DIRS include
     
-    REQUIRES esp_timer
+    REQUIRES driver esp_timer esp_common M5Unified M5GFX
 )
 
 

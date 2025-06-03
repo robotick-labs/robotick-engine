@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/api.h"
+#include "robotick/api_base.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/utils/TypeId.h"
 
@@ -36,8 +36,8 @@ namespace robotick
 
 	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard basic construction and memory layout", "[blackboard]")
 	{
-		std::vector<BlackboardFieldInfo> schema = {{"age", TypeId(GET_TYPE_ID(int))}, {"score", TypeId(GET_TYPE_ID(double))},
-			{"name", TypeId(GET_TYPE_ID(FixedString64))}};
+		std::vector<BlackboardFieldInfo> schema = {
+			{"age", TypeId(GET_TYPE_ID(int))}, {"score", TypeId(GET_TYPE_ID(double))}, {"name", TypeId(GET_TYPE_ID(FixedString64))}};
 
 		auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
 
@@ -52,8 +52,8 @@ namespace robotick
 
 	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard binds to WorkloadsBuffer and performs typed access", "[blackboard][buffer]")
 	{
-		std::vector<BlackboardFieldInfo> schema = {{"age", TypeId(GET_TYPE_ID(int))}, {"score", TypeId(GET_TYPE_ID(double))},
-			{"name", TypeId(GET_TYPE_ID(FixedString64))}};
+		std::vector<BlackboardFieldInfo> schema = {
+			{"age", TypeId(GET_TYPE_ID(int))}, {"score", TypeId(GET_TYPE_ID(double))}, {"name", TypeId(GET_TYPE_ID(FixedString64))}};
 
 		auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
 

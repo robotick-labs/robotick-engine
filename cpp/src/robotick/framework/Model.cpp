@@ -4,7 +4,7 @@
 
 #include "robotick/framework/Model.h"
 
-#include "robotick/api.h"
+#include "robotick/api_base.h"
 #include "robotick/framework/data/DataConnection.h"
 
 #include <cassert>

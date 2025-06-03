@@ -65,7 +65,7 @@ add_executable(robotick_tests ${ROBOTICK_TEST_SOURCES})
 # Link against core framework and Catch2
 target_link_libraries(robotick_tests
   PRIVATE
-    robotick_framework
+    robotick-engine
     Catch2::Catch2WithMain
 )
 
@@ -80,8 +80,8 @@ target_compile_definitions(robotick_tests PRIVATE CATCH_CONFIG_ENABLE_EXCEPTIONS
 include(Catch)
 catch_discover_tests(robotick_tests)
 
-# Ensure robotick_framework is built before running tests
-add_dependencies(robotick_tests robotick_framework)
+# Ensure robotick-engine is built before running tests
+add_dependencies(robotick_tests robotick-engine)
 
 # ========================
 # ✅ Runtime DLL Copy (for VS Code / Debugging)
@@ -89,6 +89,6 @@ add_dependencies(robotick_tests robotick_framework)
 
 add_custom_command(TARGET robotick_tests POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    $<TARGET_FILE:robotick_framework>
+    $<TARGET_FILE:robotick-engine>
     $<TARGET_FILE_DIR:robotick_tests>
 )

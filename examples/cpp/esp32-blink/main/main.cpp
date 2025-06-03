@@ -22,6 +22,7 @@ namespace robotick
 	void ensure_workloads()
 	{
 		ROBOTICK_KEEP_WORKLOAD(ConsoleTelemetryWorkload)
+		ROBOTICK_KEEP_WORKLOAD(HeartbeatDisplayWorkload)
 		ROBOTICK_KEEP_WORKLOAD(TimingDiagnosticsWorkload)
 		ROBOTICK_KEEP_WORKLOAD(SyncedGroupWorkload)
 	}
@@ -52,7 +53,7 @@ void create_non_threaded_model(robotick::Model& model)
 
 void create_simple_model(robotick::Model& model)
 {
-	auto root = model.add("TimingDiagnosticsWorkload", "timing_diag", 1000.0);
+	auto root = model.add("HeartbeatDisplayWorkload", "heartbeat", 30.0);
 	model.set_root(root);
 }
 

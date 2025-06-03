@@ -4,6 +4,8 @@
 
 #pragma once
 
-#include "robotick/config/AssertUtils.h"
-#include "robotick/config/PlatformDefaults.h"
-#include "robotick/config/PlatformDefines.h"
+#include "robotick/api_base.h"
+
+#include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/registry/FieldRegistry.h"
+#include "robotick/framework/registry/WorkloadRegistry.h"
