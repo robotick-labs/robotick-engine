@@ -15,6 +15,7 @@
                 "CMAKE_C_COMPILER": "/usr/bin/gcc",
                 "CMAKE_CXX_COMPILER": "/usr/bin/g++",
                 "ROBOTICK_PLATFORM_UBUNTU": "ON",
+                "ROBOTICK_PLATFORM_DESKTOP": "ON",
                 "ROBOTICK_ENABLE_PYTHON": "ON",
                 "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-ubuntu-x64.cmake"
             }

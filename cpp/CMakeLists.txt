@@ -17,17 +17,18 @@ idf_component_register(
         src/robotick/workloads/diagnostics/HelloWorkload.cpp
         src/robotick/workloads/diagnostics/TimingDiagnosticsWorkload.cpp
         src/robotick/workloads/ui/HeartbeatDisplayWorkload.cpp
-        # Add other minimal ESP32-safe files only
 
     INCLUDE_DIRS include
-    
+
     REQUIRES driver esp_timer esp_common M5Unified M5GFX
 )
 
+# ✅ Works reliably in ESP-IDF — apply to all files in this component
+add_definitions(-DROBOTICK_PLATFORM_ESP32)
 
+# Linker flags (unchanged)
 target_link_options(${COMPONENT_LIB} PRIVATE "-Wl,--gc-sections")
 set_property(TARGET ${COMPONENT_LIB} APPEND PROPERTY LINK_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/robotick_linker_patch.ld")
 target_link_options(${COMPONENT_LIB} PRIVATE
   "-T${CMAKE_CURRENT_SOURCE_DIR}/robotick_linker_patch.ld")
-  

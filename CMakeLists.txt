@@ -69,6 +69,9 @@ target_compile_options(robotick-engine PRIVATE -fno-exceptions)
 
 if(ROBOTICK_PLATFORM_UBUNTU)
     add_compile_definitions(ROBOTICK_PLATFORM_UBUNTU)
+    add_compile_definitions(ROBOTICK_PLATFORM_DESKTOP)
+elseif(ROBOTICK_PLATFORM_ESP32)
+    add_compile_definitions(ROBOTICK_PLATFORM_ESP32)
 endif()
 
 # =========================

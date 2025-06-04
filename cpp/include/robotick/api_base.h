@@ -6,4 +6,3 @@
 
 #include "robotick/config/AssertUtils.h"
 #include "robotick/config/PlatformDefaults.h"
-#include "robotick/config/PlatformDefines.h"
