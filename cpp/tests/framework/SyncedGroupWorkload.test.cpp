@@ -113,7 +113,7 @@ namespace
 
 TEST_CASE("Unit|Workloads|SyncedGroupWorkload|All children tick in parallel")
 {
-	const TickInfo tick_info = TICK_INFO_10MS_100HZ;
+	const TickInfo tick_info = TICK_INFO_FIRST_10MS_100HZ;
 	const double tick_rate_hz = 1.0 / tick_info.delta_time;
 	const int tick_count = 5;
 
@@ -156,7 +156,7 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|Child busy flags skip ticks")
 {
 	using namespace std::chrono;
 
-	const TickInfo tick_info = TICK_INFO_10MS_100HZ;
+	const TickInfo tick_info = TICK_INFO_FIRST_10MS_100HZ;
 	const double tick_rate_hz = 1.0 / tick_info.delta_time;
 	constexpr int num_ticks = 5;
 
@@ -201,7 +201,7 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|tick() passes real time_delta (chi
 {
 	using namespace std::chrono;
 
-	const TickInfo tick_info = TICK_INFO_10MS_100HZ;
+	const TickInfo tick_info = TICK_INFO_FIRST_10MS_100HZ;
 	const double tick_rate_hz = 1.0 / tick_info.delta_time;
 
 	Model model;
@@ -242,9 +242,9 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|Child allowed to run at slower fix
 {
 	using namespace std::chrono;
 
-	const TickInfo group_tick_info = TICK_INFO_10MS_100HZ;
+	const TickInfo group_tick_info = TICK_INFO_FIRST_10MS_100HZ;
 	const double group_tick_rate_hz = 1.0 / group_tick_info.delta_time;
-	const double child_tick_rate_hz = 1.0 / TICK_INFO_100MS_10HZ.delta_time; // child wants to tick 10x slower than group - we should let it
+	const double child_tick_rate_hz = 1.0 / TICK_INFO_FIRST_100MS_10HZ.delta_time; // child wants to tick 10x slower than group - we should let it
 
 	Model model;
 	const auto h = model.add("CountingWorkload", "slower", child_tick_rate_hz);

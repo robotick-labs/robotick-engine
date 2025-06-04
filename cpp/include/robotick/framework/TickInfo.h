@@ -17,22 +17,22 @@ namespace robotick
 		uint64_t tick_count = 0;  // Number of ticks since engine start
 	};
 
-	static const TickInfo TICK_INFO_1MS_1KHZ = {
+	static const TickInfo TICK_INFO_FIRST_1MS_1KHZ = {
 		0.001,	   // delta_time (1 millisecond)
 		0.001,	   // time_now (same as delta_time for first tick)
 		1'000'000, // time_now_ns (1 ms in nanoseconds)
 		1		   // tick_count
 	};
 
-	static const TickInfo TICK_INFO_10MS_100HZ = {
+	static const TickInfo TICK_INFO_FIRST_10MS_100HZ = {
 		0.01,		// delta_time (10 milliseconds)
 		0.01,		// time_now (same as delta_time for first tick)
 		10'000'000, // time_now_ns (10 ms in nanoseconds)
 		1			// tick_count
 	};
 
-	static const TickInfo TICK_INFO_100MS_10HZ = {
-		0.1,		 // delta_time (10 milliseconds)
+	static const TickInfo TICK_INFO_FIRST_100MS_10HZ = {
+		0.1,		 // delta_time (100 milliseconds)
 		0.1,		 // time_now (same as delta_time for first tick)
 		100'000'000, // time_now_ns (10 ms in nanoseconds)
 		1			 // tick_count

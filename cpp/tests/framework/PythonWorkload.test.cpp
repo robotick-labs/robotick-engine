@@ -56,7 +56,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Python tick executes")
 	REQUIRE(info.type != nullptr);
 	REQUIRE(info.type->tick_fn != nullptr);
 
-	REQUIRE_NOTHROW(info.type->tick_fn(inst_ptr, TICK_INFO_10MS_100HZ));
+	REQUIRE_NOTHROW(info.type->tick_fn(inst_ptr, TICK_INFO_FIRST_10MS_100HZ));
 }
 
 TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
@@ -76,7 +76,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	REQUIRE(info.type->tick_fn != nullptr);
 
 	// Execute tick
-	info.type->tick_fn(inst_ptr, TICK_INFO_10MS_100HZ);
+	info.type->tick_fn(inst_ptr, TICK_INFO_FIRST_10MS_100HZ);
 
 	// === Find the output blackboard ===
 	const auto* output_struct = info.type->output_struct;
