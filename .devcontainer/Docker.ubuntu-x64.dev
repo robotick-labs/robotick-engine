@@ -1,6 +1,6 @@
 FROM ubuntu:24.04
 
-# 🛠 Install system dependencies
+# 🛠 Install system dependencies + Paho MQTT C from apt
 RUN apt-get update && apt-get install -y \
     cmake \
     clang \
@@ -14,16 +14,28 @@ RUN apt-get update && apt-get install -y \
     python3-venv \
     ninja-build \
     gdb \
-    && apt-get clean
+    libssl-dev \
+    libpaho-mqtt-dev \
+    libpaho-mqtt1.3 && \
+    apt-get clean
 
-# Create and activate Python venv, install robotick in editable mode
+# 🔧 Build and install Paho MQTT C++ manually
+RUN git clone --depth=1 https://github.com/eclipse/paho.mqtt.cpp.git /tmp/paho.mqtt.cpp && \
+    cd /tmp/paho.mqtt.cpp && \
+    cmake -Bbuild -S. \
+        -DPAHO_BUILD_STATIC=TRUE \
+        -DPAHO_BUILD_SHARED=TRUE \
+        -DCMAKE_PREFIX_PATH=/usr && \
+    cmake --build build --target install && \
+    ldconfig && \
+    rm -rf /tmp/paho.mqtt.cpp
+
+# 🐍 Python venv and Robotick install
 WORKDIR /workspace
 COPY . .
 
-# Create virtual environment and install into it
 RUN python3 -m venv /venv && \
     /venv/bin/pip install -U pip && \
     /venv/bin/pip install -e .
 
-# Make it default for future Docker RUN/CMD steps
 ENV PATH="/venv/bin:$PATH"

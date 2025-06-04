@@ -104,6 +104,16 @@ else()
 endif()
 
 # =========================
+# ✅ Additional libs
+# =========================
+
+target_link_libraries(robotick-engine PUBLIC nlohmann_json::nlohmann_json)
+
+find_package(PahoMqttCpp REQUIRED)
+target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3)
+
+
+# =========================
 # ✅ Optional Executable
 # =========================
 
@@ -143,6 +153,12 @@ if (ROBOTICK_BUILD_TESTS)
 else()
     message(STATUS "❌ ROBOTICK_BUILD_TESTS - OFF")
 endif()
+
+# =========================
+# ✅ Add JSON Submodule
+# =========================
+
+add_subdirectory(cpp/libs/json)
 
 # =========================
 # ✅ Auto-add License Headers
