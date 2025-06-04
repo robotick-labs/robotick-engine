@@ -11,5 +11,5 @@ cpp/build/*
 *_LOG.TXT
 out/*
 my_git_config.sh
-examples/cpp/esp32-blink/build/*
-examples/cpp/esp32-blink/robotick_framework
+examples/cpp/esp32-blink/build
+examples/cpp/esp32-blink/components

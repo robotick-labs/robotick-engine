@@ -51,24 +51,6 @@ namespace robotick
 		}
 	}
 
-	// Move constructor
-	inline Thread::Thread(Thread&& other) noexcept
-	{
-		handle = other.handle;
-		other.handle = nullptr;
-	}
-
-	// Move assignment
-	inline Thread& Thread::operator=(Thread&& other) noexcept
-	{
-		if (this != &other)
-		{
-			handle = other.handle;
-			other.handle = nullptr;
-		}
-		return *this;
-	}
-
 	inline Thread::~Thread()
 	{
 		// Task deletes itself using vTaskDelete(nullptr)

@@ -1,7 +1,7 @@
 // Copyright Robotick Labs
 #include "robotick/framework/registry/WorkloadRegistry.h"
 
-#include "robotick/api.h"
+#include "robotick/api_base.h"
 
 #include <memory>
 #include <stdexcept>

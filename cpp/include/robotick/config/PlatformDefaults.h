@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "robotick/config/PlatformDefines.h"
-
 namespace robotick
 {
 	// DEFAULT_MAX_BLACKBOARDS_BYTES
