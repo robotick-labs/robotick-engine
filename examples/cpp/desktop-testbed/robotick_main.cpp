@@ -17,7 +17,7 @@ void signal_handler()
 
 void populate_model(robotick::Model& model)
 {
-	auto console = model.add("ConsoleTelemetryWorkload", "console", 10.0);
+	auto console = model.add("ConsoleTelemetryWorkload", "console", 5.0);
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
 	auto test_state_2 = model.add(
 		"PythonWorkload", "test_state_2", 1.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});

@@ -23,6 +23,7 @@ namespace robotick
 	// Forward declaration(s)
 	class Engine;
 	struct DataConnectionInfo;
+	struct TickInfo;
 	struct WorkloadInstanceInfo;
 
 	// Utility to detect void
@@ -80,7 +81,7 @@ namespace robotick
 	template <typename, typename = std::void_t<>> struct has_tick : std::false_type
 	{
 	};
-	template <typename T> struct has_tick<T, std::void_t<decltype(std::declval<T>().tick(std::declval<double>()))>> : std::true_type
+	template <typename T> struct has_tick<T, std::void_t<decltype(std::declval<T>().tick(std::declval<const TickInfo&>()))>> : std::true_type
 	{
 	};
 
@@ -175,7 +176,7 @@ namespace robotick
 		void (*load_fn)(void*);
 		void (*setup_fn)(void*);
 		void (*start_fn)(void*, double);
-		void (*tick_fn)(void*, double);
+		void (*tick_fn)(void*, const TickInfo&);
 		void (*stop_fn)(void*);
 	};
 
@@ -203,7 +204,7 @@ namespace robotick
 		void (*load_fn)(void*) = nullptr;
 		void (*setup_fn)(void*) = nullptr;
 		void (*start_fn)(void*, double) = nullptr;
-		void (*tick_fn)(void*, double) = nullptr;
+		void (*tick_fn)(void*, const TickInfo&) = nullptr;
 		void (*stop_fn)(void*) = nullptr;
 
 		if constexpr (has_set_children<Type>::value)
@@ -237,9 +238,9 @@ namespace robotick
 				static_cast<Type*>(i)->start(d);
 			};
 		if constexpr (has_tick<Type>::value)
-			tick_fn = +[](void* i, double dt)
+			tick_fn = +[](void* i, const TickInfo& tick_info)
 			{
-				static_cast<Type*>(i)->tick(dt);
+				static_cast<Type*>(i)->tick(tick_info);
 			};
 		if constexpr (has_stop<Type>::value)
 			stop_fn = +[](void* i)

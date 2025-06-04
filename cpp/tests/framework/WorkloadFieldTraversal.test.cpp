@@ -42,7 +42,7 @@ namespace robotick::test
 			SimpleInputs inputs;
 			SimpleOutputs outputs;
 
-			void tick(double) { outputs.output_value = inputs.input_value + 1; }
+			void tick(const TickInfo&) { outputs.output_value = inputs.input_value + 1; }
 		};
 
 		ROBOTICK_DEFINE_WORKLOAD(SimpleWorkload, void, SimpleInputs, SimpleOutputs)
@@ -200,7 +200,7 @@ namespace robotick::test
 		struct BBWorkload
 		{
 			BBInputs inputs;
-			void tick(double) {}
+			void tick(const TickInfo&) {}
 		};
 		ROBOTICK_DEFINE_WORKLOAD(BBWorkload, void, BBInputs, void)
 

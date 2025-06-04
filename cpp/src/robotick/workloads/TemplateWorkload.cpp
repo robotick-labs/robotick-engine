@@ -2,11 +2,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/api_base.h"
-#include "robotick/framework/common/FixedString.h"
+#include "robotick/api.h"
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 
 namespace robotick
 {
@@ -139,12 +136,12 @@ namespace robotick
 			(void)time_now;					 // (just to stop compiler warning is about unused args)
 		}
 
-		void tick(double delta_time)
+		void tick(const TickInfo& tick_info)
 		{
 			// Main tick loop
 
 			outputs.has_called_tick = true; // (for unit-testing of this template - not for illustrating suggested usage!)
-			(void)delta_time;				// (just to stop compiler warning is about unused args)
+			(void)tick_info;				// (just to stop compiler warning is about unused args)
 		}
 
 		void stop()

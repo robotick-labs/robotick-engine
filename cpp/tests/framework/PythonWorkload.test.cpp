@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/api.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/data/Blackboard.h"
@@ -55,7 +56,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Python tick executes")
 	REQUIRE(info.type != nullptr);
 	REQUIRE(info.type->tick_fn != nullptr);
 
-	REQUIRE_NOTHROW(info.type->tick_fn(inst_ptr, 0.01));
+	REQUIRE_NOTHROW(info.type->tick_fn(inst_ptr, TICK_INFO_10MS_100HZ));
 }
 
 TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
@@ -75,7 +76,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	REQUIRE(info.type->tick_fn != nullptr);
 
 	// Execute tick
-	info.type->tick_fn(inst_ptr, 0.01);
+	info.type->tick_fn(inst_ptr, TICK_INFO_10MS_100HZ);
 
 	// === Find the output blackboard ===
 	const auto* output_struct = info.type->output_struct;

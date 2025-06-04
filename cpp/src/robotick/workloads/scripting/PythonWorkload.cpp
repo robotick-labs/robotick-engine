@@ -2,13 +2,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/api_base.h"
-#include "robotick/framework/common/FixedString.h"
+#include "robotick/api.h"
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/PythonRuntime.h"
-#include "robotick/framework/utils/TypeId.h"
 
 #include <algorithm>
 #include <cassert>
@@ -178,7 +174,7 @@ namespace robotick
 			}
 		}
 
-		void tick(double time_delta)
+		void tick(const TickInfo& tick_info)
 		{
 			if (!internal_state->py_instance)
 				return;
@@ -207,7 +203,7 @@ namespace robotick
 			// engine not supporting exceptions)
 			try
 			{
-				internal_state->py_instance.attr("tick")(time_delta, py_in, py_out);
+				internal_state->py_instance.attr("tick")(tick_info.delta_time, py_in, py_out);
 			}
 			catch (const py::error_already_set& e)
 			{

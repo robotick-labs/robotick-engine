@@ -38,7 +38,7 @@ namespace robotick::test
 			RegistryTestInputs inputs;
 			RegistryTestOutputs outputs;
 
-			void tick(double) { outputs.output_value_1 = inputs.input_value + 1; }
+			void tick(const TickInfo&) { outputs.output_value_1 = inputs.input_value + 1; }
 		};
 
 		ROBOTICK_DEFINE_WORKLOAD(RegistryTestWorkload, void, RegistryTestInputs, RegistryTestOutputs)

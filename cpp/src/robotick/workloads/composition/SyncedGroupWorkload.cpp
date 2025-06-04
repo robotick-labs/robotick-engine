@@ -2,10 +2,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/api.h"
+#include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/DataConnection.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/platform/Threading.h"
 
 #include <atomic>
@@ -35,7 +34,6 @@ namespace robotick
 		std::mutex tick_mutex;
 
 		bool running = false;
-		double tick_interval_sec = 0.0;
 
 		void set_engine(const Engine& engine_in) { engine = &engine_in; }
 
@@ -68,9 +66,8 @@ namespace robotick
 			}
 		}
 
-		void start(double tick_rate_hz)
+		void start(double)
 		{
-			tick_interval_sec = 1.0 / tick_rate_hz;
 			running = true;
 
 			for (auto& child : children)
@@ -100,9 +97,10 @@ namespace robotick
 			}
 		}
 
-		void tick(double time_delta)
+		void tick(const TickInfo&)
 		{
-			tick_interval_sec = time_delta;
+			// note - we don't use the supplied TickInfo as we don't need if for ourselves, and our children are allowed to tick at their requested
+			// rate (as long as equal to or slower than our tick rate).  That is enforced in Model validation code.
 
 			for (auto& child : children)
 			{
@@ -135,8 +133,9 @@ namespace robotick
 			ROBOTICK_ASSERT(child.type && child.type->tick_fn && child.tick_rate_hz > 0.0);
 
 			uint32_t last_tick = 0;
-			auto next_tick_time = std::chrono::steady_clock::now();
-			auto last_tick_time = std::chrono::steady_clock::now();
+			const auto child_start_time = std::chrono::steady_clock::now();
+			auto last_tick_time = child_start_time;
+			auto next_tick_time = child_start_time;
 
 			const auto tick_interval_sec = std::chrono::duration<double>(1.0 / child.tick_rate_hz);
 			const auto tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(tick_interval_sec);
@@ -145,12 +144,14 @@ namespace robotick
 			Thread::set_affinity(2);
 			Thread::set_priority_high();
 
+			TickInfo tick_info;
+
 			while (true)
 			{
 				{
 					std::unique_lock<std::mutex> lock(tick_mutex);
 					tick_cv.wait(lock,
-						[&]()
+						[&]
 						{
 							return child_info.tick_counter->load() > last_tick || !running;
 						});
@@ -160,18 +161,25 @@ namespace robotick
 				if (!running)
 					return;
 
-				auto now_pre_tick = std::chrono::steady_clock::now();
-				double time_delta = std::chrono::duration<double>(now_pre_tick - last_tick_time).count();
-				last_tick_time = now_pre_tick;
+				const auto now = std::chrono::steady_clock::now();
+				const auto ns_since_start = std::chrono::duration_cast<std::chrono::nanoseconds>(now - child_start_time).count();
+				const auto ns_since_last = std::chrono::duration_cast<std::chrono::nanoseconds>(now - last_tick_time).count();
+
+				tick_info.tick_count += 1;
+				tick_info.time_now_ns = ns_since_start;
+				tick_info.time_now = ns_since_start * 1e-9;
+				tick_info.delta_time = ns_since_last * 1e-9;
+
+				last_tick_time = now;
 
 				std::atomic_thread_fence(std::memory_order_acquire);
 
-				child.type->tick_fn(child_info.workload_ptr, time_delta);
+				child.type->tick_fn(child_info.workload_ptr, tick_info);
 				next_tick_time += tick_interval;
 
-				auto now_post_tick = std::chrono::steady_clock::now();
-				child.mutable_stats.last_tick_duration = std::chrono::duration<double>(now_post_tick - now_pre_tick).count();
-				child.mutable_stats.last_time_delta = time_delta;
+				const auto now_post = std::chrono::steady_clock::now();
+				child.mutable_stats.last_tick_duration = std::chrono::duration<double>(now_post - now).count();
+				child.mutable_stats.last_time_delta = tick_info.delta_time;
 
 				Thread::hybrid_sleep_until(std::chrono::time_point_cast<std::chrono::steady_clock::duration>(next_tick_time));
 			}
@@ -195,7 +203,7 @@ namespace robotick
 			impl->set_children(children, pending_connections);
 		}
 		void start(double tick_rate_hz) { impl->start(tick_rate_hz); }
-		void tick(double time_delta) { impl->tick(time_delta); }
+		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
 		void stop() { impl->stop(); }
 	};
 

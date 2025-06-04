@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/api.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -23,7 +24,7 @@ namespace
 	struct DummyTickingWorkload
 	{
 		inline static int tick_count = 0;
-		void tick(double) { ++tick_count; }
+		void tick(const TickInfo&) { ++tick_count; }
 		static void reset() { tick_count = 0; }
 	};
 
@@ -31,7 +32,7 @@ namespace
 	{
 		DummyTickingWorkload* impl = new DummyTickingWorkload();
 		~DummyTickingWrapper() { delete impl; }
-		void tick(double time_delta) { impl->tick(time_delta); }
+		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
 	};
 
 	struct DummyTickingRegister
@@ -49,9 +50,9 @@ namespace
 					static_cast<DummyTickingWrapper*>(p)->~DummyTickingWrapper();
 				},
 				nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-				[](void* p, double time_delta)
+				[](void* p, const TickInfo& tick_info)
 				{
-					static_cast<DummyTickingWrapper*>(p)->tick(time_delta);
+					static_cast<DummyTickingWrapper*>(p)->tick(tick_info);
 				},
 				nullptr};
 
@@ -64,13 +65,13 @@ namespace
 
 	struct SlowTickWorkload
 	{
-		void tick(double) { std::this_thread::sleep_for(std::chrono::milliseconds(20)); }
+		void tick(const TickInfo&) { std::this_thread::sleep_for(std::chrono::milliseconds(20)); }
 	};
 
 	struct SlowWrapper
 	{
 		SlowTickWorkload impl;
-		void tick(double time_delta) { impl.tick(time_delta); }
+		void tick(const TickInfo& tick_info) { impl.tick(tick_info); }
 	};
 
 	struct SlowTickRegister
@@ -88,9 +89,9 @@ namespace
 					static_cast<SlowWrapper*>(p)->~SlowWrapper();
 				},
 				nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-				[](void* p, double time_delta)
+				[](void* p, const TickInfo& tick_info)
 				{
-					static_cast<SlowWrapper*>(p)->tick(time_delta);
+					static_cast<SlowWrapper*>(p)->tick(tick_info);
 				},
 				nullptr};
 
@@ -118,7 +119,7 @@ TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Child ticks are invoked in sequ
 	REQUIRE(group_ptr != nullptr);
 
 	REQUIRE_NOTHROW(group_info.type->start_fn(group_ptr, 50.0));
-	REQUIRE_NOTHROW(group_info.type->tick_fn(group_ptr, 0.01));
+	REQUIRE_NOTHROW(group_info.type->tick_fn(group_ptr, TICK_INFO_10MS_100HZ));
 	REQUIRE_NOTHROW(group_info.type->stop_fn(group_ptr));
 
 	CHECK(DummyTickingWorkload::tick_count == 2);
@@ -135,5 +136,5 @@ TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Overrun logs if exceeded")
 	engine.load(model);
 
 	const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
-	REQUIRE_NOTHROW(group_info.type->tick_fn(group_info.get_ptr(engine), 0.001)); // 1ms budget, expect warning log
+	REQUIRE_NOTHROW(group_info.type->tick_fn(group_info.get_ptr(engine), TICK_INFO_1MS_1KHZ)); // 1ms budget, expect warning log
 }
