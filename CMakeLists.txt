@@ -140,12 +140,6 @@ if (ROBOTICK_BUILD_TESTS)
             $<TARGET_FILE:robotick-engine>
             ${CMAKE_BINARY_DIR}/cpp/tests/$<CONFIG>
     )
-
-    add_custom_command(TARGET robotick-engine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:robotick-engine>
-            ${CMAKE_BINARY_DIR}/Debug
-    )
 else()
     message(STATUS "❌ ROBOTICK_BUILD_TESTS - OFF")
 endif()

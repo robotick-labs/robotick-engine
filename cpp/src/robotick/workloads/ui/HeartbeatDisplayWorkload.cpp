@@ -191,7 +191,7 @@ namespace robotick
 			static constexpr int BAR_THICKNESS = 10;	// Thickness of each bracket‐ring (same “height” as your original horizontal bars)
 			static constexpr int BAR_SPACING = 6;		// Gap (in pixels) between nested bracket‐rings
 			static constexpr int ANGLE_STEPS = 45;		// Number of segments used to approximate each 90° half‐bracket
-			static constexpr int LABEL_ANGLE = 305;		// ANgle at which to draw our labels
+			static constexpr int LABEL_ANGLE = 305;		// Angle at which to draw our labels
 
 			struct StatBar
 			{
@@ -213,7 +213,7 @@ namespace robotick
 			canvas.setTextColor(WHITE);
 			canvas.setTextDatum(MC_DATUM);
 
-			const int COLOUR_UNFILLED = canvas.color565(50, 30, 30);
+			const int COLOR_UNFILLED = canvas.color565(50, 30, 30);
 			const int LEFT_COUNT = (N + 1) / 2; // more on left if odd
 			const int RIGHT_COUNT = N / 2;
 
@@ -244,7 +244,7 @@ namespace robotick
 					int xo1 = 160 + static_cast<int>(outer_radius * cosf(a1));
 					int yo1 = 120 - static_cast<int>(outer_radius * sinf(a1));
 
-					drawFilledQuad(canvas, xi0, yi0, xo0, yo0, xo1, yo1, xi1, yi1, COLOUR_UNFILLED);
+					drawFilledQuad(canvas, xi0, yi0, xo0, yo0, xo1, yo1, xi1, yi1, COLOR_UNFILLED);
 
 					bool should_fill = left_side ? (s >= ANGLE_STEPS - fill_steps) : (s < fill_steps);
 

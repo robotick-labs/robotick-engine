@@ -45,6 +45,4 @@ include_directories(
     "${IDF_PATH}/components/esp_common/include"
     "${IDF_PATH}/components/esp_system/include"
     "${IDF_PATH}/components/esp_hw_support/include"
-
-    "/workspaces/robotick/esp-idf-dummy"
 )
