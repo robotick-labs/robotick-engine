@@ -44,7 +44,7 @@ namespace robotick::test
 		struct TickCounterWorkload
 		{
 			int count = 0;
-			void tick(double) { count++; }
+			void tick(const TickInfo&) { count++; }
 		};
 		ROBOTICK_DEFINE_WORKLOAD(TickCounterWorkload)
 

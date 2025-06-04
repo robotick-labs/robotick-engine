@@ -2,10 +2,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/api.h"
+#include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/DataConnection.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 
 #include <chrono>
 #include <cstdio>
@@ -79,7 +78,7 @@ namespace robotick
 			pending_connections.swap(remaining);
 		}
 
-		void tick(double time_delta)
+		void tick(const TickInfo& tick_info)
 		{
 			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set by now");
 
@@ -98,20 +97,20 @@ namespace robotick
 					}
 
 					// tick the child:
-					child_info.workload_info->type->tick_fn(child_info.workload_ptr, time_delta);
+					child_info.workload_info->type->tick_fn(child_info.workload_ptr, tick_info);
 
 					const auto now_post_tick = std::chrono::steady_clock::now();
 					child_info.workload_info->mutable_stats.last_tick_duration = std::chrono::duration<double>(now_post_tick - now_pre_tick).count();
 
-					child_info.workload_info->mutable_stats.last_time_delta = time_delta;
+					child_info.workload_info->mutable_stats.last_time_delta = tick_info.delta_time;
 				}
 			}
 
 			auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_time).count();
 
-			if (elapsed > time_delta)
+			if (elapsed > tick_info.delta_time)
 			{
-				std::printf("[Sequenced] Overrun: tick took %.3fms (budget %.3fms)\n", elapsed * 1000.0, time_delta * 1000.0);
+				std::printf("[Sequenced] Overrun: tick took %.3fms (budget %.3fms)\n", elapsed * 1000.0, tick_info.delta_time * 1000.0);
 			}
 		}
 	};
@@ -136,7 +135,7 @@ namespace robotick
 
 		void start(double) { /* placeholder for consistency with SequencedGroup*/ }
 
-		void tick(double time_delta) { impl->tick(time_delta); }
+		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
 
 		void stop() { /* placeholder for consistency with SequencedGroup*/ }
 	};

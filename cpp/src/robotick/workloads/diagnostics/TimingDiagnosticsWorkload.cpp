@@ -2,9 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/api.h"
 
 #include <chrono>
 #include <cmath>
@@ -67,14 +65,14 @@ namespace robotick
 			internal_state.sum_dt2 = 0.0;
 		}
 
-		void tick(double time_delta)
+		void tick(const TickInfo& tick_info)
 		{
-			if (config.log_rate_hz == 0 || time_delta <= 0.0)
+			if (config.log_rate_hz == 0 || tick_info.delta_time <= 0.0)
 			{
 				return;
 			}
 
-			const double actual_dt = time_delta;
+			const double actual_dt = tick_info.delta_time;
 			const double tick_rate = 1.0 / actual_dt;
 
 			outputs.last_tick_rate = tick_rate;

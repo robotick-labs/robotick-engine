@@ -34,7 +34,7 @@ namespace robotick::test
 		struct SenderWorkload
 		{
 			SenderOut outputs;
-			void tick(double) { outputs.output++; }
+			void tick(const TickInfo&) { outputs.output++; }
 		};
 		ROBOTICK_DEFINE_WORKLOAD(SenderWorkload, void, void, SenderOut)
 
@@ -42,7 +42,7 @@ namespace robotick::test
 		{
 			ReceiverIn inputs;
 			std::vector<int> received;
-			void tick(double) { received.push_back(inputs.input); }
+			void tick(const TickInfo&) { received.push_back(inputs.input); }
 		};
 		ROBOTICK_DEFINE_WORKLOAD(ReceiverWorkload, void, ReceiverIn)
 	} // namespace

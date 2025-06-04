@@ -4,9 +4,9 @@
 
 #pragma once
 
+#include "robotick/api.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
-#include "robotick/framework/api.h"
 
 #include <atomic>
 #include <memory>

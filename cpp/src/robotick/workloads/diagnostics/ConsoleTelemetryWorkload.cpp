@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/api.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/ConsoleTelemetryTable.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 
@@ -235,7 +235,7 @@ namespace robotick
 			collector->set_engine(engine);
 		}
 
-		void tick(double)
+		void tick(const TickInfo&)
 		{
 			// Note - when using ConsoleTelemetryWorkload it is strongly recommended to run it at 5-10Hz max.
 			// This avoids overwhelming stdout and dominating frame time, even without pretty printing.

@@ -4,8 +4,7 @@
 
 #include "robotick/framework/Engine.h"
 
-#include "robotick/api_base.h"
-#include "robotick/config/PlatformDefaults.h"
+#include "robotick/api.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
@@ -303,8 +302,14 @@ namespace robotick
 		const auto& root_info = state->instances[root_handle.index];
 		void* root_ptr = root_info.get_ptr(*this);
 
-		if (root_info.tick_rate_hz <= 0 || !root_info.type->tick_fn || !root_ptr)
-			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_rate_hz and tick_fn");
+		if (root_info.tick_rate_hz <= 0.0)
+			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_rate_hz>0.0 - check your model settings");
+
+		if (root_info.type->tick_fn == nullptr)
+			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_fn - check it has been correctly registered");
+
+		if (!root_ptr)
+			ROBOTICK_FATAL_EXIT("Root workload must have valid object-pointer - check it has been correctly registered");
 
 		// Start all workloads
 		for (auto& inst : state->instances)
@@ -315,30 +320,40 @@ namespace robotick
 
 		state->is_running = true;
 
-		const std::chrono::duration<double> tick_interval_sec(1.0 / root_info.tick_rate_hz);
-		const std::chrono::steady_clock::duration tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(tick_interval_sec);
+		const auto child_tick_interval_sec = std::chrono::duration<double>(1.0 / root_info.tick_rate_hz);
+		const auto child_tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(child_tick_interval_sec);
 
-		std::chrono::steady_clock::time_point next_tick_time = std::chrono::steady_clock::now();
-		std::chrono::steady_clock::time_point last_tick_time = next_tick_time;
+		const auto engine_start_time = std::chrono::steady_clock::now();
+		auto last_tick_time = engine_start_time;
+		auto next_tick_time = engine_start_time;
+
+		TickInfo tick_info;
 
 		do
 		{
-			const std::chrono::steady_clock::time_point now_pre_tick = std::chrono::steady_clock::now();
-			const double time_delta = std::chrono::duration<double>(now_pre_tick - last_tick_time).count();
-			last_tick_time = now_pre_tick;
+			const auto now = std::chrono::steady_clock::now();
+			const auto ns_since_start = std::chrono::duration_cast<std::chrono::nanoseconds>(now - engine_start_time).count();
+			const auto ns_since_last = std::chrono::duration_cast<std::chrono::nanoseconds>(now - last_tick_time).count();
+
+			tick_info.tick_count += 1;
+			tick_info.time_now_ns = ns_since_start;
+			tick_info.time_now = ns_since_start * 1e-9;
+			tick_info.delta_time = ns_since_last * 1e-9;
+
+			last_tick_time = now;
 
 			for (size_t index : state->data_connections_acquired_indices)
 				state->data_connections_all[index].do_data_copy();
 
 			std::atomic_thread_fence(std::memory_order_release);
 
-			root_info.type->tick_fn(root_ptr, time_delta);
+			root_info.type->tick_fn(root_ptr, tick_info);
 
-			const std::chrono::steady_clock::time_point now_post_tick = std::chrono::steady_clock::now();
-			root_info.mutable_stats.last_tick_duration = std::chrono::duration<double>(now_post_tick - now_pre_tick).count();
-			root_info.mutable_stats.last_time_delta = time_delta;
+			const auto now_post = std::chrono::steady_clock::now();
+			root_info.mutable_stats.last_tick_duration = std::chrono::duration<double>(now_post - now).count();
+			root_info.mutable_stats.last_time_delta = tick_info.delta_time;
 
-			next_tick_time += tick_interval;
+			next_tick_time += child_tick_interval;
 			Thread::hybrid_sleep_until(next_tick_time);
 
 		} while (!stop_after_next_tick_flag.is_set());

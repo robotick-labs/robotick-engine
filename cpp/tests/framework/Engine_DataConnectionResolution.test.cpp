@@ -39,7 +39,7 @@ namespace robotick::test
 			CountingDataConnOutputs outputs;
 			size_t tick_count = 0;
 
-			void tick(double)
+			void tick(const TickInfo&)
 			{
 				outputs.output_value = inputs.input_value + 1;
 				tick_count++;

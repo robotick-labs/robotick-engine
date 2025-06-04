@@ -18,8 +18,6 @@ namespace robotick
 	{
 		std::scoped_lock lock(mutex);
 
-		ROBOTICK_INFO("WorkloadRegistry: registering workload '%s'...", entry.name.c_str());
-
 		if (entries.find(entry.name) != entries.end())
 		{
 			ROBOTICK_FATAL_EXIT("WorkloadRegistry: entry with name '%s' already exists.", entry.name.c_str());

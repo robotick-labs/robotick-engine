@@ -69,18 +69,14 @@ namespace robotick
 			start_time_sec = (double)esp_timer_get_time() / 1e6;
 		}
 
-		void tick(double delta_time)
+		void tick(const TickInfo& tick_info)
 		{
-			(void)delta_time;
+			const float alive_time_sec = static_cast<float>(tick_info.time_now_ns * 1e-9); // avoids any double/float
 
-			const int64_t now_us = esp_timer_get_time();
-			const double now_time_sec = (double)now_us / 1e6;
+			const float bpm = config.rest_heart_rate * inputs.heart_rate_scale;
+			const float beat_duration = 60.0f / bpm;
+			const float beat_phase = fmodf(alive_time_sec, beat_duration) / beat_duration;
 
-			const float alive_time_sec = (float)(now_time_sec - start_time_sec);
-
-			float bpm = config.rest_heart_rate * inputs.heart_rate_scale;
-
-			const float beat_phase = fmodf(alive_time_sec, 60.0f / bpm) / (60.0f / bpm);
 			update_heart(beat_phase);
 
 			M5Canvas canvas(&M5.Lcd);
