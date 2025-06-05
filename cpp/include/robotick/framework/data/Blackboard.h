@@ -22,7 +22,7 @@ namespace robotick
 	struct BlackboardTestUtils;
 	struct DataConnectionUtils;
 	struct DataConnectionsFactory;
-	struct MqttClientWorkload;
+	struct MqttFieldSync;
 	struct PythonWorkload;
 	struct WorkloadFieldsIterator;
 
@@ -64,7 +64,7 @@ namespace robotick
 		friend struct BlackboardTestUtils;
 		friend struct DataConnectionUtils;
 		friend struct DataConnectionsFactory;
-		friend struct MqttClientWorkload;
+		friend struct MqttFieldSync;
 		friend struct PythonWorkload;
 		friend struct WorkloadFieldsIterator;
 

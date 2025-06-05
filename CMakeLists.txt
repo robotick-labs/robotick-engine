@@ -98,7 +98,9 @@ if(ROBOTICK_ENABLE_PYTHON)
     # 👇 Enable exceptions selectively for sources that require it (Python + MQTT)
     set(EXCEPTION_ENABLED_SOURCES ${PYTHON_SOURCES})
     list(APPEND EXCEPTION_ENABLED_SOURCES
+        ${CMAKE_SOURCE_DIR}/cpp/src/robotick/framework/data/MqttFieldSync.cpp
         ${CMAKE_SOURCE_DIR}/cpp/src/robotick/workloads/telemetry/MqttClientWorkload.cpp
+        ${CMAKE_SOURCE_DIR}/cpp/src/robotick/platform/MqttClient.cpp
     )
 
     foreach(source_file IN LISTS EXCEPTION_ENABLED_SOURCES)
