@@ -8,12 +8,15 @@ project(robotick-engine)
 # ✅ Project-wide Settings
 # =========================
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-add_compile_options(-Wall -Wextra -Werror)
+# Apply common flags only to C++ files
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Disable rtti globally (too expensive for our purposes - we've rolled our own simplified equivalent)
-add_compile_options(-fno-rtti)
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror;-fno-rtti>"
+    )
+endif()
 
 # Optional AddressSanitizer support
 option(ROBOTICK_ENABLE_ASAN "Enable AddressSanitizer for runtime memory checks" OFF)
@@ -101,6 +104,7 @@ if(ROBOTICK_ENABLE_PYTHON)
         ${CMAKE_SOURCE_DIR}/cpp/src/robotick/framework/data/MqttFieldSync.cpp
         ${CMAKE_SOURCE_DIR}/cpp/src/robotick/workloads/telemetry/MqttClientWorkload.cpp
         ${CMAKE_SOURCE_DIR}/cpp/src/robotick/platform/MqttClient.cpp
+        ${CMAKE_SOURCE_DIR}/cpp/src/robotick/platform/posix/WebServer.cpp
     )
 
     foreach(source_file IN LISTS EXCEPTION_ENABLED_SOURCES)
@@ -114,10 +118,12 @@ endif()
 # ✅ Additional libs
 # =========================
 
-target_link_libraries(robotick-engine PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(robotick-engine PUBLIC nlohmann_json::nlohmann_json) # for MqttClient
 
 find_package(PahoMqttCpp REQUIRED)
-target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3)
+target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3) # for MqttClient
+
+target_link_libraries(robotick-engine PRIVATE civetweb) # for WebServer / RemoteControlWorkload
 
 # =========================
 # ✅ Optional Executable
@@ -165,6 +171,21 @@ endif()
 # =========================
 
 add_subdirectory(cpp/lib/json)
+
+
+# ================================================================
+# ✅ Add civetweb - selectively so we don't also pull in its tests
+# ================================================================
+
+add_library(civetweb STATIC
+    cpp/lib/civetweb/src/civetweb.c
+)
+
+target_include_directories(civetweb PUBLIC
+    cpp/lib/civetweb/include
+)
+
+target_compile_definitions(civetweb PRIVATE NO_SSL)
 
 # =========================
 # ✅ Auto-add License Headers

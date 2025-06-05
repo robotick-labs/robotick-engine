@@ -14,8 +14,9 @@ RUN apt-get update && apt-get install -y \
     python3-venv \
     ninja-build \
     gdb \
-    libssl-dev && \
-    apt-get clean
+    libssl-dev \
+    libcurl4-openssl-dev \
+    && apt-get clean
 
 # 🔧 Build and install Paho MQTT C lib (with exported CMake targets)
 RUN git clone --depth=1 https://github.com/eclipse/paho.mqtt.c.git /tmp/paho.mqtt.c && \
