@@ -1,5 +1,4 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
@@ -23,6 +22,8 @@ namespace robotick
 	struct BlackboardTestUtils;
 	struct DataConnectionUtils;
 	struct DataConnectionsFactory;
+	struct MqttFieldSync;
+	struct PythonWorkload;
 	struct WorkloadFieldsIterator;
 
 	struct BlackboardFieldInfo
@@ -63,6 +64,7 @@ namespace robotick
 		friend struct BlackboardTestUtils;
 		friend struct DataConnectionUtils;
 		friend struct DataConnectionsFactory;
+		friend struct MqttFieldSync;
 		friend struct PythonWorkload;
 		friend struct WorkloadFieldsIterator;
 

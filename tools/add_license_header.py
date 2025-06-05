@@ -6,7 +6,6 @@ from pathlib import Path
 
 LICENSE_HEADER = '''\
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 '''
 

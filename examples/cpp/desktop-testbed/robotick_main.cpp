@@ -1,5 +1,4 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
@@ -15,7 +14,7 @@ void signal_handler()
 	g_stop_flag.set();
 }
 
-void populate_model(robotick::Model& model)
+void populate_model_hello_world(robotick::Model& model)
 {
 	auto console = model.add("ConsoleTelemetryWorkload", "console", 5.0);
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
@@ -27,12 +26,24 @@ void populate_model(robotick::Model& model)
 	model.set_root(root);
 }
 
+void populate_model_hello_mqtt(robotick::Model& model)
+{
+	auto timing_diag = model.add("TimingDiagnosticsWorkload", "timing_diag", 100.0);
+	auto mqtt_client = model.add("MqttClientWorkload", "mqtt_client", 30.0, {{"broker_url", "mqtt://192.168.5.14"}});
+	auto console_telem = model.add("ConsoleTelemetryWorkload", "console", 5.0);
+	auto hello = model.add("HelloWorkload", "hello", 1.0);
+
+	std::vector<robotick::WorkloadHandle> children = {console_telem, timing_diag, mqtt_client, hello};
+	auto root = model.add("SyncedGroupWorkload", "root_group", children, 100.0);
+	model.set_root(root);
+}
+
 ROBOTICK_ENTRYPOINT
 {
 	robotick::setup_exit_handler(signal_handler);
 
 	robotick::Model model;
-	populate_model(model);
+	populate_model_hello_mqtt(model);
 
 	robotick::Engine engine;
 	engine.load(model);

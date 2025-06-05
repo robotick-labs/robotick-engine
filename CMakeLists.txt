@@ -95,13 +95,29 @@ if(ROBOTICK_ENABLE_PYTHON)
     target_compile_definitions(robotick-engine PUBLIC ROBOTICK_ENABLE_PYTHON=1)
     target_link_libraries(robotick-engine PUBLIC pybind11::embed ${Python3_LIBRARIES})
 
-    # 👇 Enable exceptions only on Python-related sources
-    foreach(source_file IN LISTS PYTHON_SOURCES)
+    # 👇 Enable exceptions selectively for sources that require it (Python + MQTT)
+    set(EXCEPTION_ENABLED_SOURCES ${PYTHON_SOURCES})
+    list(APPEND EXCEPTION_ENABLED_SOURCES
+        ${CMAKE_SOURCE_DIR}/cpp/src/robotick/framework/data/MqttFieldSync.cpp
+        ${CMAKE_SOURCE_DIR}/cpp/src/robotick/workloads/telemetry/MqttClientWorkload.cpp
+        ${CMAKE_SOURCE_DIR}/cpp/src/robotick/platform/MqttClient.cpp
+    )
+
+    foreach(source_file IN LISTS EXCEPTION_ENABLED_SOURCES)
         set_source_files_properties(${source_file} PROPERTIES COMPILE_FLAGS "-fexceptions -frtti")
     endforeach()
 else()
     message(STATUS "❌ ROBOTICK_ENABLE_PYTHON - OFF")
 endif()
+
+# =========================
+# ✅ Additional libs
+# =========================
+
+target_link_libraries(robotick-engine PUBLIC nlohmann_json::nlohmann_json)
+
+find_package(PahoMqttCpp REQUIRED)
+target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3)
 
 # =========================
 # ✅ Optional Executable
@@ -143,6 +159,12 @@ if (ROBOTICK_BUILD_TESTS)
 else()
     message(STATUS "❌ ROBOTICK_BUILD_TESTS - OFF")
 endif()
+
+# =========================
+# ✅ Add JSON Submodule
+# =========================
+
+add_subdirectory(cpp/lib/json)
 
 # =========================
 # ✅ Auto-add License Headers

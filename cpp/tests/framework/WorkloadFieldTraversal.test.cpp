@@ -1,6 +1,5 @@
 
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
@@ -73,18 +72,18 @@ namespace robotick::test
 		WorkloadFieldsIterator::for_each_workload_field(engine, nullptr,
 			[&](const WorkloadFieldView& view)
 			{
-				CHECK(view.instance->unique_name == "W");
+				CHECK(view.workload_info->unique_name == "W");
 				const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
 				// Verify pointer lies within workloads buffer
-				CHECK(workloads_buf.contains_object(field_ptr, view.field->size));
+				CHECK(workloads_buf.contains_object(field_ptr, view.field_info->size));
 
-				if (view.field->name == "input_value")
+				if (view.field_info->name == "input_value")
 				{
 					found_input = true;
 					CHECK(*static_cast<const int*>(view.field_ptr) == 42);
 				}
-				if (view.field->name == "output_value")
+				if (view.field_info->name == "output_value")
 				{
 					found_output = true;
 					CHECK(*static_cast<const int*>(view.field_ptr) == 123);
@@ -120,17 +119,17 @@ namespace robotick::test
 		WorkloadFieldsIterator::for_each_workload_field(engine, &mirror_buf,
 			[&](const WorkloadFieldView& view)
 			{
-				CHECK(view.instance->unique_name == "W");
+				CHECK(view.workload_info->unique_name == "W");
 				const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
-				CHECK(mirror_buf.contains_object(field_ptr, view.field->size));
+				CHECK(mirror_buf.contains_object(field_ptr, view.field_info->size));
 
-				if (view.field->name == "input_value")
+				if (view.field_info->name == "input_value")
 				{
 					found_input = true;
 					CHECK(*static_cast<const int*>(view.field_ptr) == 99);
 				}
-				if (view.field->name == "output_value")
+				if (view.field_info->name == "output_value")
 				{
 					found_output = true;
 					CHECK(*static_cast<const int*>(view.field_ptr) == 888);
@@ -178,7 +177,7 @@ namespace robotick::test
 		WorkloadFieldsIterator::for_each_field_in_workload(engine, info, nullptr,
 			[&](const WorkloadFieldView& view)
 			{
-				found_fields.insert(view.field->name.c_str());
+				found_fields.insert(view.field_info->name.c_str());
 			});
 
 		CHECK(found_fields.count("input_value") == 1);
@@ -215,8 +214,8 @@ namespace robotick::test
 		WorkloadFieldsIterator::for_each_workload_field(engine, nullptr,
 			[&](const WorkloadFieldView& view)
 			{
-				if (view.subfield)
-					seen_fields.insert(view.subfield->name.c_str());
+				if (view.subfield_info)
+					seen_fields.insert(view.subfield_info->name.c_str());
 			});
 
 		CHECK(seen_fields.count("x") == 1);

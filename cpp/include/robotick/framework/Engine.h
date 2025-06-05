@@ -1,5 +1,4 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
@@ -18,6 +17,7 @@ namespace robotick
 	class ConsoleTelemetryCollector;
 	class WorkloadsBuffer;
 	struct DataConnectionInfo;
+	struct MqttFieldSync;
 	struct StructRegistryEntry;
 	struct WorkloadFieldsIterator;
 	struct WorkloadInstanceInfo;
@@ -32,6 +32,7 @@ namespace robotick
 	{
 		friend struct robotick::test::EngineInspector;
 		friend struct robotick::ConsoleTelemetryCollector;
+		friend struct robotick::MqttFieldSync;
 		friend struct robotick::WorkloadFieldsIterator;
 		friend struct robotick::WorkloadInstanceInfo;
 
@@ -51,6 +52,7 @@ namespace robotick
 	  protected:
 		const WorkloadInstanceInfo* get_root_instance_info() const;
 		const WorkloadInstanceInfo& get_instance_info(size_t index) const;
+		const WorkloadInstanceInfo* find_instance_info(const char* unique_name) const;
 		const std::vector<WorkloadInstanceInfo>& get_all_instance_info() const;
 		const std::vector<DataConnectionInfo>& get_all_data_connections() const;
 

@@ -1,5 +1,4 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
@@ -263,11 +262,13 @@ namespace robotick
 			"Inconsistent outputs: type vs member presence mismatch on Workload registration");
 
 		if constexpr (!is_void_v<ConfigType>)
-			cfg_struct = FieldRegistry::get().register_struct(config_name, sizeof(ConfigType), TypeId{config_name}, offsetof(Type, config), {});
+			cfg_struct =
+				FieldRegistry::get().register_struct(config_name, "config", sizeof(ConfigType), TypeId{config_name}, offsetof(Type, config), {});
 		if constexpr (!is_void_v<InputType>)
-			in_struct = FieldRegistry::get().register_struct(input_name, sizeof(InputType), TypeId{input_name}, offsetof(Type, inputs), {});
+			in_struct = FieldRegistry::get().register_struct(input_name, "inputs", sizeof(InputType), TypeId{input_name}, offsetof(Type, inputs), {});
 		if constexpr (!is_void_v<OutputType>)
-			out_struct = FieldRegistry::get().register_struct(output_name, sizeof(OutputType), TypeId{output_name}, offsetof(Type, outputs), {});
+			out_struct =
+				FieldRegistry::get().register_struct(output_name, "outputs", sizeof(OutputType), TypeId{output_name}, offsetof(Type, outputs), {});
 
 		const WorkloadRegistryEntry entry = {workload_name, TypeId{workload_name}, sizeof(Type), alignof(Type),
 			[](void* ptr)
@@ -313,7 +314,8 @@ namespace robotick
 
 #define ROBOTICK_DEFINE_WORKLOAD(...)                                                                                                                \
 	GET_WORKLOAD_DEFINE_MACRO(                                                                                                                       \
-		__VA_ARGS__, ROBOTICK_DEFINE_WORKLOAD_4, ROBOTICK_DEFINE_WORKLOAD_3, ROBOTICK_DEFINE_WORKLOAD_2, ROBOTICK_DEFINE_WORKLOAD_1)(__VA_ARGS__)
+		__VA_ARGS__, ROBOTICK_DEFINE_WORKLOAD_4, ROBOTICK_DEFINE_WORKLOAD_3, ROBOTICK_DEFINE_WORKLOAD_2, ROBOTICK_DEFINE_WORKLOAD_1)                 \
+	(__VA_ARGS__)
 
 #define ROBOTICK_KEEP_WORKLOAD(Type)                                                                                                                 \
 	extern volatile bool g_##Type##_NoDeadStrip;                                                                                                     \

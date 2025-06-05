@@ -1,5 +1,4 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
