@@ -45,6 +45,8 @@ namespace robotick
 		 */
 		void publish_fields(const Engine& engine, const WorkloadsBuffer& buffer, bool publish_control);
 
+		std::unordered_map<std::string, nlohmann::json>& get_updated_topics() { return updated_topics; };
+
 	  private:
 		std::string root;	   // e.g. "robotick"
 		PublisherFn publisher; // for unit tests only
