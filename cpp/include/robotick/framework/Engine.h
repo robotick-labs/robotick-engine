@@ -52,6 +52,7 @@ namespace robotick
 	  protected:
 		const WorkloadInstanceInfo* get_root_instance_info() const;
 		const WorkloadInstanceInfo& get_instance_info(size_t index) const;
+		const WorkloadInstanceInfo* find_instance_info(const char* unique_name) const;
 		const std::vector<WorkloadInstanceInfo>& get_all_instance_info() const;
 		const std::vector<DataConnectionInfo>& get_all_data_connections() const;
 

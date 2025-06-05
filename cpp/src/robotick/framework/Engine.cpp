@@ -35,6 +35,7 @@ namespace robotick
 
 		const WorkloadInstanceInfo* root_instance = nullptr;
 		std::vector<WorkloadInstanceInfo> instances;
+		std::unordered_map<std::string, WorkloadInstanceInfo*> instances_by_unique_name;
 		std::vector<DataConnectionInfo> data_connections_all;
 		std::vector<size_t> data_connections_acquired_indices;
 	};
@@ -42,6 +43,7 @@ namespace robotick
 	Engine::Engine() : state(std::make_unique<Engine::State>())
 	{
 	}
+
 	Engine::~Engine()
 	{
 		for (auto& instance : state->instances)
@@ -59,18 +61,29 @@ namespace robotick
 	{
 		return state->root_instance;
 	}
+
 	const WorkloadInstanceInfo& Engine::get_instance_info(size_t index) const
 	{
 		return state->instances.at(index);
 	}
+
+	const WorkloadInstanceInfo* Engine::find_instance_info(const char* unique_name) const
+	{
+		// make it use our state->instances_by_unique_name map instead
+		auto it = state->instances_by_unique_name.find(unique_name);
+		return (it != state->instances_by_unique_name.end()) ? it->second : nullptr;
+	}
+
 	const std::vector<WorkloadInstanceInfo>& Engine::get_all_instance_info() const
 	{
 		return state->instances;
 	}
+
 	const std::vector<DataConnectionInfo>& Engine::get_all_data_connections() const
 	{
 		return state->data_connections_all;
 	}
+
 	WorkloadsBuffer& Engine::get_workloads_buffer() const
 	{
 		return state->workloads_buffer;
@@ -173,6 +186,7 @@ namespace robotick
 		state->workloads_buffer = WorkloadsBuffer(total_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
 		uint8_t* buffer_ptr = state->workloads_buffer.raw_ptr();
 		state->instances.reserve(seeds.size());
+		state->instances_by_unique_name.reserve(seeds.size());
 
 		for (size_t i = 0; i < seeds.size(); ++i)
 		{
@@ -180,7 +194,12 @@ namespace robotick
 			const auto* type = WorkloadRegistry::get().find(seed.type.c_str());
 			uint8_t* ptr = buffer_ptr + offsets[i];
 
-			state->instances.emplace_back(WorkloadInstanceInfo{offsets[i], type, seed.name, seed.tick_rate_hz, {}, WorkloadInstanceStats{}});
+			WorkloadInstanceInfo& new_info =
+				state->instances.emplace_back(WorkloadInstanceInfo{offsets[i], type, seed.name, seed.tick_rate_hz, {}, WorkloadInstanceStats{}});
+
+			// add it to our map for quick lookup by name
+			state->instances_by_unique_name[new_info.unique_name] = &new_info;
+
 #if defined(ROBOTICK_DEBUG)
 			constexpr size_t MAX_SIZE = 2048;
 			alignas(std::max_align_t) static constexpr uint8_t zero[MAX_SIZE] = {};

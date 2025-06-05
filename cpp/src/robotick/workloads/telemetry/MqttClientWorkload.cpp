@@ -68,11 +68,9 @@ namespace robotick
 		MqttClientConfig config;
 		MqttClientInputs inputs;
 		MqttClientOutputs outputs;
-
 		State<MqttClientWorkloadState> state;
 
 		MqttClientWorkload() {}
-
 		MqttClientWorkload(const MqttClientWorkload&) = delete;
 		MqttClientWorkload& operator=(const MqttClientWorkload&) = delete;
 
@@ -85,8 +83,6 @@ namespace robotick
 		void load()
 		{
 			ROBOTICK_ASSERT_MSG(state->engine != nullptr, "Engine should have been set by now");
-			// ROBOTICK_ASSERT(state->mirror_buffer.  != nullptr, "Engine should have been set by now");
-
 			std::string broker = std::string(config.broker_url.c_str()) + ":" + std::to_string(config.broker_mqtt_port);
 			std::string client_id = "robotick::MqttClientWorkload";
 
@@ -95,9 +91,9 @@ namespace robotick
 			state->mqtt->set_callback(
 				[this](const std::string& topic, const std::string& payload)
 				{
-					if (topic.find("/outputs/") != std::string::npos)
+					if (topic.find(config.root_topic_namespace.to_string() + "/control/") != 0)
 					{
-						return; // Skip outputs - they are intended to be read-only
+						ROBOTICK_FATAL_EXIT("MqttClient - we should only be subscribed to topics in the '<root>/control/#' group");
 					}
 
 					nlohmann::json incoming;
@@ -112,9 +108,7 @@ namespace robotick
 					}
 
 					if (state->last_published.find(topic) != state->last_published.end() && state->last_published[topic] == incoming)
-					{
-						return; // we're just having our initial value reflected back at us - ignore it
-					}
+						return;
 
 					state->updated_topics[topic] = incoming;
 				});
@@ -124,88 +118,188 @@ namespace robotick
 
 		void start(double)
 		{
-			state->mqtt->subscribe(std::string(config.root_topic_namespace.c_str()) + "/#");
+			std::string root = config.root_topic_namespace.to_string();
+			state->mqtt->subscribe(root + "/control/#");
 
-			update_mirror_buffer();	   // mirror workloads buffer to reduce aliasing as we work with it later
-			sync_all_fields_to_mqtt(); // send initial full state
+			update_mirror_buffer();
+
+			const bool should_publish_control = true; // also publish writeable fields to "control" topic-group once on startup
+			sync_all_fields_to_mqtt(should_publish_control);
 
 			state->updated_topics.clear();
-			// ^- ignore any topic-updates received before this point - mqtt should reflect our initial state, not the other way around.
 		}
 
 		void tick(const TickInfo&)
 		{
-			update_mirror_buffer(); // mirror workloads buffer to reduce aliasing as we work with it later
-
+			update_mirror_buffer(); // TODO - get ordering right vs below, which currently goes into main buffer - though perhaps it shouldn't?
 			sync_updated_topics_from_mqtt();
-			detect_and_publish_changed_fields();
+
+			const bool should_publish_control = false;
+			sync_all_fields_to_mqtt(should_publish_control);
 		}
 
 		inline void update_mirror_buffer() { state->mirror_buffer.update_mirror_from(state->engine->get_workloads_buffer()); }
 
-		void sync_all_fields_to_mqtt()
+		void sync_all_fields_to_mqtt(const bool should_publish_control)
 		{
 			WorkloadFieldsIterator::for_each_workload_field(*state->engine, &state->mirror_buffer,
 				[&](const WorkloadFieldView& view)
 				{
-					std::string topic = config.root_topic_namespace.to_string();
-
-					if (!view.workload_info || !view.field_ptr)
+					if (!view.workload_info || !view.field_ptr || !view.struct_info || !view.field_info)
 						return;
 
-					topic += "/" + view.workload_info->unique_name;
+					std::string root = config.root_topic_namespace.to_string();
+					std::string field_path = view.workload_info->unique_name + "/" + view.struct_info->local_name + "/" + view.field_info->name;
 
-					if (!view.struct_info)
-						return;
-
-					topic += "/" + view.struct_info->local_name;
-
-					if (!view.field_info)
-						return;
-
-					topic += "/" + view.field_info->name;
-
-					TypeId field_type(view.field_info->type);
-
+					TypeId field_type = view.field_info->type;
 					if (view.subfield_info)
 					{
-						topic += "/" + view.subfield_info->name.to_string();
+						field_path += "/" + view.subfield_info->name.to_string();
 						field_type = view.subfield_info->type;
 					}
 
-					publish_if_changed(topic, view.field_ptr, field_type);
+					publish_if_changed(root + "/state/" + field_path, view.field_ptr, field_type);
+
+					if (should_publish_control && !view.struct_info->is_read_only())
+					{
+						const bool retain = true;
+						const nlohmann::json payload = serialize_field(view.field_ptr, field_type);
+						state->mqtt->publish(root + "/control/" + field_path, payload.dump(), retain);
+					}
 				});
 		}
 
 		void sync_updated_topics_from_mqtt()
 		{
-			for (const auto& updated_topic : state->updated_topics)
+			WorkloadsBuffer& target_workloads_buffer =
+				state->engine->get_workloads_buffer(); // sync directly info main buffer - needs careful thought...
+
+			std::string control_prefix = config.root_topic_namespace.to_string() + "/control/";
+
+			for (const auto& [topic, payload] : state->updated_topics)
 			{
-				(void)updated_topic;
-				// TODO: Fetch payload for this topic, then update blackboard fields as needed
-				// You will parse and dispatch later
+				if (topic.find(control_prefix) != 0)
+					continue;
+
+				// Strip off "robotick/control/"
+				std::string suffix = topic.substr(control_prefix.size());
+
+				// Split into path tokens
+				std::vector<std::string> tokens;
+				size_t start = 0, end;
+				while ((end = suffix.find('/', start)) != std::string::npos)
+				{
+					tokens.push_back(suffix.substr(start, end - start));
+					start = end + 1;
+				}
+				tokens.push_back(suffix.substr(start));
+
+				if (tokens.size() < 3 || tokens.size() > 4)
+					continue;
+
+				const std::string& workload_name = tokens[0];
+				const std::string& struct_name = tokens[1];
+				const std::string& field_name = tokens[2];
+				const std::string subfield_name = (tokens.size() == 4) ? tokens[3] : "";
+
+				const WorkloadInstanceInfo* workload_info = state->engine->find_instance_info(workload_name.c_str());
+				if (!workload_info)
+				{
+					ROBOTICK_WARNING("MqttClient - unable to find workload for incoming topic '%s'", topic.c_str());
+					continue;
+				}
+
+				const StructRegistryEntry* struct_info = nullptr;
+				if (struct_name == "config")
+				{
+					struct_info = workload_info->type->config_struct;
+				}
+				else if (struct_name == "inputs")
+				{
+					struct_info = workload_info->type->input_struct;
+				}
+				else if (struct_name == "outputs")
+				{
+					struct_info = workload_info->type->output_struct;
+				}
+
+				if (!struct_info)
+				{
+					ROBOTICK_WARNING("MqttClient - unable to find '%s' on workload for incoming topic '%s'", struct_name.c_str(), topic.c_str());
+					continue;
+				}
+
+				const FieldInfo* field_info = struct_info->find_field(field_name.c_str());
+				if (!field_info)
+				{
+					ROBOTICK_WARNING("MqttClient - unable to find field '%s' on workload for incoming topic '%s'", field_name.c_str(), topic.c_str());
+					continue;
+				}
+
+				void* field_ptr = field_info->get_data_ptr(target_workloads_buffer, *workload_info, *struct_info);
+				if (!field_ptr)
+				{
+					ROBOTICK_WARNING(
+						"MqttClient - unable to find data-ptr for field '%s' on workload for incoming topic '%s'", field_name.c_str(), topic.c_str());
+					continue;
+				}
+
+				TypeId field_type = field_info->type;
+
+				if (field_type == GET_TYPE_ID(Blackboard))
+				{
+					Blackboard& blackboard = *static_cast<Blackboard*>(field_ptr);
+					const BlackboardFieldInfo* sub_field_info = blackboard.get_field_info(subfield_name);
+					if (!sub_field_info)
+					{
+						ROBOTICK_WARNING(
+							"MqttClient - unable to find sub-field '%s' on workload for incoming topic '%s'", subfield_name.c_str(), topic.c_str());
+					}
+
+					field_ptr = sub_field_info->get_data_ptr(blackboard);
+					field_type = sub_field_info->type;
+				}
+
+				try
+				{
+					if (field_type == GET_TYPE_ID(int))
+						*reinterpret_cast<int*>(field_ptr) = payload.get<int>();
+					else if (field_type == GET_TYPE_ID(double))
+						*reinterpret_cast<double*>(field_ptr) = payload.get<double>();
+					else if (field_type == GET_TYPE_ID(FixedString64))
+						*reinterpret_cast<FixedString64*>(field_ptr) = FixedString64(payload.get<std::string>().c_str());
+					else if (field_type == GET_TYPE_ID(FixedString128))
+						*reinterpret_cast<FixedString128*>(field_ptr) = FixedString128(payload.get<std::string>().c_str());
+					else
+					{
+						ROBOTICK_WARNING("MqttClient: Unsupported field type in topic %s", topic.c_str());
+					}
+				}
+				catch (...)
+				{
+					ROBOTICK_WARNING("MqttClient: Failed to apply update from topic %s", topic.c_str());
+				}
 			}
+
 			state->updated_topics.clear();
 		}
 
-		void detect_and_publish_changed_fields()
+		nlohmann::json serialize_field(void* field_ptr, const TypeId& field_type)
 		{
-			sync_all_fields_to_mqtt(); // fine to use this for both initial sync and on tick - it only updates MQTT for modified fields anyway
+			if (field_type == GET_TYPE_ID(int))
+				return *reinterpret_cast<int*>(field_ptr);
+			if (field_type == GET_TYPE_ID(double))
+				return *reinterpret_cast<double*>(field_ptr);
+			if (field_type == GET_TYPE_ID(FixedString64))
+				return reinterpret_cast<FixedString64*>(field_ptr)->c_str();
+			if (field_type == GET_TYPE_ID(FixedString128))
+				return reinterpret_cast<FixedString128*>(field_ptr)->c_str();
+			return nullptr;
 		}
 
 		void publish_if_changed(const std::string& topic, void* field_ptr, const TypeId& field_type)
 		{
-			nlohmann::json payload;
-
-			if (field_type == GET_TYPE_ID(int))
-				payload = *reinterpret_cast<int*>(field_ptr);
-			else if (field_type == GET_TYPE_ID(double))
-				payload = *reinterpret_cast<double*>(field_ptr);
-			else if (field_type == GET_TYPE_ID(FixedString64))
-				payload = reinterpret_cast<FixedString64*>(field_ptr)->c_str();
-			else if (field_type == GET_TYPE_ID(FixedString128))
-				payload = reinterpret_cast<FixedString128*>(field_ptr)->c_str();
-
+			nlohmann::json payload = serialize_field(field_ptr, field_type);
 			if (state->last_published[topic] != payload)
 			{
 				state->mqtt->publish(topic, payload.dump(), true);

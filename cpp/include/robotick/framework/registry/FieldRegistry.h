@@ -53,6 +53,16 @@ namespace robotick
 		size_t offset_within_workload = OFFSET_UNBOUND;
 		std::vector<FieldInfo> fields;
 		std::map<std::string, FieldInfo*> field_from_name;
+
+		bool is_read_only() const { return (local_name != "inputs"); }; // config and outputs are read-only structures
+
+		const FieldInfo* find_field(const char* field_name) const
+		{
+			auto it = field_from_name.find(field_name);
+			if (it != field_from_name.end())
+				return it->second;
+			return nullptr;
+		}
 	};
 
 	class FieldRegistry

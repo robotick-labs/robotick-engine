@@ -31,8 +31,9 @@ void populate_model_hello_mqtt(robotick::Model& model)
 	auto timing_diag = model.add("TimingDiagnosticsWorkload", "timing_diag", 100.0);
 	auto mqtt_client = model.add("MqttClientWorkload", "mqtt_client", 30.0, {{"broker_url", "mqtt://192.168.5.14"}});
 	auto console_telem = model.add("ConsoleTelemetryWorkload", "console", 5.0);
+	auto hello = model.add("HelloWorkload", "hello", 1.0);
 
-	std::vector<robotick::WorkloadHandle> children = {console_telem, timing_diag, mqtt_client};
+	std::vector<robotick::WorkloadHandle> children = {console_telem, timing_diag, mqtt_client, hello};
 	auto root = model.add("SyncedGroupWorkload", "root_group", children, 100.0);
 	model.set_root(root);
 }

@@ -99,6 +99,7 @@ namespace robotick
 			row.type = depth_prefix(depth, info.type->name.c_str());
 			row.name = info.unique_name;
 
+			std::vector<std::string> config_entries;
 			std::vector<std::string> input_entries;
 			std::vector<std::string> output_entries;
 
@@ -107,9 +108,6 @@ namespace robotick
 			WorkloadFieldsIterator::for_each_field_in_workload(*engine, info, &mirror_buffer,
 				[&](const WorkloadFieldView& view)
 				{
-					if (view.struct_info == view.workload_info->type->config_struct)
-						return; // skip config
-
 					std::ostringstream entry;
 					entry << view.field_info->name.c_str();
 
@@ -132,7 +130,7 @@ namespace robotick
 						else if (type == GET_TYPE_ID(FixedString128))
 							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
 						else
-							entry << "<unsupported>";
+							entry << "<?>";
 					}
 					else
 					{
@@ -149,15 +147,18 @@ namespace robotick
 						else if (type == GET_TYPE_ID(FixedString128))
 							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
 						else
-							entry << "<unsupported>";
+							entry << "<?>";
 					}
 
-					if (view.struct_info == view.workload_info->type->input_struct)
+					if (view.struct_info == view.workload_info->type->config_struct)
+						config_entries.push_back(entry.str());
+					else if (view.struct_info == view.workload_info->type->input_struct)
 						input_entries.push_back(entry.str());
 					else
 						output_entries.push_back(entry.str());
 				});
 
+			row.config = config_entries.empty() ? "-" : join(config_entries, "\n");
 			row.inputs = input_entries.empty() ? "-" : join(input_entries, "\n");
 			row.outputs = output_entries.empty() ? "-" : join(output_entries, "\n");
 
@@ -214,13 +215,15 @@ namespace robotick
 				double goal_ms = goal_dist(gen);
 				double percent = (tick_ms / goal_ms) * 100.0;
 
+				std::ostringstream config_oss;
 				std::ostringstream input_oss;
 				std::ostringstream output_oss;
+				config_oss << "config_" << i << "=" << val_dist(gen);
 				input_oss << "input_" << i << "=" << val_dist(gen);
 				output_oss << "output_" << i << "=" << val_dist(gen);
 
-				rows.push_back(ConsoleTelemetryRow{
-					"DummyType" + std::to_string(i), "Workload" + std::to_string(i), input_oss.str(), output_oss.str(), tick_ms, goal_ms, percent});
+				rows.push_back(ConsoleTelemetryRow{"DummyType" + std::to_string(i), "Workload" + std::to_string(i), config_oss.str(), input_oss.str(),
+					output_oss.str(), tick_ms, goal_ms, percent});
 			}
 
 			return rows;
