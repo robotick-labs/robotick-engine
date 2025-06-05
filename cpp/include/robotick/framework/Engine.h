@@ -17,6 +17,7 @@ namespace robotick
 	class ConsoleTelemetryCollector;
 	class WorkloadsBuffer;
 	struct DataConnectionInfo;
+	struct MqttClientWorkload;
 	struct StructRegistryEntry;
 	struct WorkloadFieldsIterator;
 	struct WorkloadInstanceInfo;
@@ -31,6 +32,7 @@ namespace robotick
 	{
 		friend struct robotick::test::EngineInspector;
 		friend struct robotick::ConsoleTelemetryCollector;
+		friend struct robotick::MqttClientWorkload;
 		friend struct robotick::WorkloadFieldsIterator;
 		friend struct robotick::WorkloadInstanceInfo;
 

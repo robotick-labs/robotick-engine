@@ -14,10 +14,10 @@ namespace robotick
 
 	struct WorkloadFieldView
 	{
-		const WorkloadInstanceInfo* instance = nullptr;
+		const WorkloadInstanceInfo* workload_info = nullptr;
 		const StructRegistryEntry* struct_info = nullptr;
-		const FieldInfo* field = nullptr;
-		const BlackboardFieldInfo* subfield = nullptr;
+		const FieldInfo* field_info = nullptr;
+		const BlackboardFieldInfo* subfield_info = nullptr;
 		void* field_ptr = nullptr;
 	};
 

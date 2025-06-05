@@ -58,7 +58,7 @@ namespace robotick::test
 		// Check input struct
 		REQUIRE(workload->input_struct != nullptr);
 		const auto* inputs = workload->input_struct;
-		CHECK(inputs->name == "RegistryTestInputs");
+		CHECK(inputs->global_name == "RegistryTestInputs");
 		CHECK(inputs->type == TypeId(GET_TYPE_ID(RegistryTestInputs)));
 		CHECK(inputs->size == sizeof(RegistryTestInputs));
 		CHECK(inputs->fields.size() == 1);
@@ -67,7 +67,7 @@ namespace robotick::test
 		// Check output struct
 		REQUIRE(workload->output_struct != nullptr);
 		const auto* outputs = workload->output_struct;
-		CHECK(outputs->name == "RegistryTestOutputs");
+		CHECK(outputs->global_name == "RegistryTestOutputs");
 		CHECK(outputs->type == TypeId(GET_TYPE_ID(RegistryTestOutputs)));
 		CHECK(outputs->size == sizeof(RegistryTestOutputs));
 		CHECK(outputs->fields.size() == 2);

@@ -46,7 +46,8 @@ namespace robotick
 
 	struct StructRegistryEntry
 	{
-		std::string name;
+		std::string global_name;
+		std::string local_name;
 		size_t size = 0;
 		TypeId type = TypeId::invalid();
 		size_t offset_within_workload = OFFSET_UNBOUND;
@@ -59,9 +60,10 @@ namespace robotick
 	  public:
 		static FieldRegistry& get();
 
-		const StructRegistryEntry* register_struct(const std::string& name, size_t size, TypeId type, size_t offset, std::vector<FieldInfo> fields);
+		const StructRegistryEntry* register_struct(
+			const std::string& global_name, const std::string& local_name, size_t size, TypeId type, size_t offset, std::vector<FieldInfo> fields);
 
-		const StructRegistryEntry* get_struct(const std::string& name) const;
+		const StructRegistryEntry* get_struct(const std::string& global_name) const;
 
 	  private:
 		std::unordered_map<std::string, StructRegistryEntry> entries;
@@ -77,7 +79,7 @@ namespace robotick
 #define ROBOTICK_BEGIN_FIELDS(StructType)                                                                                                            \
 	static_assert(std::is_standard_layout<StructType>::value, "Structs must be standard layout");                                                    \
 	[[maybe_unused]] static const robotick::StructRegistryEntry* s_robotick_fields_##StructType = robotick::FieldRegistry::get().register_struct(                     \
-		#StructType, sizeof(StructType), GET_TYPE_ID(StructType), robotick::OFFSET_UNBOUND, {
+		#StructType, "", sizeof(StructType), GET_TYPE_ID(StructType), robotick::OFFSET_UNBOUND, {
 
 #define ROBOTICK_FIELD(StructType, FieldType, FieldName)                                                                                             \
 	{#FieldName, offsetof(StructType, FieldName), GET_TYPE_ID(FieldType), sizeof(decltype(StructType::FieldName))},

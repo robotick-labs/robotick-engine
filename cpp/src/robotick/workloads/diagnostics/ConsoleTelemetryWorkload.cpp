@@ -107,22 +107,22 @@ namespace robotick
 			WorkloadFieldsIterator::for_each_field_in_workload(*engine, info, &mirror_buffer,
 				[&](const WorkloadFieldView& view)
 				{
-					if (view.struct_info == view.instance->type->config_struct)
+					if (view.struct_info == view.workload_info->type->config_struct)
 						return; // skip config
 
 					std::ostringstream entry;
-					entry << view.field->name.c_str();
+					entry << view.field_info->name.c_str();
 
-					if (view.subfield)
-						entry << "." << view.subfield->name.c_str();
+					if (view.subfield_info)
+						entry << "." << view.subfield_info->name.c_str();
 
 					entry << "=";
 
-					if (view.subfield)
+					if (view.subfield_info)
 					{
-						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.subfield->size));
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.subfield_info->size));
 
-						const TypeId& type = view.subfield->type;
+						const TypeId& type = view.subfield_info->type;
 						if (type == GET_TYPE_ID(int))
 							entry << *static_cast<const int*>(view.field_ptr);
 						else if (type == GET_TYPE_ID(double))
@@ -136,10 +136,10 @@ namespace robotick
 					}
 					else
 					{
-						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.field->size));
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.field_info->size));
 
 						// fallback for top-level (non-blackboard) fields
-						const TypeId& type = view.field->type;
+						const TypeId& type = view.field_info->type;
 						if (type == GET_TYPE_ID(int))
 							entry << *static_cast<const int*>(view.field_ptr);
 						else if (type == GET_TYPE_ID(double))
@@ -152,7 +152,7 @@ namespace robotick
 							entry << "<unsupported>";
 					}
 
-					if (view.struct_info == view.instance->type->input_struct)
+					if (view.struct_info == view.workload_info->type->input_struct)
 						input_entries.push_back(entry.str());
 					else
 						output_entries.push_back(entry.str());
@@ -193,8 +193,8 @@ namespace robotick
 		ConsoleTelemetryConfig config;
 		std::unique_ptr<ConsoleTelemetryCollector> collector;
 
-		ConsoleTelemetryWorkload() {};
-		~ConsoleTelemetryWorkload() {};
+		ConsoleTelemetryWorkload(){};
+		~ConsoleTelemetryWorkload(){};
 
 		static std::vector<ConsoleTelemetryRow> collect_console_telemetry_rows_demo(const Engine&)
 		{

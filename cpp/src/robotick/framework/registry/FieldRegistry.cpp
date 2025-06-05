@@ -14,13 +14,15 @@ namespace robotick
 	}
 
 	const StructRegistryEntry* FieldRegistry::register_struct(
-		const std::string& name, size_t size, TypeId type, size_t offset, std::vector<FieldInfo> fields)
+		const std::string& global_name, const std::string& local_name, size_t size, TypeId type, size_t offset, std::vector<FieldInfo> fields)
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 
-		auto& entry = entries[name];
+		auto& entry = entries[global_name];
 
-		entry.name = name;
+		entry.global_name = global_name;
+		entry.local_name = local_name.empty() ? entry.local_name : local_name;
+
 		entry.size = size;
 
 		if (entry.offset_within_workload == OFFSET_UNBOUND)

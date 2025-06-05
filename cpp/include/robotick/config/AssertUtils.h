@@ -68,9 +68,7 @@ namespace robotick
 	{                                                                                                                                                \
 		if (!(cond))                                                                                                                                 \
 		{                                                                                                                                            \
-			ROBOTICK_BREAKPOINT();                                                                                                                   \
-			ROBOTICK_INTERNAL_LOG("ASSERT", "Assertion failed: %s", #cond);                                                                          \
-			exit(1);                                                                                                                                 \
+			ROBOTICK_FATAL_EXIT("Assertion failed: %s", #cond);                                                                                      \
 		}                                                                                                                                            \
 	} while (0)
 
@@ -79,9 +77,7 @@ namespace robotick
 	{                                                                                                                                                \
 		if (!(cond))                                                                                                                                 \
 		{                                                                                                                                            \
-			ROBOTICK_BREAKPOINT();                                                                                                                   \
-			ROBOTICK_INTERNAL_LOG("ASSERT", "Assertion failed: %s - " fmt, #cond, ##__VA_ARGS__);                                                    \
-			exit(1);                                                                                                                                 \
+			ROBOTICK_FATAL_EXIT("Assertion failed: %s - " fmt, #cond, ##__VA_ARGS__);                                                                \
 		}                                                                                                                                            \
 	} while (0)
 
