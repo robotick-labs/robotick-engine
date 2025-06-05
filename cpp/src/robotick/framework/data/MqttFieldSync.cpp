@@ -16,41 +16,65 @@ namespace robotick
 	MqttFieldSync::MqttFieldSync(Engine& engine, const std::string& root_ns, IMqttClient& mqtt_client)
 		: root(root_ns), publisher(nullptr), mqtt_ptr(&mqtt_client), engine_ptr(&engine)
 	{
-		// Register callback on the IMqttClient
-		mqtt_ptr->set_callback(
-			[this](const std::string& topic, const std::string& payload)
-			{
-				// Only care about "<root>/control/…"
-				if (topic.find(root + "/control/") != 0)
-					return;
+		try
+		{
 
-				nlohmann::json incoming;
-				try
+			// Register callback on the IMqttClient
+			mqtt_ptr->set_callback(
+				[this](const std::string& topic, const std::string& payload)
 				{
-					incoming = nlohmann::json::parse(payload);
-				}
-				catch (...)
-				{
-					ROBOTICK_WARNING("MqttFieldSync - Ignoring malformed JSON from topic: %s", topic.c_str());
-					return;
-				}
+					// Only care about "<root>/control/…"
+					if (topic.find(root + "/control/") != 0)
+						return;
 
-				auto it = last_published.find(topic);
-				if (it != last_published.end() && it->second == incoming)
-					return;
+					nlohmann::json incoming;
+					try
+					{
+						incoming = nlohmann::json::parse(payload);
+					}
+					catch (...)
+					{
+						ROBOTICK_WARNING("MqttFieldSync - Ignoring malformed JSON from topic: %s", topic.c_str());
+						return;
+					}
 
-				updated_topics[topic] = incoming;
-			});
+					auto it = last_published.find(topic);
+					if (it != last_published.end() && it->second == incoming)
+						return;
+
+					updated_topics[topic] = incoming;
+				});
+		}
+		catch (...)
+		{
+			ROBOTICK_FATAL_EXIT("MqttFieldSync - Failed to set MQTT callback.");
+		}
 	}
 
 	// Subscribe to control/# and publish initial state+control
 	void MqttFieldSync::subscribe_and_sync_startup()
 	{
-		if (!mqtt_ptr || !engine_ptr)
-			return;
+		ROBOTICK_ASSERT_MSG(mqtt_ptr != nullptr, "MqttFieldSync::subscribe_and_sync_startup - mqtt_ptr should have been set before calling");
+		ROBOTICK_ASSERT_MSG(engine_ptr != nullptr, "MqttFieldSync::subscribe_and_sync_startup - engine_ptr should have been set before calling");
 
-		mqtt_ptr->subscribe(root + "/control/#");
-		publish_fields(*engine_ptr, engine_ptr->get_workloads_buffer(), true);
+		try
+		{
+			mqtt_ptr->subscribe(root + "/control/#");
+		}
+		catch (...)
+		{
+			ROBOTICK_WARNING("MqttFieldSync - Failed to subscribe to control topics.");
+		}
+
+		try
+		{
+			publish_fields(*engine_ptr, engine_ptr->get_workloads_buffer(), true);
+		}
+		catch (...)
+		{
+			ROBOTICK_WARNING("MqttFieldSync - Failed to publish startup fields.");
+		}
+
 		updated_topics.clear();
 	}
 
@@ -199,20 +223,38 @@ namespace robotick
 				nlohmann::json value = serialize(view.field_ptr, type);
 
 				// Publish "<root>/state/<path>"
-				last_published[root + "/state/" + path] = value;
-				if (mqtt_ptr)
-					mqtt_ptr->publish(root + "/state/" + path, value.dump(), true);
-				else if (publisher)
-					publisher("state/" + path, value.dump(), true);
+				const std::string state_topic = root + "/state/" + path;
+				last_published[state_topic] = value;
+
+				try
+				{
+					if (mqtt_ptr)
+						mqtt_ptr->publish(state_topic, value.dump(), true);
+					else if (publisher)
+						publisher("state/" + path, value.dump(), true);
+				}
+				catch (...)
+				{
+					ROBOTICK_WARNING("MqttFieldSync - Failed to publish state topic: %s", state_topic.c_str());
+				}
 
 				// If requested, also publish "<root>/control/<path>" for writable fields
+				const std::string control_topic = root + "/control/" + path;
+
 				if (publish_control && !view.struct_info->is_read_only())
 				{
-					last_published[root + "/control/" + path] = value;
-					if (mqtt_ptr)
-						mqtt_ptr->publish(root + "/control/" + path, value.dump(), true);
-					else if (publisher)
-						publisher("control/" + path, value.dump(), true);
+					last_published[control_topic] = value;
+					try
+					{
+						if (mqtt_ptr)
+							mqtt_ptr->publish(control_topic, value.dump(), true);
+						else if (publisher)
+							publisher("control/" + path, value.dump(), true);
+					}
+					catch (...)
+					{
+						ROBOTICK_WARNING("MqttFieldSync - Failed to publish control topic: %s", control_topic.c_str());
+					}
 				}
 			});
 	}

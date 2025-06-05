@@ -29,18 +29,6 @@ namespace robotick
 	ROBOTICK_FIELD(MqttClientConfig, FixedString64, root_topic_namespace)
 	ROBOTICK_END_FIELDS()
 
-	struct MqttClientInputs
-	{
-	};
-	ROBOTICK_BEGIN_FIELDS(MqttClientInputs)
-	ROBOTICK_END_FIELDS()
-
-	struct MqttClientOutputs
-	{
-	};
-	ROBOTICK_BEGIN_FIELDS(MqttClientOutputs)
-	ROBOTICK_END_FIELDS()
-
 	//----------------------------------------------------------------------
 	// Internal State
 	//----------------------------------------------------------------------
@@ -60,8 +48,7 @@ namespace robotick
 	struct MqttClientWorkload
 	{
 		MqttClientConfig config;
-		MqttClientInputs inputs;
-		MqttClientOutputs outputs;
+
 		State<MqttClientWorkloadState> state;
 
 		void set_engine(const Engine& engine_in) { state->engine = &engine_in; }
@@ -71,7 +58,15 @@ namespace robotick
 			ROBOTICK_ASSERT_MSG(state->engine != nullptr, "Engine must be set before load()");
 
 			// 1. Create and connect MQTT client
-			const std::string broker = std::string(config.broker_url.c_str()) + ":" + std::to_string(config.broker_mqtt_port);
+
+			const std::string broker = [&]()
+			{
+				std::string url = config.broker_url.c_str();
+				if (url.back() == '/')
+					url.pop_back(); // Remove trailing slash
+				return url + ":" + std::to_string(config.broker_mqtt_port);
+			}();
+
 			const std::string client_id = "robotick::MqttClientWorkload";
 			auto mqtt_client = std::make_unique<MqttClient>(broker, client_id);
 			mqtt_client->connect();
@@ -97,6 +92,6 @@ namespace robotick
 		}
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(MqttClientWorkload, MqttClientConfig, MqttClientInputs, MqttClientOutputs)
+	ROBOTICK_DEFINE_WORKLOAD(MqttClientWorkload, MqttClientConfig)
 
 } // namespace robotick
