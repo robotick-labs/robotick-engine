@@ -131,8 +131,11 @@ namespace robotick
 
 		void tick(const TickInfo&)
 		{
-			update_mirror_buffer(); // TODO - get ordering right vs below, which currently goes into main buffer - though perhaps it shouldn't?
-			sync_updated_topics_from_mqtt();
+			sync_updated_topics_from_mqtt(); // note - we will move this into a new pre_tick() callback for priviledged use
+											 // by Data Pipeline components [#119]
+
+			update_mirror_buffer(); // we do this once the main workloads-buffer has been updated above.  We should also do
+									// this in pre_tick() once implemented
 
 			const bool should_publish_control = false;
 			sync_all_fields_to_mqtt(should_publish_control);
