@@ -35,14 +35,14 @@ endif()
 # ✅ Public Include Path
 # =========================
 
-include_directories(${CMAKE_SOURCE_DIR}/cpp/include)
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # =========================
 # ✅ Source Collection
 # =========================
 
 file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
-    ${CMAKE_SOURCE_DIR}/cpp/src/robotick/*.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/robotick/*.cpp
 )
 
 set(CORE_SOURCES "")
@@ -66,6 +66,10 @@ endforeach()
 add_library(robotick-engine SHARED ${CORE_SOURCES})
 set_target_properties(robotick-engine PROPERTIES OUTPUT_NAME robotick-engine)
 target_compile_definitions(robotick-engine PRIVATE ROBOTICK_EXPORTS)
+
+target_include_directories(robotick-engine PUBLIC
+    ${CMAKE_CURRENT_LIST_DIR}/include
+)
 
 # Disable exceptions in this module unless overridden (e.g. test-suite enables them to catch errors, which it overrides to throw)
 target_compile_options(robotick-engine PRIVATE -fno-exceptions)
@@ -101,10 +105,10 @@ if(ROBOTICK_ENABLE_PYTHON)
     # 👇 Enable exceptions selectively for sources that require it (Python + MQTT)
     set(EXCEPTION_ENABLED_SOURCES ${PYTHON_SOURCES})
     list(APPEND EXCEPTION_ENABLED_SOURCES
-        ${CMAKE_SOURCE_DIR}/cpp/src/robotick/framework/data/MqttFieldSync.cpp
-        ${CMAKE_SOURCE_DIR}/cpp/src/robotick/workloads/telemetry/MqttClientWorkload.cpp
-        ${CMAKE_SOURCE_DIR}/cpp/src/robotick/platform/MqttClient.cpp
-        ${CMAKE_SOURCE_DIR}/cpp/src/robotick/platform/posix/WebServer.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/framework/data/MqttFieldSync.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/workloads/telemetry/MqttClientWorkload.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/MqttClient.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/posix/WebServer.cpp
     )
 
     foreach(source_file IN LISTS EXCEPTION_ENABLED_SOURCES)
@@ -126,18 +130,11 @@ target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3) # for Mq
 target_link_libraries(robotick-engine PRIVATE civetweb) # for WebServer / RemoteControlWorkload
 
 # =========================
-# ✅ Optional Executable
-# =========================
-
-add_executable(robotick_main ${CMAKE_SOURCE_DIR}/examples/cpp/desktop-testbed/robotick_main.cpp)
-target_link_libraries(robotick_main PRIVATE robotick-engine)
-
-# =========================
 # ✅ ESP32 libs (if needed)
 # =========================
 
 if(ROBOTICK_PLATFORM_ESP32)
-    target_include_directories(robotick_main PRIVATE
+    target_include_directories(robotick-engine PRIVATE
         ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/include
         ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/xtensa/include
         ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos
@@ -155,12 +152,12 @@ endif()
 if (ROBOTICK_BUILD_TESTS)
     message(STATUS "✅ ROBOTICK_BUILD_TESTS - ON")
     enable_testing()
-    add_subdirectory(cpp/tests)
+    add_subdirectory(tests)
 
     add_custom_command(TARGET robotick-engine POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:robotick-engine>
-            ${CMAKE_BINARY_DIR}/cpp/tests/$<CONFIG>
+            ${CMAKE_BINARY_DIR}/tests/$<CONFIG>
     )
 else()
     message(STATUS "❌ ROBOTICK_BUILD_TESTS - OFF")
@@ -170,7 +167,7 @@ endif()
 # ✅ Add JSON Submodule
 # =========================
 
-add_subdirectory(cpp/lib/json)
+add_subdirectory(lib/json)
 
 
 # ================================================================
@@ -178,11 +175,11 @@ add_subdirectory(cpp/lib/json)
 # ================================================================
 
 add_library(civetweb STATIC
-    cpp/lib/civetweb/src/civetweb.c
+    lib/civetweb/src/civetweb.c
 )
 
 target_include_directories(civetweb PUBLIC
-    cpp/lib/civetweb/include
+    lib/civetweb/include
 )
 
 target_compile_definitions(civetweb PRIVATE NO_SSL)
@@ -205,8 +202,8 @@ endif()
 # ✅ Data for Remote Control and other systems (Post-build)
 # =======================================================
 
-set(RUNTIME_DATA_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data)
-set(RUNTIME_DATA_DEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/data)
+set(RUNTIME_DATA_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../data)
+set(RUNTIME_DATA_DEST_DIR $<TARGET_FILE_DIR:robotick-engine>/data)
 
 # Ensure the directory exists at build time
 add_custom_command(
