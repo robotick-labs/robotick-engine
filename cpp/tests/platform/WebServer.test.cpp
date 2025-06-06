@@ -87,7 +87,7 @@ TEST_CASE("Unit|Platform|WebServer|WebServer serves static file and fallback han
 	std::string last_body;
 
 	WebServer server;
-	server.start(8089,
+	server.start(8089, "data/remote_control_interface_web",
 		[&](const WebRequest& request, WebResponse& response)
 		{
 			fallback_called = true;

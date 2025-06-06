@@ -70,20 +70,18 @@ namespace robotick
 		return response.status_code;
 	}
 
-	void WebServer::start(uint16_t port, WebRequestHandler handler_in)
+	void WebServer::start(uint16_t port, const std::string& web_root_folder, WebRequestHandler handler_in)
 	{
 		ROBOTICK_ASSERT(!running && "WebServer already started");
 		handler = std::move(handler_in);
 
 		std::filesystem::path exe = std::filesystem::canonical("/proc/self/exe");
-		std::filesystem::path base_dir = exe.parent_path() / "data/remote_control_interface_web";
+		std::filesystem::path base_dir = exe.parent_path() / web_root_folder;
 		document_root = base_dir.string();
 		std::string port_str = std::to_string(port);
 
 		const char* options[] = {
 			"listening_ports", port_str.c_str(), "document_root", document_root.c_str(), "enable_directory_listing", "no", nullptr};
-
-		ROBOTICK_ASSERT_MSG(std::filesystem::exists(base_dir / "index.html"), "Expected index.html not found in %s", document_root.c_str());
 
 		ctx = mg_start(nullptr, nullptr, options);
 		if (!ctx)

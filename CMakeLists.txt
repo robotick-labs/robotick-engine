@@ -200,3 +200,20 @@ if(ROBOTICK_ENABLE_PYTHON)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     )
 endif()
+
+# =======================================================
+# ✅ Data for Remote Control and other systems (Post-build)
+# =======================================================
+
+set(RUNTIME_DATA_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data)
+set(RUNTIME_DATA_DEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/data)
+
+# Ensure the directory exists at build time
+add_custom_command(
+    TARGET robotick-engine POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${RUNTIME_DATA_SOURCE_DIR}
+            ${RUNTIME_DATA_DEST_DIR}
+    COMMENT "📦 Copying runtime data to build directory"
+)
+

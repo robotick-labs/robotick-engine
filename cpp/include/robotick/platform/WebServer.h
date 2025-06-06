@@ -31,7 +31,7 @@ namespace robotick
 		WebServer();
 		~WebServer();
 
-		void start(uint16_t port, WebRequestHandler handler);
+		void start(uint16_t port, const std::string& web_root_folder, WebRequestHandler handler = nullptr);
 		void stop();
 		bool is_running() const;
 
