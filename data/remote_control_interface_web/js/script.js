@@ -1,6 +1,56 @@
-const client = mqtt.connect('ws://' + location.hostname + ':7081');
-client.on('connect', () => console.log('MQTT connected'));
-client.on('error', err => console.error('MQTT error:', err));
+
+const joystickState = {
+    use_web_inputs: true,
+    left: { x: 0.0, y: 0.0 },
+    right: { x: 0.0, y: 0.0 },
+    dead_zone_left: { x: 0.0, y: 0.0 },
+    dead_zone_right: { x: 0.0, y: 0.0 },
+    scale_left: { x: 1.0, y: 1.0 },
+    scale_right: { x: 1.0, y: 1.0 }
+};
+
+const lastSentState = JSON.parse(JSON.stringify(joystickState)); // deep clone
+let lastSendTime = 0;
+const sendIntervalMs = 1.0/30.0; // 30Hz max send-rate (less if no changes)
+
+function sendJoystickInput(topic, normX, normY) {
+    const mapping = {
+        "left_stick": "left",
+        "right_stick": "right"
+        // add other mappings if needed
+    };
+
+    const key = mapping[topic];
+    if (!key) return;
+
+    const current = joystickState[key];
+    const last = lastSentState[key];
+    const changed =
+        Math.abs(current.x - normX) > 0.001 ||
+        Math.abs(current.y - normY) > 0.001;
+
+    if (!changed) return;
+
+    const now = performance.now();
+    if (now - lastSendTime < sendIntervalMs) return;
+
+    current.x = normX;
+    current.y = normY;
+    lastSentState[key].x = normX;
+    lastSentState[key].y = normY;
+
+    lastSendTime = now;
+
+    const payload = {
+        [key]: { x: normX, y: normY }
+    };
+
+    fetch('/api/joystick_input', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).catch(err => console.error('POST error:', err));
+}
 
 function createStick(areaId, knobId, topic, autoCenterX, autoCenterY) {
     const area = document.getElementById(areaId);
@@ -14,29 +64,23 @@ function createStick(areaId, knobId, topic, autoCenterX, autoCenterY) {
         knob.style.top = `${y}px`;
     }
 
-    function sendMQTT(normX, normY) {
-        const payload = JSON.stringify([normX, normY]);
-        client.publish(topic, payload);
-    }
-
     function movePointer(globalX, globalY) {
         const rect = area.getBoundingClientRect();
         const originX = rect.width / 2;
         const originY = rect.height / 2;
         let dx = globalX - rect.left - originX;
         let dy = globalY - rect.top - originY;
-   
+
         const maxRangeX = rect.width / 2 - knob.offsetWidth / 2;
         const maxRangeY = rect.height / 2 - knob.offsetHeight / 2;
         dx = Math.max(-maxRangeX, Math.min(maxRangeX, dx));
-        dy = Math.max(-maxRangeY, Math.min(maxRangeY, dy));       
+        dy = Math.max(-maxRangeY, Math.min(maxRangeY, dy));
 
         setKnob(originX + dx, originY + dy);
 
         const normX = dx / maxRangeX;
-        const normY = -dy / maxRangeY; // invert Y so up=+1
-        
-        sendMQTT(normX, normY);
+        const normY = -dy / maxRangeY; // invert Y so up is positive (more intuitive)
+        sendJoystickInput(topic, normX, normY);
     }
 
     function resetKnob() {
@@ -46,16 +90,16 @@ function createStick(areaId, knobId, topic, autoCenterX, autoCenterY) {
 
         const normX = autoCenterX ? 0 : (x - originX) / ((areaRect.width / 2) - (knob.offsetWidth / 2));
         const normY = autoCenterY ? 0 : -(y - originY) / ((areaRect.height / 2) - (knob.offsetHeight / 2));
-        sendMQTT(normX, normY);
+        sendJoystickInput(topic, normX, normY);
     }
 
     return { movePointer, resetKnob, area };
 }
 
-const leftStick = createStick('left-area', 'left-knob', 'control/remote_control_interface/left_stick', true, true);
-const rightStick = createStick('right-area', 'right-knob', 'control/remote_control_interface/right_stick', true, false);
+const leftStick = createStick('left-area', 'left-knob', 'left_stick', true, true);
+const rightStick = createStick('right-area', 'right-knob', 'right_stick', true, false);
 
-const activeTouches = {}; // touchId → { side: 'left'|'right', startX, startY }
+const activeTouches = {};
 
 function touchStartedInArea(touch, area) {
     const rect = area.getBoundingClientRect();
@@ -99,11 +143,7 @@ function handleTouchEnd(e) {
     for (const touch of e.changedTouches) {
         const touchData = activeTouches[touch.identifier];
         if (touchData) {
-            if (touchData.side === 'left') {
-                leftStick.resetKnob();
-            } else if (touchData.side === 'right') {
-                rightStick.resetKnob();
-            }
+            (touchData.side === 'left' ? leftStick : rightStick).resetKnob();
             delete activeTouches[touch.identifier];
         }
     }
@@ -114,7 +154,6 @@ document.addEventListener('touchmove', handleTouchMove);
 document.addEventListener('touchend', handleTouchEnd);
 document.addEventListener('touchcancel', handleTouchEnd);
 
-// Mouse support for testing
 let mouseActive = null;
 let mouseStartX = 0;
 let mouseStartY = 0;

@@ -10,7 +10,7 @@ namespace robotick
 	struct RemoteControlConfig
 	{
 		int port = 7080;
-		FixedString128 web_root_folder = "data/remote_control_interface_web";
+		FixedString128 web_root_folder = "engine-data/remote_control_interface_web";
 	};
 	ROBOTICK_BEGIN_FIELDS(RemoteControlConfig)
 	ROBOTICK_FIELD(RemoteControlConfig, int, port)
@@ -80,7 +80,32 @@ namespace robotick
 
 		State<RemoteControlState> state;
 
-		void setup() { state->server.start(config.port, config.web_root_folder.c_str()); }
+		void setup()
+		{
+			state->server.start(config.port, config.web_root_folder.c_str(),
+				[&](const WebRequest& request, WebResponse& response)
+				{
+					if (request.method == "POST")
+					{
+						if (request.uri == "/api/joystick_input")
+						{
+							response.status_code = 200; // OK
+														/*TODO - make client send us object-wise json e.g.
+							
+														{
+															"use_web_inputs": true,
+															"left": { "x": 0.0, "y": 0.0 },
+															"right": { "x": 0.0, "y": 0.0 },
+															"dead_zone_left": { "x": 0.0, "y": 0.0 },
+															"dead_zone_right": { "x": 0.0, "y": 0.0 },
+															"scale_left": { "x": 1.0, "y": 1.0 },
+															"scale_right": { "x": 1.0, "y": 1.0 }
+															}*/
+						}
+					}
+				} // <-- this was missing
+			);
+		}
 
 		void tick(const TickInfo&)
 		{

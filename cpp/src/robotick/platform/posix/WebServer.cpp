@@ -37,6 +37,11 @@ namespace robotick
 		if (len > 0)
 			request.body = std::string(buffer, len);
 
+		if (request.uri == "/")
+		{
+			return 0; // Let CivetWeb handle it (asking for default file - e.g. index.html)
+		}
+
 		// Try static file path
 		std::filesystem::path file_path = std::filesystem::path(self->document_root) / request.uri.substr(1); // Strip leading '/'
 		if (std::filesystem::exists(file_path))

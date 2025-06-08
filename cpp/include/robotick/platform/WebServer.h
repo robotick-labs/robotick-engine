@@ -20,7 +20,7 @@ namespace robotick
 	{
 		std::string body;
 		std::string content_type = "text/plain"; // Default
-		int status_code = 200;					 // Default: OK
+		int status_code = 404;					 // Default: NotFound (intuituve - meaning it's not been handled)
 	};
 
 	using WebRequestHandler = std::function<void(const WebRequest&, WebResponse&)>;
