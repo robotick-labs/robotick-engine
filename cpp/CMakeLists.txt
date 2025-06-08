@@ -198,3 +198,12 @@ if(ROBOTICK_ENABLE_PYTHON)
     )
 endif()
 
+# Mirror CTest entries into top-level build dir
+if (ROBOTICK_BUILD_TESTS)
+    include(CTest)  # Ensures CTest support is initialized
+    add_test(NAME robotick_tests
+             COMMAND robotick_tests
+             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/cpp/tests)
+endif()
+
+

@@ -6,12 +6,13 @@
     "cmake.buildDirectory": "${workspaceFolder}/build",
     "cmake.testExplorer.enableOutput": true,
     "cmake.testExplorer.useCTest": true,
+    "cmake.testExplorer.extraCTestArgs": "--test-dir ${workspaceFolder}/build/ubuntu-x64-debug/cpp/tests",
     "testMate.cpp.testFramework": "catch2",
     "testMate.cpp.enableTestDiscovery": true,
     "testMate.cpp.debug.config.template": "Debug Robotick Tests (No Leak Check)",
     "catch2TestExplorer.useCTest": false,
     "catch2TestExplorer.executables": [
-        "**/cpp/tests/robotick_tests"
+        "${workspaceFolder}/build/ubuntu-x64-debug/cpp/tests/robotick_tests"
     ],
     "C_Cpp.default.compileCommands": "${workspaceFolder}/build/ubuntu-x64-debug/compile_commands.json",
     "C_Cpp.codeAnalysis.clangTidy.enabled": true,
