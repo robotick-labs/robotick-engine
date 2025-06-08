@@ -1,34 +1,209 @@
-idf_component_register(
-    SRCS
-        src/robotick/framework/Engine.cpp
-        src/robotick/framework/Model.cpp
-        src/robotick/framework/WorkloadInstanceInfo.cpp
-        src/robotick/framework/data/Blackboard.cpp
-        src/robotick/framework/data/DataConnection.cpp
-        src/robotick/framework/registry/FieldRegistry.cpp
-        src/robotick/framework/registry/WorkloadRegistry.cpp
-        src/robotick/framework/utils/ConsoleTable.cpp
-        src/robotick/framework/utils/ConsoleTelemetryTable.cpp
-        src/robotick/framework/utils/WorkloadFieldsIterator.cpp
-        # workloads
-        src/robotick/workloads/composition/SequencedGroupWorkload.cpp
-        src/robotick/workloads/composition/SyncedGroupWorkload.cpp
-        src/robotick/workloads/diagnostics/ConsoleTelemetryWorkload.cpp
-        src/robotick/workloads/diagnostics/HelloWorkload.cpp
-        src/robotick/workloads/diagnostics/TimingDiagnosticsWorkload.cpp
-        src/robotick/workloads/ui/HeartbeatDisplayWorkload.cpp
+# Copyright Robotick Labs
+# SPDX-License-Identifier: Apache-2.0
 
-    INCLUDE_DIRS include
+cmake_minimum_required(VERSION 3.16)
+project(robotick-engine)
 
-    REQUIRES driver esp_timer esp_common M5Unified M5GFX
+# =========================
+# ✅ Project-wide Settings
+# =========================
+
+# Apply common flags only to C++ files
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror;-fno-rtti>"
+    )
+endif()
+
+# Optional AddressSanitizer support
+option(ROBOTICK_ENABLE_ASAN "Enable AddressSanitizer for runtime memory checks" OFF)
+option(ROBOTICK_ASAN_DETECT_LEAKS "Enable ASAN leak detection (not always useful in tests)" OFF)
+
+if(ROBOTICK_ENABLE_ASAN)
+    message(STATUS "✅ ASAN enabled")
+    if(ROBOTICK_ASAN_DETECT_LEAKS)
+        message(STATUS "ℹ️  Run with: ASAN_OPTIONS=detect_leaks=1 ./your_executable")
+    endif()
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address)
+endif()
+
+# =========================
+# ✅ Public Include Path
+# =========================
+
+include_directories(${CMAKE_SOURCE_DIR}/include)
+
+# =========================
+# ✅ Source Collection
+# =========================
+
+file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_LIST_DIR}/src/robotick/*.cpp
 )
 
-# ✅ Works reliably in ESP-IDF — apply to all files in this component
-add_definitions(-DROBOTICK_PLATFORM_ESP32)
+set(CORE_SOURCES "")
+set(PYTHON_SOURCES "")
 
-# Linker flags (unchanged)
-target_link_options(${COMPONENT_LIB} PRIVATE "-Wl,--gc-sections")
-set_property(TARGET ${COMPONENT_LIB} APPEND PROPERTY LINK_DEPENDS
-  "${CMAKE_CURRENT_SOURCE_DIR}/robotick_linker_patch.ld")
-target_link_options(${COMPONENT_LIB} PRIVATE
-  "-T${CMAKE_CURRENT_SOURCE_DIR}/robotick_linker_patch.ld")
+foreach(file ${ALL_CPP_SOURCES})
+    if(file MATCHES ".*/PythonRuntime.cpp$" OR file MATCHES ".*/PythonWorkload.cpp$")
+        if(ROBOTICK_ENABLE_PYTHON)
+            list(APPEND CORE_SOURCES ${file})
+            list(APPEND PYTHON_SOURCES ${file})
+        endif()
+    else()
+        list(APPEND CORE_SOURCES ${file})
+    endif()
+endforeach()
+
+# =========================
+# ✅ Core Framework Library
+# =========================
+
+add_library(robotick-engine SHARED ${CORE_SOURCES})
+set_target_properties(robotick-engine PROPERTIES OUTPUT_NAME robotick-engine)
+target_compile_definitions(robotick-engine PRIVATE ROBOTICK_EXPORTS)
+
+target_include_directories(robotick-engine PUBLIC
+    ${CMAKE_CURRENT_LIST_DIR}/include
+)
+
+# Disable exceptions in this module unless overridden (e.g. test-suite enables them to catch errors, which it overrides to throw)
+target_compile_options(robotick-engine PRIVATE -fno-exceptions)
+
+if(ROBOTICK_PLATFORM_UBUNTU)
+    add_compile_definitions(ROBOTICK_PLATFORM_UBUNTU)
+    add_compile_definitions(ROBOTICK_PLATFORM_DESKTOP)
+elseif(ROBOTICK_PLATFORM_ESP32)
+    add_compile_definitions(ROBOTICK_PLATFORM_ESP32)
+endif()
+
+# =========================
+# ✅ Optional Python Workloads
+# =========================
+
+if(ROBOTICK_ENABLE_PYTHON)
+    message(STATUS "✅ ROBOTICK_ENABLE_PYTHON - ON")
+
+    # Ensure pybind11 and Python3 are available
+    include(FetchContent)
+    FetchContent_Declare(
+        pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG        v2.11.1
+    )
+    FetchContent_MakeAvailable(pybind11)
+
+    find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+    target_compile_definitions(robotick-engine PUBLIC ROBOTICK_ENABLE_PYTHON=1)
+    target_link_libraries(robotick-engine PUBLIC pybind11::embed ${Python3_LIBRARIES})
+
+    # 👇 Enable exceptions selectively for sources that require it (Python + MQTT)
+    set(EXCEPTION_ENABLED_SOURCES ${PYTHON_SOURCES})
+    list(APPEND EXCEPTION_ENABLED_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/framework/data/MqttFieldSync.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/workloads/telemetry/MqttClientWorkload.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/MqttClient.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/posix/WebServer.cpp
+    )
+
+    foreach(source_file IN LISTS EXCEPTION_ENABLED_SOURCES)
+        set_source_files_properties(${source_file} PROPERTIES COMPILE_FLAGS "-fexceptions -frtti")
+    endforeach()
+else()
+    message(STATUS "❌ ROBOTICK_ENABLE_PYTHON - OFF")
+endif()
+
+# =========================
+# ✅ Additional libs
+# =========================
+
+target_link_libraries(robotick-engine PUBLIC nlohmann_json::nlohmann_json) # for MqttClient
+
+find_package(PahoMqttCpp REQUIRED)
+target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3) # for MqttClient
+
+target_link_libraries(robotick-engine PRIVATE civetweb) # for WebServer / RemoteControlWorkload
+
+# =========================
+# ✅ ESP32 libs (if needed)
+# =========================
+
+if(ROBOTICK_PLATFORM_ESP32)
+    target_include_directories(robotick-engine PRIVATE
+        ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/include
+        ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/xtensa/include
+        ${IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos
+        ${IDF_PATH}/components/newlib/platform_include
+        ${IDF_PATH}/components/esp_common/include
+        ${IDF_PATH}/components/esp_system/include
+        ${PROJECT_SOURCE_DIR}/esp-idf-dummy
+    )
+endif()
+
+# =========================
+# ✅ Unit Tests via Catch2
+# =========================
+
+if (ROBOTICK_BUILD_TESTS)
+    message(STATUS "✅ ROBOTICK_BUILD_TESTS - ON")
+    enable_testing()
+    add_subdirectory(tests)
+
+    add_custom_command(TARGET robotick-engine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:robotick-engine>
+            ${CMAKE_BINARY_DIR}/tests/$<CONFIG>
+    )
+else()
+    message(STATUS "❌ ROBOTICK_BUILD_TESTS - OFF")
+endif()
+
+# =========================
+# ✅ Add JSON Submodule
+# =========================
+
+add_subdirectory(lib/json)
+
+
+# ================================================================
+# ✅ Add civetweb - selectively so we don't also pull in its tests
+# ================================================================
+
+add_library(civetweb STATIC
+    lib/civetweb/src/civetweb.c
+)
+
+target_include_directories(civetweb PUBLIC
+    lib/civetweb/include
+)
+
+target_compile_definitions(civetweb PRIVATE NO_SSL)
+
+# =========================
+# ✅ Auto-add License Headers
+# =========================
+
+if(ROBOTICK_ENABLE_PYTHON)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+    add_custom_target(add_license
+        COMMAND ${CMAKE_COMMAND} -E echo "Adding Apache 2.0 headers..."
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/add_license_header.py ${CMAKE_SOURCE_DIR}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+endif()
+
+# Mirror CTest entries into top-level build dir
+if (ROBOTICK_BUILD_TESTS)
+    include(CTest)  # Ensures CTest support is initialized
+    add_test(NAME robotick_tests
+             COMMAND robotick_tests
+             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/cpp/tests)
+endif()
+
+

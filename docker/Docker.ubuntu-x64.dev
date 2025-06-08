@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     cmake \
     clang \
     clang-tidy \
+    clang-format \
     curl \
     g++ \
     make \
@@ -14,8 +15,9 @@ RUN apt-get update && apt-get install -y \
     python3-venv \
     ninja-build \
     gdb \
-    libssl-dev && \
-    apt-get clean
+    libssl-dev \
+    libcurl4-openssl-dev \
+    && apt-get clean
 
 # 🔧 Build and install Paho MQTT C lib (with exported CMake targets)
 RUN git clone --depth=1 https://github.com/eclipse/paho.mqtt.c.git /tmp/paho.mqtt.c && \
@@ -42,12 +44,32 @@ RUN git clone --depth=1 https://github.com/eclipse/paho.mqtt.cpp.git /tmp/paho.m
     rm -rf /tmp/paho.mqtt.cpp
 
 # 🐍 Set up Python venv and install Robotick in editable mode
-WORKDIR /workspace
-COPY . .
+ARG WORKDIR=/workspace
+
+# Copy everything into container (safe for single-repo or parent-repo setups)
+COPY . ${WORKDIR}
+WORKDIR ${WORKDIR}
 
 RUN python3 -m venv /venv && \
     /venv/bin/pip install --upgrade pip && \
-    /venv/bin/pip install -e .
+    if [ -f setup.py ]; then \
+        echo "✅ Installing Python package from root"; \
+        /venv/bin/pip install -e .; \
+    elif [ -f robotick-engine/setup.py ]; then \
+        echo "✅ Installing Python package from robotick-engine subdir"; \
+        cd robotick-engine && /venv/bin/pip install -e .; \
+    else \
+        echo "❌ setup.py not found!" && exit 1; \
+    fi
 
 # 👣 Use venv as default Python environment
 ENV PATH="/venv/bin:$PATH"
+
+# Make git happy inside container
+RUN git config --global --add safe.directory ${WORKDIR}
+
+RUN git config --global --add safe.directory /workspace \
+ && git config --global --add safe.directory /workspace/robotick-engine
+
+
+

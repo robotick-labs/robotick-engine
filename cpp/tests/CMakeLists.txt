@@ -48,8 +48,14 @@ set_target_properties(Catch2WithMain PROPERTIES CXX_CLANG_TIDY "")
 # Automatically discover test .cpp files
 file(GLOB_RECURSE ROBOTICK_TEST_SOURCES
   CONFIGURE_DEPENDS
-  ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/*.test.cpp
 )
+
+if(false) # enable to debug test-sources
+    foreach(source ${ROBOTICK_TEST_SOURCES})
+        message(STATUS "Test source: ${source} from ${CMAKE_CURRENT_SOURCE_DIR}")
+    endforeach()
+endif()
 
 # Build test executable
 add_executable(robotick_tests ${ROBOTICK_TEST_SOURCES})
@@ -68,6 +74,9 @@ target_link_libraries(robotick_tests
     robotick-engine
     Catch2::Catch2WithMain
 )
+
+# Link against curl lib (for WebServer testing)
+target_link_libraries(robotick_tests PRIVATE curl)
 
 # ✅ Re-enable exceptions just for test target
 target_compile_options(robotick_tests PRIVATE -fexceptions)
@@ -92,3 +101,17 @@ add_custom_command(TARGET robotick_tests POST_BUILD
     $<TARGET_FILE:robotick-engine>
     $<TARGET_FILE_DIR:robotick_tests>
 )
+
+# =======================================================
+# ✅ Test data for WebServer and other tests
+# =======================================================
+
+set(TEST_DATA_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data)
+set(TEST_DATA_DEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/data)
+
+message(STATUS "📦 Copying test data from: ${TEST_DATA_SOURCE_DIR}")
+message(STATUS "📦 Copying test data to:   ${TEST_DATA_DEST_DIR}")
+
+file(COPY ${TEST_DATA_SOURCE_DIR}
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+

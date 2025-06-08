@@ -1,3 +1,6 @@
 [submodule "cpp/lib/json"]
 	path = cpp/lib/json
 	url = https://github.com/nlohmann/json.git
+[submodule "cpp/lib/civetweb"]
+	path = cpp/lib/civetweb
+	url = https://github.com/civetweb/civetweb.git

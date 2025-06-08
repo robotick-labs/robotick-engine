@@ -9,13 +9,41 @@
         "--build",
         "${workspaceFolder}/build/${input:buildPreset}",
         "--config",
-        "Debug"
+        "Debug",
+        "--target",
+        "robotick_main"
       ],
       "group": {
         "kind": "build",
         "isDefault": true
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Build robotick_tests",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "${workspaceFolder}/build/${input:buildPreset}",
+        "--config",
+        "Debug",
+        "--target",
+        "robotick_tests"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "buildPreset",
+      "type": "command",
+      "command": "cmake.activeBuildPresetName",
+      "description": "Choose the CMake build preset"
     }
   ]
 }
