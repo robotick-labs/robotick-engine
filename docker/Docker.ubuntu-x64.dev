@@ -68,4 +68,8 @@ ENV PATH="/venv/bin:$PATH"
 # Make git happy inside container
 RUN git config --global --add safe.directory ${WORKDIR}
 
+RUN git config --global --add safe.directory /workspace \
+ && git config --global --add safe.directory /workspace/robotick-engine
+
+
 
