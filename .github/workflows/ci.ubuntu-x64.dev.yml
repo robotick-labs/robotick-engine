@@ -68,5 +68,5 @@ jobs:
             robotick-ci \
             bash -c "
               set -e
-              ctest --test-dir build/ubuntu-x64-debug --output-on-failure --timeout 10
+              ctest --test-dir build/ubuntu-x64-debug/cpp/tests --output-on-failure --timeout 10
             "
