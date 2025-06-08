@@ -27,3 +27,41 @@ body {
     top: 50%;
     transform: translate(-50%, -50%);
 }
+
+.controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-family: sans-serif;
+    text-align: center;
+}
+
+.toggle-button {
+    padding: 10px 20px;
+    font-size: 1.1em;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 1em;
+    transition: background 0.2s;
+}
+
+.toggle-button.active {
+    background: #3c3;
+    color: #000;
+}
+
+.toggle-button.inactive {
+    background: silver;
+    color: #000;
+}
+
+.slider-group {
+    margin: 10px 0;
+}
+
+.slider-group label {
+    margin-right: 5px;
+}

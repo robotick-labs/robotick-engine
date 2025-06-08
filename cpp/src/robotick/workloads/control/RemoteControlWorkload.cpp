@@ -5,6 +5,8 @@
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/platform/WebServer.h"
 
+#include <nlohmann/json.hpp>
+
 namespace robotick
 {
 	struct RemoteControlConfig
@@ -26,11 +28,6 @@ namespace robotick
 		double right_x = 0;
 		double right_y = 0;
 
-		double dead_zone_left_x = 0.0;
-		double dead_zone_left_y = 0.0;
-		double dead_zone_right_x = 0.0;
-		double dead_zone_right_y = 0.0;
-
 		double scale_left_x = 1.0;
 		double scale_left_y = 1.0;
 		double scale_right_x = 1.0;
@@ -42,10 +39,6 @@ namespace robotick
 	ROBOTICK_FIELD(RemoteControlInputs, double, left_y)
 	ROBOTICK_FIELD(RemoteControlInputs, double, right_x)
 	ROBOTICK_FIELD(RemoteControlInputs, double, right_y)
-	ROBOTICK_FIELD(RemoteControlInputs, double, dead_zone_left_x)
-	ROBOTICK_FIELD(RemoteControlInputs, double, dead_zone_left_y)
-	ROBOTICK_FIELD(RemoteControlInputs, double, dead_zone_right_x)
-	ROBOTICK_FIELD(RemoteControlInputs, double, dead_zone_right_y)
 	ROBOTICK_FIELD(RemoteControlInputs, double, scale_left_x)
 	ROBOTICK_FIELD(RemoteControlInputs, double, scale_left_y)
 	ROBOTICK_FIELD(RemoteControlInputs, double, scale_right_x)
@@ -85,26 +78,45 @@ namespace robotick
 			state->server.start(config.port, config.web_root_folder.c_str(),
 				[&](const WebRequest& request, WebResponse& response)
 				{
-					if (request.method == "POST")
+					if (request.method == "POST" && request.uri == "/api/joystick_input")
 					{
-						if (request.uri == "/api/joystick_input")
+						const auto json_opt = nlohmann::json::parse(request.body, nullptr, /*allow exceptions*/ false);
+						if (json_opt.is_discarded())
 						{
-							response.status_code = 200; // OK
-														/*TODO - make client send us object-wise json e.g.
-							
-														{
-															"use_web_inputs": true,
-															"left": { "x": 0.0, "y": 0.0 },
-															"right": { "x": 0.0, "y": 0.0 },
-															"dead_zone_left": { "x": 0.0, "y": 0.0 },
-															"dead_zone_right": { "x": 0.0, "y": 0.0 },
-															"scale_left": { "x": 1.0, "y": 1.0 },
-															"scale_right": { "x": 1.0, "y": 1.0 }
-															}*/
+							response.status_code = 400;
+							response.body = "Invalid JSON format.";
+							return;
 						}
+
+						const nlohmann::json& json = json_opt;
+
+						auto& w = state->web_inputs;
+
+						if (json.contains("use_web_inputs") && json["use_web_inputs"].is_boolean())
+							w.use_web_inputs = json["use_web_inputs"].get<bool>();
+
+						auto try_set_vec2 = [&](const std::string& name, double& x, double& y)
+						{
+							if (!json.contains(name))
+								return;
+							const auto& obj = json[name];
+							if (obj.is_object())
+							{
+								if (obj.contains("x") && obj["x"].is_number())
+									x = obj["x"].get<double>();
+								if (obj.contains("y") && obj["y"].is_number())
+									y = obj["y"].get<double>();
+							}
+						};
+
+						try_set_vec2("left", w.left_x, w.left_y);
+						try_set_vec2("right", w.right_x, w.right_y);
+						try_set_vec2("scale_left", w.scale_left_x, w.scale_left_y);
+						try_set_vec2("scale_right", w.scale_right_x, w.scale_right_y);
+
+						response.status_code = 200;
 					}
-				} // <-- this was missing
-			);
+				});
 		}
 
 		void tick(const TickInfo&)
@@ -114,10 +126,10 @@ namespace robotick
 
 			const RemoteControlInputs& inputs_ref = use_web_inputs ? state->web_inputs : inputs;
 
-			outputs.left_x = apply_dead_zone(inputs_ref.left_x, inputs_ref.dead_zone_left_x) * inputs_ref.scale_left_x;
-			outputs.left_y = apply_dead_zone(inputs_ref.left_y, inputs_ref.dead_zone_left_y) * inputs_ref.scale_left_y;
-			outputs.right_x = apply_dead_zone(inputs_ref.right_x, inputs_ref.dead_zone_right_x) * inputs_ref.scale_right_x;
-			outputs.right_y = apply_dead_zone(inputs_ref.right_y, inputs_ref.dead_zone_right_y) * inputs_ref.scale_right_y;
+			outputs.left_x = inputs_ref.left_x * inputs_ref.scale_left_x;
+			outputs.left_y = inputs_ref.left_y * inputs_ref.scale_left_y;
+			outputs.right_x = inputs_ref.right_x * inputs_ref.scale_right_x;
+			outputs.right_y = inputs_ref.right_y * inputs_ref.scale_right_y;
 		}
 
 		void stop() { state->server.stop(); }

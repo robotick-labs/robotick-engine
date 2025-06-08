@@ -1,55 +1,91 @@
 
+// Local runtime-only state for applying dead zones
+const localState = {
+    left: { x: 0.0, y: 0.0 },
+    right: { x: 0.0, y: 0.0 }
+};
+
+// Intended-to-send state
 const joystickState = {
     use_web_inputs: true,
     left: { x: 0.0, y: 0.0 },
     right: { x: 0.0, y: 0.0 },
-    dead_zone_left: { x: 0.0, y: 0.0 },
-    dead_zone_right: { x: 0.0, y: 0.0 },
+    dead_zone_left: { x: 0.1, y: 0.1 },
+    dead_zone_right: { x: 0.1, y: 0.1 },
     scale_left: { x: 1.0, y: 1.0 },
     scale_right: { x: 1.0, y: 1.0 }
 };
 
-const lastSentState = JSON.parse(JSON.stringify(joystickState)); // deep clone
-let lastSendTime = 0;
-const sendIntervalMs = 1.0/30.0; // 30Hz max send-rate (less if no changes)
+const lastSentState = JSON.parse(JSON.stringify(joystickState));
+let dirtyKeys = new Set();
+let ticking = false;
+
+function applyDeadZone(value, threshold) {
+    if (Math.abs(value) < threshold) return 0.0;
+    const sign = value > 0 ? 1 : -1;
+    return ((Math.abs(value) - threshold) / (1.0 - threshold)) * sign;
+}
 
 function sendJoystickInput(topic, normX, normY) {
     const mapping = {
         "left_stick": "left",
         "right_stick": "right"
-        // add other mappings if needed
     };
 
     const key = mapping[topic];
     if (!key) return;
 
-    const current = joystickState[key];
-    const last = lastSentState[key];
-    const changed =
-        Math.abs(current.x - normX) > 0.001 ||
-        Math.abs(current.y - normY) > 0.001;
+    const dz = joystickState[key === 'left' ? 'dead_zone_left' : 'dead_zone_right'];
+    const filteredX = applyDeadZone(normX, dz.x);
+    const filteredY = applyDeadZone(normY, dz.y);
 
-    if (!changed) return;
+    localState[key].x = filteredX;
+    localState[key].y = filteredY;
 
-    const now = performance.now();
-    if (now - lastSendTime < sendIntervalMs) return;
+    joystickState[key].x = filteredX;
+    joystickState[key].y = filteredY;
+    dirtyKeys.add(key);
 
-    current.x = normX;
-    current.y = normY;
-    lastSentState[key].x = normX;
-    lastSentState[key].y = normY;
+    if (!ticking) startTickLoop();
+}
 
-    lastSendTime = now;
+function startTickLoop() {
+    ticking = true;
+    const tickIntervalMs = 33; // 30Hz
 
-    const payload = {
-        [key]: { x: normX, y: normY }
+    const tick = () => {
+        if (dirtyKeys.size === 0) {
+            ticking = false;
+            return;
+        }
+
+        const payload = { use_web_inputs: joystickState.use_web_inputs };
+
+        for (const key of dirtyKeys) {
+            const current = joystickState[key];
+            const last = lastSentState[key];
+            if (
+                Math.abs(current.x - last.x) > 0.001 ||
+                Math.abs(current.y - last.y) > 0.001
+            ) {
+                payload[key] = { x: current.x, y: current.y };
+                last.x = current.x;
+                last.y = current.y;
+            }
+        }
+
+        dirtyKeys.clear();
+
+        fetch('/api/joystick_input', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).catch(err => console.error('POST error:', err));
+
+        setTimeout(tick, tickIntervalMs);
     };
 
-    fetch('/api/joystick_input', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    }).catch(err => console.error('POST error:', err));
+    tick();
 }
 
 function createStick(areaId, knobId, topic, autoCenterX, autoCenterY) {
@@ -197,3 +233,43 @@ document.addEventListener('mouseup', () => {
     }
     mouseActive = null;
 });
+
+// UI control setup
+window.onload = () => {
+    const takeoverBtn = document.getElementById("takeover-button");
+    takeoverBtn.classList.add("active");
+
+    takeoverBtn.onclick = () => {
+        joystickState.use_web_inputs = !joystickState.use_web_inputs;
+        takeoverBtn.classList.toggle("active", joystickState.use_web_inputs);
+        takeoverBtn.classList.toggle("inactive", !joystickState.use_web_inputs);
+        sendFullState();
+    };
+
+    const deadzoneBindings = [
+        ["deadzone-left-x", "dead_zone_left", "x"],
+        ["deadzone-left-y", "dead_zone_left", "y"],
+        ["deadzone-right-x", "dead_zone_right", "x"],
+        ["deadzone-right-y", "dead_zone_right", "y"]
+    ];
+
+    deadzoneBindings.forEach(([id, group, axis]) => {
+        const slider = document.getElementById(id);
+        slider.value = joystickState[group][axis];
+        slider.oninput = () => {
+            joystickState[group][axis] = parseFloat(slider.value);
+            dirtyKeys.add(group);
+            if (!ticking) startTickLoop();
+        };
+    });
+
+    sendFullState();
+};
+
+function sendFullState() {
+    fetch('/api/joystick_input', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(joystickState)
+    }).catch(err => console.error('POST error:', err));
+}
