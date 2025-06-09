@@ -1,0 +1,19 @@
+{
+    "version": 1,
+    "presets": {
+        "ubuntu-workloads-all": {
+            "mode": "exclude",
+            "workloads": [
+                "BaseXWorkload",
+                "HeartbeatDisplayWorkload"
+            ]
+        },
+        "esp32s3-workloads-all": {
+            "mode": "include",
+            "workloads": [
+                "BaseXWorkload",
+                "HeartbeatDisplayWorkload"
+            ]
+        }
+    }
+}
