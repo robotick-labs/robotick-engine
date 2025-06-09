@@ -46,7 +46,6 @@ file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
 # Separate workload and non-workload sources
 set(WORKLOAD_SOURCES "")
 set(NON_WORKLOAD_SOURCES "")
-
 foreach(SRC_FILE ${ALL_CPP_SOURCES})
     if(SRC_FILE MATCHES ".*/workloads/.*\\.cpp$")
         list(APPEND WORKLOAD_SOURCES ${SRC_FILE})
@@ -55,60 +54,68 @@ foreach(SRC_FILE ${ALL_CPP_SOURCES})
     endif()
 endforeach()
 
-# Begin workload filtering
-set(WORKLOAD_CONFIG_PATH "${CMAKE_CURRENT_LIST_DIR}/CMakeWorkloads.json")
-message(STATUS "📄 Looking for workload config at: ${WORKLOAD_CONFIG_PATH}")
+# Define workload config search paths
+set(ENGINE_WORKLOAD_CONFIG "${CMAKE_CURRENT_LIST_DIR}/CMakeWorkloads.json")
+set(PROJECT_WORKLOAD_CONFIG "${CMAKE_SOURCE_DIR}/CMakeWorkloads.json")  # ✅ correct path to project-level file
 
-if (EXISTS ${WORKLOAD_CONFIG_PATH})
-    file(READ ${WORKLOAD_CONFIG_PATH} RAW_WORKLOAD_JSON)
+message(STATUS "📄 Looking for workload config:")
+message(STATUS "    • Engine: ${ENGINE_WORKLOAD_CONFIG}")
+message(STATUS "    • Project: ${PROJECT_WORKLOAD_CONFIG}")
 
-    if (NOT DEFINED WORKLOAD_PRESET)
-        message(WARNING "⚠️  WORKLOAD_PRESET not defined (e.g. via -DWORKLOAD_PRESET=ubuntu-x64-debug). No workloads will be included.")
+set(RAW_WORKLOAD_JSON "")
+
+# Load and concatenate JSON contents from both sources
+foreach(PATH IN LISTS PROJECT_WORKLOAD_CONFIG ENGINE_WORKLOAD_CONFIG)
+    if(EXISTS ${PATH})
+        file(READ ${PATH} THIS_JSON)
+        string(APPEND RAW_WORKLOAD_JSON ${THIS_JSON})
+    endif()
+endforeach()
+
+if(RAW_WORKLOAD_JSON STREQUAL "")
+    message(WARNING "⚠️  No CMakeWorkloads.json found — no workloads will be included.")
+    set(FILTERED_WORKLOAD_SOURCES "")
+elseif(NOT DEFINED WORKLOAD_PRESET)
+    message(WARNING "⚠️  WORKLOAD_PRESET not defined (e.g. via -DWORKLOAD_PRESET=ubuntu-x64-debug). No workloads will be included.")
+    set(FILTERED_WORKLOAD_SOURCES "")
+else()
+    message(STATUS "🔧 Using workload preset: '${WORKLOAD_PRESET}'")
+
+    string(JSON PRESETS_JSON ERROR_VARIABLE JSON_PRESETS_ERR GET ${RAW_WORKLOAD_JSON} presets)
+    string(JSON DUMMY_CHECK ERROR_VARIABLE JSON_PRESET_ERR GET ${PRESETS_JSON} ${WORKLOAD_PRESET})
+
+    if(JSON_PRESET_ERR)
+        message(WARNING "⚠️  No entry found for workload preset '${WORKLOAD_PRESET}' — no workloads will be included.")
         set(FILTERED_WORKLOAD_SOURCES "")
     else()
-        message(STATUS "🔧 Using workload preset: '${WORKLOAD_PRESET}'")
+        string(JSON MODE GET ${PRESETS_JSON} ${WORKLOAD_PRESET} mode)
+        string(JSON FILES GET ${PRESETS_JSON} ${WORKLOAD_PRESET} workloads)
 
-        string(JSON PRESETS_JSON ERROR_VARIABLE JSON_PRESETS_ERR GET ${RAW_WORKLOAD_JSON} presets)
-        string(JSON MODE ERROR_VARIABLE JSON_MODE_ERR GET ${PRESETS_JSON} ${WORKLOAD_PRESET} mode)
-        string(JSON FILES ERROR_VARIABLE JSON_FILES_ERR GET ${PRESETS_JSON} ${WORKLOAD_PRESET} workloads)
-
-        # Convert JSON array to proper CMake list
         string(JSON FILE_COUNT LENGTH ${FILES})
         set(PARSED_WORKLOAD_LIST "")
         foreach(IDX RANGE 0 ${FILE_COUNT})
             math(EXPR INDEX "${IDX} - 1")
-            if (INDEX GREATER_EQUAL 0)
+            if(INDEX GREATER_EQUAL 0)
                 string(JSON ITEM GET ${FILES} ${INDEX})
                 list(APPEND PARSED_WORKLOAD_LIST ${ITEM})
             endif()
         endforeach()
 
-        if(JSON_MODE_ERR OR JSON_FILES_ERR)
-            message(WARNING "⚠️  No entry found for workload preset '${WORKLOAD_PRESET}' in CMakeWorkloads.json — no workloads will be included.")
-            set(FILTERED_WORKLOAD_SOURCES "")
-        else()
-            set(FILTERED_WORKLOAD_SOURCES "")
-            foreach(SRC_FILE ${WORKLOAD_SOURCES})
-                get_filename_component(SRC_NAME ${SRC_FILE} NAME_WE)
+        set(FILTERED_WORKLOAD_SOURCES "")
+        foreach(SRC_FILE ${WORKLOAD_SOURCES})
+            get_filename_component(SRC_NAME ${SRC_FILE} NAME_WE)
+            list(FIND PARSED_WORKLOAD_LIST ${SRC_NAME} FILE_MATCH_INDEX)
 
-                list(FIND PARSED_WORKLOAD_LIST ${SRC_NAME} FILE_MATCH_INDEX)
+            if ((MODE STREQUAL "include" AND FILE_MATCH_INDEX GREATER -1) OR
+                (MODE STREQUAL "exclude" AND FILE_MATCH_INDEX EQUAL -1))
+                list(APPEND FILTERED_WORKLOAD_SOURCES ${SRC_FILE})
+            endif()
+        endforeach()
 
-                # message(STATUS "🔍 Checking workload: ${SRC_NAME} ${FILE_MATCH_INDEX}")           
-
-                if ((MODE STREQUAL "include" AND FILE_MATCH_INDEX GREATER -1) OR
-                    (MODE STREQUAL "exclude" AND FILE_MATCH_INDEX EQUAL -1))
-                    list(APPEND FILTERED_WORKLOAD_SOURCES ${SRC_FILE})
-                endif()
-            endforeach()
-
-            message(STATUS "🎯 Applied workload preset '${WORKLOAD_PRESET}' from CMakeWorkloads.json")
-            message(STATUS "🔍 Filter mode: ${MODE}")
-            message(STATUS "📂 Including workload sources: ${FILTERED_WORKLOAD_SOURCES}")
-        endif()
+        message(STATUS "🎯 Applied workload preset '${WORKLOAD_PRESET}'")
+        message(STATUS "🔍 Filter mode: ${MODE}")
+        message(STATUS "📂 Including workload sources: ${FILTERED_WORKLOAD_SOURCES}")
     endif()
-else()
-    message(WARNING "⚠️  CMakeWorkloads.json not found at: ${WORKLOAD_CONFIG_PATH} — no workloads will be included.")
-    set(FILTERED_WORKLOAD_SOURCES "")
 endif()
 
 # Final source list = all non-workload files + filtered workload files
