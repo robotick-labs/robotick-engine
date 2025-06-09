@@ -58,7 +58,6 @@
             "description": "Debug build for ESP32-S3 using Espressif toolchain and SDK",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-esp32s3.cmake",
                 "CMAKE_BUILD_TYPE": "Debug",
                 "ROBOTICK_PLATFORM_ESP32": "ON",
                 "ROBOTICK_BUILD_TESTS": "OFF"
