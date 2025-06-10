@@ -1,8 +1,13 @@
 # Copyright Robotick Labs
 # SPDX-License-Identifier: Apache-2.0
 
+# robotick-engine/cpp/CMakeLists.txt
+
 cmake_minimum_required(VERSION 3.16)
-project(robotick-engine)
+
+if(ROBOTICK_PLATFORM_UBUNTU)
+    project(robotick-engine)
+endif()
 
 # =========================
 # ✅ Project-wide Settings
@@ -28,111 +33,12 @@ if(ROBOTICK_ENABLE_ASAN)
     add_link_options(-fsanitize=address)
 endif()
 
-# =========================
-# ✅ Public Include Path
-# =========================
+# ===================================
+# ✅ Source Collection
+# ===================================
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
-
-# =====================================================
-# ✅ Source Collection (Filtered by Workload-Preset)
-# =====================================================
-
-# Discover all .cpp files
-file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
-    ${CMAKE_CURRENT_LIST_DIR}/src/robotick/*.cpp
-)
-
-# Separate workload and non-workload sources
-set(WORKLOAD_SOURCES "")
-set(NON_WORKLOAD_SOURCES "")
-foreach(SRC_FILE ${ALL_CPP_SOURCES})
-    if(SRC_FILE MATCHES ".*/workloads/.*\\.cpp$")
-        list(APPEND WORKLOAD_SOURCES ${SRC_FILE})
-    else()
-        list(APPEND NON_WORKLOAD_SOURCES ${SRC_FILE})
-    endif()
-endforeach()
-
-# Define workload config search paths
-set(ENGINE_WORKLOAD_CONFIG "${CMAKE_CURRENT_LIST_DIR}/CMakeWorkloads.json")
-set(PROJECT_WORKLOAD_CONFIG "${CMAKE_SOURCE_DIR}/CMakeWorkloads.json")  # ✅ correct path to project-level file
-
-message(STATUS "📄 Looking for workload config:")
-message(STATUS "    • Engine: ${ENGINE_WORKLOAD_CONFIG}")
-message(STATUS "    • Project: ${PROJECT_WORKLOAD_CONFIG}")
-
-set(RAW_WORKLOAD_JSON "")
-
-# Load and concatenate JSON contents from both sources
-foreach(PATH IN LISTS PROJECT_WORKLOAD_CONFIG ENGINE_WORKLOAD_CONFIG)
-    if(EXISTS ${PATH})
-        file(READ ${PATH} THIS_JSON)
-        string(APPEND RAW_WORKLOAD_JSON ${THIS_JSON})
-    endif()
-endforeach()
-
-if(RAW_WORKLOAD_JSON STREQUAL "")
-    message(WARNING "⚠️  No CMakeWorkloads.json found — no workloads will be included.")
-    set(FILTERED_WORKLOAD_SOURCES "")
-elseif(NOT DEFINED WORKLOAD_PRESET)
-    message(WARNING "⚠️  WORKLOAD_PRESET not defined (e.g. via -DWORKLOAD_PRESET=ubuntu-x64-debug). No workloads will be included.")
-    set(FILTERED_WORKLOAD_SOURCES "")
-else()
-    message(STATUS "🔧 Using workload preset: '${WORKLOAD_PRESET}'")
-
-    string(JSON PRESETS_JSON ERROR_VARIABLE JSON_PRESETS_ERR GET ${RAW_WORKLOAD_JSON} presets)
-    string(JSON DUMMY_CHECK ERROR_VARIABLE JSON_PRESET_ERR GET ${PRESETS_JSON} ${WORKLOAD_PRESET})
-
-    if(JSON_PRESET_ERR)
-        message(WARNING "⚠️  No entry found for workload preset '${WORKLOAD_PRESET}' — no workloads will be included.")
-        set(FILTERED_WORKLOAD_SOURCES "")
-    else()
-        string(JSON MODE GET ${PRESETS_JSON} ${WORKLOAD_PRESET} mode)
-        string(JSON FILES GET ${PRESETS_JSON} ${WORKLOAD_PRESET} workloads)
-
-        string(JSON FILE_COUNT LENGTH ${FILES})
-        set(PARSED_WORKLOAD_LIST "")
-        foreach(IDX RANGE 0 ${FILE_COUNT})
-            math(EXPR INDEX "${IDX} - 1")
-            if(INDEX GREATER_EQUAL 0)
-                string(JSON ITEM GET ${FILES} ${INDEX})
-                list(APPEND PARSED_WORKLOAD_LIST ${ITEM})
-            endif()
-        endforeach()
-
-        set(FILTERED_WORKLOAD_SOURCES "")
-        foreach(SRC_FILE ${WORKLOAD_SOURCES})
-            get_filename_component(SRC_NAME ${SRC_FILE} NAME_WE)
-            list(FIND PARSED_WORKLOAD_LIST ${SRC_NAME} FILE_MATCH_INDEX)
-
-            if ((MODE STREQUAL "include" AND FILE_MATCH_INDEX GREATER -1) OR
-                (MODE STREQUAL "exclude" AND FILE_MATCH_INDEX EQUAL -1))
-                list(APPEND FILTERED_WORKLOAD_SOURCES ${SRC_FILE})
-            endif()
-        endforeach()
-
-        message(STATUS "🎯 Applied workload preset '${WORKLOAD_PRESET}'")
-        message(STATUS "🔍 Filter mode: ${MODE}")
-        message(STATUS "📂 Including workload sources: ${FILTERED_WORKLOAD_SOURCES}")
-    endif()
-endif()
-
-# Final source list = all non-workload files + filtered workload files
-set(ALL_CPP_SOURCES ${NON_WORKLOAD_SOURCES} ${FILTERED_WORKLOAD_SOURCES})
-
-set(CORE_SOURCES "")
-set(PYTHON_SOURCES "")
-foreach(file ${ALL_CPP_SOURCES})
-    if(file MATCHES ".*/PythonRuntime.cpp$" OR file MATCHES ".*/PythonWorkload.cpp$")
-        if(ROBOTICK_ENABLE_PYTHON)
-            list(APPEND CORE_SOURCES ${file})
-            list(APPEND PYTHON_SOURCES ${file})
-        endif()
-    else()
-        list(APPEND CORE_SOURCES ${file})
-    endif()
-endforeach()
+set(ROBOTICK_ENGINE_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
+include(${ROBOTICK_ENGINE_SOURCE_DIR}/cmake/RobotickWorkloadFilter.cmake)
 
 # =========================
 # ✅ Core Framework Library
@@ -194,9 +100,12 @@ endif()
 # =========================
 
 target_link_libraries(robotick-engine PUBLIC nlohmann_json::nlohmann_json)
-find_package(PahoMqttCpp REQUIRED)
-target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3)
-target_link_libraries(robotick-engine PRIVATE civetweb)
+
+if(ROBOTICK_PLATFORM_UBUNTU)
+    find_package(PahoMqttCpp REQUIRED)
+    target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3)
+    target_link_libraries(robotick-engine PRIVATE civetweb)
+endif()
 
 # =========================
 # ✅ ESP32 libs (if needed)

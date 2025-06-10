@@ -1,3 +1,5 @@
+# robotick-engine/docker/Dockerfile.esp32s3.dev
+
 FROM espressif/idf:release-v5.4
 
-# Minimal, since the image already contains toolchains, Python env, and ESP-IDF
+RUN apt-get update && apt-get install -y ninja-build
