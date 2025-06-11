@@ -1,5 +1,5 @@
 {
-    "version": 3,
+    "version": 4,
     "cmakeMinimumRequired": {
         "major": 3,
         "minor": 21
@@ -17,7 +17,8 @@
                 "ROBOTICK_PLATFORM_UBUNTU": "ON",
                 "ROBOTICK_ENABLE_PYTHON": "ON",
                 "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-ubuntu-x64.cmake",
-                "WORKLOAD_PRESET": "ubuntu-workloads-all"
+                "WORKLOAD_PRESET": "ubuntu-workloads-all",
+                "ROBOTICK_PROJECT_ROOT": "${sourceDir}"
             }
         },
         {
@@ -62,7 +63,8 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "ROBOTICK_PLATFORM_ESP32": "ON",
                 "ROBOTICK_BUILD_TESTS": "OFF",
-                "WORKLOAD_PRESET": "esp32s3-workloads-all"
+                "WORKLOAD_PRESET": "esp32s3-workloads-all",
+                "ROBOTICK_PROJECT_ROOT": "${sourceDir}"
             },
             "environment": {
                 "IDF_PATH": "C:/Espressif/frameworks/esp-idf-v5.4.1",
