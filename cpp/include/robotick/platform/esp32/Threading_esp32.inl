@@ -106,7 +106,7 @@ namespace robotick
 		// Convert target_time to absolute time in microseconds
 		int64_t target_us = duration_cast<microseconds>(target_time.time_since_epoch()).count();
 
-		esp_task_wdt_reset();
+		// esp_task_wdt_reset();
 
 		while (true)
 		{
@@ -126,7 +126,7 @@ namespace robotick
 			if (++spin_counter % watchdog_yield_interval == 0)
 			{
 				taskYIELD();		  // Allow IDLE tasks to run
-				esp_task_wdt_reset(); // Pet the watchdog manually
+				// esp_task_wdt_reset(); // Pet the watchdog manually
 			}
 		}
 	}
