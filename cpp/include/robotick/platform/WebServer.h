@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(ROBOTICK_PLATFORM_DESKTOP)
+
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -44,3 +46,6 @@ namespace robotick
 		std::string document_root;
 	};
 } // namespace robotick
+
+#endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)
+

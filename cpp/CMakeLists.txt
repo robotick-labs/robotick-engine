@@ -1,26 +1,28 @@
 # Copyright Robotick Labs
 # SPDX-License-Identifier: Apache-2.0
 
+# robotick-engine/cpp/CMakeLists.txt
+
 cmake_minimum_required(VERSION 3.16)
-project(robotick-engine)
+
+if(ROBOTICK_PLATFORM_UBUNTU)
+    project(robotick-engine)
+endif()
 
 # =========================
 # ✅ Project-wide Settings
 # =========================
 
-# Apply common flags only to C++ files
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
     add_compile_options(
         "$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror;-fno-rtti>"
     )
 endif()
 
-# Optional AddressSanitizer support
 option(ROBOTICK_ENABLE_ASAN "Enable AddressSanitizer for runtime memory checks" OFF)
-option(ROBOTICK_ASAN_DETECT_LEAKS "Enable ASAN leak detection (not always useful in tests)" OFF)
+option(ROBOTICK_ASAN_DETECT_LEAKS "Enable ASAN leak detection" OFF)
 
 if(ROBOTICK_ENABLE_ASAN)
     message(STATUS "✅ ASAN enabled")
@@ -31,33 +33,12 @@ if(ROBOTICK_ENABLE_ASAN)
     add_link_options(-fsanitize=address)
 endif()
 
-# =========================
-# ✅ Public Include Path
-# =========================
-
-include_directories(${CMAKE_SOURCE_DIR}/include)
-
-# =========================
+# ===================================
 # ✅ Source Collection
-# =========================
+# ===================================
 
-file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
-    ${CMAKE_CURRENT_LIST_DIR}/src/robotick/*.cpp
-)
-
-set(CORE_SOURCES "")
-set(PYTHON_SOURCES "")
-
-foreach(file ${ALL_CPP_SOURCES})
-    if(file MATCHES ".*/PythonRuntime.cpp$" OR file MATCHES ".*/PythonWorkload.cpp$")
-        if(ROBOTICK_ENABLE_PYTHON)
-            list(APPEND CORE_SOURCES ${file})
-            list(APPEND PYTHON_SOURCES ${file})
-        endif()
-    else()
-        list(APPEND CORE_SOURCES ${file})
-    endif()
-endforeach()
+set(ROBOTICK_ENGINE_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
+include(${ROBOTICK_ENGINE_SOURCE_DIR}/cmake/RobotickWorkloadFilter.cmake)
 
 # =========================
 # ✅ Core Framework Library
@@ -71,7 +52,6 @@ target_include_directories(robotick-engine PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
-# Disable exceptions in this module unless overridden (e.g. test-suite enables them to catch errors, which it overrides to throw)
 target_compile_options(robotick-engine PRIVATE -fno-exceptions)
 
 if(ROBOTICK_PLATFORM_UBUNTU)
@@ -87,8 +67,6 @@ endif()
 
 if(ROBOTICK_ENABLE_PYTHON)
     message(STATUS "✅ ROBOTICK_ENABLE_PYTHON - ON")
-
-    # Ensure pybind11 and Python3 are available
     include(FetchContent)
     FetchContent_Declare(
         pybind11
@@ -102,7 +80,6 @@ if(ROBOTICK_ENABLE_PYTHON)
     target_compile_definitions(robotick-engine PUBLIC ROBOTICK_ENABLE_PYTHON=1)
     target_link_libraries(robotick-engine PUBLIC pybind11::embed ${Python3_LIBRARIES})
 
-    # 👇 Enable exceptions selectively for sources that require it (Python + MQTT)
     set(EXCEPTION_ENABLED_SOURCES ${PYTHON_SOURCES})
     list(APPEND EXCEPTION_ENABLED_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/robotick/framework/data/MqttFieldSync.cpp
@@ -122,12 +99,13 @@ endif()
 # ✅ Additional libs
 # =========================
 
-target_link_libraries(robotick-engine PUBLIC nlohmann_json::nlohmann_json) # for MqttClient
+target_link_libraries(robotick-engine PUBLIC nlohmann_json::nlohmann_json)
 
-find_package(PahoMqttCpp REQUIRED)
-target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3) # for MqttClient
-
-target_link_libraries(robotick-engine PRIVATE civetweb) # for WebServer / RemoteControlWorkload
+if(ROBOTICK_PLATFORM_UBUNTU)
+    find_package(PahoMqttCpp REQUIRED)
+    target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3)
+    target_link_libraries(robotick-engine PRIVATE civetweb)
+endif()
 
 # =========================
 # ✅ ESP32 libs (if needed)
@@ -169,19 +147,12 @@ endif()
 
 add_subdirectory(lib/json)
 
+# =========================
+# ✅ Add civetweb (minimal)
+# =========================
 
-# ================================================================
-# ✅ Add civetweb - selectively so we don't also pull in its tests
-# ================================================================
-
-add_library(civetweb STATIC
-    lib/civetweb/src/civetweb.c
-)
-
-target_include_directories(civetweb PUBLIC
-    lib/civetweb/include
-)
-
+add_library(civetweb STATIC lib/civetweb/src/civetweb.c)
+target_include_directories(civetweb PUBLIC lib/civetweb/include)
 target_compile_definitions(civetweb PRIVATE NO_SSL)
 
 # =========================
@@ -190,7 +161,6 @@ target_compile_definitions(civetweb PRIVATE NO_SSL)
 
 if(ROBOTICK_ENABLE_PYTHON)
     find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
-
     add_custom_target(add_license
         COMMAND ${CMAKE_COMMAND} -E echo "Adding Apache 2.0 headers..."
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/add_license_header.py ${CMAKE_SOURCE_DIR}
@@ -198,12 +168,9 @@ if(ROBOTICK_ENABLE_PYTHON)
     )
 endif()
 
-# Mirror CTest entries into top-level build dir
 if (ROBOTICK_BUILD_TESTS)
-    include(CTest)  # Ensures CTest support is initialized
+    include(CTest)
     add_test(NAME robotick_tests
              COMMAND robotick_tests
              WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/cpp/tests)
 endif()
-
-

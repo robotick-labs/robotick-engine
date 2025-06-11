@@ -3,8 +3,6 @@
 
 #include "robotick/api.h"
 
-#ifdef ROBOTICK_PLATFORM_ESP32
-
 #include <M5Unified.h>
 
 namespace robotick
@@ -280,4 +278,3 @@ namespace robotick
 
 } // namespace robotick
 
-#endif

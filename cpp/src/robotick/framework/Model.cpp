@@ -94,4 +94,64 @@ namespace robotick
 		}
 	}
 
+	WorkloadHandle Model::add(const std::string& type, const std::string& name, double tick_rate_hz, const std::map<std::string, std::string>& config)
+	{
+		if (root_workload.is_valid())
+			ROBOTICK_FATAL_EXIT("Cannot add workloads after root has been set. Model root must be set last.");
+
+		const std::vector<WorkloadHandle> children = {};
+		workload_seeds.push_back({type, name, tick_rate_hz, children, config});
+		return {static_cast<uint32_t>(workload_seeds.size() - 1)};
+	}
+
+	WorkloadHandle Model::add(const std::string& type, const std::string& name, const std::vector<WorkloadHandle>& children, double tick_rate_hz,
+		const std::map<std::string, std::string>& config)
+	{
+		if (root_workload.is_valid())
+			ROBOTICK_FATAL_EXIT("Cannot add workloads after root has been set. Model root must be set last.");
+
+		for (auto child : children)
+		{
+			if (!child.is_valid() || child.index >= workload_seeds.size())
+				ROBOTICK_FATAL_EXIT("Child handle out of range when adding workload '%s'", name.c_str());
+		}
+
+		workload_seeds.push_back({type, name, tick_rate_hz, children, config});
+		return {static_cast<uint32_t>(workload_seeds.size() - 1)};
+	}
+
+	void Model::add_remote_model(const Model& remote_model, const std::string& model_name, const std::string& comms_channel)
+	{
+		if (model_name.empty())
+		{
+			ROBOTICK_FATAL_EXIT("add_remote_model: model_name must not be empty");
+		}
+
+		if (remote_model.get_workload_seeds().empty())
+		{
+			ROBOTICK_FATAL_EXIT("add_remote_model: remote_model must contain at least one workload");
+		}
+
+		if (remote_models.find(model_name) != remote_models.end())
+		{
+			ROBOTICK_FATAL_EXIT("add_remote_model: a remote model with name '%s' already exists", model_name.c_str());
+		}
+
+		RemoteModelSeed seed;
+		seed.model_name = model_name;
+		seed.comms_channel = comms_channel;
+		seed.model = remote_model; // deep copy
+
+		remote_models[model_name] = std::move(seed);
+	}
+
+	void Model::set_root(WorkloadHandle handle, const bool auto_finalize)
+	{
+		root_workload = handle; // no more changes once root has been set, so good time to validate the model...
+		if (auto_finalize)
+		{
+			finalize();
+		}
+	}
+
 } // namespace robotick

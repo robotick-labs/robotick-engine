@@ -72,6 +72,8 @@ namespace robotick
 // Platform-specific implementation
 #if defined(ROBOTICK_PLATFORM_ESP32)
 #include "robotick/platform/esp32/Threading_esp32.inl"
-#else
+#elif defined(ROBOTICK_PLATFORM_DESKTOP)
 #include "robotick/platform/desktop/Threading_desktop.inl"
+#else
+#error "No Threading implementation for this platform – define a platform macro or add a generic fallback"
 #endif

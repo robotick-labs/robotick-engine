@@ -21,7 +21,11 @@ if docker ps -a --format '{{.Names}}' | grep -q "^robotick-dev-esp32s3$"; then
 fi
 
 # 🚀 Run container with mounts and ssh agent
+
 docker run -it \
+  --user root \
+  --privileged \
+  -v /dev:/dev \
   -v "$(pwd)":/workspace \
   -v "$HOME/.robotick-vscode-server":/root/.vscode-server \
   -v "$SSH_AUTH_SOCK:/ssh-agent" \
@@ -29,3 +33,5 @@ docker run -it \
   --name robotick-dev-esp32s3 \
   robotick-dev:esp32s3 \
   bash
+
+
