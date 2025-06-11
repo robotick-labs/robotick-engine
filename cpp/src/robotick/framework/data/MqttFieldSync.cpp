@@ -1,6 +1,8 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
+#if defined(ROBOTICK_PLATFORM_DESKTOP)
+
 #include "robotick/framework/data/MqttFieldSync.h"
 #include "robotick/api.h"
 
@@ -273,3 +275,5 @@ namespace robotick
 		return nullptr;
 	}
 } // namespace robotick
+
+#endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)

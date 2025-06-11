@@ -1,3 +1,6 @@
+
+#if defined(ROBOTICK_PLATFORM_DESKTOP)
+
 #include "robotick/platform/WebServer.h"
 #include "robotick/api.h"
 
@@ -114,3 +117,5 @@ namespace robotick
 		ROBOTICK_INFO("WebServer stopped.");
 	}
 } // namespace robotick
+
+#endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)

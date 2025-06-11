@@ -22,6 +22,9 @@ fi
 
 # 🚀 Run container with mounts and ssh agent
 docker run -it \
+  --user $(id -u):$(id -g) \
+  --device=/dev/ttyACM1 \
+  --privileged \
   -v "$(pwd)":/workspace \
   -v "$HOME/.robotick-vscode-server":/root/.vscode-server \
   -v "$SSH_AUTH_SOCK:/ssh-agent" \

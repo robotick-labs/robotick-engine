@@ -3,6 +3,8 @@
 
 #pragma once
 
+#if defined(ROBOTICK_PLATFORM_DESKTOP)
+
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
@@ -59,3 +61,5 @@ namespace robotick
 		nlohmann::json serialize(void* ptr, TypeId type);
 	};
 } // namespace robotick
+
+#endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)
