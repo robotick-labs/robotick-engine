@@ -6,6 +6,34 @@ file(GLOB_RECURSE ALL_CPP_SOURCES
     ${ROBOTICK_ENGINE_SOURCE_DIR}/src/robotick/*.cpp
 )
 
+# -----------------------------------------------
+# Resolve WORKLOAD_PRESET from CMake var or ENV
+# -----------------------------------------------
+if(NOT DEFINED WORKLOAD_PRESET OR "${WORKLOAD_PRESET}" STREQUAL "")
+    if(DEFINED ENV{WORKLOAD_PRESET} AND NOT "$ENV{WORKLOAD_PRESET}" STREQUAL "")
+        set(WORKLOAD_PRESET "$ENV{WORKLOAD_PRESET}")
+        message(STATUS "🌍 WORKLOAD_PRESET loaded from environment: ${WORKLOAD_PRESET}")
+    else()
+        message(FATAL_ERROR "❌ WORKLOAD_PRESET is not set. Define it in CMake or as an environment variable.")
+    endif()
+else()
+    message(STATUS "📦 WORKLOAD_PRESET set via CMake: ${WORKLOAD_PRESET}")
+endif()
+
+# -----------------------------------------------
+# Resolve ROBOTICK_PROJECT_ROOT from CMake var or ENV
+# -----------------------------------------------
+if(NOT DEFINED ROBOTICK_PROJECT_ROOT OR "${ROBOTICK_PROJECT_ROOT}" STREQUAL "")
+    if(DEFINED ENV{ROBOTICK_PROJECT_ROOT} AND NOT "$ENV{ROBOTICK_PROJECT_ROOT}" STREQUAL "")
+        set(ROBOTICK_PROJECT_ROOT "$ENV{ROBOTICK_PROJECT_ROOT}")
+        message(STATUS "🌍 ROBOTICK_PROJECT_ROOT loaded from environment: ${ROBOTICK_PROJECT_ROOT}")
+    else()
+        message(FATAL_ERROR "❌ ROBOTICK_PROJECT_ROOT is not set. Define it in CMake or as an environment variable.")
+    endif()
+else()
+    message(STATUS "📦 ROBOTICK_PROJECT_ROOT set via CMake: ${ROBOTICK_PROJECT_ROOT}")
+endif()
+
 # Separate workload and non-workload sources
 set(WORKLOAD_SOURCES "")
 set(NON_WORKLOAD_SOURCES "")
@@ -18,8 +46,23 @@ foreach(SRC_FILE ${ALL_CPP_SOURCES})
 endforeach()
 
 # Load config from engine/project
+
+message(STATUS "🔎 CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
+message(STATUS "🔎 CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
+message(STATUS "🔎 CMAKE_CURRENT_LIST_DIR: ${CMAKE_CURRENT_LIST_DIR}")
+
 set(ENGINE_WORKLOAD_CONFIG "${ROBOTICK_ENGINE_SOURCE_DIR}/CMakeWorkloads.json")
-set(PROJECT_WORKLOAD_CONFIG "${CMAKE_SOURCE_DIR}/CMakeWorkloads.json")
+
+if(DEFINED ROBOTICK_PROJECT_ROOT)
+    message(STATUS "📁 ROBOTICK_PROJECT_ROOT = ${ROBOTICK_PROJECT_ROOT}")
+    set(PROJECT_WORKLOAD_CONFIG "${ROBOTICK_PROJECT_ROOT}/CMakeWorkloads.json")
+else()
+    message(WARNING "⚠️ ROBOTICK_PROJECT_ROOT not defined — falling back to CMAKE_SOURCE_DIR")
+    set(PROJECT_WORKLOAD_CONFIG "${CMAKE_SOURCE_DIR}/CMakeWorkloads.json")
+endif()
+
+message(STATUS "📦 ENGINE_WORKLOAD_CONFIG: ${ENGINE_WORKLOAD_CONFIG}")
+message(STATUS "📦 PROJECT_WORKLOAD_CONFIG: ${PROJECT_WORKLOAD_CONFIG}")
 
 set(RAW_WORKLOAD_JSON "")
 foreach(PATH IN LISTS PROJECT_WORKLOAD_CONFIG ENGINE_WORKLOAD_CONFIG)
