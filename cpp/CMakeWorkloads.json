@@ -2,17 +2,30 @@
     "version": 1,
     "presets": {
         "ubuntu-workloads-all": {
-            "mode": "exclude",
+            "mode": "include",
             "workloads": [
-                "BaseXWorkload",
-                "HeartbeatDisplayWorkload"
+                "SequencedGroupWorkload",
+                "SyncedGroupWorkload",
+                "RemoteControlWorkload",
+                "SteeringMixerWorkload",
+                "ConsoleTelemetryWorkload",
+                "TimingDiagnosticsWorkload",
+                "HelloWorkload",
+                "TemplateWorkload",
+                "PythonWorkload",
+                "MqttClientWorkload"
             ]
         },
         "esp32s3-workloads-all": {
             "mode": "include",
             "workloads": [
                 "BaseXWorkload",
-                "HeartbeatDisplayWorkload"
+                "FaceDisplayWorkload",
+                "HeartbeatDisplayWorkload",
+                "HelloWorkload",
+                "SteeringMixerWorkload",
+                "ConsoleTelemetryWorkload",
+                "TimingDiagnosticsWorkload"
             ]
         }
     }
