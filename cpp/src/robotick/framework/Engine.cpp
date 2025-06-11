@@ -341,7 +341,9 @@ namespace robotick
 		const auto child_tick_interval_sec = std::chrono::duration<double>(1.0 / root_info.tick_rate_hz);
 		const auto child_tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(child_tick_interval_sec);
 
-		const auto engine_start_time = std::chrono::steady_clock::now();
+		const auto engine_start_time = std::chrono::steady_clock::now() - child_tick_interval;
+		// ^- subtract tick-interval so initial delta is from tick-interval
+
 		auto last_tick_time = engine_start_time;
 		auto next_tick_time = engine_start_time;
 

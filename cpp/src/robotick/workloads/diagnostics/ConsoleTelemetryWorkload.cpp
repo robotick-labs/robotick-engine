@@ -18,8 +18,8 @@ namespace robotick
 {
 	struct ConsoleTelemetryConfig
 	{
-		bool enable_pretty_print = true;
-		bool enable_unicode = true;
+		bool enable_pretty_print = false;
+		bool enable_unicode = false;
 		bool enable_demo = false;
 	};
 
