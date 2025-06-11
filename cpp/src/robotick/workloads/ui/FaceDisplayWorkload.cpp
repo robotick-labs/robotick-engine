@@ -33,7 +33,7 @@ struct FaceDisplayWorkload {
 
 	void setup() {
 		M5.begin();
-		M5.Lcd.setRotation(1);
+		M5.Lcd.setRotation(3);
 		schedule_blink_pair(0.0f);
 	}
 
@@ -81,7 +81,7 @@ struct FaceDisplayWorkload {
 	}
 
 	void draw_face(M5Canvas& canvas) {
-		canvas.fillScreen(TFT_LIGHTGREY);
+		canvas.fillScreen(TFT_WHITE);
 
 		int center_y = 120;
 		int eye_w = 30;
@@ -93,11 +93,16 @@ struct FaceDisplayWorkload {
 			float scale_y = 1.0f - 0.8f * eye_blink_progress[i];
 			draw_eye(canvas, cx, center_y, eye_w, static_cast<int>(eye_h * scale_y));
 		}
+
+        // debug-marker to let us see where our origin is, and x-axis (should be top-left of screen)
+        // canvas.fillEllipse(50, 0, 10, 10, TFT_GREEN); 
+        // canvas.fillEllipse(0, 0, 30, 30, TFT_BLUE); 
+
 	}
 
 	void draw_eye(M5Canvas& canvas, int cx, int cy, int rx, int ry) {
 		canvas.fillEllipse(cx, cy, rx, ry, TFT_BLACK);  // pupil
-		canvas.fillEllipse(cx - rx / 4, cy + ry / 3, rx / 3, ry / 4, TFT_WHITE); // highlight
+		canvas.fillEllipse(cx + rx / 4, cy - ry / 3, rx / 3, ry / 4, TFT_WHITE); // highlight
 	}
 };
 
