@@ -3,6 +3,8 @@
 
 #include "robotick/api.h"
 
+#include <algorithm>
+
 namespace robotick
 {
 

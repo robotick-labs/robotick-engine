@@ -63,7 +63,7 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "ROBOTICK_PLATFORM_ESP32": "ON",
                 "ROBOTICK_BUILD_TESTS": "OFF",
-                "WORKLOAD_PRESET": "esp32s3-workloads-all",
+                "WORKLOAD_PRESET": "esp32-s3-workloads-all",
                 "ROBOTICK_PROJECT_ROOT": "${sourceDir}"
             },
             "environment": {

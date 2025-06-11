@@ -16,7 +16,7 @@
                 "MqttClientWorkload"
             ]
         },
-        "esp32s3-workloads-all": {
+        "esp32-s3-workloads-all": {
             "mode": "include",
             "workloads": [
                 "BaseXWorkload",

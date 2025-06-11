@@ -38,7 +38,7 @@ struct FaceDisplayWorkload {
 	}
 
 	void tick(const TickInfo& tick_info) {
-		const float now_sec = static_cast<float>(tick_info.time_now_ns * 1e-9f);
+		const float now_sec = tick_info.time_now_ns * 1e-9f;
 		update_blinks(now_sec);
 
 		M5Canvas canvas(&M5.Lcd);
