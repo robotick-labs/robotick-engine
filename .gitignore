@@ -13,3 +13,4 @@ out/*
 my_git_config.sh
 examples/cpp/esp32-blink/build
 examples/cpp/esp32-blink/components
+.venv

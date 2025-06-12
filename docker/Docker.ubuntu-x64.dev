@@ -1,77 +1,17 @@
 FROM ubuntu:24.04
 
-# 🛠 Install system dependencies
-RUN apt-get update && apt-get install -y \
-    cmake \
-    clang \
-    clang-tidy \
-    clang-format \
-    curl \
-    g++ \
-    make \
-    git \
-    python3 \
-    python3-pip \
-    python3-venv \
-    ninja-build \
-    gdb \
-    libssl-dev \
-    libcurl4-openssl-dev \
-    && apt-get clean
+# 🧱 Root-level setup (install packages and MQTT libs)
+COPY ./1_setup_my_env_as_root.ubuntu.sh /1_setup_my_env_as_root.ubuntu.sh
+RUN chmod +x /1_setup_my_env_as_root.ubuntu.sh && /1_setup_my_env_as_root.ubuntu.sh
 
-# 🔧 Build and install Paho MQTT C lib (with exported CMake targets)
-RUN git clone --depth=1 https://github.com/eclipse/paho.mqtt.c.git /tmp/paho.mqtt.c && \
-    cd /tmp/paho.mqtt.c && \
-    cmake -Bbuild -S. \
-        -DPAHO_BUILD_STATIC=TRUE \
-        -DPAHO_BUILD_SHARED=TRUE \
-        -DPAHO_WITH_SSL=TRUE \
-        -DPAHO_BUILD_CMAKE_EXPORTS=ON \
-        -DCMAKE_INSTALL_PREFIX=/usr && \
-    cmake --build build --target install -- -j$(nproc) && \
-    ldconfig && \
-    rm -rf /tmp/paho.mqtt.c
+# 🧑 User-level setup (e.g. Python venv, editable install)
+COPY ./2_setup_my_env_as_user.ubuntu.sh /2_setup_my_env_as_user.ubuntu.sh
 
-# 🔧 Build and install Paho MQTT C++ lib
-RUN git clone --depth=1 https://github.com/eclipse/paho.mqtt.cpp.git /tmp/paho.mqtt.cpp && \
-    cd /tmp/paho.mqtt.cpp && \
-    cmake -Bbuild -S. \
-        -DPAHO_BUILD_STATIC=TRUE \
-        -DPAHO_BUILD_SHARED=TRUE \
-        -DCMAKE_PREFIX_PATH=/usr && \
-    cmake --build build --target install -- -j$(nproc) && \
-    ldconfig && \
-    rm -rf /tmp/paho.mqtt.cpp
+WORKDIR /workspace
+COPY . .
 
-# 🐍 Set up Python venv and install Robotick in editable mode
-ARG WORKDIR=/workspace
+# 🚀 Run user-level script (non-root context, if needed during build)
+# Or leave this for dev container shell if venv activation is interactive
+RUN chmod +x /2_setup_my_env_as_user.ubuntu.sh
 
-# Copy everything into container (safe for single-repo or parent-repo setups)
-COPY . ${WORKDIR}
-WORKDIR ${WORKDIR}
-
-RUN python3 -m venv /venv && \
-    /venv/bin/pip install --upgrade pip && \
-    if [ -f setup.py ]; then \
-        echo "✅ Installing Python package from root"; \
-        /venv/bin/pip install -e .; \
-    elif [ -f robotick-engine/setup.py ]; then \
-        echo "✅ Installing Python package from robotick-engine subdir"; \
-        cd robotick-engine && /venv/bin/pip install -e .; \
-    else \
-        echo "❌ setup.py not found!" && exit 1; \
-    fi
-
-# 👣 Use venv as default Python environment
-ENV PATH="/venv/bin:$PATH"
-
-# Make git happy inside container
-RUN git config --global --add safe.directory ${WORKDIR}
-
-RUN git config --global --add safe.directory /workspace \
- && git config --global --add safe.directory /workspace/robotick-engine
-
-
-
-
-
+CMD [ "bash" ]
