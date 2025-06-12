@@ -76,6 +76,7 @@ namespace robotick
 			ROBOTICK_FATAL_EXIT("Failed to connect to %s", config.host.c_str());
 
 		state = State::Connected;
+		ROBOTICK_INFO("Proactive connection established to %s:%d", config.host.c_str(), config.port);
 	}
 
 	void RemoteEngineConnection::accept_socket()
@@ -103,6 +104,8 @@ namespace robotick
 		close(socket_fd); // Close listener
 		socket_fd = client_fd;
 		state = State::Connected;
+
+		ROBOTICK_INFO("Passive connection accepted on port %d", config.port);
 	}
 
 	void RemoteEngineConnection::send_message(const MessageType type, const uint8_t* data, size_t size)
@@ -118,33 +121,73 @@ namespace robotick
 		header.reserved = 0;
 		header.payload_len = static_cast<uint32_t>(size);
 
-		send(socket_fd, &header, sizeof(header), 0);
-		send(socket_fd, data, size, 0);
+		// Send header safely
+		const uint8_t* header_ptr = reinterpret_cast<const uint8_t*>(&header);
+		size_t header_remaining = sizeof(header);
+		while (header_remaining > 0)
+		{
+			ssize_t sent = send(socket_fd, header_ptr, header_remaining, 0);
+			if (sent <= 0)
+				return; // Optionally log or handle as a disconnection
+			header_ptr += sent;
+			header_remaining -= sent;
+		}
+
+		// Send payload safely (if any)
+		const uint8_t* data_ptr = data;
+		size_t data_remaining = size;
+		while (data_remaining > 0)
+		{
+			ssize_t sent = send(socket_fd, data_ptr, data_remaining, 0);
+			if (sent <= 0)
+				return; // Optionally log or handle as a disconnection
+			data_ptr += sent;
+			data_remaining -= sent;
+		}
 	}
 
 	bool RemoteEngineConnection::receive_message(std::vector<uint8_t>& buffer_out)
 	{
-		// this can be called by Proactive or Passive RemoteEngineConnection's during handshake
+		// This can be called by Proactive or Passive RemoteEngineConnection during handshake or tick exchange
 
 		MessageHeader header{};
-		ssize_t read_bytes = recv(socket_fd, &header, sizeof(header), MSG_WAITALL);
-		if (read_bytes != sizeof(header))
-			return false;
+		uint8_t* header_ptr = reinterpret_cast<uint8_t*>(&header);
+		size_t header_remaining = sizeof(header);
+
+		// Manually read the full header
+		while (header_remaining > 0)
+		{
+			ssize_t bytes = recv(socket_fd, header_ptr, header_remaining, 0);
+			if (bytes <= 0)
+				return false;
+			header_ptr += bytes;
+			header_remaining -= bytes;
+		}
 
 		if (std::memcmp(header.magic, MAGIC, 4) != 0 || header.version != VERSION)
 			return false;
 
+		// Now read the payload
 		if (header.payload_len > 0)
 		{
 			buffer_out.resize(header.payload_len);
-			read_bytes = recv(socket_fd, buffer_out.data(), buffer_out.size(), MSG_WAITALL);
-			if (read_bytes != static_cast<ssize_t>(header.payload_len))
-				return false;
+			uint8_t* payload_ptr = buffer_out.data();
+			size_t payload_remaining = header.payload_len;
+
+			while (payload_remaining > 0)
+			{
+				ssize_t bytes = recv(socket_fd, payload_ptr, payload_remaining, 0);
+				if (bytes <= 0)
+					return false;
+				payload_ptr += bytes;
+				payload_remaining -= bytes;
+			}
 		}
 		else
 		{
 			buffer_out.clear();
 		}
+
 		return true;
 	}
 
@@ -202,6 +245,8 @@ namespace robotick
 		}
 
 		send_message(MessageType::Subscribe, payload.data(), payload.size());
+
+		ROBOTICK_INFO("Proactive handshake sent with %zu field(s)", fields.size());
 	}
 
 	void RemoteEngineConnection::receive_handshake_and_bind()
@@ -215,6 +260,7 @@ namespace robotick
 		// receive info
 		std::string data(reinterpret_cast<char*>(buffer.data()), buffer.size());
 		size_t start = 0;
+		int bound_count = 0;
 		for (size_t index = 0; index <= data.size(); ++index)
 		{
 			if (index == data.size() || data[index] == '\n')
@@ -229,9 +275,12 @@ namespace robotick
 					continue;
 				}
 				fields.push_back(field);
+				bound_count++;
 			}
 		}
+
 		send_message(MessageType::Ack, nullptr, 0);
+		ROBOTICK_INFO("Passive handshake received. Bound %d field(s)", bound_count);
 	}
 
 	void RemoteEngineConnection::handle_handshake()
@@ -241,7 +290,10 @@ namespace robotick
 			send_handshake();
 			std::vector<uint8_t> ack;
 			if (receive_message(ack))
+			{
 				state = State::Subscribed;
+				ROBOTICK_INFO("Proactive connection received handshake ACK");
+			}
 		}
 		else
 		{
@@ -260,7 +312,12 @@ namespace robotick
 		{
 			receive_into_fields();
 		}
-		state = State::Ticking;
+
+		if (state != State::Ticking)
+		{
+			state = State::Ticking;
+			ROBOTICK_INFO("RemoteEngineConnection [%s] is now ticking", mode == Mode::Proactive ? "Mode::Proactive" : "Mode::Passive");
+		}
 	}
 
 	void RemoteEngineConnection::tick()
