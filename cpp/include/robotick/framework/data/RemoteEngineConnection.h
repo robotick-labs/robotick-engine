@@ -17,8 +17,8 @@ namespace robotick
 	  public:
 		enum class Mode
 		{
-			Proactive,
-			Passive
+			Sender,
+			Receiver
 		};
 		enum class State
 		{
@@ -65,8 +65,8 @@ namespace robotick
 		bool is_connected() const;
 		bool is_ready_for_tick() const;
 
-		void register_field(const Field& field);	  // for Proactive
-		void set_field_binder(BinderCallback binder); // for Passive
+		void register_field(const Field& field);	  // for Sender
+		void set_field_binder(BinderCallback binder); // for Receiver
 
 	  private:
 		void connect_socket();

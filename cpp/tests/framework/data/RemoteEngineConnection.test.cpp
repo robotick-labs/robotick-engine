@@ -19,7 +19,7 @@ TEST_CASE("RemoteEngineConnection|Handshake and tick exchange", "[RemoteEngineCo
 	std::thread server(
 		[&]()
 		{
-			RemoteEngineConnection server({"127.0.0.1", port}, RemoteEngineConnection::Mode::Passive);
+			RemoteEngineConnection server({"127.0.0.1", port}, RemoteEngineConnection::Mode::Receiver);
 			server.set_field_binder(
 				[&](const std::string& path, RemoteEngineConnection::Field& out)
 				{
@@ -45,7 +45,7 @@ TEST_CASE("RemoteEngineConnection|Handshake and tick exchange", "[RemoteEngineCo
 		{
 			while (!server_ready)
 				std::this_thread::sleep_for(std::chrono::milliseconds(5));
-			RemoteEngineConnection client({"127.0.0.1", port}, RemoteEngineConnection::Mode::Proactive);
+			RemoteEngineConnection client({"127.0.0.1", port}, RemoteEngineConnection::Mode::Sender);
 			client.register_field({.path = "x", .send_ptr = &send_value, .size = sizeof(int), .type_hash = 0});
 			while (!client.is_ready_for_tick())
 				client.tick();
@@ -67,7 +67,7 @@ TEST_CASE("RemoteEngineConnection|Handles large payload", "[RemoteEngineConnecti
 	std::thread server(
 		[&]()
 		{
-			RemoteEngineConnection server({"127.0.0.1", port}, RemoteEngineConnection::Mode::Passive);
+			RemoteEngineConnection server({"127.0.0.1", port}, RemoteEngineConnection::Mode::Receiver);
 			std::vector<uint8_t> recv(32768);
 			server.set_field_binder(
 				[&](const std::string&, RemoteEngineConnection::Field& out)
@@ -90,7 +90,7 @@ TEST_CASE("RemoteEngineConnection|Handles large payload", "[RemoteEngineConnecti
 		{
 			while (!ready)
 				std::this_thread::sleep_for(std::chrono::milliseconds(5));
-			RemoteEngineConnection client({"127.0.0.1", port}, RemoteEngineConnection::Mode::Proactive);
+			RemoteEngineConnection client({"127.0.0.1", port}, RemoteEngineConnection::Mode::Sender);
 			client.register_field({.path = "blob", .send_ptr = buffer.data(), .size = buffer.size(), .type_hash = 0});
 			while (!client.is_ready_for_tick())
 				client.tick();

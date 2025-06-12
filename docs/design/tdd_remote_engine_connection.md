@@ -46,8 +46,8 @@ After the handshake, all connections enter a `tick-synchronous` phase:
 
 ```cpp
 enum class Mode {
-    Proactive,  // brain-side
-    Passive     // spine-side
+    Sender,  // brain-side
+    Receiver     // spine-side
 };
 ```
 
@@ -98,7 +98,7 @@ enum class Mode {
 ```cpp
 class RemoteEngineConnection {
 public:
-    enum class Mode { Passive, Proactive };
+    enum class Mode { Receiver, Sender };
 
     RemoteEngineConnection(const std::string& uri, Mode mode);
 

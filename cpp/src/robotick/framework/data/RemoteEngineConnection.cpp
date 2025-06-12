@@ -44,11 +44,15 @@ namespace robotick
 
 	void RemoteEngineConnection::register_field(const Field& field)
 	{
+		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::register_field() should only be called in Mode::Sender");
+
 		fields.push_back(field);
 	}
 
 	void RemoteEngineConnection::set_field_binder(BinderCallback cb)
 	{
+		ROBOTICK_ASSERT_MSG(mode == Mode::Receiver, "RemoteEngineConnection::set_field_binder() should only be called in Mode::Receiver");
+
 		binder = std::move(cb);
 	}
 
@@ -64,7 +68,7 @@ namespace robotick
 
 	void RemoteEngineConnection::connect_socket()
 	{
-		ROBOTICK_ASSERT_MSG(mode == Mode::Proactive, "RemoteEngineConnection::connect_socket() should only be called in Mode::Proactive");
+		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::connect_socket() should only be called in Mode::Sender");
 
 		socket_fd = create_tcp_socket();
 		sockaddr_in addr{};
@@ -85,12 +89,12 @@ namespace robotick
 			ROBOTICK_FATAL_EXIT("Failed to connect to %s", config.host.c_str());
 
 		state = State::Connected;
-		ROBOTICK_INFO("Proactive connection established to %s:%d", config.host.c_str(), config.port);
+		ROBOTICK_INFO("Sender connection established to %s:%d", config.host.c_str(), config.port);
 	}
 
 	void RemoteEngineConnection::accept_socket()
 	{
-		ROBOTICK_ASSERT_MSG(mode == Mode::Passive, "RemoteEngineConnection::accept_socket() should only be called in Mode::Passive");
+		ROBOTICK_ASSERT_MSG(mode == Mode::Receiver, "RemoteEngineConnection::accept_socket() should only be called in Mode::Receiver");
 
 		socket_fd = create_tcp_socket();
 		sockaddr_in addr{};
@@ -114,14 +118,14 @@ namespace robotick
 		socket_fd = client_fd;
 		state = State::Connected;
 
-		ROBOTICK_INFO("Passive connection accepted on port %d", config.port);
+		ROBOTICK_INFO("Receiver connection accepted on port %d", config.port);
 	}
 
 	void RemoteEngineConnection::send_message(const MessageType type, const uint8_t* data, size_t size)
 	{
-		ROBOTICK_ASSERT_MSG(!(mode == Mode::Passive && type == MessageType::Subscribe), "Passive connections must not send MessageType::Subscribe");
-		ROBOTICK_ASSERT_MSG(!(mode == Mode::Proactive && type == MessageType::Ack), "Proactive connections must not send MessageType::Ack");
-		ROBOTICK_ASSERT_MSG(!(mode == Mode::Passive && type == MessageType::Fields), "Passive connections must not send MessageType::Fields");
+		ROBOTICK_ASSERT_MSG(!(mode == Mode::Receiver && type == MessageType::Subscribe), "Receiver connections must not send MessageType::Subscribe");
+		ROBOTICK_ASSERT_MSG(!(mode == Mode::Sender && type == MessageType::Ack), "Sender connections must not send MessageType::Ack");
+		ROBOTICK_ASSERT_MSG(!(mode == Mode::Receiver && type == MessageType::Fields), "Receiver connections must not send MessageType::Fields");
 
 		MessageHeader header{};
 		std::memcpy(header.magic, MAGIC, 4);
@@ -157,7 +161,7 @@ namespace robotick
 
 	bool RemoteEngineConnection::receive_message(std::vector<uint8_t>& buffer_out)
 	{
-		// This can be called by Proactive or Passive RemoteEngineConnection during handshake or tick exchange
+		// This can be called by Sender or Receiver RemoteEngineConnection during handshake or tick exchange
 
 		MessageHeader header{};
 		uint8_t* header_ptr = reinterpret_cast<uint8_t*>(&header);
@@ -210,7 +214,7 @@ namespace robotick
 
 	void RemoteEngineConnection::send_fields_as_message()
 	{
-		ROBOTICK_ASSERT_MSG(mode == Mode::Proactive, "RemoteEngineConnection::send_fields_as_message() should only be called in Mode::Proactive");
+		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::send_fields_as_message() should only be called in Mode::Sender");
 
 		std::vector<uint8_t> buffer;
 		for (const auto& field : fields)
@@ -225,7 +229,7 @@ namespace robotick
 
 	void RemoteEngineConnection::receive_into_fields()
 	{
-		ROBOTICK_ASSERT_MSG(mode == Mode::Passive, "RemoteEngineConnection::receive_into_fields() should only be called in Mode::Passive");
+		ROBOTICK_ASSERT_MSG(mode == Mode::Receiver, "RemoteEngineConnection::receive_into_fields() should only be called in Mode::Receiver");
 
 		std::vector<uint8_t> buffer;
 		if (!receive_message(buffer))
@@ -247,7 +251,7 @@ namespace robotick
 
 	void RemoteEngineConnection::send_handshake()
 	{
-		ROBOTICK_ASSERT_MSG(mode == Mode::Proactive, "RemoteEngineConnection::send_handshake() should only be called in Mode::Proactive");
+		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::send_handshake() should only be called in Mode::Sender");
 
 		std::vector<uint8_t> payload;
 
@@ -267,12 +271,12 @@ namespace robotick
 
 		send_message(MessageType::Subscribe, payload.data(), payload.size());
 
-		ROBOTICK_INFO("Proactive handshake sent with %zu field(s)", fields.size());
+		ROBOTICK_INFO("Sender handshake sent with %zu field(s)", fields.size());
 	}
 
 	void RemoteEngineConnection::receive_handshake_and_bind()
 	{
-		ROBOTICK_ASSERT_MSG(mode == Mode::Passive, "RemoteEngineConnection::receive_handshake_and_bind() should only be called in Mode::Passive");
+		ROBOTICK_ASSERT_MSG(mode == Mode::Receiver, "RemoteEngineConnection::receive_handshake_and_bind() should only be called in Mode::Receiver");
 
 		std::vector<uint8_t> buffer;
 		if (!receive_message(buffer))
@@ -301,19 +305,19 @@ namespace robotick
 		}
 
 		send_message(MessageType::Ack, nullptr, 0);
-		ROBOTICK_INFO("Passive handshake received. Bound %d field(s)", bound_count);
+		ROBOTICK_INFO("Receiver handshake received. Bound %d field(s)", bound_count);
 	}
 
 	void RemoteEngineConnection::handle_handshake()
 	{
-		if (mode == Mode::Proactive)
+		if (mode == Mode::Sender)
 		{
 			send_handshake();
 			std::vector<uint8_t> ack;
 			if (receive_message(ack))
 			{
 				state = State::Subscribed;
-				ROBOTICK_INFO("Proactive connection received handshake ACK");
+				ROBOTICK_INFO("Sender connection received handshake ACK");
 			}
 		}
 		else
@@ -325,7 +329,7 @@ namespace robotick
 
 	void RemoteEngineConnection::handle_tick_exchange()
 	{
-		if (mode == Mode::Proactive)
+		if (mode == Mode::Sender)
 		{
 			send_fields_as_message();
 		}
@@ -337,7 +341,7 @@ namespace robotick
 		if (state != State::Ticking)
 		{
 			state = State::Ticking;
-			ROBOTICK_INFO("RemoteEngineConnection [%s] is now ticking", mode == Mode::Proactive ? "Mode::Proactive" : "Mode::Passive");
+			ROBOTICK_INFO("RemoteEngineConnection [%s] is now ticking", mode == Mode::Sender ? "Mode::Sender" : "Mode::Receiver");
 		}
 	}
 
@@ -345,7 +349,7 @@ namespace robotick
 	{
 		if (!is_connected())
 		{
-			if (mode == Mode::Proactive)
+			if (mode == Mode::Sender)
 				connect_socket();
 			else
 				accept_socket();
