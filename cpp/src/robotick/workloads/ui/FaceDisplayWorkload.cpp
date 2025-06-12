@@ -44,12 +44,24 @@ namespace robotick
 
 		State<FaceDisplayState> state;
 
+		~FaceDisplayWorkload()
+		{
+			auto& s = state.get();
+			if (s.canvas)
+			{
+				delete s.canvas;
+			}
+		}
+
 		void setup()
 		{
 			auto& s = state.get();
 			M5.begin();
 			M5.Lcd.setRotation(3);
+
 			s.canvas = new M5Canvas(&M5.Lcd);
+			s.canvas->createSprite(320, 240);
+
 			schedule_blink_pair(0.0f);
 		}
 
@@ -61,7 +73,6 @@ namespace robotick
 			const float now_sec = tick_info.time_now_ns * 1e-9f;
 			update_blinks(now_sec);
 
-			canvas.createSprite(320, 240);
 			draw_face(canvas);
 			canvas.pushSprite(0, 0);
 		}

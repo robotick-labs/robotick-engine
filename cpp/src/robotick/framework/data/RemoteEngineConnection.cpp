@@ -70,7 +70,16 @@ namespace robotick
 		sockaddr_in addr{};
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(config.port);
-		inet_pton(AF_INET, config.host.c_str(), &addr.sin_addr);
+
+		if (inet_pton(AF_INET, config.host.c_str(), &addr.sin_addr) != 1)
+		{
+			close(socket_fd);
+
+			ROBOTICK_FATAL_EXIT("Invalid IP address: %s", config.host.c_str());
+
+			socket_fd = -1;
+			return;
+		}
 
 		if (connect(socket_fd, (sockaddr*)&addr, sizeof(addr)) < 0)
 			ROBOTICK_FATAL_EXIT("Failed to connect to %s", config.host.c_str());
@@ -167,6 +176,14 @@ namespace robotick
 		if (std::memcmp(header.magic, MAGIC, 4) != 0 || header.version != VERSION)
 			return false;
 
+		// An attacker could send a message with a huge payload_len causing memory exhaustion. Add a maximum payload size limit.
+		constexpr size_t MAX_PAYLOAD_SIZE = 1024 * 1024; // 1MB
+		if (header.payload_len > MAX_PAYLOAD_SIZE)
+		{
+			ROBOTICK_WARNING("Payload too large: %u", header.payload_len);
+			return false;
+		}
+
 		// Now read the payload
 		if (header.payload_len > 0)
 		{
@@ -218,7 +235,11 @@ namespace robotick
 		for (auto& field : fields)
 		{
 			if (offset + field.size > buffer.size())
+			{
+				ROBOTICK_FATAL_EXIT("RemoteEngineConnection::receive_into_fields() - buffer received is too small for all expected fields");
 				break;
+			}
+
 			std::memcpy(field.recv_ptr, buffer.data() + offset, field.size);
 			offset += field.size;
 		}
