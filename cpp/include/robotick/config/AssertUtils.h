@@ -25,7 +25,10 @@
 #define ROBOTICK_BREAKPOINT() __builtin_trap()
 #endif
 
-#define ROBOTICK_INTERNAL_LOG(level, fmt, ...) fprintf(stderr, "[%s] %s:%d: " fmt "\n", level, __FILE__, __LINE__, ##__VA_ARGS__)
+#define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+
+#define ROBOTICK_INTERNAL_LOG(level, fmt, ...) \
+    fprintf(stderr, "[%s] %s:%d: " fmt "\n", level, __FILENAME__, __LINE__, ##__VA_ARGS__)
 
 // =====================================================================
 // ✅ TEST ERROR HANDLER

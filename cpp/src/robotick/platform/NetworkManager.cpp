@@ -1,6 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/api.h"
 #include "robotick/platform/NetworkManager.h"
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
@@ -65,15 +66,29 @@ bool NetworkHotspot::stop() {
 
 namespace robotick {
 
-bool NetworkHotspot::start(const NetworkHotspotConfig& cfg) {
-    if (cfg.type != NetworkType::Wifi) return false;
-    std::string cmd = "nmcli dev wifi hotspot ifname " + cfg.iface +
-                      " ssid " + cfg.ssid + " password " + cfg.password;
-    return std::system(cmd.c_str()) == 0;
-}
+bool NetworkHotspot::start(const NetworkHotspotConfig& cfg) 
+{
+    if (cfg.type != NetworkType::Wifi)
+    {
+        return false;
+    }
 
-bool NetworkHotspot::stop() {
-    return std::system("nmcli connection down Hotspot") == 0;
+    std::string cmd = "nmcli dev wifi hotspot ifname " + cfg.iface +
+                      " ssid " + cfg.ssid + " password " + cfg.password +
+                      " && ip a | grep " + cfg.iface;
+    
+    const int result = std::system(cmd.c_str());
+    const bool success = result==0;
+    if(success)
+    {
+        ROBOTICK_INFO("NetworkHotspot successfully using: %s", cmd.c_str());
+    }
+    else 
+    {
+        ROBOTICK_WARNING("NetworkHotspot failed to start using: %s", cmd.c_str());
+    }
+
+    return success;
 }
 
 bool NetworkClient::connect(const NetworkClientConfig& cfg) {

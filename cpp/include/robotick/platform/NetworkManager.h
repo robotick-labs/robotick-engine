@@ -29,7 +29,7 @@ struct NetworkClientConfig {
 class NetworkHotspot {
 public:
     static bool start(const NetworkHotspotConfig& cfg);
-    static bool stop();
+    // the hotspot with auto-terminate with our application process
 };
 
 class NetworkClient {
