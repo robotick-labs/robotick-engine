@@ -25,10 +25,13 @@
 #define ROBOTICK_BREAKPOINT() __builtin_trap()
 #endif
 
-#define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+inline const char* robotick_filename(const char* path) {
+    const char* slash = strrchr(path, '/');
+    return slash ? slash + 1 : path;
+}
 
 #define ROBOTICK_INTERNAL_LOG(level, fmt, ...) \
-    fprintf(stderr, "[%s] %s:%d: " fmt "\n", level, __FILENAME__, __LINE__, ##__VA_ARGS__)
+    fprintf(stderr, "[%s] %s:%d: " fmt "\n", level, robotick_filename(__FILE__), __LINE__, ##__VA_ARGS__);
 
 // =====================================================================
 // ✅ TEST ERROR HANDLER
@@ -127,7 +130,7 @@ namespace robotick
 	do                                                                                                                                               \
 	{                                                                                                                                                \
 		ROBOTICK_INTERNAL_LOG("INFO", __VA_ARGS__);                                                                                                  \
-	} while (0)
+	} while (0);
 
 // =====================================================================
 // ✅ TEST MACROS

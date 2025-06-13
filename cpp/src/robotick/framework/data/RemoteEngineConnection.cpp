@@ -184,7 +184,7 @@ namespace robotick
 		constexpr size_t MAX_PAYLOAD_SIZE = 1024 * 1024; // 1MB
 		if (header.payload_len > MAX_PAYLOAD_SIZE)
 		{
-			ROBOTICK_WARNING("Payload too large: %u", header.payload_len);
+			ROBOTICK_WARNING("Payload too large: %u", static_cast<unsigned int>(header.payload_len));
 			return false;
 		}
 
