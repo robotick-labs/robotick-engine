@@ -62,7 +62,11 @@ namespace robotick
 		void bind_blackboards_in_struct(
 			WorkloadInstanceInfo& workload_instance_info, const StructRegistryEntry& struct_entry, size_t& blackboard_storage_offset);
 		void bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances, const size_t blackboards_data_start_offset);
+
 		size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances);
+
+		void setup_remote_engine_senders(const Model& model);
+		void setup_remote_engines_listener();
 
 	  private:
 		struct State;

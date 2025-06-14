@@ -38,8 +38,10 @@ namespace robotick
 		}
 	} // namespace
 
-	RemoteEngineConnection::RemoteEngineConnection(const ConnectionConfig& config, Mode mode) : mode(mode), config(config)
+	void RemoteEngineConnection::configure(const ConnectionConfig& config_in, Mode mode_in)
 	{
+		config = config_in;
+		mode = mode_in;
 	}
 
 	void RemoteEngineConnection::register_field(const Field& field)

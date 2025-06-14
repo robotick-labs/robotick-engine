@@ -6,6 +6,7 @@
 #include "robotick/api.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/FieldUtils.h"
@@ -38,6 +39,9 @@ namespace robotick
 		std::unordered_map<std::string, WorkloadInstanceInfo*> instances_by_unique_name;
 		std::vector<DataConnectionInfo> data_connections_all;
 		std::vector<size_t> data_connections_acquired_indices;
+
+		std::vector<std::unique_ptr<RemoteEngineConnection>> remote_engine_senders; // one sender per engine we need to send data to
+		RemoteEngineConnection remote_engines_receiver;								// one receiver in case any engines need to send data to us
 	};
 
 	Engine::Engine() : state(std::make_unique<Engine::State>())
@@ -303,7 +307,132 @@ namespace robotick
 				inst.type->setup_fn(inst.get_ptr(*this));
 		}
 
+		setup_remote_engine_senders(model);
+		setup_remote_engines_listener();
+
 		state->root_instance = root_instance;
+	}
+
+	struct FieldPathTokens
+	{
+		std::string workload;
+		std::string struct_name; // "inputs" or "outputs"
+		std::string field;
+		std::string subfield; // optional
+	};
+
+	FieldPathTokens parse_field_path(const std::string& path)
+	{
+		FieldPathTokens tokens;
+
+		size_t dot1 = path.find('.');
+		if (dot1 == std::string::npos)
+			return tokens;
+
+		tokens.workload = path.substr(0, dot1);
+
+		size_t dot2 = path.find('.', dot1 + 1);
+		if (dot2 == std::string::npos)
+			return tokens;
+
+		tokens.struct_name = path.substr(dot1 + 1, dot2 - dot1 - 1);
+
+		size_t dot3 = path.find('.', dot2 + 1);
+		if (dot3 == std::string::npos)
+		{
+			tokens.field = path.substr(dot2 + 1);
+		}
+		else
+		{
+			tokens.field = path.substr(dot2 + 1, dot3 - dot2 - 1);
+			tokens.subfield = path.substr(dot3 + 1);
+		}
+
+		return tokens;
+	}
+
+	constexpr int DEFAULT_REMOTE_ENGINE_PORT = 7262;
+
+	void Engine::setup_remote_engines_listener()
+	{
+		state->remote_engines_receiver.configure(
+			RemoteEngineConnection::ConnectionConfig{"", DEFAULT_REMOTE_ENGINE_PORT}, RemoteEngineConnection::Mode::Receiver);
+
+		state->remote_engines_receiver.set_field_binder(
+			[&](const std::string& path, RemoteEngineConnection::Field& out)
+			{
+				FieldPathTokens tokens = parse_field_path(path);
+				const WorkloadInstanceInfo* found_workload = find_instance_info(tokens.workload.c_str());
+				if (!found_workload || tokens.struct_name != "inputs")
+				{
+					return false;
+				}
+
+				const FieldInfo* found_field = found_workload->type->input_struct->find_field(tokens.field.c_str());
+				if (!found_field)
+				{
+					return false;
+				}
+
+				// Get pointer to that field
+				TypeId type = found_field->type;
+				void* ptr = found_field->get_data_ptr(get_workloads_buffer(), *found_workload, *found_workload->type->input_struct);
+				size_t size = found_field->size;
+				if (!ptr)
+				{
+					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engines_listener - data ptr missing %s", path.c_str());
+				}
+
+				// Handle Blackboard subfields if needed
+				if (!tokens.subfield.empty())
+				{
+					if (type == GET_TYPE_ID(Blackboard))
+					{
+						Blackboard& blackboard = *static_cast<Blackboard*>(ptr);
+						const BlackboardFieldInfo* sbinfo = blackboard.get_field_info(tokens.subfield);
+						if (!sbinfo)
+						{
+							ROBOTICK_FATAL_EXIT("Engine::setup_remote_engines_listener - unknown subfield %s", path.c_str());
+						}
+						ptr = sbinfo->get_data_ptr(blackboard);
+						type = sbinfo->type;
+						size = sbinfo->size;
+					}
+					else
+					{
+						ROBOTICK_FATAL_EXIT("Remote Engine Connections to non-Blackboad subfields are not yet supported");
+					}
+				}
+
+				out.path = path;
+				out.recv_ptr = ptr;
+				out.size = size;
+				out.type_hash = type;
+
+				return true;
+			});
+	}
+
+	void Engine::setup_remote_engine_senders(const Model& model)
+	{
+		const auto& remote_models = model.get_remote_models();
+
+		state->remote_engine_senders.clear(); // Just in case
+		state->remote_engine_senders.reserve(remote_models.size());
+
+		for (const auto& remote_model_entry : remote_models)
+		{
+			const RemoteModelSeed& remote_model = remote_model_entry.second;
+
+			RemoteEngineConnection::ConnectionConfig config;
+			config.host = remote_model.comms_channel;
+			config.port = DEFAULT_REMOTE_ENGINE_PORT;
+
+			auto conn = std::make_unique<RemoteEngineConnection>();
+			conn->configure(config, RemoteEngineConnection::Mode::Sender);
+
+			state->remote_engine_senders.emplace_back(std::move(conn));
+		}
 	}
 
 	bool Engine::is_running() const

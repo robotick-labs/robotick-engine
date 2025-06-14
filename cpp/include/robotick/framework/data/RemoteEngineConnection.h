@@ -52,13 +52,15 @@ namespace robotick
 
 		using BinderCallback = std::function<bool(const std::string& path, Field& out_field)>;
 
-		RemoteEngineConnection(const ConnectionConfig& config, Mode mode);
+		RemoteEngineConnection() = default;
 		~RemoteEngineConnection() noexcept { cleanup(); }
 
 		RemoteEngineConnection(const RemoteEngineConnection&) = delete;
 		RemoteEngineConnection& operator=(const RemoteEngineConnection&) = delete;
 		RemoteEngineConnection(RemoteEngineConnection&&) noexcept = delete;
 		RemoteEngineConnection& operator=(RemoteEngineConnection&&) noexcept = delete;
+
+		void configure(const ConnectionConfig& config, Mode mode);
 
 		void tick();
 		void cleanup();

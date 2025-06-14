@@ -13,6 +13,55 @@
 
 namespace robotick
 {
+	void Model::connect_remote(const std::string& source_field_path, const std::string& dest_field_path)
+	{
+		// Expected format: |remote_model_id|field.path
+
+		ROBOTICK_ASSERT_MSG((!source_field_path.empty() && source_field_path[0] != '|'), "Source field paths cannot be empty or remote: %s",
+			source_field_path.c_str());
+
+		size_t first_pipe = dest_field_path.find('|', 1);
+		if (first_pipe == std::string::npos)
+		{
+			ROBOTICK_FATAL_EXIT("Invalid remote field format: %s", dest_field_path.c_str());
+		}
+
+		const std::string model_id = dest_field_path.substr(1, first_pipe - 1);
+		const std::string remote_field_path = dest_field_path.substr(first_pipe + 1);
+
+		auto it = remote_models.find(model_id);
+		if (it == remote_models.end())
+		{
+			ROBOTICK_FATAL_EXIT("Unknown remote model ID: %s", model_id.c_str());
+		}
+
+		RemoteModelSeed& remote_model = it->second;
+
+		// Prevent duplicate incoming remote-connections
+		if (std::any_of(remote_model.remote_data_connection_seeds.begin(), remote_model.remote_data_connection_seeds.end(),
+				[&](const auto& s)
+				{
+					return s.dest_field_path == remote_field_path;
+				}))
+		{
+			ROBOTICK_FATAL_EXIT(
+				"Remote destination field already has an incoming remote-connection: |%s|%s", model_id.c_str(), remote_field_path.c_str());
+		}
+
+		// Prevent duplicate incoming local-connections
+		if (std::any_of(remote_model.model.data_connection_seeds.begin(), remote_model.model.data_connection_seeds.end(),
+				[&](const auto& s)
+				{
+					return s.dest_field_path == remote_field_path;
+				}))
+		{
+			ROBOTICK_FATAL_EXIT(
+				"Remote Destination field already has an incoming local-connection: |%s|%s", model_id.c_str(), remote_field_path.c_str());
+		}
+
+		// All good - add remote data-connection
+		remote_model.remote_data_connection_seeds.push_back({source_field_path, remote_field_path});
+	}
 
 	void Model::connect(const std::string& source_field_path, const std::string& dest_field_path)
 	{
@@ -21,6 +70,16 @@ namespace robotick
 
 		if (source_field_path == dest_field_path)
 			ROBOTICK_FATAL_EXIT("Source and destination field paths are identical: %s", dest_field_path.c_str());
+
+		if (!source_field_path.empty() && source_field_path[0] == '|')
+			ROBOTICK_FATAL_EXIT("Source field paths cannot be remote: %s", source_field_path.c_str());
+
+		// Destination field is "remote":
+		if (!dest_field_path.empty() && dest_field_path[0] == '|')
+		{
+			connect_remote(source_field_path, dest_field_path);
+			return; // we're done with remote path, skip local below
+		}
 
 		if (std::any_of(data_connection_seeds.begin(), data_connection_seeds.end(),
 				[&](const auto& s)
@@ -137,9 +196,28 @@ namespace robotick
 			ROBOTICK_FATAL_EXIT("add_remote_model: a remote model with name '%s' already exists", model_name.c_str());
 		}
 
+		const auto separator = comms_channel.find(':');
+		if (separator == std::string::npos)
+		{
+			ROBOTICK_FATAL_EXIT("add_remote_model: invalid comms_channel format, expected <mode>:<address>");
+		}
+
+		const std::string mode = comms_channel.substr(0, separator);
+		const std::string address = comms_channel.substr(separator + 1);
+
 		RemoteModelSeed seed;
 		seed.model_name = model_name;
-		seed.comms_channel = comms_channel;
+
+		if (mode == "ip")
+		{
+			seed.comms_mode = RemoteModelSeed::Mode::IP;
+		}
+		else
+		{
+			ROBOTICK_FATAL_EXIT("add_remote_model: unsupported comms_channel mode: '%s'", mode.c_str());
+		}
+
+		seed.comms_channel = address;
 		seed.model = remote_model; // deep copy
 
 		remote_models[model_name] = std::move(seed);

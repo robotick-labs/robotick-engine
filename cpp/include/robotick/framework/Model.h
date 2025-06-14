@@ -55,9 +55,14 @@ namespace robotick
 
 		const std::vector<DataConnectionSeed>& get_data_connection_seeds() const { return data_connection_seeds; }
 
+		const std::unordered_map<std::string, RemoteModelSeed>& get_remote_models() const { return remote_models; }
+
 		WorkloadHandle get_root() const { return root_workload; }
 
 		void finalize();
+
+	  protected:
+		void connect_remote(const std::string& source_field_path, const std::string& dest_field_path);
 
 	  private:
 		std::vector<WorkloadSeed> workload_seeds;
@@ -71,8 +76,18 @@ namespace robotick
 	struct RemoteModelSeed
 	{
 		std::string model_name;
-		std::string comms_channel; // e.g. "uart:/dev/ttyUSB0", "ip:192.168.1.42", "local"
+
+		enum class Mode
+		{
+			IP,
+			UART,
+			Local
+		} comms_mode;
+
+		std::string comms_channel; // e.g. "/dev/ttyUSB0", "192.168.1.42", ""
 		Model model;
+
+		std::vector<DataConnectionSeed> remote_data_connection_seeds;
 	};
 
 } // namespace robotick

@@ -9,18 +9,19 @@
 
 using namespace robotick;
 
-TEST_CASE("RemoteEngineConnection|Handshake and tick exchange", "[RemoteEngineConnection]")
+TEST_CASE("Integration|Framework|Data|RemoteEngineConnection|Handshake and tick exchange", "[RemoteEngineConnection]")
 {
 	constexpr int port = 34567;
-	std::atomic<bool> server_ready{false};
+	std::atomic<bool> receiver_ready{false};
 	int recv_value = 0;
 	int send_value = 42;
 
-	std::thread server(
+	std::thread receiver_thread(
 		[&]()
 		{
-			RemoteEngineConnection server({"127.0.0.1", port}, RemoteEngineConnection::Mode::Receiver);
-			server.set_field_binder(
+			RemoteEngineConnection receiver;
+			receiver.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Receiver);
+			receiver.set_field_binder(
 				[&](const std::string& path, RemoteEngineConnection::Field& out)
 				{
 					if (path == "x")
@@ -33,43 +34,45 @@ TEST_CASE("RemoteEngineConnection|Handshake and tick exchange", "[RemoteEngineCo
 					}
 					return false;
 				});
-			server_ready = true;
-			while (!server.is_ready_for_tick())
-				server.tick();
+			receiver_ready = true;
+			while (!receiver.is_ready_for_tick())
+				receiver.tick();
 			for (int i = 0; i < 3; ++i)
-				server.tick();
+				receiver.tick();
 		});
 
-	std::thread client(
+	std::thread sender_thread(
 		[&]()
 		{
-			while (!server_ready)
+			while (!receiver_ready)
 				std::this_thread::sleep_for(std::chrono::milliseconds(5));
-			RemoteEngineConnection client({"127.0.0.1", port}, RemoteEngineConnection::Mode::Sender);
-			client.register_field({.path = "x", .send_ptr = &send_value, .size = sizeof(int), .type_hash = 0});
-			while (!client.is_ready_for_tick())
-				client.tick();
+			RemoteEngineConnection sender;
+			sender.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Sender);
+			sender.register_field({.path = "x", .send_ptr = &send_value, .size = sizeof(int), .type_hash = 0});
+			while (!sender.is_ready_for_tick())
+				sender.tick();
 			for (int i = 0; i < 3; ++i)
-				client.tick();
+				sender.tick();
 		});
 
-	server.join();
-	client.join();
+	receiver_thread.join();
+	sender_thread.join();
 	REQUIRE(recv_value == 42);
 }
 
-TEST_CASE("RemoteEngineConnection|Handles large payload", "[RemoteEngineConnection]")
+TEST_CASE("Integration|Framework|Data|RemoteEngineConnection|Handles large payload", "[RemoteEngineConnection]")
 {
 	constexpr int port = 34568;
 	std::atomic<bool> ready{false};
 	std::vector<uint8_t> buffer(32768, 0xAB);
 
-	std::thread server(
+	std::thread receiver_thread(
 		[&]()
 		{
-			RemoteEngineConnection server({"127.0.0.1", port}, RemoteEngineConnection::Mode::Receiver);
+			RemoteEngineConnection receiver;
+			receiver.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Receiver);
 			std::vector<uint8_t> recv(32768);
-			server.set_field_binder(
+			receiver.set_field_binder(
 				[&](const std::string&, RemoteEngineConnection::Field& out)
 				{
 					out.recv_ptr = recv.data();
@@ -78,26 +81,27 @@ TEST_CASE("RemoteEngineConnection|Handles large payload", "[RemoteEngineConnecti
 					return true;
 				});
 			ready = true;
-			while (!server.is_ready_for_tick())
-				server.tick();
+			while (!receiver.is_ready_for_tick())
+				receiver.tick();
 			for (int i = 0; i < 3; ++i)
-				server.tick();
+				receiver.tick();
 			REQUIRE(recv[100] == 0xAB);
 		});
 
-	std::thread client(
+	std::thread sender_thread(
 		[&]()
 		{
 			while (!ready)
 				std::this_thread::sleep_for(std::chrono::milliseconds(5));
-			RemoteEngineConnection client({"127.0.0.1", port}, RemoteEngineConnection::Mode::Sender);
-			client.register_field({.path = "blob", .send_ptr = buffer.data(), .size = buffer.size(), .type_hash = 0});
-			while (!client.is_ready_for_tick())
-				client.tick();
+			RemoteEngineConnection sender;
+			sender.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Sender);
+			sender.register_field({.path = "blob", .send_ptr = buffer.data(), .size = buffer.size(), .type_hash = 0});
+			while (!sender.is_ready_for_tick())
+				sender.tick();
 			for (int i = 0; i < 3; ++i)
-				client.tick();
+				sender.tick();
 		});
 
-	server.join();
-	client.join();
+	receiver_thread.join();
+	sender_thread.join();
 }
