@@ -68,6 +68,8 @@ namespace robotick
 		void setup_remote_engine_senders(const Model& model);
 		void setup_remote_engines_listener();
 
+		void tick_remote_engine_connections();
+
 	  private:
 		struct State;
 		std::unique_ptr<State> state;
