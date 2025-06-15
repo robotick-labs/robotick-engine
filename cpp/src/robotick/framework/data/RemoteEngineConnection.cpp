@@ -14,7 +14,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define ROBOTICK_REMOTE_ENGINE_LOG_PACKETS 0
+#define ROBOTICK_REMOTE_ENGINE_LOG_PACKETS 1
 
 namespace robotick
 {
@@ -23,6 +23,8 @@ namespace robotick
 	{
 		constexpr const char* MAGIC = "RBIN";
 		constexpr uint8_t VERSION = 1;
+
+		constexpr float RECONNECT_ATTEMPT_INTERVAL_SEC = 1.0f;
 
 		struct MessageHeader
 		{
@@ -118,10 +120,17 @@ namespace robotick
 		binder = std::move(binder_callback);
 	}
 
-	void RemoteEngineConnection::tick()
+	void RemoteEngineConnection::tick(const TickInfo& tick_info)
 	{
 		if (!has_basic_connection())
 		{
+			if (time_sec_to_reconnect > 0.0F)
+			{
+				// wait a bit longer before trying to reconnect (try every RECONNECT_ATTEMPT_INTERVAL_SEC)
+				time_sec_to_reconnect -= (float)tick_info.delta_time;
+				return;
+			}
+
 			if (mode == Mode::Sender)
 				connect_socket();
 			else
@@ -129,7 +138,8 @@ namespace robotick
 
 			if (state == State::Disconnected)
 			{
-				return;
+				// time_sec_to_reconnect = RECONNECT_ATTEMPT_INTERVAL_SEC;
+				return; // try again in a bit
 			}
 			// else have an initial go at the below
 		}
@@ -267,6 +277,11 @@ namespace robotick
 	{
 		ROBOTICK_ASSERT_MSG(mode == Mode::Receiver, "RemoteEngineConnection::receive_handshake_and_bind() should only be called in Mode::Receiver");
 
+		if (!binder)
+		{
+			ROBOTICK_FATAL_EXIT("Receiver connection has no binder callback set before handshake");
+		}
+
 		std::vector<uint8_t> buffer;
 		const ReceiveResult receive_result = receive_message(buffer);
 		if (receive_result != ReceiveResult::MessageReceived)
@@ -290,7 +305,8 @@ namespace robotick
 				start = index + 1;
 
 				Field field;
-				if (!binder || !binder(path, field))
+
+				if (!binder(path, field))
 				{
 					ROBOTICK_WARNING("Failed to bind field: %s", path.c_str());
 					continue;
@@ -585,6 +601,11 @@ namespace robotick
 				break;
 			}
 
+			if (!field.recv_ptr)
+			{
+				ROBOTICK_FATAL_EXIT("Receiver field '%s' has null recv_ptr", field.path.c_str());
+			}
+
 			std::memcpy(field.recv_ptr, buffer.data() + offset, field.size);
 			offset += field.size;
 		}
@@ -607,6 +628,14 @@ namespace robotick
 		if (socket_fd >= 0)
 			close(socket_fd);
 		socket_fd = -1;
+
+		time_sec_to_reconnect = RECONNECT_ATTEMPT_INTERVAL_SEC;
+
+		if (mode == Mode::Receiver)
+		{
+			// receiver gets told what fields to use by sender, on handshake.  We should therefore clear then whenever we disconnect
+			fields.clear();
+		}
 
 		set_state(State::Disconnected);
 	}

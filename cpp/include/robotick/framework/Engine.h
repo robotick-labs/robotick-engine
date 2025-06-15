@@ -68,7 +68,7 @@ namespace robotick
 		void setup_remote_engine_senders(const Model& model);
 		void setup_remote_engines_listener();
 
-		void tick_remote_engine_connections();
+		void tick_remote_engine_connections(const TickInfo& tick_info);
 
 	  private:
 		struct State;

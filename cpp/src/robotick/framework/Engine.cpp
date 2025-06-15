@@ -515,7 +515,7 @@ namespace robotick
 			last_tick_time = now;
 
 			// update remote data-connections
-			tick_remote_engine_connections();
+			tick_remote_engine_connections(tick_info);
 
 			// update local data-connections
 			for (size_t index : state->data_connections_acquired_indices)
@@ -543,13 +543,13 @@ namespace robotick
 		}
 	}
 
-	void Engine::tick_remote_engine_connections()
+	void Engine::tick_remote_engine_connections(const TickInfo& tick_info)
 	{
-		state->remote_engines_receiver.tick();
+		state->remote_engines_receiver.tick(tick_info);
 
 		for (auto& remote_engine_sender_ptr : state->remote_engine_senders)
 		{
-			remote_engine_sender_ptr->tick();
+			remote_engine_sender_ptr->tick(tick_info);
 		}
 	}
 

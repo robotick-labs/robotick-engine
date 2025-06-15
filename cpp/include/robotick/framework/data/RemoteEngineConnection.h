@@ -11,6 +11,7 @@
 
 namespace robotick
 {
+	struct TickInfo;
 
 	class RemoteEngineConnection
 	{
@@ -75,7 +76,7 @@ namespace robotick
 
 		void configure(const ConnectionConfig& config, Mode mode);
 
-		void tick();
+		void tick(const TickInfo& tick_info);
 
 		void register_field(const Field& field);	  // for Sender
 		void set_field_binder(BinderCallback binder); // for Receiver
@@ -103,15 +104,18 @@ namespace robotick
 		void try_receive_handshake_ack();
 		void handle_tick_exchange();
 
-	  private:
-		State state = State::Disconnected;
+	  private: // things we set up once on startup:
 		Mode mode;
 		ConnectionConfig config;
-
-		int socket_fd = -1;
-		std::vector<Field> fields;
-
 		BinderCallback binder;
+
+	  private:
+		std::vector<Field> fields; // set on startup (register_field()) on Sender; on receive_handshake_and_bind() on Receiver
+
+	  private: // runtime values
+		State state = State::Disconnected;
+		int socket_fd = -1;
+		float time_sec_to_reconnect = 0.0f;
 	};
 
 } // namespace robotick
