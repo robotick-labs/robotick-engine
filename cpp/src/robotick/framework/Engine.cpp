@@ -307,8 +307,12 @@ namespace robotick
 				inst.type->setup_fn(inst.get_ptr(*this));
 		}
 
+		ROBOTICK_INFO("Setting up remote engine senders...");
 		setup_remote_engine_senders(model);
+
+		ROBOTICK_INFO("Setting up remote engines listener...");
 		setup_remote_engines_listener();
+		ROBOTICK_INFO("Finished setting up remote engines listener");
 
 		state->root_instance = root_instance;
 	}
@@ -424,14 +428,33 @@ namespace robotick
 		{
 			const RemoteModelSeed& remote_model = remote_model_entry.second;
 
+			if (remote_model.remote_data_connection_seeds.size() == 0)
+			{
+				ROBOTICK_WARNING("Remote model '%s' has no remote data-connections - skipping adding remote_engine_sender for it",
+					remote_model.model_name.c_str());
+
+				continue;
+			}
+
+			RemoteEngineConnection& remote_engine_connection =
+				*(state->remote_engine_senders.emplace_back(std::make_unique<RemoteEngineConnection>()).get());
+
 			RemoteEngineConnection::ConnectionConfig config;
 			config.host = remote_model.comms_channel;
 			config.port = DEFAULT_REMOTE_ENGINE_PORT;
 
-			auto conn = std::make_unique<RemoteEngineConnection>();
-			conn->configure(config, RemoteEngineConnection::Mode::Sender);
+			remote_engine_connection.configure(config, RemoteEngineConnection::Mode::Sender);
 
-			state->remote_engine_senders.emplace_back(std::move(conn));
+			for (const auto& remote_data_connection_seed : remote_model.remote_data_connection_seeds)
+			{
+				RemoteEngineConnection::Field remote_field;
+				remote_field.path = remote_data_connection_seed.dest_field_path;
+				remote_field.send_ptr = nullptr; // TODO - establish local pointer from which to copy value each tick
+				remote_field.size = 0;			 // TODO - find this out
+				remote_field.type_hash = 0;		 // TODO - find this out too
+
+				remote_engine_connection.register_field(remote_field);
+			}
 		}
 	}
 

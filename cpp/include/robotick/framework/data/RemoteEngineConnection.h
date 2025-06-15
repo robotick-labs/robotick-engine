@@ -23,9 +23,9 @@ namespace robotick
 		enum class State
 		{
 			Disconnected,
-			Connected,
-			Subscribed,
-			Ticking
+			ReadyForHandshake,
+			ReadyForHandshakeAck,
+			Ready
 		};
 
 		enum class MessageType : uint8_t
@@ -33,6 +33,19 @@ namespace robotick
 			Subscribe = 1,
 			Ack = 2,
 			Fields = 3
+		};
+
+		enum class ReceiveResult
+		{
+			MessageReceived,
+			NoMessageYet,
+			ConnectionLost
+		};
+
+		enum class SendResult
+		{
+			Success,
+			ConnectionLost
 		};
 
 		struct ConnectionConfig
@@ -53,7 +66,7 @@ namespace robotick
 		using BinderCallback = std::function<bool(const std::string& path, Field& out_field)>;
 
 		RemoteEngineConnection() = default;
-		~RemoteEngineConnection() noexcept { cleanup(); }
+		~RemoteEngineConnection() noexcept { disconnect(); }
 
 		RemoteEngineConnection(const RemoteEngineConnection&) = delete;
 		RemoteEngineConnection& operator=(const RemoteEngineConnection&) = delete;
@@ -63,26 +76,34 @@ namespace robotick
 		void configure(const ConnectionConfig& config, Mode mode);
 
 		void tick();
-		void cleanup();
-		bool is_connected() const;
-		bool is_ready_for_tick() const;
 
 		void register_field(const Field& field);	  // for Sender
 		void set_field_binder(BinderCallback binder); // for Receiver
 
+		void disconnect();
+
+		bool has_basic_connection() const; // we have established a basic connection, but perhaps but yet completed handshake
+		bool is_ready() const;			   // we have finished our handshake and ready for field-data exchange through out tick() method
+
 	  private:
+		State get_state() const { return state; };
+		void set_state(const State state);
+
 		void connect_socket();
 		void accept_socket();
 		void send_handshake();
 		void receive_handshake_and_bind();
 		void send_fields_as_message();
 		void receive_into_fields();
-		void send_message(const MessageType type, const uint8_t* data, size_t size);
-		bool receive_message(std::vector<uint8_t>& buffer_out);
+
+		SendResult send_message(const MessageType type, const uint8_t* data, size_t size);
+		ReceiveResult receive_message(std::vector<uint8_t>& buffer_out);
 
 		void handle_handshake();
+		void try_receive_handshake_ack();
 		void handle_tick_exchange();
 
+	  private:
 		State state = State::Disconnected;
 		Mode mode;
 		ConnectionConfig config;
