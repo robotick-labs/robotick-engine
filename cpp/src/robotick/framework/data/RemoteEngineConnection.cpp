@@ -1,4 +1,3 @@
-
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
@@ -28,17 +27,25 @@ namespace robotick
 		{
 			int fd = socket(AF_INET, SOCK_STREAM, 0);
 			if (fd < 0)
+			{
 				ROBOTICK_FATAL_EXIT("Failed to create socket");
+			}
 
 			int opt = 1;
 
 			// Allow address reuse
 			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
-				ROBOTICK_WARNING("Failed to set SO_REUSEADDR on socket");
+			{
+				close(fd);
+				ROBOTICK_FATAL_EXIT("Failed to set SO_REUSEADDR on socket");
+			}
 
-			// Disable Nagle's algorithm — send immediately
+			// Disable Nagle's algorithm (batches up messages) — send every message immediately (essential for real-time control)
 			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0)
-				ROBOTICK_WARNING("Failed to set TCP_NODELAY on socket");
+			{
+				close(fd);
+				ROBOTICK_FATAL_EXIT("Failed to set TCP_NODELAY on socket");
+			}
 
 			// Set non-blocking
 			int flags = fcntl(fd, F_GETFL, 0);
@@ -272,6 +279,11 @@ namespace robotick
 
 			for (const auto& field : fields)
 			{
+				if (field.path.find('\n') != std::string::npos)
+				{
+					ROBOTICK_FATAL_EXIT("Field path contains newline character - this will break handshake data: %s", field.path.c_str());
+				}
+
 				if (!is_first_field)
 				{
 					payload.push_back('\n');
@@ -323,11 +335,13 @@ namespace robotick
 
 		if (in_progress_message.is_completed())
 		{
-			auto& buffer = in_progress_message.get_payload();
+			auto [payload_data, payload_size] = in_progress_message.get_payload();
 
-			std::string data(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+			std::string data(reinterpret_cast<const char*>(payload_data), payload_size);
 			size_t start = 0;
 			size_t bound_count = 0;
+			size_t failed_count = 0;
+
 			for (size_t index = 0; index <= data.size(); ++index)
 			{
 				if (index == data.size() || data[index] == '\n')
@@ -340,11 +354,17 @@ namespace robotick
 					if (!binder(path, field))
 					{
 						ROBOTICK_WARNING("Failed to bind field: %s", path.c_str());
+						failed_count++;
 						continue;
 					}
 					fields.push_back(field);
 					bound_count++;
 				}
+			}
+
+			if (failed_count > 0)
+			{
+				ROBOTICK_FATAL_EXIT("Failed to bind %zu fields - disconnecting", failed_count);
 			}
 
 			in_progress_message.vacate(); // vacate ready for next user
@@ -465,16 +485,16 @@ namespace robotick
 
 		if (in_progress_message.is_completed())
 		{
-			const auto& buffer = in_progress_message.get_payload();
+			auto [payload_data, payload_size] = in_progress_message.get_payload();
 
 			size_t offset = 0;
 			for (auto& field : fields)
 			{
-				if (offset + field.size > buffer.size())
+				if (offset + field.size > payload_size)
 				{
 					ROBOTICK_FATAL_EXIT(
 						"RemoteEngineConnection::receive_into_fields() - buffer received is too small (%zu bytes) for all expected fields (%zu)",
-						buffer.size(), (offset + field.size));
+						payload_size, (offset + field.size));
 
 					break;
 				}
@@ -484,7 +504,7 @@ namespace robotick
 					ROBOTICK_FATAL_EXIT("Receiver field '%s' has null recv_ptr", field.path.c_str());
 				}
 
-				std::memcpy(field.recv_ptr, buffer.data() + offset, field.size);
+				std::memcpy(field.recv_ptr, payload_data + offset, field.size);
 				offset += field.size;
 			}
 
@@ -512,7 +532,7 @@ namespace robotick
 		constexpr int max_wait_ms = 500;
 		constexpr int tick_wait_ms = 10;
 		int total_wait_ms = 0;
-		while (socket_fd >= 0 && total_wait_ms <= max_wait_ms && in_progress_message.is_occupied() && in_progress_message.is_completed())
+		while (socket_fd >= 0 && total_wait_ms <= max_wait_ms && in_progress_message.is_occupied() && !in_progress_message.is_completed())
 		{
 			InProgressMessage::Result result = in_progress_message.tick(socket_fd);
 			if (result == InProgressMessage::Result::ConnectionLost)

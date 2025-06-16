@@ -12,7 +12,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define ROBOTICK_REMOTE_ENGINE_LOG_PACKETS 0
+#define ROBOTICK_REMOTE_ENGINE_LOG_PACKETS 1
 
 namespace robotick
 {
@@ -41,31 +41,25 @@ namespace robotick
 
 	void InProgressMessage::begin_send(uint8_t message_type, const uint8_t* data_ptr, const size_t data_size)
 	{
-		ROBOTICK_ASSERT(is_vacant() && "InProgressMessage::begin_send() should only ever be called when empty");
+		ROBOTICK_ASSERT(is_vacant() && "InProgressMessage::begin_send() should only ever be called when vacant");
 
 		stage = Stage::Sending;
 		header = {};
-		std::memcpy(header.magic, MAGIC, 4);
+
+		static_assert(sizeof(MAGIC) == sizeof(header.magic));
+
+		std::memcpy(header.magic, MAGIC, sizeof(MAGIC));
 		header.version = VERSION;
 		header.type = message_type;
 		header.payload_len = static_cast<uint32_t>(data_size);
 
-		if (data_ptr != nullptr && data_size > 0)
-		{
-			payload.assign(static_cast<const uint8_t*>(data_ptr), static_cast<const uint8_t*>(data_ptr) + data_size);
-		}
-		else
-		{
-			payload.clear();
-		}
-
-		buffer.resize(sizeof(MessageHeader) + payload.size());
+		buffer.resize(sizeof(MessageHeader) + data_size);
 
 		header.serialize(buffer.data());
 
-		if (payload.size() > 0)
+		if (data_ptr != nullptr && data_size > 0)
 		{
-			std::memcpy(buffer.data() + sizeof(MessageHeader), payload.data(), payload.size());
+			std::memcpy(buffer.data() + sizeof(MessageHeader), data_ptr, data_size);
 		}
 
 		cursor = 0;
@@ -73,9 +67,10 @@ namespace robotick
 
 	void InProgressMessage::begin_receive()
 	{
-		ROBOTICK_ASSERT(is_vacant() && "InProgressMessage::begin_send() should only ever be called when empty");
+		ROBOTICK_ASSERT(is_vacant() && "InProgressMessage::begin_receive() should only ever be called when vacant");
 
 		stage = Stage::Receiving;
+		header = {};
 		buffer.resize(sizeof(MessageHeader));
 		cursor = 0;
 	}
@@ -83,9 +78,9 @@ namespace robotick
 	void InProgressMessage::vacate()
 	{
 		stage = Stage::Vacant;
+		header = {};
 		cursor = 0;
 		buffer.clear();
-		payload.clear();
 	}
 
 	InProgressMessage::Result InProgressMessage::tick(int socket_fd)
@@ -123,7 +118,9 @@ namespace robotick
 			// finished reading header — validate and prepare for payload
 			header.deserialize(buffer.data());
 
-			if (std::memcmp(header.magic, MAGIC, 4) != 0 || header.version != VERSION)
+			static_assert(sizeof(MAGIC) == sizeof(header.magic));
+
+			if (std::memcmp(header.magic, MAGIC, sizeof(MAGIC)) != 0 || header.version != VERSION)
 			{
 				ROBOTICK_WARNING("InProgressMessage::tick(): Invalid header magic or version");
 				return Result::ConnectionLost;
@@ -135,8 +132,7 @@ namespace robotick
 				return Result::ConnectionLost;
 			}
 
-			payload.resize(header.payload_len);
-			buffer.resize(header.payload_len);
+			buffer.resize(sizeof(MessageHeader) + header.payload_len);
 			cursor = 0;
 
 			// handle zero-payload case immediately
@@ -153,12 +149,11 @@ namespace robotick
 		if (stage == Stage::Receiving)
 		{
 			// finished payload
-			std::memcpy(payload.data(), buffer.data(), payload.size());
-			log_preview("Received full message", header, payload.data(), payload.size());
+			log_preview("Received full message", header, buffer.data() + sizeof(MessageHeader), buffer.size() - sizeof(MessageHeader));
 		}
 		else
 		{
-			log_preview("Sent full message", header, payload.data(), payload.size());
+			log_preview("Sent full message", header, buffer.data() + sizeof(MessageHeader), buffer.size() - sizeof(MessageHeader));
 		}
 
 		stage = Stage::Completed;

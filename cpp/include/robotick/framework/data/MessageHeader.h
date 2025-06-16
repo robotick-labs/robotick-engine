@@ -31,14 +31,13 @@ namespace robotick
 			out[11] = payload_len & 0xFF;
 		}
 
-		inline bool deserialize(const uint8_t* in)
+		inline void deserialize(const uint8_t* in)
 		{
 			memcpy(magic, in, 4);
 			version = in[4];
 			type = in[5];
 			reserved = (in[6] << 8) | in[7];
 			payload_len = (in[8] << 24) | (in[9] << 16) | (in[10] << 8) | in[11];
-			return true;
 		}
 	};
 #pragma pack(pop)

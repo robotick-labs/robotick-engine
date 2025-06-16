@@ -30,7 +30,7 @@ namespace robotick
 		double speed = 0.0;
 		double turn_rate = 0.0;
 
-		double speed_scale = -1.0; // TODO - ensure we can set initial value via model-data
+		double speed_scale = 1.0;
 		double turn_rate_scale = 1.0;
 	};
 
