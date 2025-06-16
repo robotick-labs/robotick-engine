@@ -29,6 +29,9 @@ namespace robotick
 	{
 		double speed = 0.0;
 		double turn_rate = 0.0;
+
+		double speed_scale = -1.0; // TODO - ensure we can set initial value via model-data
+		double turn_rate_scale = 1.0;
 	};
 
 	ROBOTICK_BEGIN_FIELDS(SteeringMixerTransformerInputs)
@@ -57,8 +60,8 @@ namespace robotick
 
 		void tick(const TickInfo&)
 		{
-			const double speed = inputs.speed;
-			const double turn = inputs.turn_rate;
+			const double speed = inputs.speed * inputs.speed_scale;
+			const double turn = inputs.turn_rate * inputs.turn_rate_scale;
 
 			double left = speed + turn * config.max_speed_differential;
 			double right = speed - turn * config.max_speed_differential;

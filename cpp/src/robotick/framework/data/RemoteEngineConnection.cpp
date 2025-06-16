@@ -56,6 +56,7 @@ namespace robotick
 			return; // already in desired state
 		}
 
+		const auto prev_state = state;
 		state = target_state;
 
 		const bool is_receiver = (mode == Mode::Receiver);
@@ -74,15 +75,23 @@ namespace robotick
 		}
 		else if (state == State::ReadyForFieldsRequest)
 		{
-			const char* field_data_str = is_receiver ? "send" : "receive";
-			ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFieldsRequest] - ready to %s fields-request!%s", color_start, mode_str,
-				field_data_str, color_end);
+			const bool show_always = false;
+			if (show_always || prev_state != State::ReadyForFields) // only show after connecting, to minimise spam
+			{
+				const char* field_data_str = is_receiver ? "send" : "receive";
+				ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFieldsRequest] - ready to %s fields-request!%s", color_start,
+					mode_str, field_data_str, color_end);
+			}
 		}
 		else if (state == State::ReadyForFields)
 		{
-			const char* field_data_str = is_receiver ? "receive" : "send";
-			ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFields] - ready to %s fields-data!%s", color_start, mode_str,
-				field_data_str, color_end);
+			const bool show_always = false;
+			if (show_always)
+			{
+				const char* field_data_str = is_receiver ? "receive" : "send";
+				ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFields] - ready to %s fields-data!%s", color_start, mode_str,
+					field_data_str, color_end);
+			}
 		}
 		else
 		{
