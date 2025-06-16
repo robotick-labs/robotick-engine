@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "robotick/framework/data/InProgressMessage.h"
+
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -16,12 +18,13 @@ namespace robotick
 	class RemoteEngineConnection
 	{
 	  public:
-		enum class Mode
+		enum class Mode : uint8_t
 		{
 			Sender,
 			Receiver
 		};
-		enum class State
+
+		enum class State : uint8_t
 		{
 			Disconnected,
 			ReadyForHandshake,
@@ -36,16 +39,17 @@ namespace robotick
 			Fields = 3
 		};
 
-		enum class ReceiveResult
+		enum class ReceiveResult : uint8_t
 		{
-			MessageReceived,
-			NoMessageYet,
+			MessageReceiving,
+			TryAgainNextTick,
 			ConnectionLost
 		};
 
-		enum class SendResult
+		enum class SendResult : uint8_t
 		{
-			Success,
+			MessageSending,
+			TryAgainNextTick,
 			ConnectionLost
 		};
 
@@ -87,35 +91,34 @@ namespace robotick
 		bool is_ready() const;			   // we have finished our handshake and ready for field-data exchange through out tick() method
 
 	  private:
-		State get_state() const { return state; };
+		[[nodiscard]] State get_state() const { return state; };
 		void set_state(const State state);
 
-		void connect_socket();
-		void accept_socket();
-		void send_handshake();
-		void receive_handshake_and_bind();
+		void tick_disconnected_sender();
+		void tick_disconnected_receiver();
+		void tick_send_handshake();
+		void tick_receive_handshake_and_bind();
 		void send_fields_as_message();
 		void receive_into_fields();
 
-		SendResult send_message(const MessageType type, const uint8_t* data, size_t size);
-		ReceiveResult receive_message(std::vector<uint8_t>& buffer_out);
+		void tick_ready_for_handshake();
+		void tick_ready_for_handshake_ack();
+		void tick_ready();
 
-		void handle_handshake();
-		void try_receive_handshake_ack();
-		void handle_tick_exchange();
-
-	  private: // things we set up once on startup:
+		// things we set up once on startup:
 		Mode mode;
 		ConnectionConfig config;
 		BinderCallback binder;
 
-	  private:
-		std::vector<Field> fields; // set on startup (register_field()) on Sender; on receive_handshake_and_bind() on Receiver
+		// set on startup (register_field()) on Sender; on tick_receive_handshake_and_bind() on Receiver:
+		std::vector<Field> fields;
 
-	  private: // runtime values
+		// runtime values:
 		State state = State::Disconnected;
 		int socket_fd = -1;
 		float time_sec_to_reconnect = 0.0f;
+
+		InProgressMessage in_progress_message;
 	};
 
 } // namespace robotick
