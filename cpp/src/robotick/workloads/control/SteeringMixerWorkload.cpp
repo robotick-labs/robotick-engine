@@ -72,6 +72,11 @@ namespace robotick
 
 			outputs.left_motor = left;
 			outputs.right_motor = right;
+
+			// ROBOTICK_INFO("\033[2J\033[H"); // Clear screen + move cursor to top-left
+			//
+			// ROBOTICK_INFO("SteeringMixerWorkload::tick() inputs: speed=%.3f, turn=%.3f outputs: left_motor=%.3f, right_motor=%.3f", speed, turn,
+			// 	outputs.left_motor, outputs.right_motor);
 		}
 	};
 

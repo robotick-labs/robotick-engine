@@ -23,6 +23,7 @@
 #include <future>
 #include <sstream>
 #include <stdexcept>
+#include <tuple>
 #include <vector>
 
 namespace robotick
@@ -311,7 +312,7 @@ namespace robotick
 		setup_remote_engine_senders(model);
 
 		ROBOTICK_INFO("Setting up remote engines listener...");
-		setup_remote_engines_listener();
+		setup_remote_engines_receiver();
 		ROBOTICK_INFO("Finished setting up remote engines listener");
 
 		state->root_instance = root_instance;
@@ -355,9 +356,77 @@ namespace robotick
 		return tokens;
 	}
 
+	std::tuple<void*, size_t, TypeId> Engine::find_field_info(const std::string& path) const
+	{
+		FieldPathTokens tokens = parse_field_path(path);
+
+		const WorkloadInstanceInfo* found_workload = find_instance_info(tokens.workload.c_str());
+		if (!found_workload)
+		{
+			ROBOTICK_FATAL_EXIT("Engine::find_field_info - unknown workload in path: %s", path.c_str());
+		}
+
+		const StructRegistryEntry* target_struct = nullptr;
+
+		if (tokens.struct_name == "config")
+		{
+			target_struct = found_workload->type->config_struct;
+		}
+		else if (tokens.struct_name == "inputs")
+		{
+			target_struct = found_workload->type->input_struct;
+		}
+		else if (tokens.struct_name == "outputs")
+		{
+			target_struct = found_workload->type->output_struct;
+		}
+		else
+		{
+			ROBOTICK_FATAL_EXIT("Engine::find_field_info - unsupported struct name: %s in %s", tokens.struct_name.c_str(), path.c_str());
+		}
+
+		const FieldInfo* found_field = target_struct->find_field(tokens.field.c_str());
+		if (!found_field)
+		{
+			ROBOTICK_FATAL_EXIT("Engine::find_field_info - unknown field: %s", path.c_str());
+		}
+
+		void* ptr = found_field->get_data_ptr(get_workloads_buffer(), *found_workload, *target_struct);
+		if (!ptr)
+		{
+			ROBOTICK_FATAL_EXIT("Engine::find_field_info - data ptr missing: %s", path.c_str());
+		}
+
+		TypeId type = found_field->type;
+		size_t size = found_field->size;
+
+		// Handle subfield, if any
+		if (!tokens.subfield.empty())
+		{
+			if (type == GET_TYPE_ID(Blackboard))
+			{
+				Blackboard& blackboard = *static_cast<Blackboard*>(ptr);
+				const BlackboardFieldInfo* sbinfo = blackboard.get_field_info(tokens.subfield);
+				if (!sbinfo)
+				{
+					ROBOTICK_FATAL_EXIT("Engine::find_field_info - unknown subfield: %s", path.c_str());
+				}
+				ptr = sbinfo->get_data_ptr(blackboard);
+				type = sbinfo->type;
+				size = sbinfo->size;
+			}
+			else
+			{
+				ROBOTICK_FATAL_EXIT("Engine::find_field_info - subfields only supported for Blackboard types: %s", path.c_str());
+			}
+		}
+
+		return std::make_tuple(ptr, size, type);
+	}
+
 	constexpr int DEFAULT_REMOTE_ENGINE_PORT = 7262;
 
-	void Engine::setup_remote_engines_listener()
+	void Engine::setup_remote_engines_receiver()
 	{
 		state->remote_engines_receiver.configure(
 			RemoteEngineConnection::ConnectionConfig{"", DEFAULT_REMOTE_ENGINE_PORT}, RemoteEngineConnection::Mode::Receiver);
@@ -365,47 +434,10 @@ namespace robotick
 		state->remote_engines_receiver.set_field_binder(
 			[&](const std::string& path, RemoteEngineConnection::Field& out)
 			{
-				FieldPathTokens tokens = parse_field_path(path);
-				const WorkloadInstanceInfo* found_workload = find_instance_info(tokens.workload.c_str());
-				if (!found_workload || tokens.struct_name != "inputs")
+				auto [ptr, size, type] = find_field_info(path);
+				if (ptr == nullptr)
 				{
-					return false;
-				}
-
-				const FieldInfo* found_field = found_workload->type->input_struct->find_field(tokens.field.c_str());
-				if (!found_field)
-				{
-					return false;
-				}
-
-				// Get pointer to that field
-				TypeId type = found_field->type;
-				void* ptr = found_field->get_data_ptr(get_workloads_buffer(), *found_workload, *found_workload->type->input_struct);
-				size_t size = found_field->size;
-				if (!ptr)
-				{
-					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engines_listener - data ptr missing %s", path.c_str());
-				}
-
-				// Handle Blackboard subfields if needed
-				if (!tokens.subfield.empty())
-				{
-					if (type == GET_TYPE_ID(Blackboard))
-					{
-						Blackboard& blackboard = *static_cast<Blackboard*>(ptr);
-						const BlackboardFieldInfo* sbinfo = blackboard.get_field_info(tokens.subfield);
-						if (!sbinfo)
-						{
-							ROBOTICK_FATAL_EXIT("Engine::setup_remote_engines_listener - unknown subfield %s", path.c_str());
-						}
-						ptr = sbinfo->get_data_ptr(blackboard);
-						type = sbinfo->type;
-						size = sbinfo->size;
-					}
-					else
-					{
-						ROBOTICK_FATAL_EXIT("Remote Engine Connections to non-Blackboad subfields are not yet supported");
-					}
+					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engines_receiver() - unable to resolve field path: %s", path.c_str());
 				}
 
 				out.path = path;
@@ -447,11 +479,19 @@ namespace robotick
 
 			for (const auto& remote_data_connection_seed : remote_model.remote_data_connection_seeds)
 			{
+				const auto& source_field_path = remote_data_connection_seed.source_field_path;
+
+				auto [ptr, size, type] = find_field_info(source_field_path);
+				if (ptr == nullptr)
+				{
+					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engine_senders() - unable to resolve source field path: %s", source_field_path.c_str());
+				}
+
 				RemoteEngineConnection::Field remote_field;
 				remote_field.path = remote_data_connection_seed.dest_field_path;
-				remote_field.send_ptr = nullptr; // TODO - establish local pointer from which to copy value each tick
-				remote_field.size = 0;			 // TODO - find this out
-				remote_field.type_hash = 0;		 // TODO - find this out too
+				remote_field.send_ptr = ptr;
+				remote_field.size = size;
+				remote_field.type_hash = type;
 
 				remote_engine_connection.register_field(remote_field);
 			}
@@ -545,7 +585,12 @@ namespace robotick
 
 	void Engine::tick_remote_engine_connections(const TickInfo& tick_info)
 	{
-		state->remote_engines_receiver.tick(tick_info);
+		const bool enable_remote_engines_receiver = (state->remote_engine_senders.size() == 0); // placeholder for having config setting
+
+		if (enable_remote_engines_receiver)
+		{
+			state->remote_engines_receiver.tick(tick_info);
+		}
 
 		for (auto& remote_engine_sender_ptr : state->remote_engine_senders)
 		{

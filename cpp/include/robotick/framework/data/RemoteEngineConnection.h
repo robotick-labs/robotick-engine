@@ -28,14 +28,14 @@ namespace robotick
 		{
 			Disconnected,
 			ReadyForHandshake,
-			ReadyForHandshakeAck,
-			Ready
+			ReadyForFieldsRequest,
+			ReadyForFields
 		};
 
 		enum class MessageType : uint8_t
 		{
 			Subscribe = 1,
-			Ack = 2,
+			FieldsRequest = 2,
 			Fields = 3
 		};
 
@@ -88,7 +88,8 @@ namespace robotick
 		void disconnect();
 
 		bool has_basic_connection() const; // we have established a basic connection, but perhaps but yet completed handshake
-		bool is_ready() const;			   // we have finished our handshake and ready for field-data exchange through out tick() method
+
+		bool is_ready() const; // we have finished our handshake and ready for field-data exchange through out tick() method
 
 	  private:
 		[[nodiscard]] State get_state() const { return state; };
@@ -102,8 +103,8 @@ namespace robotick
 		void receive_into_fields();
 
 		void tick_ready_for_handshake();
-		void tick_ready_for_handshake_ack();
-		void tick_ready();
+		void tick_ready_for_field_request();
+		void tick_ready_for_fields();
 
 		// things we set up once on startup:
 		Mode mode;

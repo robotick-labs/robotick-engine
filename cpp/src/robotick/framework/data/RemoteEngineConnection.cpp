@@ -11,10 +11,11 @@
 #include <cstring>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define ROBOTICK_REMOTE_ENGINE_LOG_PACKETS 1
+#define ROBOTICK_REMOTE_ENGINE_LOG_PACKETS 0
 
 namespace robotick
 {
@@ -30,11 +31,19 @@ namespace robotick
 				ROBOTICK_FATAL_EXIT("Failed to create socket");
 
 			int opt = 1;
+
+			// Allow address reuse
 			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
 				ROBOTICK_WARNING("Failed to set SO_REUSEADDR on socket");
 
+			// Disable Nagle's algorithm — send immediately
+			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0)
+				ROBOTICK_WARNING("Failed to set TCP_NODELAY on socket");
+
+			// Set non-blocking
 			int flags = fcntl(fd, F_GETFL, 0);
 			fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
 			return fd;
 		}
 
@@ -49,35 +58,35 @@ namespace robotick
 
 		state = target_state;
 
-		const char* mode_str = (mode == Mode::Receiver) ? "Receiver" : "Sender";
+		const bool is_receiver = (mode == Mode::Receiver);
+		const char* mode_str = is_receiver ? "Receiver" : "Sender";
+		const char* color_start = is_receiver ? "\033[33m" : "\033[32m"; // yellow : green
+		const char* color_end = "\033[0m";
 
 		if (state == State::Disconnected)
 		{
-			ROBOTICK_INFO("RemoteEngineConnection [%s] [-> State::Disconnected] - disconnected", mode_str);
+			ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::Disconnected] - disconnected%s", color_start, mode_str, color_end);
 		}
 		else if (state == State::ReadyForHandshake)
 		{
-			ROBOTICK_INFO("RemoteEngineConnection [%s] [-> State::ReadyForHandshake] - socket-connection established, ready for handshake", mode_str);
+			ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForHandshake] - socket-connection established, ready for handshake%s",
+				color_start, mode_str, color_end);
 		}
-		else if (state == State::ReadyForHandshakeAck)
+		else if (state == State::ReadyForFieldsRequest)
 		{
-			if(mode == Mode::Receiver)
-			{
-				ROBOTICK_INFO("RemoteEngineConnection [%s] [-> State::ReadyForHandshakeAck] - receiver sending acknowledgement to remote-sender", mode_str);
-			}
-			else
-			{
-				ROBOTICK_INFO("RemoteEngineConnection [%s] [-> State::ReadyForHandshakeAck] - handshake sent - awaiting acknowledgement from remote-listener", mode_str);
-			}
+			const char* field_data_str = is_receiver ? "send" : "receive";
+			ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFieldsRequest] - ready to %s fields-request!%s", color_start, mode_str,
+				field_data_str, color_end);
 		}
-		else if (state == State::Ready)
+		else if (state == State::ReadyForFields)
 		{
-			const char* field_data_str = (mode == Mode::Receiver) ? "receive" : "send";
-			ROBOTICK_INFO("RemoteEngineConnection [%s] [-> State::Ready] - ready to %s field data!", mode_str, field_data_str);
+			const char* field_data_str = is_receiver ? "receive" : "send";
+			ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFields] - ready to %s fields-data!%s", color_start, mode_str,
+				field_data_str, color_end);
 		}
 		else
 		{
-			ROBOTICK_FATAL_EXIT("RemoteEngineConnection [%s]- unknown state %i", mode_str, (int)state);
+			ROBOTICK_FATAL_EXIT("RemoteEngineConnection [%s] - unknown state %i", mode_str, static_cast<int>(state));
 		}
 	}
 
@@ -138,13 +147,13 @@ namespace robotick
 		{
 			tick_ready_for_handshake();
 		}
-		if (state == State::ReadyForHandshakeAck)
+		if (state == State::ReadyForFieldsRequest)
 		{
-			tick_ready_for_handshake_ack();
+			tick_ready_for_field_request();
 		}
-		if (state == State::Ready)
+		if (state == State::ReadyForFields)
 		{
-			tick_ready();
+			tick_ready_for_fields();
 		}
 	}
 
@@ -155,7 +164,7 @@ namespace robotick
 
 	bool RemoteEngineConnection::is_ready() const
 	{
-		return state == State::Ready;
+		return state == State::ReadyForFieldsRequest || state == State::ReadyForFields;
 	}
 
 	void RemoteEngineConnection::tick_disconnected_sender()
@@ -277,7 +286,7 @@ namespace robotick
 			in_progress_message.vacate(); // vacate ready for next user
 
 			ROBOTICK_INFO("Sender handshake sent with %zu field(s)", fields.size());
-			set_state(State::ReadyForHandshakeAck);
+			set_state(State::ReadyForFieldsRequest);
 		}
 	}
 
@@ -328,11 +337,11 @@ namespace robotick
 					bound_count++;
 				}
 			}
-			
+
 			in_progress_message.vacate(); // vacate ready for next user
 
 			ROBOTICK_INFO("Receiver handshake received. Bound %zu field(s) - total %zu (should be same value)", bound_count, fields.size());
-			set_state(State::ReadyForHandshakeAck);
+			set_state(State::ReadyForFieldsRequest);
 		}
 	}
 
@@ -348,7 +357,7 @@ namespace robotick
 		}
 	}
 
-	void RemoteEngineConnection::tick_ready_for_handshake_ack()
+	void RemoteEngineConnection::tick_ready_for_field_request()
 	{
 		std::vector<uint8_t> ack;
 
@@ -367,17 +376,17 @@ namespace robotick
 			}
 
 			if (in_progress_message.is_completed())
-			{	
+			{
 				in_progress_message.vacate(); // vacate ready for next user
 
-				set_state(State::Ready);
+				set_state(State::ReadyForFields);
 			}
 		}
 		else
 		{
 			if (in_progress_message.is_vacant())
 			{
-				in_progress_message.begin_send((uint8_t)MessageType::Ack, nullptr, 0);
+				in_progress_message.begin_send((uint8_t)MessageType::FieldsRequest, nullptr, 0);
 			}
 
 			const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
@@ -388,10 +397,10 @@ namespace robotick
 			}
 
 			if (in_progress_message.is_completed())
-			{	
+			{
 				in_progress_message.vacate(); // vacate ready for next user
 
-				set_state(State::Ready);
+				set_state(State::ReadyForFields);
 			}
 		}
 	}
@@ -424,6 +433,8 @@ namespace robotick
 		if (in_progress_message.is_completed())
 		{
 			in_progress_message.vacate(); // vacate ready for next user
+
+			set_state(State::ReadyForFieldsRequest);
 		}
 	}
 
@@ -444,7 +455,7 @@ namespace robotick
 		}
 
 		if (in_progress_message.is_completed())
-		{	
+		{
 			const auto& buffer = in_progress_message.get_payload();
 
 			size_t offset = 0;
@@ -470,11 +481,11 @@ namespace robotick
 
 			in_progress_message.vacate(); // vacate ready for next user
 
-			set_state(State::Ready);
+			set_state(State::ReadyForFieldsRequest);
 		}
 	}
 
-	void RemoteEngineConnection::tick_ready()
+	void RemoteEngineConnection::tick_ready_for_fields()
 	{
 		if (mode == Mode::Sender)
 		{
@@ -488,6 +499,24 @@ namespace robotick
 
 	void RemoteEngineConnection::disconnect()
 	{
+		// tick in_progress_message if occupied, to ensure we're not sending partial messages
+		constexpr int max_wait_ms = 500;
+		constexpr int tick_wait_ms = 10;
+		int total_wait_ms = 0;
+		while (socket_fd >= 0 && total_wait_ms <= max_wait_ms && in_progress_message.is_occupied() && in_progress_message.is_completed())
+		{
+			InProgressMessage::Result result = in_progress_message.tick(socket_fd);
+			if (result == InProgressMessage::Result::ConnectionLost)
+			{
+				break;
+			}
+
+			Thread::sleep_ms(tick_wait_ms);
+			total_wait_ms += tick_wait_ms;
+		}
+
+		in_progress_message.vacate();
+
 		if (socket_fd >= 0)
 			close(socket_fd);
 		socket_fd = -1;

@@ -22,8 +22,16 @@
     },
     "clang-format.style": "file",
     "search.exclude": {
-        "**/lib": true
+        "**/lib": true,
+        "**/components/robotick-engine": true
     },
+    "files.exclude": {
+        "**/components/robotick-engine": true
+    },
+    "files.watcherExclude": {
+        "**/components/robotick-engine/**": true
+    },
+    "search.useGlobalIgnoreFiles": true,
     "files.associations": {
         "type_traits": "cpp",
         "any": "cpp",

@@ -77,7 +77,12 @@ TEST_CASE("Integration|Framework|Data|RemoteEngineConnection|Handshake and tick 
 				Thread::sleep_ms(10);
 			}
 
-			sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			while (recv_value != target_value && sender.is_ready())
+			{
+				sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+				Thread::sleep_ms(10);
+			}
+
 			Thread::sleep_ms(100);
 			sender.disconnect();
 		});
@@ -139,7 +144,7 @@ TEST_CASE("Integration|Framework|Data|RemoteEngineConnection|Handles large paylo
 				Thread::sleep_ms(10);
 			}
 
-			for (int i = 0; i < 3; ++i)
+			while (receive_buffer[100] != target_value && sender.is_ready())
 			{
 				sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
 				Thread::sleep_ms(10);
@@ -208,7 +213,13 @@ TEST_CASE("Integration|RemoteEngineConnection|Reconnect after sender drop", "[Re
 				tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
 				Thread::sleep_ms(1);
 			}
-			tx.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+
+			while (recv_value != 100 && tx.is_ready())
+			{
+				tx.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+				Thread::sleep_ms(1);
+			}
+
 			Thread::sleep_ms(10);
 			tx.disconnect();
 
@@ -218,7 +229,13 @@ TEST_CASE("Integration|RemoteEngineConnection|Reconnect after sender drop", "[Re
 				tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
 				Thread::sleep_ms(1);
 			}
-			tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
+
+			while (recv_value != send_value && tx.is_ready())
+			{
+				tx.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+				Thread::sleep_ms(1);
+			}
+
 			tx.disconnect();
 		});
 
@@ -254,14 +271,14 @@ TEST_CASE("Integration|RemoteEngineConnection|Field updates on same connection",
 				rx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
 				Thread::sleep_ms(1);
 			}
-			while (recv_value != 11)
+			while (recv_value != 11 && rx.is_ready())
 			{
 				rx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
 				Thread::sleep_ms(1);
 			}
 
 			recv_value = 0;
-			while (recv_value != 22)
+			while (recv_value != 22 && rx.is_ready())
 			{
 				rx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
 				Thread::sleep_ms(1);
@@ -281,10 +298,21 @@ TEST_CASE("Integration|RemoteEngineConnection|Field updates on same connection",
 				tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
 				Thread::sleep_ms(1);
 			}
-			tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
+
+			while (recv_value != 11 && tx.is_ready())
+			{
+				tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
+				Thread::sleep_ms(1);
+			}
 
 			send_value = 22;
-			tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
+
+			while (recv_value != send_value && tx.is_ready())
+			{
+				tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
+				Thread::sleep_ms(1);
+			}
+
 			tx.disconnect();
 		});
 

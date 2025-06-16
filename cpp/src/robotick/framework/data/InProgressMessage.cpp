@@ -29,7 +29,7 @@ namespace robotick
 		if (size > max_preview)
 			preview += "...";
 
-		ROBOTICK_INFO("%s [%d] (%zu bytes, payload %u): '%s'", label, header.type, size, header.payload_len, preview.c_str());
+		ROBOTICK_INFO("%s [%d] (%zu bytes, payload %zu bytes): '%s'", label, header.type, size, (size_t)header.payload_len, preview.c_str());
 	}
 #else
 	static void log_preview(const char*, const MessageHeader&, const uint8_t*, size_t)
@@ -48,7 +48,7 @@ namespace robotick
 		header.type = message_type;
 		header.payload_len = static_cast<uint32_t>(data_size);
 
-		if(data_ptr!=nullptr && data_size>0)
+		if (data_ptr != nullptr && data_size > 0)
 		{
 			payload.assign(static_cast<const uint8_t*>(data_ptr), static_cast<const uint8_t*>(data_ptr) + data_size);
 		}
@@ -60,7 +60,7 @@ namespace robotick
 		buffer.resize(sizeof(MessageHeader) + payload.size());
 		std::memcpy(buffer.data(), &header, sizeof(MessageHeader));
 
-		if(payload.size()>0)
+		if (payload.size() > 0)
 		{
 			std::memcpy(buffer.data() + sizeof(MessageHeader), payload.data(), payload.size());
 		}
@@ -142,7 +142,7 @@ namespace robotick
 				stage = Stage::Completed;
 				return Result::Completed;
 			}
-			
+
 			return Result::InProgress;
 		}
 
@@ -158,7 +158,7 @@ namespace robotick
 		}
 
 		stage = Stage::Completed;
-		
+
 		return Result::Completed;
 	}
 
