@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "robotick/framework/data/MessageHeader.h"
+
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -11,17 +13,6 @@ namespace robotick
 {
 	constexpr const char* MAGIC = "RBIN";
 	constexpr uint8_t VERSION = 1;
-
-	struct MessageHeader
-	{
-		char magic[4]; // 'RBIN'
-		uint8_t version;
-		uint8_t type;
-		uint16_t reserved;
-		uint32_t payload_len;
-	};
-
-	static_assert(sizeof(MessageHeader) == 12, "MessageHeader must be 12 bytes");
 
 	class InProgressMessage
 	{
@@ -34,7 +25,12 @@ namespace robotick
 			Completed
 		};
 
-		enum class Result { InProgress, Completed, ConnectionLost };
+		enum class Result
+		{
+			InProgress,
+			Completed,
+			ConnectionLost
+		};
 
 		void begin_send(uint8_t message_type, const uint8_t* data_ptr, const size_t data_size);
 		void begin_receive();

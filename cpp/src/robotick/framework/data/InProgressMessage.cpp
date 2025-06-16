@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/InProgressMessage.h"
+
 #include "robotick/api.h"
+#include "robotick/framework/data/MessageHeader.h"
 #include "robotick/platform/Threading.h"
 
 #include <errno.h>
@@ -58,7 +60,8 @@ namespace robotick
 		}
 
 		buffer.resize(sizeof(MessageHeader) + payload.size());
-		std::memcpy(buffer.data(), &header, sizeof(MessageHeader));
+
+		header.serialize(buffer.data());
 
 		if (payload.size() > 0)
 		{
@@ -118,7 +121,8 @@ namespace robotick
 		if (stage == Stage::Receiving && total == sizeof(MessageHeader))
 		{
 			// finished reading header — validate and prepare for payload
-			std::memcpy(&header, buffer.data(), sizeof(MessageHeader));
+			header.deserialize(buffer.data());
+
 			if (std::memcmp(header.magic, MAGIC, 4) != 0 || header.version != VERSION)
 			{
 				ROBOTICK_WARNING("InProgressMessage::tick(): Invalid header magic or version");
