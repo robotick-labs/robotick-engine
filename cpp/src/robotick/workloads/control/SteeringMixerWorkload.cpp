@@ -29,9 +29,6 @@ namespace robotick
 	{
 		double speed = 0.0;
 		double turn_rate = 0.0;
-
-		double speed_scale = 1.0;
-		double turn_rate_scale = 1.0;
 	};
 
 	ROBOTICK_BEGIN_FIELDS(SteeringMixerTransformerInputs)
@@ -60,8 +57,8 @@ namespace robotick
 
 		void tick(const TickInfo&)
 		{
-			const double speed = inputs.speed * inputs.speed_scale;
-			const double turn = inputs.turn_rate * inputs.turn_rate_scale;
+			const double speed = inputs.speed;
+			const double turn = inputs.turn_rate;
 
 			double left = speed + turn * config.max_speed_differential;
 			double right = speed - turn * config.max_speed_differential;
@@ -75,11 +72,6 @@ namespace robotick
 
 			outputs.left_motor = left;
 			outputs.right_motor = right;
-
-			// ROBOTICK_INFO("\033[2J\033[H"); // Clear screen + move cursor to top-left
-			//
-			// ROBOTICK_INFO("SteeringMixerWorkload::tick() inputs: speed=%.3f, turn=%.3f outputs: left_motor=%.3f, right_motor=%.3f", speed, turn,
-			// 	outputs.left_motor, outputs.right_motor);
 		}
 	};
 

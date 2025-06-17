@@ -2,7 +2,7 @@
 set -e
 echo "🔧 Installing system dependencies as root..."
 
-sudo apt-get update && sudo apt-get install -y \
+apt-get update && apt-get install -y \
   build-essential \
   cmake \
   clang \
@@ -19,7 +19,7 @@ sudo apt-get update && sudo apt-get install -y \
   gdb \
   libssl-dev \
   libcurl4-openssl-dev \
-  && sudo apt-get clean
+  && apt-get clean
 
 echo "📦 Installing Paho MQTT C library..."
 git clone --depth=1 https://github.com/eclipse/paho.mqtt.c.git /tmp/paho.mqtt.c
@@ -31,12 +31,11 @@ cmake -Bbuild -S. \
   -DPAHO_BUILD_CMAKE_EXPORTS=ON \
   -DCMAKE_INSTALL_PREFIX=/usr
 cmake --build build --target install -- -j$(nproc)
-sudo cmake --install build
-sudo ldconfig
-rm -rf /tmp/paho.mqtt.c
+cmake --install build
+ldconfig
 
-# ← HERE: move out of deleted directory
 cd /tmp
+rm -rf /tmp/paho.mqtt.c
 
 echo "📦 Installing Paho MQTT C++ library..."
 git clone --depth=1 https://github.com/eclipse/paho.mqtt.cpp.git /tmp/paho.mqtt.cpp
@@ -48,8 +47,10 @@ cmake -Bbuild -S. \
   -DCMAKE_PREFIX_PATH=/usr \
   -DCMAKE_INSTALL_PREFIX=/usr
 cmake --build build --target install -- -j$(nproc)
-sudo cmake --install build
-sudo ldconfig
+cmake --install build
+ldconfig
+
+cd /tmp
 rm -rf /tmp/paho.mqtt.cpp
 
 echo "✅ Root-level setup complete."

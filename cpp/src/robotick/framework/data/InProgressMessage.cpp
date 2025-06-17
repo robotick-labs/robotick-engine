@@ -133,7 +133,7 @@ namespace robotick
 			}
 
 			buffer.resize(sizeof(MessageHeader) + header.payload_len);
-			cursor = 0;
+			cursor = sizeof(MessageHeader); // start receiving after the header
 
 			// handle zero-payload case immediately
 			if (header.payload_len == 0)

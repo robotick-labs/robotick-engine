@@ -1,5 +1,7 @@
 FROM ubuntu:24.04
 
+RUN apt-get update && apt-get install -y git curl build-essential cmake && apt-get clean
+
 # 🧱 Root-level setup (install packages and MQTT libs)
 COPY ./1_setup_my_env_as_root.ubuntu.sh /1_setup_my_env_as_root.ubuntu.sh
 RUN chmod +x /1_setup_my_env_as_root.ubuntu.sh && /1_setup_my_env_as_root.ubuntu.sh
