@@ -102,7 +102,7 @@ namespace robotick
 		mg_set_request_handler(ctx, "/", &WebServer::callback, this);
 		running = true;
 
-		ROBOTICK_INFO("WebServer serving from '%s' at http://localhost:%d", document_root.c_str(), port);
+		ROBOTICK_INFO("WebServer serving from '%s' at http://localhost:%d", web_root_folder.c_str(), port);
 	}
 
 	void WebServer::stop()

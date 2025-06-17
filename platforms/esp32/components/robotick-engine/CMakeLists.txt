@@ -19,7 +19,7 @@ endforeach()
 idf_component_register(
     SRCS ${srcs}
     INCLUDE_DIRS ${include_dirs}
-    REQUIRES json esp_timer M5GFX M5Unified
+    REQUIRES json esp_timer M5GFX M5Unified esp_wifi
 )
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC ROBOTICK_PLATFORM_ESP32)

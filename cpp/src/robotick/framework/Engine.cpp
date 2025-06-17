@@ -6,6 +6,7 @@
 #include "robotick/api.h"
 #include "robotick/framework/Model.h"
 #include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/FieldUtils.h"
@@ -22,6 +23,7 @@
 #include <future>
 #include <sstream>
 #include <stdexcept>
+#include <tuple>
 #include <vector>
 
 namespace robotick
@@ -38,6 +40,9 @@ namespace robotick
 		std::unordered_map<std::string, WorkloadInstanceInfo*> instances_by_unique_name;
 		std::vector<DataConnectionInfo> data_connections_all;
 		std::vector<size_t> data_connections_acquired_indices;
+
+		std::vector<std::unique_ptr<RemoteEngineConnection>> remote_engine_senders; // one sender per engine we need to send data to
+		RemoteEngineConnection remote_engines_receiver;								// one receiver in case any engines need to send data to us
 	};
 
 	Engine::Engine() : state(std::make_unique<Engine::State>())
@@ -303,7 +308,194 @@ namespace robotick
 				inst.type->setup_fn(inst.get_ptr(*this));
 		}
 
+		ROBOTICK_INFO("Setting up remote engine senders...");
+		setup_remote_engine_senders(model);
+
+		ROBOTICK_INFO("Setting up remote engines listener...");
+		setup_remote_engines_receiver();
+		ROBOTICK_INFO("Finished setting up remote engines listener");
+
 		state->root_instance = root_instance;
+	}
+
+	struct FieldPathTokens
+	{
+		std::string workload;
+		std::string struct_name; // "inputs" or "outputs"
+		std::string field;
+		std::string subfield; // optional
+	};
+
+	FieldPathTokens parse_field_path(const std::string& path)
+	{
+		FieldPathTokens tokens;
+
+		size_t dot1 = path.find('.');
+		if (dot1 == std::string::npos)
+			return tokens;
+
+		tokens.workload = path.substr(0, dot1);
+
+		size_t dot2 = path.find('.', dot1 + 1);
+		if (dot2 == std::string::npos)
+			return tokens;
+
+		tokens.struct_name = path.substr(dot1 + 1, dot2 - dot1 - 1);
+
+		size_t dot3 = path.find('.', dot2 + 1);
+		if (dot3 == std::string::npos)
+		{
+			tokens.field = path.substr(dot2 + 1);
+		}
+		else
+		{
+			tokens.field = path.substr(dot2 + 1, dot3 - dot2 - 1);
+			tokens.subfield = path.substr(dot3 + 1);
+		}
+
+		return tokens;
+	}
+
+	std::tuple<void*, size_t, TypeId> Engine::find_field_info(const std::string& path) const
+	{
+		FieldPathTokens tokens = parse_field_path(path);
+
+		const WorkloadInstanceInfo* found_workload = find_instance_info(tokens.workload.c_str());
+		if (!found_workload)
+		{
+			ROBOTICK_FATAL_EXIT("Engine::find_field_info - unknown workload in path: %s", path.c_str());
+		}
+
+		const StructRegistryEntry* target_struct = nullptr;
+
+		if (tokens.struct_name == "config")
+		{
+			target_struct = found_workload->type->config_struct;
+		}
+		else if (tokens.struct_name == "inputs")
+		{
+			target_struct = found_workload->type->input_struct;
+		}
+		else if (tokens.struct_name == "outputs")
+		{
+			target_struct = found_workload->type->output_struct;
+		}
+		else
+		{
+			ROBOTICK_FATAL_EXIT("Engine::find_field_info - unsupported struct name: %s in %s", tokens.struct_name.c_str(), path.c_str());
+		}
+
+		const FieldInfo* found_field = target_struct->find_field(tokens.field.c_str());
+		if (!found_field)
+		{
+			ROBOTICK_FATAL_EXIT("Engine::find_field_info - unknown field: %s", path.c_str());
+		}
+
+		void* ptr = found_field->get_data_ptr(get_workloads_buffer(), *found_workload, *target_struct);
+		if (!ptr)
+		{
+			ROBOTICK_FATAL_EXIT("Engine::find_field_info - data ptr missing: %s", path.c_str());
+		}
+
+		TypeId type = found_field->type;
+		size_t size = found_field->size;
+
+		// Handle subfield, if any
+		if (!tokens.subfield.empty())
+		{
+			if (type == GET_TYPE_ID(Blackboard))
+			{
+				Blackboard& blackboard = *static_cast<Blackboard*>(ptr);
+				const BlackboardFieldInfo* sbinfo = blackboard.get_field_info(tokens.subfield);
+				if (!sbinfo)
+				{
+					ROBOTICK_FATAL_EXIT("Engine::find_field_info - unknown subfield: %s", path.c_str());
+				}
+				ptr = sbinfo->get_data_ptr(blackboard);
+				type = sbinfo->type;
+				size = sbinfo->size;
+			}
+			else
+			{
+				ROBOTICK_FATAL_EXIT("Engine::find_field_info - subfields only supported for Blackboard types: %s", path.c_str());
+			}
+		}
+
+		return std::make_tuple(ptr, size, type);
+	}
+
+	constexpr int DEFAULT_REMOTE_ENGINE_PORT = 7262;
+
+	void Engine::setup_remote_engines_receiver()
+	{
+		state->remote_engines_receiver.configure(
+			RemoteEngineConnection::ConnectionConfig{"", DEFAULT_REMOTE_ENGINE_PORT}, RemoteEngineConnection::Mode::Receiver);
+
+		state->remote_engines_receiver.set_field_binder(
+			[&](const std::string& path, RemoteEngineConnection::Field& out)
+			{
+				auto [ptr, size, type] = find_field_info(path);
+				if (ptr == nullptr)
+				{
+					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engines_receiver() - unable to resolve field path: %s", path.c_str());
+				}
+
+				out.path = path;
+				out.recv_ptr = ptr;
+				out.size = size;
+				out.type_hash = type;
+
+				return true;
+			});
+	}
+
+	void Engine::setup_remote_engine_senders(const Model& model)
+	{
+		const auto& remote_models = model.get_remote_models();
+
+		state->remote_engine_senders.clear(); // Just in case
+		state->remote_engine_senders.reserve(remote_models.size());
+
+		for (const auto& remote_model_entry : remote_models)
+		{
+			const RemoteModelSeed& remote_model = remote_model_entry.second;
+
+			if (remote_model.remote_data_connection_seeds.size() == 0)
+			{
+				ROBOTICK_WARNING("Remote model '%s' has no remote data-connections - skipping adding remote_engine_sender for it",
+					remote_model.model_name.c_str());
+
+				continue;
+			}
+
+			RemoteEngineConnection& remote_engine_connection =
+				*(state->remote_engine_senders.emplace_back(std::make_unique<RemoteEngineConnection>()).get());
+
+			RemoteEngineConnection::ConnectionConfig config;
+			config.host = remote_model.comms_channel;
+			config.port = DEFAULT_REMOTE_ENGINE_PORT;
+
+			remote_engine_connection.configure(config, RemoteEngineConnection::Mode::Sender);
+
+			for (const auto& remote_data_connection_seed : remote_model.remote_data_connection_seeds)
+			{
+				const auto& source_field_path = remote_data_connection_seed.source_field_path;
+
+				auto [ptr, size, type] = find_field_info(source_field_path);
+				if (ptr == nullptr)
+				{
+					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engine_senders() - unable to resolve source field path: %s", source_field_path.c_str());
+				}
+
+				RemoteEngineConnection::Field remote_field;
+				remote_field.path = remote_data_connection_seed.dest_field_path;
+				remote_field.send_ptr = ptr;
+				remote_field.size = size;
+				remote_field.type_hash = type;
+
+				remote_engine_connection.register_field(remote_field);
+			}
+		}
 	}
 
 	bool Engine::is_running() const
@@ -362,6 +554,10 @@ namespace robotick
 
 			last_tick_time = now;
 
+			// update remote data-connections
+			tick_remote_engine_connections(tick_info);
+
+			// update local data-connections
 			for (size_t index : state->data_connections_acquired_indices)
 				state->data_connections_all[index].do_data_copy();
 
@@ -384,6 +580,21 @@ namespace robotick
 		{
 			if (inst.type->stop_fn)
 				inst.type->stop_fn(inst.get_ptr(*this));
+		}
+	}
+
+	void Engine::tick_remote_engine_connections(const TickInfo& tick_info)
+	{
+		const bool enable_remote_engines_receiver = (state->remote_engine_senders.size() == 0); // placeholder for having config setting
+
+		if (enable_remote_engines_receiver)
+		{
+			state->remote_engines_receiver.tick(tick_info);
+		}
+
+		for (auto& remote_engine_sender_ptr : state->remote_engine_senders)
+		{
+			remote_engine_sender_ptr->tick(tick_info);
 		}
 	}
 

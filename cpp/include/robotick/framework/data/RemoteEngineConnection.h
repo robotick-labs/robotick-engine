@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "robotick/framework/data/InProgressMessage.h"
+
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -11,28 +13,44 @@
 
 namespace robotick
 {
+	struct TickInfo;
 
 	class RemoteEngineConnection
 	{
 	  public:
-		enum class Mode
+		enum class Mode : uint8_t
 		{
 			Sender,
 			Receiver
 		};
-		enum class State
+
+		enum class State : uint8_t
 		{
 			Disconnected,
-			Connected,
-			Subscribed,
-			Ticking
+			ReadyForHandshake,
+			ReadyForFieldsRequest,
+			ReadyForFields
 		};
 
 		enum class MessageType : uint8_t
 		{
 			Subscribe = 1,
-			Ack = 2,
+			FieldsRequest = 2,
 			Fields = 3
+		};
+
+		enum class ReceiveResult : uint8_t
+		{
+			MessageReceiving,
+			TryAgainNextTick,
+			ConnectionLost
+		};
+
+		enum class SendResult : uint8_t
+		{
+			MessageSending,
+			TryAgainNextTick,
+			ConnectionLost
 		};
 
 		struct ConnectionConfig
@@ -52,43 +70,56 @@ namespace robotick
 
 		using BinderCallback = std::function<bool(const std::string& path, Field& out_field)>;
 
-		RemoteEngineConnection(const ConnectionConfig& config, Mode mode);
-		~RemoteEngineConnection() noexcept { cleanup(); }
+		RemoteEngineConnection() = default;
+		~RemoteEngineConnection() noexcept { disconnect(); }
 
 		RemoteEngineConnection(const RemoteEngineConnection&) = delete;
 		RemoteEngineConnection& operator=(const RemoteEngineConnection&) = delete;
 		RemoteEngineConnection(RemoteEngineConnection&&) noexcept = delete;
 		RemoteEngineConnection& operator=(RemoteEngineConnection&&) noexcept = delete;
 
-		void tick();
-		void cleanup();
-		bool is_connected() const;
-		bool is_ready_for_tick() const;
+		void configure(const ConnectionConfig& config, Mode mode);
+
+		void tick(const TickInfo& tick_info);
 
 		void register_field(const Field& field);	  // for Sender
 		void set_field_binder(BinderCallback binder); // for Receiver
 
+		void disconnect();
+
+		bool has_basic_connection() const; // we have established a basic connection, but perhaps but yet completed handshake
+
+		bool is_ready() const; // we have finished our handshake and ready for field-data exchange through out tick() method
+
 	  private:
-		void connect_socket();
-		void accept_socket();
-		void send_handshake();
-		void receive_handshake_and_bind();
+		[[nodiscard]] State get_state() const { return state; };
+		void set_state(const State state);
+
+		void tick_disconnected_sender();
+		void tick_disconnected_receiver();
+		void tick_send_handshake();
+		void tick_receive_handshake_and_bind();
 		void send_fields_as_message();
 		void receive_into_fields();
-		void send_message(const MessageType type, const uint8_t* data, size_t size);
-		bool receive_message(std::vector<uint8_t>& buffer_out);
 
-		void handle_handshake();
-		void handle_tick_exchange();
+		void tick_ready_for_handshake();
+		void tick_ready_for_field_request();
+		void tick_ready_for_fields();
 
-		State state = State::Disconnected;
+		// things we set up once on startup:
 		Mode mode;
 		ConnectionConfig config;
+		BinderCallback binder;
 
-		int socket_fd = -1;
+		// set on startup (register_field()) on Sender; on tick_receive_handshake_and_bind() on Receiver:
 		std::vector<Field> fields;
 
-		BinderCallback binder;
+		// runtime values:
+		State state = State::Disconnected;
+		int socket_fd = -1;
+		float time_sec_to_reconnect = 0.0f;
+
+		InProgressMessage in_progress_message;
 	};
 
 } // namespace robotick
