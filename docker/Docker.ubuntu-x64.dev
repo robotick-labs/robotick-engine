@@ -12,8 +12,7 @@ COPY ./2_setup_my_env_as_user.ubuntu.sh /2_setup_my_env_as_user.ubuntu.sh
 WORKDIR /workspace
 COPY . .
 
-# 🚀 Run user-level script (non-root context, if needed during build)
-# Or leave this for dev container shell if venv activation is interactive
-RUN chmod +x /2_setup_my_env_as_user.ubuntu.sh
+# 🚀 Run user-level script (sets up our python requirements)
+RUN chmod +x /2_setup_my_env_as_user.ubuntu.sh && /2_setup_my_env_as_user.ubuntu.sh
 
 CMD [ "bash" ]

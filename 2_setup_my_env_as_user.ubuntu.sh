@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
 set -e
-echo "🐍 Setting up Python environment..."
+echo "🐍 Setting up Python environment (Docker-friendly, system-wide)..."
 
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SETUP_FILE="$SCRIPT_DIR/setup.py"
 
-if [ -f setup.py ]; then
-  echo "✅ Installing Robotick from root setup.py..."
-  pip install -e .
-elif [ -f robotick-engine/setup.py ]; then
-  echo "✅ Installing Robotick from subdir..."
-  cd robotick-engine && pip install -e .
-else
-  echo "❌ setup.py not found!" && exit 1
+if [ ! -f "$SETUP_FILE" ]; then
+  echo "❌ setup.py not found in $SCRIPT_DIR!" && exit 1
 fi
 
-echo "✅ Python setup complete."
+echo "🧹 Removing any existing .egg-info metadata..."
+find "$SCRIPT_DIR" -type d -name '*.egg-info' -exec rm -rf {} +
+
+echo "📦 Installing Robotick (editable) to system site-packages..."
+pip3 install --break-system-packages -e "$SCRIPT_DIR"
+
+echo "🔍 Verifying 'robotick' module import using: $(which python3)"
+if ! python3 -c "import robotick" 2>/dev/null; then
+  echo "❌ 'robotick' module not importable after install!"
+  exit 1
+fi
+
+echo "✅ Python setup complete (system install, no sudo)."
