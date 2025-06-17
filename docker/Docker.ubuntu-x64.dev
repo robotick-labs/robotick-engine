@@ -1,18 +1,31 @@
 FROM ubuntu:24.04
 
-RUN apt-get update && apt-get install -y git curl build-essential cmake && apt-get clean
+# 🛠️ Install base dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    build-essential \
+    cmake \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && apt-get clean
 
 # 🧱 Root-level setup (install packages and MQTT libs)
 COPY ./1_setup_my_env_as_root.ubuntu.sh /1_setup_my_env_as_root.ubuntu.sh
 RUN chmod +x /1_setup_my_env_as_root.ubuntu.sh && /1_setup_my_env_as_root.ubuntu.sh
 
-# 🧑 User-level setup (e.g. Python venv, editable install)
+# 🧑 User-level setup script
 COPY ./2_setup_my_env_as_user.ubuntu.sh /2_setup_my_env_as_user.ubuntu.sh
 
+# Set working directory where setup.py lives
 WORKDIR /workspace
+
+# Copy all source files into container
 COPY . .
 
-# 🚀 Run user-level script (sets up our python requirements)
-RUN chmod +x /2_setup_my_env_as_user.ubuntu.sh && /2_setup_my_env_as_user.ubuntu.sh
+# 🚀 Run user-level script (system-wide editable Python install)
+RUN chmod +x ./2_setup_my_env_as_user.ubuntu.sh && ./2_setup_my_env_as_user.ubuntu.sh
 
-CMD [ "bash" ]
+# 🧼 Optional: default interactive shell
+CMD ["bash"]
