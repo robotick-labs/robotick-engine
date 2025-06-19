@@ -46,9 +46,11 @@ jobs:
 
       - name: 🔧 Run IDF Clean + Build inside Docker
         run: |
-          docker run --rm \
+          docker run --rm -t \
+            --user root \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace/examples/cpp/esp32-testbed \
+            -e TERM=xterm-256color \
             robotick-dev:esp32s3 \
             bash -c "
               set -e
