@@ -17,6 +17,14 @@
 #include <utility>
 #include <vector>
 
+namespace std
+{
+	template <size_t N> struct hash<robotick::FixedString<N>>
+	{
+		size_t operator()(const robotick::FixedString<N>& s) const noexcept { return robotick::hash(s); }
+	};
+} // namespace std
+
 namespace robotick
 {
 	// Forward declaration(s)

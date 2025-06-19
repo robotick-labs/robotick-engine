@@ -1,7 +1,10 @@
+// Copyright Robotick Labs
 #pragma once
 
-#include <stddef.h> // for size_t
-#include <string.h> // for memcpy, strncmp
+#include "robotick/framework/common/Hash.h"
+
+#include <stddef.h>
+#include <string.h>
 
 namespace robotick
 {
@@ -56,7 +59,18 @@ namespace robotick
 		bool operator!=(const FixedString<N>& other) const { return !(*this == other); }
 
 		bool empty() const { return data[0] == '\0'; }
+
+		size_t length() const { return fixed_strlen(data); };
+
+		constexpr size_t capacity() const { return N; }
 	};
+
+	template <size_t N> inline size_t hash(const FixedString<N>& s)
+	{
+		// Hash only up to null terminator
+		const size_t len = s.length();
+		return fnv1a_hash(s.data, len);
+	}
 
 	// Type aliases
 	using FixedString8 = FixedString<8>;
@@ -69,20 +83,3 @@ namespace robotick
 	using FixedString1024 = FixedString<1024>;
 
 } // namespace robotick
-
-#include <functional> // std::hash
-#include <string>
-#include <string_view>
-
-// Hash function (must be defined outside any namespace)
-namespace std
-{
-	template <size_t N> struct hash<robotick::FixedString<N>>
-	{
-		size_t operator()(const robotick::FixedString<N>& s) const noexcept
-		{
-			// Use the part before the null terminator
-			return std::hash<std::string_view>{}(std::string_view(s.c_str(), robotick::fixed_strlen(s.c_str())));
-		}
-	};
-} // namespace std
