@@ -98,7 +98,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 
 	REQUIRE(output_blackboard->has("greeting"));
 	const FixedString64 greeting = output_blackboard->get<FixedString64>("greeting");
-	REQUIRE(greeting.to_string().substr(0, 15) == "[Python] Hello!");
+	REQUIRE(std::string(greeting.c_str()).substr(0, 15) == "[Python] Hello!");
 
 	REQUIRE(output_blackboard->has("val_double"));
 	const double val_double = output_blackboard->get<double>("val_double");

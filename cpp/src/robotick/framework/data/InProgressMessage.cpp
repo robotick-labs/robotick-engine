@@ -99,7 +99,6 @@ namespace robotick
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 			{
 				// non-fatal; just try again later
-				Thread::sleep_ms(1);
 				return Result::InProgress;
 			}
 			return Result::ConnectionLost;
