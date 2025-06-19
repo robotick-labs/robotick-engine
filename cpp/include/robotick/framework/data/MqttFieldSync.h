@@ -62,4 +62,44 @@ namespace robotick
 	};
 } // namespace robotick
 
+#else // !defined(ROBOTICK_PLATFORM_DESKTOP)
+
+
+#include <string>
+#include <unordered_map>
+
+namespace nlohmann
+{
+	struct json{}; // stub implementation for now
+}
+
+namespace robotick
+{
+
+	class Engine;
+	class WorkloadsBuffer;
+	class IMqttClient;
+
+	class MqttFieldSync
+	{
+	  public:
+		using PublisherFn = std::function<void(const std::string&, const std::string&, bool)>;
+
+		inline MqttFieldSync(const std::string& /*root_ns*/, PublisherFn /*publisher*/) {}
+		inline MqttFieldSync(Engine& /*engine*/, const std::string& /*root_ns*/, IMqttClient& /*mqtt_client*/) {}
+
+		inline void subscribe_and_sync_startup() {}
+		inline void apply_control_updates() {}
+		inline void publish_state_fields() {}
+		inline void publish_fields(const Engine& /*engine*/, const WorkloadsBuffer& /*buffer*/, bool /*publish_control*/) {}
+
+		inline std::unordered_map<std::string, nlohmann::json>& get_updated_topics()
+		{
+			static std::unordered_map<std::string, nlohmann::json> dummy;
+			return dummy;
+		}
+	};
+
+} // namespace robotick
+
 #endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)

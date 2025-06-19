@@ -3,7 +3,9 @@
 
 #include "robotick/api.h"
 
+#if defined(ROBOTICK_PLATFORM_ESP32)
 #include <M5Unified.h>
+#endif // #if defined(ROBOTICK_PLATFORM_ESP32)
 
 namespace robotick
 {
@@ -57,6 +59,8 @@ namespace robotick
 		HeartbeatOutputs outputs;
 
 		double start_time_sec = 0.0;
+
+#if defined(ROBOTICK_PLATFORM_ESP32)
 
 		void setup()
 		{
@@ -272,9 +276,9 @@ namespace robotick
 
 			canvas.setTextDatum(TL_DATUM); // Reset
 		}
+#endif // #if defined(ROBOTICK_PLATFORM_ESP32)
 	};
 
 	ROBOTICK_DEFINE_WORKLOAD(HeartbeatDisplayWorkload, HeartbeatConfig, HeartbeatInputs, HeartbeatOutputs)
 
 } // namespace robotick
-

@@ -2,8 +2,16 @@
 
 FROM espressif/idf:release-v5.4
 
+# Install any additional tools you need
 RUN apt-get update && apt-get install -y ninja-build
 
+# Set your working directory inside the container
+WORKDIR /workspace
 
+# Copy the whole repo into the container (or at least the needed parts)
+COPY . .
+
+# Run the symlink script
+RUN bash make_symlinks.sh
 
 

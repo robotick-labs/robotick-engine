@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/api.h"
+
+#if defined(ROBOTICK_PLATFORM_ESP32)
 #include <M5Unified.h>
+#endif // #if defined(ROBOTICK_PLATFORM_ESP32)
 
 namespace robotick
 {
@@ -77,11 +80,15 @@ namespace robotick
 				return;
 
 			double clamped = std::max(-config.max_motor_speed, std::min(config.max_motor_speed, input_speed));
+
+#if defined(ROBOTICK_PLATFORM_ESP32)
 			int8_t duty = static_cast<int8_t>(clamped * 127.0);
 			uint8_t reg = BASEX_PWM_DUTY_ADDR + index;
 
 			constexpr uint32_t BASEX_I2C_FREQ = 400000;
+
 			m5::In_I2C.writeRegister8(BASEX_I2C_ADDR, reg, static_cast<uint8_t>(duty), BASEX_I2C_FREQ);
+#endif // #if defined(ROBOTICK_PLATFORM_ESP32)
 
 			output_ref = clamped;
 		}

@@ -28,7 +28,8 @@ namespace robotick
 			int fd = socket(AF_INET, SOCK_STREAM, 0);
 			if (fd < 0)
 			{
-				ROBOTICK_FATAL_EXIT("Failed to create socket");
+				ROBOTICK_WARNING("Failed to create socket");
+				return -1;
 			}
 
 			int opt = 1;
@@ -37,14 +38,14 @@ namespace robotick
 			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
 			{
 				close(fd);
-				ROBOTICK_FATAL_EXIT("Failed to set SO_REUSEADDR on socket");
+				ROBOTICK_WARNING("Failed to set SO_REUSEADDR on socket");
 			}
 
 			// Disable Nagle's algorithm (batches up messages) — send every message immediately (essential for real-time control)
 			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0)
 			{
 				close(fd);
-				ROBOTICK_FATAL_EXIT("Failed to set TCP_NODELAY on socket");
+				ROBOTICK_WARNING("Failed to set TCP_NODELAY on socket");
 			}
 
 			// Set non-blocking
@@ -190,6 +191,11 @@ namespace robotick
 		ROBOTICK_INFO("RemoteEngineConnection::tick_disconnected_sender() [Sender] Attempting to connect to %s:%d", config.host.c_str(), config.port);
 
 		socket_fd = create_tcp_socket();
+		if (socket_fd < 0)
+		{
+			return;
+		}
+
 		sockaddr_in addr{};
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(config.port);
@@ -228,16 +234,21 @@ namespace robotick
 		if (socket_fd < 0)
 		{
 			socket_fd = create_tcp_socket();
+			if (socket_fd < 0)
+			{
+				return;
+			}
+
 			sockaddr_in addr{};
 			addr.sin_family = AF_INET;
 			addr.sin_port = htons(config.port);
 			addr.sin_addr.s_addr = INADDR_ANY;
 
 			if (bind(socket_fd, (sockaddr*)&addr, sizeof(addr)) < 0)
-				ROBOTICK_FATAL_EXIT("Failed to bind socket");
+				ROBOTICK_WARNING("Failed to bind socket");
 
 			if (listen(socket_fd, 1) < 0)
-				ROBOTICK_FATAL_EXIT("Failed to listen on socket");
+				ROBOTICK_WARNING("Failed to listen on socket");
 
 			return;
 		}

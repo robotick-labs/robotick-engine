@@ -1,0 +1,16 @@
+BasedOnStyle: Microsoft
+AllowShortFunctionsOnASingleLine: InlineOnly
+ColumnLimit: 150
+IndentWidth: 4
+TabWidth: 4
+UseTab: Always
+DerivePointerAlignment: false
+PointerAlignment: Left
+NamespaceIndentation: All
+SortIncludes: true
+SpacesInAngles: false
+SpaceBeforeParens: ControlStatements
+AlignAfterOpenBracket: DontAlign
+AllowShortLambdasOnASingleLine: Empty
+BreakBeforeBraces: Allman
+AlignConsecutiveDeclarations: false
