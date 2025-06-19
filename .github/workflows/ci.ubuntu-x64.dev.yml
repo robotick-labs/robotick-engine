@@ -1,50 +1,72 @@
-  esp32s3-build:
+name: CI - Build & Test (ubuntu-x64.dev)
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  docker-ci:
     runs-on: ubuntu-latest
-    name: Build & Test (esp32s3)
+    name: Build & Test (${{ matrix.preset }})
+
+    strategy:
+      matrix:
+        preset: [ubuntu-x64-debug, ubuntu-x64-development, ubuntu-x64-release]
 
     steps:
-      - name: 🧾 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: 💾 Cache Docker layers
+      - name: Cache Docker layers
         uses: actions/cache@v4
         with:
-          path: /tmp/.docker-cache-esp32s3
-          key: docker-esp32s3-${{ hashFiles('docker/Docker.esp32s3.dev') }}
+          path: /tmp/.docker-cache
+          key: docker-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('docker/Docker.ubuntu-x64.dev') }}
           restore-keys: |
-            docker-esp32s3-
+            docker-${{ runner.os }}-
 
-      - name: 📦 Load Docker cache
+      - name: Load Docker cache
         run: |
-          mkdir -p /tmp/.docker-cache-esp32s3
-          if [ -f /tmp/.docker-cache-esp32s3/image.tar ]; then
-            docker load -i /tmp/.docker-cache-esp32s3/image.tar || true
+          mkdir -p /tmp/.docker-cache
+          if [ -f /tmp/.docker-cache/image.tar ]; then
+            docker load -i /tmp/.docker-cache/image.tar || true
           fi
 
-      - name: 🏗️ Build Docker image (robotick-dev:esp32s3)
+      - name: Build Docker image (robotick-ci)
         run: |
-          docker build --no-cache \
-            -t robotick-dev:esp32s3 \
-            -f docker/Docker.esp32s3.dev \
+          docker build -t robotick-ci \
+            -f docker/Docker.ubuntu-x64.dev \
             .
 
-      - name: 💾 Save Docker image to cache
+      - name: Save Docker image to cache
         run: |
-          mkdir -p /tmp/.docker-cache-esp32s3
-          docker save robotick-dev:esp32s3 > /tmp/.docker-cache-esp32s3/image.tar
+          mkdir -p /tmp/.docker-cache
+          docker save robotick-ci > /tmp/.docker-cache/image.tar
 
-      - name: 🔧 Run IDF Clean + Build inside Docker
+      - name: Run CMake Build in Docker
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
-            -w /workspace/examples/cpp/esp32-testbed \
-            robotick-dev:esp32s3 \
+            -w /workspace \
+            robotick-ci \
             bash -c "
               set -e
-              echo '🧹 Running IDF clean...'
-              ./1_idf_clean.sh
-              echo '🛠️  Running IDF build...'
-              ./2_idf_build.sh
+              cmake --preset ${{ matrix.preset }} &&
+              cmake --build --preset ${{ matrix.preset }} -j$(nproc)
+            "
+
+      - name: Run CTest in Docker (Debug Only)
+        if: matrix.preset == 'ubuntu-x64-debug'
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            robotick-ci \
+            bash -c "
+              set -e
+              ctest --test-dir build/ubuntu-x64-debug/cpp/tests --output-on-failure --timeout 10
             "

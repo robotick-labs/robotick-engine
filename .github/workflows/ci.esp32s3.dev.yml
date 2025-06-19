@@ -1,31 +1,50 @@
-name: CI - Build ESP32-S3
-
-on:
-  push:
-    branches: [main, dev]
-  pull_request:
-    branches: [main, dev]
-
-jobs:
   esp32s3-build:
     runs-on: ubuntu-latest
-    name: Build ESP32-S3 Testbed Firmware (Debug)
+    name: Build & Test (esp32s3)
 
     steps:
-      - name: Checkout repository
+      - name: 🧾 Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Build ESP32-S3 Docker Image
-        run: |
-          bash ./docker-build-esp32s3.sh
+      - name: 💾 Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.docker-cache-esp32s3
+          key: docker-esp32s3-${{ hashFiles('docker/Docker.esp32s3.dev') }}
+          restore-keys: |
+            docker-esp32s3-
 
-      - name: Run ESP32-S3 Docker Container & Build Bot
+      - name: 📦 Load Docker cache
         run: |
-          bash ./docker-run-esp32s3.sh bash -c '
-            set -e
-            cd examples/cpp/esp32-testbed/
-            ./1_idf_clean.sh
-            ./2_idf_build.sh
-          '
+          mkdir -p /tmp/.docker-cache-esp32s3
+          if [ -f /tmp/.docker-cache-esp32s3/image.tar ]; then
+            docker load -i /tmp/.docker-cache-esp32s3/image.tar || true
+          fi
+
+      - name: 🏗️ Build Docker image (robotick-dev:esp32s3)
+        run: |
+          docker build --no-cache \
+            -t robotick-dev:esp32s3 \
+            -f docker/Docker.esp32s3.dev \
+            .
+
+      - name: 💾 Save Docker image to cache
+        run: |
+          mkdir -p /tmp/.docker-cache-esp32s3
+          docker save robotick-dev:esp32s3 > /tmp/.docker-cache-esp32s3/image.tar
+
+      - name: 🔧 Run IDF Clean + Build inside Docker
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace/examples/cpp/esp32-testbed \
+            robotick-dev:esp32s3 \
+            bash -c "
+              set -e
+              echo '🧹 Running IDF clean...'
+              ./1_idf_clean.sh
+              echo '🛠️  Running IDF build...'
+              ./2_idf_build.sh
+            "
