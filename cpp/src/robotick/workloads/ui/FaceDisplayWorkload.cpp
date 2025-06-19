@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/api.h"
+
+#if defined(ROBOTICK_PLATFORM_ESP32)
 #include <M5Unified.h>
+#endif // #if defined(ROBOTICK_PLATFORM_ESP32)
 
 namespace robotick
 {
@@ -33,7 +36,10 @@ namespace robotick
 	{
 		float eye_blink_progress[2] = {0, 0};
 		float next_blink_time[2] = {0, 0};
+
+#if defined(ROBOTICK_PLATFORM_ESP32)
 		M5Canvas* canvas = nullptr;
+#endif // #if defined(ROBOTICK_PLATFORM_ESP32)
 	};
 
 	struct FaceDisplayWorkload
@@ -43,6 +49,8 @@ namespace robotick
 		FaceDisplayOutputs outputs;
 
 		State<FaceDisplayState> state;
+
+#if defined(ROBOTICK_PLATFORM_ESP32)
 
 		~FaceDisplayWorkload()
 		{
@@ -143,6 +151,8 @@ namespace robotick
 			canvas.fillEllipse(cx, cy, rx, ry, TFT_BLACK);
 			canvas.fillEllipse(cx + rx / 4, cy - ry / 3, rx / 3, ry / 4, TFT_WHITE);
 		}
+
+#endif // #if defined(ROBOTICK_PLATFORM_ESP32)
 	};
 
 	ROBOTICK_DEFINE_WORKLOAD(FaceDisplayWorkload, FaceDisplayConfig, FaceDisplayInputs, FaceDisplayOutputs)
