@@ -5,7 +5,9 @@
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/platform/WebServer.h"
 
+#if defined(ROBOTICK_PLATFORM_DESKTOP)
 #include <nlohmann/json.hpp>
+#endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)
 
 namespace robotick
 {
@@ -75,6 +77,7 @@ namespace robotick
 
 		void setup()
 		{
+#if defined(ROBOTICK_PLATFORM_DESKTOP)
 			state->server.start(config.port, config.web_root_folder.c_str(),
 				[&](const WebRequest& request, WebResponse& response)
 				{
@@ -117,6 +120,7 @@ namespace robotick
 						response.status_code = 200;
 					}
 				});
+#endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)
 		}
 
 		void tick(const TickInfo&)

@@ -1,0 +1,31 @@
+name: CI - Build ESP32-S3
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  esp32s3-build:
+    runs-on: ubuntu-latest
+    name: Build ESP32-S3 Testbed Firmware (Debug)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build ESP32-S3 Docker Image
+        run: |
+          bash ./docker-build-esp32s3.sh
+
+      - name: Run ESP32-S3 Docker Container & Build Bot
+        run: |
+          bash ./docker-run-esp32s3.sh bash -c '
+            set -e
+            cd examples/cpp/esp32-testbed/
+            ./1_idf_clean.sh
+            ./2_idf_build.sh
+          '

@@ -4,7 +4,7 @@ robotick.egg-info
 */MUJOCO_LOG.TXT
 .obsidian/*
 build/*
-robotick/cpp/build/*
+**/build/*
 *.log
 Testing/*
 cpp/build/*

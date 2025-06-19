@@ -2,31 +2,14 @@
     "version": 1,
     "presets": {
         "ubuntu-workloads-all": {
-            "mode": "include",
-            "workloads": [
-                "SequencedGroupWorkload",
-                "SyncedGroupWorkload",
-                "RemoteControlWorkload",
-                "SteeringMixerWorkload",
-                "ConsoleTelemetryWorkload",
-                "TimingDiagnosticsWorkload",
-                "HelloWorkload",
-                "TemplateWorkload",
-                "PythonWorkload",
-                "MqttClientWorkload"
-            ]
+            "mode": "exclude",
+            "workloads": [],
+            "comment": "all workloads should be able to compile on all platforms, even if they end up as stubs / simulated on some"
         },
         "esp32-s3-workloads-all": {
-            "mode": "include",
-            "workloads": [
-                "BaseXWorkload",
-                "FaceDisplayWorkload",
-                "HeartbeatDisplayWorkload",
-                "HelloWorkload",
-                "SteeringMixerWorkload",
-                "ConsoleTelemetryWorkload",
-                "TimingDiagnosticsWorkload"
-            ]
+            "mode": "exclude",
+            "workloads": [],
+            "comment": "all workloads should be able to compile on all platforms, even if they end up as stubs / simulated on some"
         }
     }
 }
