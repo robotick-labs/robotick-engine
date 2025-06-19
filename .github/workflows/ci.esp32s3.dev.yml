@@ -34,7 +34,8 @@ jobs:
 
       - name: 🏗️ Build Docker image (robotick-dev:esp32s3)
         run: |
-          docker build --no-cache \
+          docker build \
+            --cache-from robotick-dev:esp32s3 \
             -t robotick-dev:esp32s3 \
             -f docker/Docker.esp32s3.dev \
             .
