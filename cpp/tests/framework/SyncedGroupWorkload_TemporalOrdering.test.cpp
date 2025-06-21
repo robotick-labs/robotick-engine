@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model0.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/platform/Threading.h"
 #include "utils/EngineInspector.h"
@@ -49,7 +49,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Data connections are propagated correctly")
 	{
-		Model model;
+		Model0 model;
 		const double tick_rate = 100.0;
 
 		auto sender = model.add("SenderWorkload", "sender", tick_rate);

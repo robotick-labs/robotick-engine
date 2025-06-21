@@ -6,7 +6,7 @@
 #include "../utils/ModelHelper.h"
 #include "robotick/api_base.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model0.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -66,7 +66,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Resolves non-blackboard to non-blackboard")
 	{
-		Model model;
+		Model0 model;
 		const WorkloadHandle handle_a = model.add("DummyA", "A", 1.0);
 		const WorkloadHandle handle_b = model.add("DummyB", "B", 1.0);
 		model_helpers::wrap_all_in_sequenced_group(model);
@@ -102,7 +102,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Resolves non-blackboard to blackboard")
 	{
-		Model model;
+		Model0 model;
 		const WorkloadHandle handle_a = model.add("DummyA", "A", 1.0);
 		const WorkloadHandle handle_b = model.add("DummyB", "B", 1.0);
 		model_helpers::wrap_all_in_sequenced_group(model);
@@ -138,7 +138,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Resolves blackboard to non-blackboard")
 	{
-		Model model;
+		Model0 model;
 		model.add("DummyA", "A", 1.0);
 		model.add("DummyB", "B", 1.0);
 		model_helpers::wrap_all_in_sequenced_group(model);
@@ -174,7 +174,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Resolves blackboard to blackboard")
 	{
-		Model model;
+		Model0 model;
 		model.add("DummyA", "A", 1.0);
 		model.add("DummyB", "B", 1.0);
 		model_helpers::wrap_all_in_sequenced_group(model);
@@ -211,7 +211,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Errors on invalid connections")
 	{
-		Model model;
+		Model0 model;
 		model.add("DummyA", "A", 1.0);
 		model.add("DummyB", "B", 1.0);
 		model_helpers::wrap_all_in_sequenced_group(model);
@@ -258,7 +258,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Unidirectional copy")
 	{
-		Model model;
+		Model0 model;
 		const WorkloadHandle handle_a = model.add("DummyA", "A", 1.0);
 		const WorkloadHandle handle_b = model.add("DummyB", "B", 1.0);
 		model_helpers::wrap_all_in_sequenced_group(model);
@@ -285,7 +285,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Throws for blackboard subfield not found")
 	{
-		Model model;
+		Model0 model;
 		model.add("DummyA", "A", 1.0);
 		model.add("DummyB", "B", 1.0);
 		model_helpers::wrap_all_in_sequenced_group(model);
@@ -302,7 +302,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Different subfields allowed")
 	{
-		Model model;
+		Model0 model;
 		model.add("DummyA", "A", 1.0);
 		model.add("DummyB", "B", 1.0);
 		model_helpers::wrap_all_in_sequenced_group(model);

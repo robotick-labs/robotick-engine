@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/api_base.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model0.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
 
@@ -41,7 +41,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Allows connecting input between valid workloads")
 	{
-		Model model;
+		Model0 model;
 
 		auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
 		auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
@@ -56,7 +56,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Duplicate inputs throw with clear error")
 	{
-		Model model;
+		Model0 model;
 
 		model.add("DummyModelDataConnWorkload", "A", 10.0);
 		model.add("DummyModelDataConnWorkload", "B", 10.0);
@@ -68,7 +68,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit|Framework|Data|Connection|Seeds are preserved for engine use")
 	{
-		Model model;
+		Model0 model;
 
 		auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
 		auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);

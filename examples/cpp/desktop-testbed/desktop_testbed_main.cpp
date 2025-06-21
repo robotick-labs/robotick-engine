@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model0.h"
 #include "robotick/platform/EntryPoint.h"
 #include "robotick/platform/Signals.h"
 #include "robotick/platform/Threading.h"
@@ -14,7 +14,7 @@ void signal_handler()
 	g_stop_flag.set();
 }
 
-void populate_model_hello_world(robotick::Model& model)
+void populate_model_hello_world(robotick::Model0& model)
 {
 	auto console = model.add("ConsoleTelemetryWorkload", "console", 5.0);
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
@@ -26,7 +26,7 @@ void populate_model_hello_world(robotick::Model& model)
 	model.set_root(root);
 }
 
-void populate_model_hello_mqtt(robotick::Model& model)
+void populate_model_hello_mqtt(robotick::Model0& model)
 {
 	auto remote_control = model.add("RemoteControlWorkload", "remote_control", 30.0);
 	auto mqtt_client = model.add("MqttClientWorkload", "mqtt_client", 30.0, {{"broker_url", "mqtt://192.168.5.14"}});
@@ -39,12 +39,12 @@ void populate_model_hello_mqtt(robotick::Model& model)
 
 #ifdef ENABLE_MODEL_1
 
-void populate_model_hello_mqtt_alt0(robotick::Model& model)
+void populate_model_hello_mqtt_alt0(robotick::Model0& model)
 {
 	model.load("hello_mqtt.yaml");
 }
 
-void populate_model_hello_mqtt_alt1(robotick::Model& model)
+void populate_model_hello_mqtt_alt1(robotick::Model0& model)
 {
 	auto remote_control = model.create("RemoteControlWorkload", "remote_control")
 	                          .set_tick_rate_hz(30.0);
@@ -65,7 +65,7 @@ void populate_model_hello_mqtt_alt1(robotick::Model& model)
 	model.set_root_workload(root);
 }
 
-void populate_model_hello_mqtt_alt2(robotick::Model& model)
+void populate_model_hello_mqtt_alt2(robotick::Model0& model)
 {
 	static WorkloadInfo remote_control("RemoteControlWorkload", "remote_control");
 	static WorkloadInfo mqtt_client("MqttClientWorkload", "mqtt_client");
@@ -96,7 +96,7 @@ ROBOTICK_ENTRYPOINT
 {
 	robotick::setup_exit_handler(signal_handler);
 
-	robotick::Model model;
+	robotick::Model0 model;
 	populate_model_hello_mqtt(model);
 
 	robotick::Engine engine;
