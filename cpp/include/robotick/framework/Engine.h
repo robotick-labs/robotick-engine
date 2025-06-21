@@ -74,6 +74,6 @@ namespace robotick
 
 	  private:
 		struct State;
-		std::unique_ptr<State> state;
+		State* state = nullptr;
 	};
 } // namespace robotick

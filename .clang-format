@@ -1,9 +1,9 @@
 BasedOnStyle: Microsoft
-AllowShortFunctionsOnASingleLine: InlineOnly
 ColumnLimit: 150
 IndentWidth: 4
 TabWidth: 4
 UseTab: Always
+
 DerivePointerAlignment: false
 PointerAlignment: Left
 NamespaceIndentation: All
@@ -11,6 +11,34 @@ SortIncludes: true
 SpacesInAngles: false
 SpaceBeforeParens: ControlStatements
 AlignAfterOpenBracket: DontAlign
-AllowShortLambdasOnASingleLine: Empty
-BreakBeforeBraces: Allman
 AlignConsecutiveDeclarations: false
+
+# -------------------------
+# Brace + Formatting Control
+# -------------------------
+
+BreakBeforeBraces: Allman
+
+BraceWrapping:
+  AfterClass: true
+  AfterControlStatement: true
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  AfterVariable: true         # ← KEY: brace after '=' goes on its own line
+  SplitEmptyRecord: true
+  BeforeInitializer: true     # Optional: adds space before initializer if needed
+
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortLambdasOnASingleLine: None
+
+BinPackArguments: false
+BinPackParameters: false
+BinPackInitializerLists: false  # ← KEY: don't squash initializers into one line
+
+Cpp11BracedListStyle: true
