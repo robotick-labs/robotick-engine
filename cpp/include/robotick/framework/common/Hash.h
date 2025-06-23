@@ -2,13 +2,18 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 namespace robotick
 {
 
-	inline size_t fnv1a_hash(const char* data, size_t len)
+	constexpr uint32_t fnv1a_hash(const char* data, size_t len)
 	{
-		size_t hash = 2166136261u; // FNV offset basis
+		uint32_t hash = 2166136261u; // FNV offset basis
+
+		if (!data)
+			return hash;
+
 		for (size_t i = 0; i < len; ++i)
 		{
 			hash ^= static_cast<unsigned char>(data[i]);

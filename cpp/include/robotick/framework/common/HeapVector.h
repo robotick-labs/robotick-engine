@@ -44,10 +44,7 @@ namespace robotick
 			}
 		}
 
-		~HeapVector()
-		{
-			destroy();
-		}
+		~HeapVector() { destroy(); }
 
 		// Copy constructor
 		HeapVector(const HeapVector& other)
@@ -77,10 +74,6 @@ namespace robotick
 		// Move constructor
 		HeapVector(HeapVector&& other) noexcept
 		{
-			if (size_ > 0)
-			{
-				ROBOTICK_FATAL_EXIT("Cannot move-assign to already-initialized HeapVector");
-			}
 			data_ = other.data_;
 			size_ = other.size_;
 			other.data_ = nullptr;
@@ -115,23 +108,11 @@ namespace robotick
 			size_ = count;
 		}
 
-		T* data()
-		{
-			return data_;
-		}
-		const T* data() const
-		{
-			return data_;
-		}
+		T* data() { return data_; }
+		const T* data() const { return data_; }
 
-		size_t size() const
-		{
-			return size_;
-		}
-		bool empty() const
-		{
-			return size_ == 0;
-		}
+		size_t size() const { return size_; }
+		bool empty() const { return size_ == 0; }
 
 		T& operator[](size_t index)
 		{
@@ -151,22 +132,10 @@ namespace robotick
 			return data_[index];
 		}
 
-		T* begin()
-		{
-			return data_;
-		}
-		T* end()
-		{
-			return data_ + size_;
-		}
-		const T* begin() const
-		{
-			return data_;
-		}
-		const T* end() const
-		{
-			return data_ + size_;
-		}
+		T* begin() { return data_; }
+		T* end() { return data_ + size_; }
+		const T* begin() const { return data_; }
+		const T* end() const { return data_ + size_; }
 
 	  private:
 		void destroy()

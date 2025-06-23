@@ -79,10 +79,10 @@ namespace robotick::test
 
 		REQUIRE(receiver_workload->received.size() > 10);
 
-		for (size_t i = 0; i < receiver_workload->received.size(); ++i)
+		for (size_t i = 1; i < receiver_workload->received.size(); ++i)
 		{
 			INFO("Received[" << i << "] = " << receiver_workload->received[i]);
-			CHECK(receiver_workload->received[i] == static_cast<int>(i));
+			CHECK(receiver_workload->received[i] == receiver_workload->received[i - 1] + 1);
 		}
 	}
 

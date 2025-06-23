@@ -29,18 +29,17 @@ namespace robotick
 		constexpr ArrayView() = default;
 
 		/// @brief Construct from pointer and size
-		constexpr ArrayView(T* data_in, size_t size_in) : data(data_in), array_size(size_in)
-		{
-		}
+		constexpr ArrayView(T* data_in, size_t size_in) : data(data_in), array_size(size_in) {}
 
 		/// @brief Construct from fixed-size C-style array
-		template <size_t N> constexpr ArrayView(T (&arr)[N]) : data(arr), array_size(N)
-		{
-		}
+		template <size_t N> constexpr ArrayView(T (&arr)[N]) : data(arr), array_size(N) {}
 
 		/// @brief Assign from pointer and size
 		void use(T* data_in, size_t size_in)
 		{
+			if (size_in > 0 && data_in == nullptr)
+				ROBOTICK_FATAL_EXIT("ArrayView::use called with null data and non-zero size");
+
 			data = data_in;
 			array_size = size_in;
 		}
@@ -55,24 +54,12 @@ namespace robotick
 #endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 		/// @brief Access raw pointer to data
-		T* data_ptr()
-		{
-			return data;
-		}
-		const T* data_ptr() const
-		{
-			return data;
-		}
+		T* data_ptr() { return data; }
+		const T* data_ptr() const { return data; }
 
 		/// @brief Get number of elements in view
-		size_t size() const
-		{
-			return array_size;
-		}
-		bool empty() const
-		{
-			return array_size == 0;
-		}
+		size_t size() const { return array_size; }
+		bool empty() const { return array_size == 0; }
 
 		/// @brief Bounds-checked element access
 		T& operator[](size_t index)
@@ -90,22 +77,10 @@ namespace robotick
 		}
 
 		/// @brief Iterator support
-		T* begin()
-		{
-			return data;
-		}
-		T* end()
-		{
-			return data + array_size;
-		}
-		const T* begin() const
-		{
-			return data;
-		}
-		const T* end() const
-		{
-			return data + array_size;
-		}
+		T* begin() { return data; }
+		T* end() { return data + array_size; }
+		const T* begin() const { return data; }
+		const T* end() const { return data + array_size; }
 
 	  private:
 		T* data = nullptr;

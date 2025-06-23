@@ -46,15 +46,15 @@ namespace robotick
 			return *this;
 		}
 
-		bool operator<(const FixedString<N>& other) const noexcept { return strncmp(data, other.data, N) < 0; }
+		bool operator<(const FixedString<N>& other) const noexcept { return strcmp(data, other.data) < 0; }
 
 		const char* c_str() const { return data; }
 
 		operator const char*() const { return data; }
 
-		bool operator==(const char* other) const noexcept { return strncmp(data, other, N) == 0; }
+		bool operator==(const char* other) const noexcept { return strcmp(data, other) == 0; }
 
-		bool operator==(const FixedString<N>& other) const { return strncmp(data, other.data, N) == 0; }
+		bool operator==(const FixedString<N>& other) const { return strcmp(data, other.data) == 0; }
 
 		bool operator!=(const FixedString<N>& other) const { return !(*this == other); }
 
