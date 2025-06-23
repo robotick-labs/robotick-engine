@@ -68,7 +68,7 @@ namespace robotick::test
 		};
 	} // namespace
 
-	TEST_CASE("Unit|Framework|Data|MqttFieldSync|MqttFieldSync can publish state and control fields")
+	TEST_CASE("Unit/Framework/Data/MqttFieldSync/MqttFieldSync can publish state and control fields")
 	{
 		Model model;
 		auto test_workload_seed_handle = model.add("TestWorkload", "W1", 1.0);
@@ -111,7 +111,7 @@ namespace robotick::test
 		CHECK_FALSE(dummy_client.retained.count("robotick/control/W1/inputs/value"));
 	}
 
-	TEST_CASE("Unit|Framework|Data|MqttFieldSync|MqttFieldSync can apply control updates")
+	TEST_CASE("Unit/Framework/Data/MqttFieldSync/MqttFieldSync can apply control updates")
 	{
 		Model model;
 		auto test_workload_seed_handle = model.add("TestWorkload", "W2", 1.0);

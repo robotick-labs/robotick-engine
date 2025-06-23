@@ -51,7 +51,7 @@ namespace robotick::test
 
 	// === Tests ===
 
-	TEST_CASE("Unit|Framework|Engine|DummyWorkload stores tick rate correctly")
+	TEST_CASE("Unit/Framework/Engine/DummyWorkload stores tick rate correctly")
 	{
 		Model model;
 		auto handle = model.add("DummyWorkload", "A", 123.0, {});
@@ -64,7 +64,7 @@ namespace robotick::test
 		REQUIRE(tick_rate == Catch::Approx(123.0));
 	}
 
-	TEST_CASE("Unit|Framework|Engine|DummyWorkload config is loaded via load()")
+	TEST_CASE("Unit/Framework/Engine/DummyWorkload config is loaded via load()")
 	{
 		Model model;
 		auto handle = model.add("DummyWorkload", "A", 1.0, {{"value", "42"}});
@@ -77,7 +77,7 @@ namespace robotick::test
 		REQUIRE(ptr->loaded_value == 42);
 	}
 
-	TEST_CASE("Unit|Framework|Engine|Rejects unknown workload type")
+	TEST_CASE("Unit/Framework/Engine/Rejects unknown workload type")
 	{
 		Model model;
 		auto handle = model.add("UnknownType", "fail", 1.0, {});
@@ -87,7 +87,7 @@ namespace robotick::test
 		REQUIRE_THROWS(engine.load(model));
 	}
 
-	TEST_CASE("Unit|Framework|Engine|Multiple workloads supported")
+	TEST_CASE("Unit/Framework/Engine/Multiple workloads supported")
 	{
 		Model model;
 		model.add("DummyWorkload", "one", 1.0, {{"value", "1"}});
@@ -104,7 +104,7 @@ namespace robotick::test
 		REQUIRE(two->loaded_value == 2);
 	}
 
-	TEST_CASE("Unit|Framework|Engine|Workloads receive tick call")
+	TEST_CASE("Unit/Framework/Engine/Workloads receive tick call")
 	{
 		Model model;
 		auto handle = model.add("TickCounterWorkload", "ticky", 200.0, {});

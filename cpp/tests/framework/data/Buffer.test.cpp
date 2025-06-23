@@ -9,7 +9,7 @@
 
 using namespace robotick;
 
-TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer supports basic access and bounds checking", "[buffer]")
+TEST_CASE("Unit/Framework/Data/Buffer/RawBuffer supports basic access and bounds checking", "[buffer]")
 {
 	RawBuffer buffer(32);
 	REQUIRE(buffer.get_size() == 32);
@@ -23,11 +23,11 @@ TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer supports basic access and bounds
 
 	SECTION("Out-of-bounds access throws")
 	{
-		ROBOTICK_REQUIRE_ERROR(buffer.as<int>(32), "");
+		ROBOTICK_REQUIRE_ERROR_MSG(buffer.as<int>(32), "");
 	}
 }
 
-TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer clones data correctly", "[buffer][clone]")
+TEST_CASE("Unit/Framework/Data/Buffer/RawBuffer clones data correctly", "[buffer][clone]")
 {
 	RawBuffer original(64);
 	std::memset(original.raw_ptr(), 0xAB, 64);
@@ -42,7 +42,7 @@ TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer clones data correctly", "[buffer
 	REQUIRE(clone.raw_ptr()[0] == static_cast<uint8_t>(0xAB));
 }
 
-TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer update_mirror_from validates size and performs copy", "[buffer][mirror]")
+TEST_CASE("Unit/Framework/Data/Buffer/RawBuffer update_mirror_from validates size and performs copy", "[buffer][mirror]")
 {
 	RawBuffer a(16);
 	RawBuffer b(16);
@@ -52,27 +52,27 @@ TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer update_mirror_from validates siz
 	REQUIRE(std::memcmp(a.raw_ptr(), b.raw_ptr(), 16) == 0);
 
 	RawBuffer c(32);
-	ROBOTICK_REQUIRE_ERROR(a.update_mirror_from(c), ("size mismatch"));
+	ROBOTICK_REQUIRE_ERROR_MSG(a.update_mirror_from(c), ("size mismatch"));
 }
 
-TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer prevents duplicate create_mirror_from", "[buffer][mirror][lifecycle]")
+TEST_CASE("Unit/Framework/Data/Buffer/RawBuffer prevents duplicate create_mirror_from", "[buffer][mirror][lifecycle]")
 {
 	RawBuffer source(8);
 	RawBuffer mirror;
 	mirror.create_mirror_from(source);
 
-	ROBOTICK_REQUIRE_ERROR(mirror.create_mirror_from(source), ("already allocated"));
+	ROBOTICK_REQUIRE_ERROR_MSG(mirror.create_mirror_from(source), ("already allocated"));
 }
 
-TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer throws if update_mirror_from used before allocation", "[buffer][mirror][invalid]")
+TEST_CASE("Unit/Framework/Data/Buffer/RawBuffer throws if update_mirror_from used before allocation", "[buffer][mirror][invalid]")
 {
 	RawBuffer source(8);
 	RawBuffer mirror; // not allocated
 
-	ROBOTICK_REQUIRE_ERROR(mirror.update_mirror_from(source), ("not initialized"));
+	ROBOTICK_REQUIRE_ERROR_MSG(mirror.update_mirror_from(source), ("not initialized"));
 }
 
-TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer contains_object checks bounds", "[buffer][bounds]")
+TEST_CASE("Unit/Framework/Data/Buffer/RawBuffer contains_object checks bounds", "[buffer][bounds]")
 {
 	RawBuffer buffer(32);
 	uint8_t* base = buffer.raw_ptr();
@@ -83,7 +83,7 @@ TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer contains_object checks bounds", 
 	REQUIRE_FALSE(buffer.contains_object(base + 32, 1)); // out of range
 }
 
-TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer handles alignment correctly in as<T>()", "[buffer][align]")
+TEST_CASE("Unit/Framework/Data/Buffer/RawBuffer handles alignment correctly in as<T>()", "[buffer][align]")
 {
 	struct Aligned
 	{
@@ -105,7 +105,7 @@ TEST_CASE("Unit|Framework|Data|Buffer|RawBuffer handles alignment correctly in a
 		{
 			RawBuffer bad_buffer(size + 1);
 
-			ROBOTICK_REQUIRE_ERROR(bad_buffer.as<Aligned>(1), "Offset is not properly aligned");
+			ROBOTICK_REQUIRE_ERROR_MSG(bad_buffer.as<Aligned>(1), "Offset is not properly aligned");
 		}
 	}
 }

@@ -24,7 +24,7 @@ using namespace robotick::test;
 #error "ROBOTICK_ENABLE_PYTHON must be set to 1"
 #endif
 
-TEST_CASE("Unit|Workloads|PythonWorkload|Metadata is registered correctly")
+TEST_CASE("Unit/Workloads/PythonWorkload/Metadata is registered correctly")
 {
 	const auto* cfg = FieldRegistry::get().get_struct("PythonConfig");
 	const auto* in = FieldRegistry::get().get_struct("PythonInputs");
@@ -39,7 +39,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Metadata is registered correctly")
 	REQUIRE(out->fields.size() == 1);
 }
 
-TEST_CASE("Unit|Workloads|PythonWorkload|Python tick executes")
+TEST_CASE("Unit/Workloads/PythonWorkload/Python tick executes")
 {
 	Model model;
 	const auto handle = model.add(
@@ -58,7 +58,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Python tick executes")
 	REQUIRE_NOTHROW(info.type->tick_fn(inst_ptr, TICK_INFO_FIRST_10MS_100HZ));
 }
 
-TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
+TEST_CASE("Unit/Workloads/PythonWorkload/Output reflects Python computation")
 {
 	Model model;
 	const auto handle = model.add("PythonWorkload", "py", 1.0,
@@ -98,7 +98,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 
 	REQUIRE(output_blackboard->has("greeting"));
 	const FixedString64 greeting = output_blackboard->get<FixedString64>("greeting");
-	REQUIRE(greeting.to_string().substr(0, 15) == "[Python] Hello!");
+	REQUIRE(std::string(greeting).substr(0, 15) == "[Python] Hello!");
 
 	REQUIRE(output_blackboard->has("val_double"));
 	const double val_double = output_blackboard->get<double>("val_double");
@@ -109,7 +109,7 @@ TEST_CASE("Unit|Workloads|PythonWorkload|Output reflects Python computation")
 	REQUIRE(val_int == 456);
 }
 
-TEST_CASE("Unit|Workloads|PythonWorkload|start/stop hooks are optional and safe")
+TEST_CASE("Unit/Workloads/PythonWorkload/start/stop hooks are optional and safe")
 {
 	Model model;
 	const auto handle = model.add(

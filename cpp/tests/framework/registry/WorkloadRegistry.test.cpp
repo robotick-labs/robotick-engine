@@ -43,7 +43,7 @@ namespace robotick::test
 		ROBOTICK_DEFINE_WORKLOAD(RegistryTestWorkload, void, RegistryTestInputs, RegistryTestOutputs)
 	} // namespace
 
-	TEST_CASE("Unit|Registry|Workload and struct/field registration works")
+	TEST_CASE("Unit/Registry/Workload and struct/field registration works")
 	{
 		const WorkloadRegistryEntry* workload = WorkloadRegistry::get().find("RegistryTestWorkload");
 		REQUIRE(workload != nullptr);

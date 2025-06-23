@@ -20,7 +20,7 @@ static int next_port()
 	return p++;
 }
 
-TEST_CASE("Integration|Framework|Data|RemoteEngineConnection|Handshake and tick exchange", "[RemoteEngineConnection]")
+TEST_CASE("Integration/Framework/Data/RemoteEngineConnection/Handshake and tick exchange", "[RemoteEngineConnection]")
 {
 	const int port = next_port();
 	std::atomic<bool> receiver_ready{false};
@@ -93,7 +93,7 @@ TEST_CASE("Integration|Framework|Data|RemoteEngineConnection|Handshake and tick 
 	REQUIRE(recv_value == 42);
 }
 
-TEST_CASE("Integration|Framework|Data|RemoteEngineConnection|Handles large payload", "[RemoteEngineConnection]")
+TEST_CASE("Integration/Framework/Data/RemoteEngineConnection/Handles large payload", "[RemoteEngineConnection]")
 {
 	constexpr uint8_t target_value = 0xAB;
 	const int port = next_port();
@@ -157,7 +157,7 @@ TEST_CASE("Integration|Framework|Data|RemoteEngineConnection|Handles large paylo
 
 // Additional coverage tests
 
-TEST_CASE("Integration|RemoteEngineConnection|Reconnect after sender drop", "[RemoteEngineConnection]")
+TEST_CASE("Integration/RemoteEngineConnection/Reconnect after sender drop", "[RemoteEngineConnection]")
 {
 	const int port = next_port();
 	std::atomic<bool> receiver_ready{false};
@@ -244,7 +244,7 @@ TEST_CASE("Integration|RemoteEngineConnection|Reconnect after sender drop", "[Re
 	REQUIRE(recv_value == 200);
 }
 
-TEST_CASE("Integration|RemoteEngineConnection|Field updates on same connection", "[RemoteEngineConnection]")
+TEST_CASE("Integration/RemoteEngineConnection/Field updates on same connection", "[RemoteEngineConnection]")
 {
 	const int port = next_port();
 	std::atomic<bool> ready{false};

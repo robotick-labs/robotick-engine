@@ -25,13 +25,13 @@
 #define ROBOTICK_BREAKPOINT() __builtin_trap()
 #endif
 
-inline const char* robotick_filename(const char* path) {
-    const char* slash = strrchr(path, '/');
-    return slash ? slash + 1 : path;
+inline const char* robotick_filename(const char* path)
+{
+	const char* slash = strrchr(path, '/');
+	return slash ? slash + 1 : path;
 }
 
-#define ROBOTICK_INTERNAL_LOG(level, fmt, ...) \
-    fprintf(stderr, "[%s] %s:%d: " fmt "\n", level, robotick_filename(__FILE__), __LINE__, ##__VA_ARGS__);
+#define ROBOTICK_INTERNAL_LOG(level, fmt, ...) fprintf(stderr, "[%s] %s:%d: " fmt "\n", level, robotick_filename(__FILE__), __LINE__, ##__VA_ARGS__);
 
 // =====================================================================
 // ✅ TEST ERROR HANDLER
@@ -136,7 +136,7 @@ namespace robotick
 // ✅ TEST MACROS
 // =====================================================================
 
-#define ROBOTICK_REQUIRE_ERROR(expr, substr_literal)                                                                                                 \
+#define ROBOTICK_REQUIRE_ERROR_MSG(expr, substr_literal)                                                                                             \
 	do                                                                                                                                               \
 	{                                                                                                                                                \
 		try                                                                                                                                          \
@@ -147,5 +147,19 @@ namespace robotick
 		catch (const robotick::TestError& e)                                                                                                         \
 		{                                                                                                                                            \
 			REQUIRE_THAT(std::string(e.what()), Catch::Matchers::ContainsSubstring(substr_literal));                                                 \
+		}                                                                                                                                            \
+	} while (0)
+
+#define ROBOTICK_REQUIRE_ERROR(expr)                                                                                                                 \
+	do                                                                                                                                               \
+	{                                                                                                                                                \
+		try                                                                                                                                          \
+		{                                                                                                                                            \
+			expr;                                                                                                                                    \
+			FAIL("Expected TestError to be thrown");                                                                                                 \
+		}                                                                                                                                            \
+		catch (const robotick::TestError&)                                                                                                           \
+		{                                                                                                                                            \
+			/*success*/                                                                                                                              \
 		}                                                                                                                                            \
 	} while (0)
