@@ -54,10 +54,11 @@ namespace robotick
 			const bool has_subfield = tokens.size() == 4;
 			if (has_subfield)
 			{
-				return ParsedFieldPath{FixedString64(tokens[0]), FixedString64(tokens[1]), {FixedString64(tokens[2]), FixedString64(tokens[3])}};
+				return ParsedFieldPath{FixedString64(tokens[0].c_str()), FixedString64(tokens[1].c_str()),
+					{FixedString64(tokens[2].c_str()), FixedString64(tokens[3].c_str())}};
 			}
 
-			return ParsedFieldPath{FixedString64(tokens[0]), FixedString64(tokens[1]), {FixedString64(tokens[2])}};
+			return ParsedFieldPath{FixedString64(tokens[0].c_str()), FixedString64(tokens[1].c_str()), {FixedString64(tokens[2].c_str())}};
 		}
 
 		static const StructRegistryEntry* get_struct_entry(const WorkloadInstanceInfo& instance, const std::string& section, size_t& out_offset)

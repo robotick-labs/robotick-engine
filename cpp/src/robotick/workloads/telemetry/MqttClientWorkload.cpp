@@ -72,7 +72,7 @@ namespace robotick
 			mqtt_client->connect();
 
 			// 2. Create MqttFieldSync
-			const std::string root_ns = config.root_topic_namespace.to_string();
+			const std::string root_ns = config.root_topic_namespace.c_str();
 			auto field_sync = std::make_unique<MqttFieldSync>(*const_cast<Engine*>(state->engine), root_ns, *mqtt_client);
 
 			state->mqtt = std::move(mqtt_client);

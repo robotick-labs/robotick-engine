@@ -47,7 +47,7 @@ namespace robotick::test
 		ROBOTICK_DEFINE_WORKLOAD(SimpleWorkload, void, SimpleInputs, SimpleOutputs)
 	} // namespace
 
-	TEST_CASE("Unit|Framework|FieldWalker|Field pointers match expected values and buffers")
+	TEST_CASE("Unit/Framework/FieldWalker/Field pointers match expected values and buffers")
 	{
 		Model model;
 		auto w = model.add("SimpleWorkload", "W", 10.0);
@@ -94,7 +94,7 @@ namespace robotick::test
 		CHECK(found_output);
 	}
 
-	TEST_CASE("Unit|Framework|FieldWalker|Override buffer works correctly")
+	TEST_CASE("Unit/Framework/FieldWalker/Override buffer works correctly")
 	{
 		Model model;
 		auto w = model.add("SimpleWorkload", "W", 10.0);
@@ -140,7 +140,7 @@ namespace robotick::test
 		CHECK(found_output);
 	}
 
-	TEST_CASE("Unit|Framework|FieldWalker|for_each_workload returns all instances")
+	TEST_CASE("Unit/Framework/FieldWalker/for_each_workload returns all instances")
 	{
 		Model model;
 		auto w1 = model.add("SimpleWorkload", "W1", 10.0);
@@ -162,7 +162,7 @@ namespace robotick::test
 		CHECK_THAT(seen_names, Catch::Matchers::Contains("W2"));
 	}
 
-	TEST_CASE("Unit|Framework|FieldWalker|for_each_field_in_workload walks individual workload fields")
+	TEST_CASE("Unit/Framework/FieldWalker/for_each_field_in_workload walks individual workload fields")
 	{
 		Model model;
 		auto w = model.add("SimpleWorkload", "Solo", 10.0);
@@ -184,7 +184,7 @@ namespace robotick::test
 		CHECK(found_fields.count("output_value") == 1);
 	}
 
-	TEST_CASE("Unit|Framework|FieldWalker|Blackboard subfields correctly walked via input-wrapped Blackboard")
+	TEST_CASE("Unit/Framework/FieldWalker/Blackboard subfields correctly walked via input-wrapped Blackboard")
 	{
 		struct BBInputs
 		{

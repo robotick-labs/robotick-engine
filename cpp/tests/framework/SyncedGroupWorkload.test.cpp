@@ -110,7 +110,7 @@ namespace
 	static SlowRegister s_register_slow;
 } // namespace
 
-TEST_CASE("Unit|Workloads|SyncedGroupWorkload|All children tick in parallel")
+TEST_CASE("Unit/Workloads/SyncedGroupWorkload/All children tick in parallel")
 {
 	const TickInfo tick_info = TICK_INFO_FIRST_10MS_100HZ;
 	const double tick_rate_hz = 1.0 / tick_info.delta_time;
@@ -151,7 +151,7 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|All children tick in parallel")
 	info.type->stop_fn(group_ptr);
 }
 
-TEST_CASE("Unit|Workloads|SyncedGroupWorkload|Child busy flags skip ticks")
+TEST_CASE("Unit/Workloads/SyncedGroupWorkload/Child busy flags skip ticks")
 {
 	using namespace std::chrono;
 
@@ -196,7 +196,7 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|Child busy flags skip ticks")
 	CHECK(w2->impl->tick_count == 2);
 }
 
-TEST_CASE("Unit|Workloads|SyncedGroupWorkload|tick() passes real time_delta (child thread measures time elapsed since last actionable tick)")
+TEST_CASE("Unit/Workloads/SyncedGroupWorkload/tick() passes real time_delta (child thread measures time elapsed since last actionable tick)")
 {
 	using namespace std::chrono;
 
@@ -237,7 +237,7 @@ TEST_CASE("Unit|Workloads|SyncedGroupWorkload|tick() passes real time_delta (chi
 	CHECK_THAT(counting->impl->last_dt, Catch::Matchers::WithinAbs(0.04, 0.005)); // (ditto)
 }
 
-TEST_CASE("Unit|Workloads|SyncedGroupWorkload|Child allowed to run at slower fixed tick rate than group")
+TEST_CASE("Unit/Workloads/SyncedGroupWorkload/Child allowed to run at slower fixed tick rate than group")
 {
 	using namespace std::chrono;
 

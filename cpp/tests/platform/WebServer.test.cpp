@@ -80,7 +80,7 @@ namespace
 
 } // namespace
 
-TEST_CASE("Unit|Platform|WebServer|WebServer serves static file and fallback handler", "[WebServer]")
+TEST_CASE("Unit/Platform/WebServer/WebServer serves static file and fallback handler", "[WebServer]")
 {
 	std::atomic<bool> fallback_called{false};
 	std::string last_method;

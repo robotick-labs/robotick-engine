@@ -217,7 +217,7 @@ namespace robotick
 				TypeId type = view.field_info->type;
 				if (view.subfield_info)
 				{
-					path += "/" + view.subfield_info->name.to_string();
+					path += "/" + std::string(view.subfield_info->name.c_str());
 					type = view.subfield_info->type;
 				}
 

@@ -13,7 +13,7 @@
 
 namespace robotick
 {
-	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard basic construction and memory layout", "[blackboard]")
+	TEST_CASE("Unit/Framework/Data/Blackboard/Blackboard basic construction and memory layout", "[blackboard]")
 	{
 		std::vector<BlackboardFieldInfo> schema = {
 			{"age", TypeId(GET_TYPE_ID(int))}, {"score", TypeId(GET_TYPE_ID(double))}, {"name", TypeId(GET_TYPE_ID(FixedString64))}};
@@ -29,7 +29,7 @@ namespace robotick
 		REQUIRE_FALSE(BlackboardTestUtils::get_info(*blackboard).has_field("missing"));
 	}
 
-	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard binds to WorkloadsBuffer and performs typed access", "[blackboard][buffer]")
+	TEST_CASE("Unit/Framework/Data/Blackboard/Blackboard binds to WorkloadsBuffer and performs typed access", "[blackboard][buffer]")
 	{
 		std::vector<BlackboardFieldInfo> schema = {
 			{"age", TypeId(GET_TYPE_ID(int))}, {"score", TypeId(GET_TYPE_ID(double))}, {"name", TypeId(GET_TYPE_ID(FixedString64))}};
@@ -56,7 +56,7 @@ namespace robotick
 		}
 	}
 
-	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard throws on missing keys or unbound source", "[blackboard][errors]")
+	TEST_CASE("Unit/Framework/Data/Blackboard/Blackboard throws on missing keys or unbound source", "[blackboard][errors]")
 	{
 		std::vector<BlackboardFieldInfo> schema = {{"alpha", TypeId(GET_TYPE_ID(int))}};
 
@@ -67,18 +67,18 @@ namespace robotick
 
 			auto* blackboard_ptr = buffer.as<Blackboard>(0);
 			new (blackboard_ptr) Blackboard(schema); // not bound
-			ROBOTICK_REQUIRE_ERROR(blackboard_ptr->get<int>("alpha"), ("Blackboard"));
+			ROBOTICK_REQUIRE_ERROR_MSG(blackboard_ptr->get<int>("alpha"), ("Blackboard"));
 		}
 
 		SECTION("Throws on missing field")
 		{
 			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
 
-			ROBOTICK_REQUIRE_ERROR(blackboard->get<int>("nonexistent"), ("Blackboard"));
+			ROBOTICK_REQUIRE_ERROR_MSG(blackboard->get<int>("nonexistent"), ("Blackboard"));
 		}
 	}
 
-	TEST_CASE("Unit|Framework|Data|Blackboard|Blackboard alignment and offset consistency", "[blackboard][layout]")
+	TEST_CASE("Unit/Framework/Data/Blackboard/Blackboard alignment and offset consistency", "[blackboard][layout]")
 	{
 		std::vector<BlackboardFieldInfo> schema = {
 			{"a", TypeId(GET_TYPE_ID(int))}, {"b", TypeId(GET_TYPE_ID(double))}, {"c", TypeId(GET_TYPE_ID(int))}};

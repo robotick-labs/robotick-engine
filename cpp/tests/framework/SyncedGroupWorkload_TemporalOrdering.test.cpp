@@ -47,7 +47,7 @@ namespace robotick::test
 		ROBOTICK_DEFINE_WORKLOAD(ReceiverWorkload, void, ReceiverIn)
 	} // namespace
 
-	TEST_CASE("Unit|Framework|Data|Connection|Data connections are propagated correctly")
+	TEST_CASE("Unit/Framework/Data/Connection/Data connections are propagated correctly")
 	{
 		Model model;
 		const double tick_rate = 100.0;

@@ -1,17 +1,27 @@
 // Copyright Robotick Labs
-// SPDX-License-Identifier: Apache-2.0
-
 #pragma once
 
-#include <algorithm>
-#include <cstring>
-#include <functional> // std::hash
-#include <iostream>
-#include <string>
-#include <string_view>
+#include "robotick/framework/common/Hash.h"
+
+#include <stddef.h>
+#include <string.h>
 
 namespace robotick
 {
+	// constexpr min function
+	template <typename T> constexpr T min_val(T a, T b)
+	{
+		return (a < b) ? a : b;
+	}
+
+	// Lightweight replacement for strlen
+	constexpr size_t fixed_strlen(const char* str)
+	{
+		size_t len = 0;
+		while (str[len] != '\0')
+			++len;
+		return len;
+	}
 
 	template <size_t N> struct FixedString
 	{
@@ -23,54 +33,43 @@ namespace robotick
 
 		FixedString(const char* str)
 		{
-			const size_t len = std::min(std::strlen(str), N - 1);
-			std::memcpy(data, str, len);
-			data[len] = '\0';
-		}
-
-		FixedString(const std::string& str)
-		{
-			const size_t len = std::min(str.size(), N - 1);
-			std::memcpy(data, str.c_str(), len);
+			const size_t len = min_val(fixed_strlen(str), N - 1);
+			memcpy(data, str, len);
 			data[len] = '\0';
 		}
 
 		FixedString& operator=(const char* str)
 		{
-			const size_t len = std::min(std::strlen(str), N - 1);
-			std::memcpy(data, str, len);
+			const size_t len = min_val(fixed_strlen(str), N - 1);
+			memcpy(data, str, len);
 			data[len] = '\0';
 			return *this;
 		}
 
-		FixedString& operator=(const std::string& str)
-		{
-			const size_t len = std::min(str.size(), N - 1);
-			std::memcpy(data, str.c_str(), len);
-			data[len] = '\0';
-			return *this;
-		}
-
-		bool operator<(const FixedString<N>& other) const noexcept { return std::strncmp(data, other.data, N) < 0; }
+		bool operator<(const FixedString<N>& other) const noexcept { return strncmp(data, other.data, N) < 0; }
 
 		const char* c_str() const { return data; }
 
 		operator const char*() const { return data; }
 
-		bool operator==(const char* other) const noexcept { return std::strncmp(data, other, N) == 0; }
-		bool operator==(const FixedString<N>& other) const { return std::strncmp(data, other.data, N) == 0; }
+		bool operator==(const char* other) const noexcept { return strncmp(data, other, N) == 0; }
+
+		bool operator==(const FixedString<N>& other) const { return strncmp(data, other.data, N) == 0; }
 
 		bool operator!=(const FixedString<N>& other) const { return !(*this == other); }
 
 		bool empty() const { return data[0] == '\0'; }
 
-		std::string to_string() const { return std::string(data); }
+		size_t length() const { return fixed_strlen(data); };
+
+		constexpr size_t capacity() const { return N; }
 	};
 
-	// Stream output (e.g., for logging)
-	template <size_t N> inline std::ostream& operator<<(std::ostream& os, const FixedString<N>& str)
+	template <size_t N> inline size_t hash(const FixedString<N>& s)
 	{
-		return os << str.c_str();
+		// Hash only up to null terminator
+		const size_t len = s.length();
+		return fnv1a_hash(s.data, len);
 	}
 
 	// Type aliases
@@ -84,16 +83,3 @@ namespace robotick
 	using FixedString1024 = FixedString<1024>;
 
 } // namespace robotick
-
-// Hash function (must be defined outside any namespace)
-namespace std
-{
-	template <size_t N> struct hash<robotick::FixedString<N>>
-	{
-		size_t operator()(const robotick::FixedString<N>& s) const noexcept
-		{
-			// Use the part before the null terminator
-			return std::hash<std::string_view>{}(std::string_view(s.c_str(), std::strlen(s.c_str())));
-		}
-	};
-} // namespace std

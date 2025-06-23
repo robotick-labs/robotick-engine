@@ -100,7 +100,7 @@ namespace
 	static SlowTickRegister s_register_slow;
 } // namespace
 
-TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Child ticks are invoked in sequence")
+TEST_CASE("Unit/Workloads/SequencedGroupWorkload/Child ticks are invoked in sequence")
 {
 	DummyTickingWorkload::reset();
 
@@ -124,7 +124,7 @@ TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Child ticks are invoked in sequ
 	CHECK(DummyTickingWorkload::tick_count == 2);
 }
 
-TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Overrun logs if exceeded")
+TEST_CASE("Unit/Workloads/SequencedGroupWorkload/Overrun logs if exceeded")
 {
 	Model model;
 	const auto handle = model.add("SlowTickWorkload", "slow", 50.0);
