@@ -48,6 +48,8 @@ namespace robotick
 
 		bool operator<(const FixedString<N>& other) const noexcept { return strcmp(data, other.data) < 0; }
 
+		char* str() { return data; }
+
 		const char* c_str() const { return data; }
 
 		operator const char*() const { return data; }

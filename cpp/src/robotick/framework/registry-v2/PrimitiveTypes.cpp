@@ -3,6 +3,7 @@
 
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/registry-v2/TypeDescriptor.h"
+#include "robotick/framework/registry-v2/TypeMacros.h"
 #include "robotick/framework/registry-v2/TypeRegistry.h"
 
 #include <cstdio>
@@ -10,11 +11,6 @@
 
 namespace robotick
 {
-	struct AutoRegisterType
-	{
-		explicit AutoRegisterType(const TypeDescriptor& desc) { TypeRegistry::get().register_type(desc); }
-	};
-
 	template <typename T> bool scan_value(const char* str, const char* format, T* out)
 	{
 		return sscanf(str, format, out) == 1;
@@ -37,9 +33,7 @@ namespace robotick
 		return scan_value(str, "%d", reinterpret_cast<int*>(out));
 	}
 
-	static constexpr TypeDescriptor s_int_type_desc = {"int", GET_TYPE_ID(int), sizeof(int), &int_to_string, &int_from_string};
-
-	static const AutoRegisterType s_register_int(s_int_type_desc);
+	ROBOTICK_REGISTER_PRIMITIVE(int, int_to_string, int_from_string);
 
 	// register float: =====
 
@@ -53,9 +47,7 @@ namespace robotick
 		return scan_value(str, "%f", reinterpret_cast<float*>(out));
 	}
 
-	static constexpr TypeDescriptor s_float_type_desc = {"float", GET_TYPE_ID(float), sizeof(float), &float_to_string, &float_from_string};
-
-	static const AutoRegisterType s_register_float(s_float_type_desc);
+	ROBOTICK_REGISTER_PRIMITIVE(float, float_to_string, float_from_string);
 
 	// register double: =====
 
@@ -69,9 +61,7 @@ namespace robotick
 		return scan_value(str, "%lf", reinterpret_cast<double*>(out));
 	}
 
-	static constexpr TypeDescriptor s_double_type_desc = {"double", GET_TYPE_ID(double), sizeof(double), &double_to_string, &double_from_string};
-
-	static const AutoRegisterType s_register_double(s_double_type_desc);
+	ROBOTICK_REGISTER_PRIMITIVE(double, double_to_string, double_from_string);
 
 	// register bool: =====
 
@@ -117,9 +107,7 @@ namespace robotick
 		return false;
 	}
 
-	static constexpr TypeDescriptor s_bool_type_desc = {"bool", GET_TYPE_ID(bool), sizeof(bool), &bool_to_string, &bool_from_string};
-
-	static const AutoRegisterType s_register_bool(s_bool_type_desc);
+	ROBOTICK_REGISTER_PRIMITIVE(bool, bool_to_string, bool_from_string);
 
 	// register FixedString<N>: =====
 
@@ -141,7 +129,8 @@ namespace robotick
 	template <size_t N> static constexpr TypeDescriptor make_fixed_string_desc(const char* name)
 	{
 		using FS = FixedString<N>;
-		return {name, TypeId(name), sizeof(FS), &fixed_string_to_string<N>, &fixed_string_from_string<N>};
+		return {name, TypeId(name), sizeof(FS), alignof(FS), TypeDescriptor::TypeCategory::Primitive, {}, &fixed_string_to_string<N>,
+			&fixed_string_from_string<N>};
 	}
 
 #define REGISTER_FIXED_STRING(N)                                                                                                                     \

@@ -31,7 +31,7 @@ namespace robotick::test
 	static const FixedString512 fs512_val = "charlie";
 	static const FixedString1024 fs1024_val = "delta";
 
-	static const ExpectedType expected[] = {
+	static const ExpectedType expected_primitive_types[] = {
 		{"int", GET_TYPE_ID(int), sizeof(int), &i_val},
 		{"float", GET_TYPE_ID(float), sizeof(float), &f_val},
 		{"double", GET_TYPE_ID(double), sizeof(double), &d_val},
@@ -49,13 +49,10 @@ namespace robotick::test
 	TEST_CASE("Unit/Framework/Registry/Types")
 	{
 		auto& registry = TypeRegistry::get();
-		const size_t expected_count = sizeof(expected) / sizeof(ExpectedType);
 
-		SECTION("All expected types are registered and unique")
+		SECTION("All Types - names and ids are unique")
 		{
 			const auto& registered_types = registry.get_registered_types();
-
-			REQUIRE(registered_types.size() == expected_count);
 
 			std::set<std::string> seen_names;
 			std::set<TypeId> seen_ids;
@@ -63,29 +60,30 @@ namespace robotick::test
 			for (auto desc : registered_types)
 			{
 				REQUIRE(desc != nullptr);
-				REQUIRE(seen_names.insert(desc->name).second);
+				REQUIRE(seen_names.insert(desc->name.c_str()).second);
 				REQUIRE(seen_ids.insert(desc->id).second);
 			}
 		}
 
-		SECTION("Sizes and TypeIds match expected")
+		SECTION("Primitive Types - expected sizes and ids are present and correct")
 		{
-			for (const auto& entry : expected)
+			for (const auto& entry : expected_primitive_types)
 			{
 				const TypeDescriptor* desc = registry.find_by_name(entry.name);
 				REQUIRE(desc != nullptr);
 				CHECK(desc->id == entry.id);
 				CHECK(desc->size == entry.size);
+				CHECK(desc->type_category == TypeDescriptor::TypeCategory::Primitive);
 			}
 		}
 
-		SECTION("Roundtrip to_string and from_string works for each type")
+		SECTION("Primitive Types - roundtrip to_string and from_string works for each")
 		{
 			static const size_t temp_buffers_size = 2048;
 
-			char buffer[temp_buffers_size]; // more thanks large enough for any expected type
+			char buffer[temp_buffers_size]; // more thanks large enough for any expected_primitive_types type
 
-			for (const auto& entry : expected)
+			for (const auto& entry : expected_primitive_types)
 			{
 				const TypeDescriptor* desc = registry.find_by_name(entry.name);
 				REQUIRE(desc != nullptr);
@@ -94,7 +92,7 @@ namespace robotick::test
 				CHECK(desc->to_string(entry.sample_value, buffer, sizeof(buffer)));
 
 				// from_string
-				uint8_t temp_storage[temp_buffers_size] = {}; // more thanks large enough for any expected type
+				uint8_t temp_storage[temp_buffers_size] = {}; // more thanks large enough for any expected_primitive_types type
 
 				void* parsed = temp_storage;
 				CHECK(desc->from_string(buffer, parsed));

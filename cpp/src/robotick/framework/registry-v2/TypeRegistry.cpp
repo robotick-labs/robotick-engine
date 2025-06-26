@@ -21,9 +21,9 @@ namespace robotick
 		// Prevent duplicate ID or name registration
 		for (const TypeDescriptor* existing_type : types)
 		{
-			if (strcmp(existing_type->name, type.name) == 0)
+			if (existing_type->name == type.name)
 			{
-				ROBOTICK_FATAL_EXIT("TypeRegistry::register_type() - cannot have multiple types with same name '%s'", type.name);
+				ROBOTICK_FATAL_EXIT("TypeRegistry::register_type() - cannot have multiple types with same name '%s'", type.name.c_str());
 			}
 			else if (existing_type->id == type.id)
 			{
@@ -58,7 +58,7 @@ namespace robotick
 		{
 			if (type->id == query_id)
 			{
-				ROBOTICK_ASSERT_MSG(strcmp(type->name, name) == 0, "If id matches then so should name as id is created from name");
+				ROBOTICK_ASSERT_MSG(type->name == name, "If id matches then so should name as id is created from name");
 				return type;
 			}
 		}
