@@ -54,7 +54,10 @@ namespace robotick::test
 
 			void setup()
 			{
-				state->blackboard_fields.initialize(2);
+				const size_t num_fields_required = 2;
+
+				state->blackboard_fields.initialize(num_fields_required);
+				ROBOTICK_ASSERT(state->blackboard_fields.size() == num_fields_required);
 
 				state->blackboard_fields[0] = FieldDescriptor{"counter", GET_TYPE_ID(int)};
 				state->blackboard_fields[1] = FieldDescriptor{"target_position", GET_TYPE_ID(Vec3)};

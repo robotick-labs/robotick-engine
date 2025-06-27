@@ -47,10 +47,13 @@ namespace robotick
 		Iterator begin() { return Iterator{head}; }
 		Iterator end() { return Iterator{nullptr}; }
 
+		const Iterator begin() const { return Iterator{head}; }
+		const Iterator end() const { return Iterator{nullptr}; }
+
 		T* front() { return head; }
 		bool empty() const { return head == nullptr; }
 
-		size_t size() const { return num_entries; };
+		size_t size() const { return num_entries; }
 
 	  private:
 		T* head = nullptr;

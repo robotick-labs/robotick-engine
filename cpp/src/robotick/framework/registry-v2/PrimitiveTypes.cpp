@@ -18,7 +18,8 @@ namespace robotick
 
 	template <typename T> bool print_value(char* out, size_t size, const char* format, const T& value)
 	{
-		return snprintf(out, size, format, value) >= 0;
+		const int result = snprintf(out, size, format, value);
+		return (result >= 0 && result < static_cast<int>(size));
 	}
 
 	// register int: =====

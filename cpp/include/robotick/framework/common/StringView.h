@@ -72,7 +72,7 @@ namespace robotick
 	/** @brief Hash function for StringView (FNV-1a over characters until null terminator) */
 	inline size_t hash(const StringView& s)
 	{
-		return fnv1a_hash(s.data, s.length());
+		return hash_string(s.data);
 	}
 
 } // namespace robotick

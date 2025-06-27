@@ -114,7 +114,7 @@ namespace robotick
 		using Vec3Base::Vec3Base;
 	};
 #else
-	struct Vec3 : public Vec3Base<Vec3f, float>
+	struct Vec3 : public Vec3Base<Vec3, float>
 	{
 		using Vec3Base::Vec3Base;
 	};

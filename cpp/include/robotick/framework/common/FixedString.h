@@ -69,9 +69,7 @@ namespace robotick
 
 	template <size_t N> inline size_t hash(const FixedString<N>& s)
 	{
-		// Hash only up to null terminator
-		const size_t len = s.length();
-		return fnv1a_hash(s.data, len);
+		return hash_string(s.data);
 	}
 
 	// Type aliases

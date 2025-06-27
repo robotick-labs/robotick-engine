@@ -29,16 +29,6 @@ namespace robotick
 
 	class Blackboard_v2
 	{
-		friend class Engine;
-		friend struct BlackboardFieldInfo;
-		friend struct BlackboardInfo;
-		friend struct BlackboardTestUtils;
-		friend struct DataConnectionUtils;
-		friend struct DataConnectionsFactory;
-		friend struct MqttFieldSync;
-		friend struct PythonWorkload;
-		friend struct WorkloadFieldsIterator;
-
 	  public:
 		Blackboard_v2() = default;
 

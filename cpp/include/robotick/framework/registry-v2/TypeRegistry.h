@@ -4,6 +4,7 @@
 #pragma once
 
 #include "robotick/framework/common/List.h"
+#include "robotick/framework/common/Map.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <stddef.h>
@@ -29,6 +30,7 @@ namespace robotick
 
 	  private:
 		TypeDescriptors types;
+		Map<TypeId, const TypeDescriptor*> types_by_id;
 	};
 
 } // namespace robotick
