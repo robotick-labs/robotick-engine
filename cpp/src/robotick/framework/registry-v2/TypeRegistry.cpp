@@ -22,7 +22,7 @@ namespace robotick
 		const TypeDescriptor** existing_type = types_by_id.find(type.id);
 		if (existing_type != nullptr)
 		{
-			ROBOTICK_FATAL_EXIT("TypeRegistry::register_type() - cannot have multiple types with same id '%d' (names new vs existing: '%s'|'%s' )",
+			ROBOTICK_FATAL_EXIT("TypeRegistry::register_type() - cannot have multiple types with same id '%u' (names new vs existing: '%s'|'%s' )",
 				type.id.value,
 #ifdef ROBOTICK_DEBUG_TYPEID_NAMES
 				type.id.name, (*existing_type)->id.name);

@@ -91,7 +91,18 @@ namespace robotick
 			return nullptr;
 		}
 
-		const Value* find(const Key& key) const { return const_cast<Map*>(this)->find(key); }
+		const Value* find(const Key& key) const
+		{
+			size_t index = DefaultHash<Key>::hash(key) % NumBuckets;
+			Bucket& bucket = buckets[index];
+
+			for (const Entry& entry : bucket.entries)
+			{
+				if (DefaultEqual<Key>::equal(entry.key, key))
+					return &entry.value;
+			}
+			return nullptr;
+		}
 
 	  private:
 		FixedVector<Bucket, NumBuckets> buckets;

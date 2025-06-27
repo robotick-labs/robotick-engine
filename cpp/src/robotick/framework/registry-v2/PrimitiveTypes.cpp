@@ -82,7 +82,9 @@ namespace robotick
 	{
 		const bool value = *reinterpret_cast<const bool*>(data);
 		const char* str = value ? "true" : "false";
-		return snprintf(out, size, "%s", str) >= 0;
+
+		const int result = snprintf(out, size, "%s", str);
+		return (result >= 0 && result < static_cast<int>(size));
 	}
 
 	static bool bool_from_string(const char* str, void* out)
@@ -116,7 +118,16 @@ namespace robotick
 	{
 		using FS = FixedString<N>;
 		const auto* str = reinterpret_cast<const FS*>(data);
-		return snprintf(out, size, "%s", str->c_str()) >= 0;
+		const char* src = str->c_str();
+
+		size_t len = str->length();
+		if (len >= size)
+			len = size - 1;
+
+		memcpy(out, src, len);
+		out[len] = '\0';
+
+		return true; // always safe and bounded
 	}
 
 	template <size_t N> static bool fixed_string_from_string(const char* str, void* out)
