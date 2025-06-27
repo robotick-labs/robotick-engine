@@ -6,20 +6,23 @@
 
 namespace robotick
 {
-
-	constexpr uint32_t fnv1a_hash(const char* data, size_t len)
+	/**
+	 * @brief Computes the 32-bit FNV-1a hash of a null-terminated C-string.
+	 *
+	 * @param str Null-terminated input string.
+	 * @return 32-bit hash value.
+	 */
+	constexpr uint32_t hash_string(const char* str)
 	{
 		uint32_t hash = 2166136261u; // FNV offset basis
-
-		if (!data)
+		if (!str)
 			return hash;
 
-		for (size_t i = 0; i < len; ++i)
+		while (*str)
 		{
-			hash ^= static_cast<unsigned char>(data[i]);
+			hash ^= static_cast<unsigned char>(*str++);
 			hash *= 16777619u; // FNV prime
 		}
 		return hash;
 	}
-
 } // namespace robotick

@@ -36,26 +36,15 @@ namespace robotick
 		class Iterator
 		{
 		  public:
-			Iterator(Node* ptr) : current(ptr)
-			{
-			}
-			T& operator*() const
-			{
-				return current->value;
-			}
-			T* operator->() const
-			{
-				return &current->value;
-			}
+			Iterator(Node* ptr) : current(ptr) {}
+			T& operator*() const { return current->value; }
+			T* operator->() const { return &current->value; }
 			Iterator& operator++()
 			{
 				current = current->next;
 				return *this;
 			}
-			bool operator!=(const Iterator& other) const
-			{
-				return current != other.current;
-			}
+			bool operator!=(const Iterator& other) const { return current != other.current; }
 
 		  private:
 			Node* current;
@@ -63,10 +52,7 @@ namespace robotick
 
 		List() = default;
 
-		~List()
-		{
-			clear();
-		}
+		~List() { clear(); }
 
 		T& push_back()
 		{
@@ -119,14 +105,11 @@ namespace robotick
 			return node->value;
 		}
 
-		Iterator begin()
-		{
-			return Iterator{head};
-		}
-		Iterator end()
-		{
-			return Iterator{nullptr};
-		}
+		Iterator begin() { return Iterator{head}; }
+		Iterator end() { return Iterator{nullptr}; }
+
+		const Iterator begin() const { return Iterator{head}; }
+		const Iterator end() const { return Iterator{nullptr}; }
 
 		void clear()
 		{
@@ -142,15 +125,9 @@ namespace robotick
 			list_size = 0;
 		}
 
-		bool empty() const
-		{
-			return head == nullptr;
-		}
+		bool empty() const { return head == nullptr; }
 
-		size_t size() const
-		{
-			return list_size;
-		}
+		size_t size() const { return list_size; }
 
 	  private:
 		Node* head = nullptr;

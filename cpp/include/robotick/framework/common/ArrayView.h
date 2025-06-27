@@ -34,6 +34,14 @@ namespace robotick
 		/// @brief Construct from fixed-size C-style array
 		template <size_t N> constexpr ArrayView(T (&arr)[N]) : data(arr), array_size(N) {}
 
+		/// @brief Assignment operator
+		constexpr ArrayView& operator=(const ArrayView& other) noexcept
+		{
+			data = other.data;
+			array_size = other.array_size;
+			return *this;
+		}
+
 		/// @brief Assign from pointer and size
 		void use(T* data_in, size_t size_in)
 		{

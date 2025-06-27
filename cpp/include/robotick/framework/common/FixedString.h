@@ -48,6 +48,8 @@ namespace robotick
 
 		bool operator<(const FixedString<N>& other) const noexcept { return strcmp(data, other.data) < 0; }
 
+		char* str() { return data; }
+
 		const char* c_str() const { return data; }
 
 		operator const char*() const { return data; }
@@ -67,9 +69,7 @@ namespace robotick
 
 	template <size_t N> inline size_t hash(const FixedString<N>& s)
 	{
-		// Hash only up to null terminator
-		const size_t len = s.length();
-		return fnv1a_hash(s.data, len);
+		return hash_string(s.data);
 	}
 
 	// Type aliases

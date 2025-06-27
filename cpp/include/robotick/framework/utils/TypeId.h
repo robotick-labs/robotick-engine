@@ -17,6 +17,8 @@ namespace robotick
 
 	struct TypeId
 	{
+		TypeId() = default;
+
 		// The only allowed constructor: from string
 		constexpr explicit TypeId(const char* type_name)
 			: value(fnv1a_32(type_name))
@@ -34,10 +36,10 @@ namespace robotick
 		static constexpr TypeId invalid() { return TypeId{"<invalid>"}; }
 		constexpr bool is_valid() const { return value != 0; }
 
-		uint32_t value;
+		uint32_t value = 0;
 
 #ifdef ROBOTICK_DEBUG_TYPEID_NAMES
-		const char* name;
+		const char* name = nullptr;
 #endif
 	};
 
