@@ -6,8 +6,6 @@
 #include "robotick/api_base.h"
 #include "robotick/framework/registry-v2/TypeDescriptor.h"
 
-#include <string.h> // for strcmp
-
 namespace robotick
 {
 	TypeRegistry& TypeRegistry::get()

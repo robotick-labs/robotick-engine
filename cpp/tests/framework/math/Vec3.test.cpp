@@ -110,6 +110,8 @@ TEST_CASE("Unit|Framework|Math|Vec3", "[vec3]")
 	{
 		Vec3f v;
 		ROBOTICK_REQUIRE_ERROR(v /= 0.0f);
+
+		ROBOTICK_REQUIRE_ERROR(v / 0.0f);
 	}
 
 	SECTION("Types Are Registered")
