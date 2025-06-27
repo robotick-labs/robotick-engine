@@ -60,7 +60,7 @@ namespace robotick
 		using Entry = MapEntry<Key, Value>;
 		using Bucket = MapBucket<Key, Value>;
 
-		Map() { buckets.fill(); }
+		Map() { buckets.fill(); } // Initialize all buckets to enable indexing
 
 		void insert(const Key& key, const Value& value)
 		{
@@ -94,7 +94,7 @@ namespace robotick
 		const Value* find(const Key& key) const
 		{
 			size_t index = DefaultHash<Key>::hash(key) % NumBuckets;
-			Bucket& bucket = buckets[index];
+			const Bucket& bucket = buckets[index];
 
 			for (const Entry& entry : bucket.entries)
 			{

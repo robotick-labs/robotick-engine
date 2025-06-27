@@ -106,6 +106,12 @@ TEST_CASE("Unit|Framework|Math|Vec3", "[vec3]")
 		CHECK(v.z == Catch::Approx(6.0f));
 	}
 
+	SECTION("Divide by zero triggers assert")
+	{
+		Vec3f v;
+		ROBOTICK_REQUIRE_ERROR(v /= 0.0f);
+	}
+
 	SECTION("Types Are Registered")
 	{
 		const TypeDescriptor* type_descriptor_vec3f = TypeRegistry::get().find_by_id(GET_TYPE_ID(Vec3f));

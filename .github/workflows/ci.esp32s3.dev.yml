@@ -34,6 +34,9 @@ jobs:
 
       - name: 🧹 Free disk space (dotnet/android/ghc)
         run: |
+          # This job does not use .NET, Android SDK, or GHC.
+          # These are wiped deliberately to reclaim ~15 GB disk space on GitHub-hosted runners
+          # in order to give space for Docker image building and other items.
           sudo rm -rf /usr/share/dotnet \
                       /usr/local/lib/android \
                       /opt/ghc || true
@@ -41,6 +44,7 @@ jobs:
 
       - name: 🧹 Prune Docker system
         run: |
+          # Intentionally prune everything to free ~15 GB; no other jobs in this workflow
           docker system prune -af || true
           df -h
 

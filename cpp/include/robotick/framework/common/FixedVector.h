@@ -40,7 +40,7 @@ namespace robotick
 		constexpr bool full() const { return count == Capacity; }
 
 		/**
-		 * @brief Fills the vector to capacity, calling default constructor on any few elements
+		 * @brief Fills the vector to capacity, calling default constructor on any new elements
 		 */
 		void fill()
 		{

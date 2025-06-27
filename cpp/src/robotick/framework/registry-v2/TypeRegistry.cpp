@@ -23,7 +23,7 @@ namespace robotick
 		if (existing_type != nullptr)
 		{
 			ROBOTICK_FATAL_EXIT("TypeRegistry::register_type() - cannot have multiple types with same id '%u' (names new vs existing: '%s'|'%s' )",
-				type.id.value,
+				(unsigned int)type.id.value,
 #ifdef ROBOTICK_DEBUG_TYPEID_NAMES
 				type.id.name, (*existing_type)->id.name);
 #else

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "robotick/api_base.h"
+
 #include <math.h> // sqrtf, sqrt
 
 namespace robotick
@@ -64,6 +66,8 @@ namespace robotick
 		}
 		TDerived& operator/=(TReal scalar)
 		{
+			ROBOTICK_ASSERT_MSG((scalar != TReal(0.0f)), "Divide by zero requested!");
+
 			x /= scalar;
 			y /= scalar;
 			z /= scalar;
