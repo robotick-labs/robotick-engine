@@ -3,7 +3,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
 #include "utils/EngineInspector.h"
@@ -104,7 +104,7 @@ TEST_CASE("Unit/Workloads/SequencedGroupWorkload/Child ticks are invoked in sequ
 {
 	DummyTickingWorkload::reset();
 
-	Model model;
+	Model_v1 model;
 	const auto child1 = model.add("DummyTickingWorkload", "child1", 50.0);
 	const auto child2 = model.add("DummyTickingWorkload", "child2", 50.0);
 	const auto group = model.add("SequencedGroupWorkload", "group", {child1, child2}, 50.0);
@@ -126,7 +126,7 @@ TEST_CASE("Unit/Workloads/SequencedGroupWorkload/Child ticks are invoked in sequ
 
 TEST_CASE("Unit/Workloads/SequencedGroupWorkload/Overrun logs if exceeded")
 {
-	Model model;
+	Model_v1 model;
 	const auto handle = model.add("SlowTickWorkload", "slow", 50.0);
 	const auto group = model.add("SequencedGroupWorkload", "group", {handle}, 1000.0);
 	model.set_root(group);

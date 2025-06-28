@@ -3,7 +3,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
 #include "utils/EngineInspector.h"
@@ -116,7 +116,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload/All children tick in parallel")
 	const double tick_rate_hz = 1.0 / tick_info.delta_time;
 	const int tick_count = 5;
 
-	Model model;
+	Model_v1 model;
 	const auto a = model.add("CountingWorkload", "a", tick_rate_hz);
 	const auto b = model.add("CountingWorkload", "b", tick_rate_hz);
 	const auto group = model.add("SyncedGroupWorkload", "group", {a, b}, tick_rate_hz);
@@ -159,7 +159,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload/Child busy flags skip ticks")
 	const double tick_rate_hz = 1.0 / tick_info.delta_time;
 	constexpr int num_ticks = 5;
 
-	Model model;
+	Model_v1 model;
 	const auto s1 = model.add("SlowWorkload", "s1", tick_rate_hz);
 	const auto s2 = model.add("SlowWorkload", "s2", tick_rate_hz);
 	const auto group = model.add("SyncedGroupWorkload", "group", {s1, s2}, tick_rate_hz);
@@ -203,7 +203,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload/tick() passes real time_delta (chi
 	const TickInfo tick_info = TICK_INFO_FIRST_10MS_100HZ;
 	const double tick_rate_hz = 1.0 / tick_info.delta_time;
 
-	Model model;
+	Model_v1 model;
 	const auto h = model.add("CountingWorkload", "ticky", tick_rate_hz);
 	const auto group = model.add("SyncedGroupWorkload", "group", {h}, tick_rate_hz);
 	model.set_root(group);
@@ -245,7 +245,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload/Child allowed to run at slower fix
 	const double group_tick_rate_hz = 1.0 / group_tick_info.delta_time;
 	const double child_tick_rate_hz = 1.0 / TICK_INFO_FIRST_100MS_10HZ.delta_time; // child wants to tick 10x slower than group - we should let it
 
-	Model model;
+	Model_v1 model;
 	const auto h = model.add("CountingWorkload", "slower", child_tick_rate_hz);
 	const auto group = model.add("SyncedGroupWorkload", "group", {h}, group_tick_rate_hz);
 	model.set_root(group);

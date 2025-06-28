@@ -4,7 +4,7 @@
 #pragma once
 
 #include "robotick/api.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
 
 #include <atomic>
@@ -40,7 +40,7 @@ namespace robotick
 		Engine();
 		~Engine();
 
-		void load(const Model& model);
+		void load(const Model_v1& model);
 
 		// The stop_flag must outlive this call. Do not pass temporaries.
 		void run(const AtomicFlag& stop_after_next_tick_flag);
@@ -67,7 +67,7 @@ namespace robotick
 
 		size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances);
 
-		void setup_remote_engine_senders(const Model& model);
+		void setup_remote_engine_senders(const Model_v1& model);
 		void setup_remote_engines_receiver();
 
 		void tick_remote_engine_connections(const TickInfo& tick_info);

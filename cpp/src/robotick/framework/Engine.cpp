@@ -4,7 +4,7 @@
 #include "robotick/framework/Engine.h"
 
 #include "robotick/api.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
@@ -30,7 +30,7 @@ namespace robotick
 {
 	struct Engine::State
 	{
-		Model m_loaded_model;
+		Model_v1 m_loaded_model;
 		bool is_running = false;
 
 		WorkloadsBuffer workloads_buffer;
@@ -161,10 +161,10 @@ namespace robotick
 		}
 	}
 
-	void Engine::load(const Model& model)
+	void Engine::load(const Model_v1& model)
 	{
 		if (!model.get_root().is_valid())
-			ROBOTICK_FATAL_EXIT("Model has no root workload");
+			ROBOTICK_FATAL_EXIT("Model_v1 has no root workload");
 
 		state->instances.clear();
 		state->data_connections_all.clear();
@@ -449,7 +449,7 @@ namespace robotick
 			});
 	}
 
-	void Engine::setup_remote_engine_senders(const Model& model)
+	void Engine::setup_remote_engine_senders(const Model_v1& model)
 	{
 		const auto& remote_models = model.get_remote_models();
 

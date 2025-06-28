@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/platform/Threading.h"
 
@@ -53,7 +53,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/Engine/DummyWorkload stores tick rate correctly")
 	{
-		Model model;
+		Model_v1 model;
 		auto handle = model.add("DummyWorkload", "A", 123.0, {});
 		model.set_root(handle);
 
@@ -66,7 +66,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/Engine/DummyWorkload config is loaded via load()")
 	{
-		Model model;
+		Model_v1 model;
 		auto handle = model.add("DummyWorkload", "A", 1.0, {{"value", "42"}});
 		model.set_root(handle);
 
@@ -79,7 +79,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/Engine/Rejects unknown workload type")
 	{
-		Model model;
+		Model_v1 model;
 		auto handle = model.add("UnknownType", "fail", 1.0, {});
 		model.set_root(handle);
 
@@ -89,7 +89,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/Engine/Multiple workloads supported")
 	{
-		Model model;
+		Model_v1 model;
 		model.add("DummyWorkload", "one", 1.0, {{"value", "1"}});
 		model.add("DummyWorkload", "two", 2.0, {{"value", "2"}});
 		model_helpers::wrap_all_in_sequenced_group(model);
@@ -106,7 +106,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/Engine/Workloads receive tick call")
 	{
-		Model model;
+		Model_v1 model;
 		auto handle = model.add("TickCounterWorkload", "ticky", 200.0, {});
 		model.set_root(handle);
 

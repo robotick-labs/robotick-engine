@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "utils/EngineInspector.h"
@@ -50,7 +50,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/Data/Connection/ExpectedHandler set for synced group children")
 	{
-		Model model;
+		Model_v1 model;
 		auto a = model.add("CountingDataConnWorkload", "A", 10.0);
 		auto b = model.add("CountingDataConnWorkload", "B", 10.0);
 		model.connect("A.outputs.output_value", "B.inputs.input_value");
@@ -76,7 +76,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/Data/Connection/ExpectedHandler set for external connections")
 	{
-		Model model;
+		Model_v1 model;
 		auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
 		auto child2 = model.add("CountingDataConnWorkload", "Child2", 10.0);
 
@@ -102,7 +102,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/Data/Connection/ExpectedHandler set to SequencedGroupWorkload for internal connections")
 	{
-		Model model;
+		Model_v1 model;
 		auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
 		auto child2 = model.add("CountingDataConnWorkload", "Child2", 10.0);
 

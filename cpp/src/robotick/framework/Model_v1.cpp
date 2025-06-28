@@ -1,7 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 
 #include "robotick/api_base.h"
 #include "robotick/framework/data/DataConnection.h"
@@ -13,7 +13,7 @@
 
 namespace robotick
 {
-	void Model::connect_remote(const std::string& source_field_path, const std::string& dest_field_path)
+	void Model_v1::connect_remote(const std::string& source_field_path, const std::string& dest_field_path)
 	{
 		// Expected format: |remote_model_id|field.path
 
@@ -63,7 +63,7 @@ namespace robotick
 		remote_model.remote_data_connection_seeds.push_back({source_field_path, remote_field_path});
 	}
 
-	void Model::connect(const std::string& source_field_path, const std::string& dest_field_path)
+	void Model_v1::connect(const std::string& source_field_path, const std::string& dest_field_path)
 	{
 		if (source_field_path.empty() || dest_field_path.empty())
 			ROBOTICK_FATAL_EXIT("Field paths must be non-empty");
@@ -91,14 +91,14 @@ namespace robotick
 		}
 
 		if (root_workload.is_valid())
-			ROBOTICK_FATAL_EXIT("Cannot add connections after root has been set. Model root must be set last.");
+			ROBOTICK_FATAL_EXIT("Cannot add connections after root has been set. Model_v1 root must be set last.");
 
 		data_connection_seeds.push_back({source_field_path, dest_field_path});
 	}
 
-	void Model::finalize()
+	void Model_v1::finalize()
 	{
-		ROBOTICK_ASSERT(root_workload.is_valid() && "Model root must be set before validation");
+		ROBOTICK_ASSERT(root_workload.is_valid() && "Model_v1 root must be set before validation");
 
 		std::function<void(WorkloadHandle, double)> validate_recursively = [&](WorkloadHandle handle, double parent_tick_rate)
 		{
@@ -153,21 +153,22 @@ namespace robotick
 		}
 	}
 
-	WorkloadHandle Model::add(const std::string& type, const std::string& name, double tick_rate_hz, const std::map<std::string, std::string>& config)
+	WorkloadHandle Model_v1::add(
+		const std::string& type, const std::string& name, double tick_rate_hz, const std::map<std::string, std::string>& config)
 	{
 		if (root_workload.is_valid())
-			ROBOTICK_FATAL_EXIT("Cannot add workloads after root has been set. Model root must be set last.");
+			ROBOTICK_FATAL_EXIT("Cannot add workloads after root has been set. Model_v1 root must be set last.");
 
 		const std::vector<WorkloadHandle> children = {};
 		workload_seeds.push_back({type, name, tick_rate_hz, children, config});
 		return {static_cast<uint32_t>(workload_seeds.size() - 1)};
 	}
 
-	WorkloadHandle Model::add(const std::string& type, const std::string& name, const std::vector<WorkloadHandle>& children, double tick_rate_hz,
+	WorkloadHandle Model_v1::add(const std::string& type, const std::string& name, const std::vector<WorkloadHandle>& children, double tick_rate_hz,
 		const std::map<std::string, std::string>& config)
 	{
 		if (root_workload.is_valid())
-			ROBOTICK_FATAL_EXIT("Cannot add workloads after root has been set. Model root must be set last.");
+			ROBOTICK_FATAL_EXIT("Cannot add workloads after root has been set. Model_v1 root must be set last.");
 
 		for (auto child : children)
 		{
@@ -179,7 +180,7 @@ namespace robotick
 		return {static_cast<uint32_t>(workload_seeds.size() - 1)};
 	}
 
-	void Model::add_remote_model(const Model& remote_model, const std::string& model_name, const std::string& comms_channel)
+	void Model_v1::add_remote_model(const Model_v1& remote_model, const std::string& model_name, const std::string& comms_channel)
 	{
 		if (model_name.empty())
 		{
@@ -223,7 +224,7 @@ namespace robotick
 		remote_models[model_name] = std::move(seed);
 	}
 
-	void Model::set_root(WorkloadHandle handle, const bool auto_finalize)
+	void Model_v1::set_root(WorkloadHandle handle, const bool auto_finalize)
 	{
 		root_workload = handle; // no more changes once root has been set, so good time to validate the model...
 		if (auto_finalize)

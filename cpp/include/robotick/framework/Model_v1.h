@@ -34,7 +34,7 @@ namespace robotick
 		std::map<std::string, std::string> config;
 	};
 
-	class Model
+	class Model_v1
 	{
 	  public:
 		static constexpr double TICK_RATE_FROM_PARENT = 0.0;
@@ -47,7 +47,7 @@ namespace robotick
 
 		void connect(const std::string& source_field_path, const std::string& dest_field_path);
 
-		void add_remote_model(const Model& remote_model, const std::string& model_name, const std::string& comms_channel);
+		void add_remote_model(const Model_v1& remote_model, const std::string& model_name, const std::string& comms_channel);
 
 		void set_root(WorkloadHandle handle, const bool auto_finalize = true);
 
@@ -85,7 +85,7 @@ namespace robotick
 		} comms_mode;
 
 		std::string comms_channel; // e.g. "/dev/ttyUSB0", "192.168.1.42", ""
-		Model model;
+		Model_v1 model;
 
 		std::vector<DataConnectionSeed> remote_data_connection_seeds;
 	};

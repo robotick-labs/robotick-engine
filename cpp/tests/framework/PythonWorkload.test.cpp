@@ -3,7 +3,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/registry/FieldRegistry.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -41,7 +41,7 @@ TEST_CASE("Unit/Workloads/PythonWorkload/Metadata is registered correctly")
 
 TEST_CASE("Unit/Workloads/PythonWorkload/Python tick executes")
 {
-	Model model;
+	Model_v1 model;
 	const auto handle = model.add(
 		"PythonWorkload", "test2", 1.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
 	model.set_root(handle);
@@ -60,7 +60,7 @@ TEST_CASE("Unit/Workloads/PythonWorkload/Python tick executes")
 
 TEST_CASE("Unit/Workloads/PythonWorkload/Output reflects Python computation")
 {
-	Model model;
+	Model_v1 model;
 	const auto handle = model.add("PythonWorkload", "py", 1.0,
 		{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}, {"example_in", "21.0"}});
 	model.set_root(handle);
@@ -111,7 +111,7 @@ TEST_CASE("Unit/Workloads/PythonWorkload/Output reflects Python computation")
 
 TEST_CASE("Unit/Workloads/PythonWorkload/start/stop hooks are optional and safe")
 {
-	Model model;
+	Model_v1 model;
 	const auto handle = model.add(
 		"PythonWorkload", "test", 10.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
 	model.set_root(handle);

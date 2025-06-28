@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/FieldRegistry.h"
@@ -49,7 +49,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/FieldWalker/Field pointers match expected values and buffers")
 	{
-		Model model;
+		Model_v1 model;
 		auto w = model.add("SimpleWorkload", "W", 10.0);
 		model.set_root(w);
 
@@ -96,7 +96,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/FieldWalker/Override buffer works correctly")
 	{
-		Model model;
+		Model_v1 model;
 		auto w = model.add("SimpleWorkload", "W", 10.0);
 		model.set_root(w);
 
@@ -142,7 +142,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/FieldWalker/for_each_workload returns all instances")
 	{
-		Model model;
+		Model_v1 model;
 		auto w1 = model.add("SimpleWorkload", "W1", 10.0);
 		model.add("SimpleWorkload", "W2", 10.0);
 		model.set_root(w1);
@@ -164,7 +164,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/FieldWalker/for_each_field_in_workload walks individual workload fields")
 	{
-		Model model;
+		Model_v1 model;
 		auto w = model.add("SimpleWorkload", "Solo", 10.0);
 		model.set_root(w);
 
@@ -203,7 +203,7 @@ namespace robotick::test
 		};
 		ROBOTICK_DEFINE_WORKLOAD(BBWorkload, void, BBInputs, void)
 
-		Model model;
+		Model_v1 model;
 		auto handle = model.add("BBWorkload", "BB", 10.0);
 		model.set_root(handle);
 

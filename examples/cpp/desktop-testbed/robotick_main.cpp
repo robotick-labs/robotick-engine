@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/platform/EntryPoint.h"
 #include "robotick/platform/Signals.h"
 #include "robotick/platform/Threading.h"
@@ -14,7 +14,7 @@ void signal_handler()
 	g_stop_flag.set();
 }
 
-void populate_model_hello_world(robotick::Model& model)
+void populate_model_hello_world(robotick::Model_v1& model)
 {
 	auto console = model.add("ConsoleTelemetryWorkload", "console", 5.0);
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
@@ -26,7 +26,7 @@ void populate_model_hello_world(robotick::Model& model)
 	model.set_root(root);
 }
 
-void populate_model_hello_mqtt(robotick::Model& model)
+void populate_model_hello_mqtt(robotick::Model_v1& model)
 {
 	auto remote_control = model.add("RemoteControlWorkload", "remote_control", 30.0);
 	auto mqtt_client = model.add("MqttClientWorkload", "mqtt_client", 30.0, {{"broker_url", "mqtt://192.168.5.14"}});
@@ -41,7 +41,7 @@ ROBOTICK_ENTRYPOINT
 {
 	robotick::setup_exit_handler(signal_handler);
 
-	robotick::Model model;
+	robotick::Model_v1 model;
 	populate_model_hello_mqtt(model);
 
 	robotick::Engine engine;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/api_base.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
 
@@ -39,50 +39,53 @@ namespace robotick::test
 		static DummyRegister s_register;
 	} // namespace
 
-	TEST_CASE("Unit/Framework/Data/Connection/Allows connecting input between valid workloads")
+	TEST_CASE("Unit/Framework/Model_v1/Connection")
 	{
-		Model model;
+		SECTION("Allows connecting input between valid workloads")
+		{
+			Model_v1 model;
 
-		auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
-		auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
+			auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
+			auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
 
-		model.connect("A.output", "B.input");
+			model.connect("A.output", "B.input");
 
-		auto group = model.add("SequencedGroupWorkload", "Group", std::vector{a, b}, 10.0);
-		model.set_root(group);
+			auto group = model.add("SequencedGroupWorkload", "Group", std::vector{a, b}, 10.0);
+			model.set_root(group);
 
-		REQUIRE_NOTHROW(model.finalize());
-	}
+			REQUIRE_NOTHROW(model.finalize());
+		}
 
-	TEST_CASE("Unit/Framework/Data/Connection/Duplicate inputs throw with clear error")
-	{
-		Model model;
+		SECTION("Duplicate inputs throw with clear error")
+		{
+			Model_v1 model;
 
-		model.add("DummyModelDataConnWorkload", "A", 10.0);
-		model.add("DummyModelDataConnWorkload", "B", 10.0);
-		model.add("DummyModelDataConnWorkload", "C", 10.0);
+			model.add("DummyModelDataConnWorkload", "A", 10.0);
+			model.add("DummyModelDataConnWorkload", "B", 10.0);
+			model.add("DummyModelDataConnWorkload", "C", 10.0);
 
-		model.connect("A.output", "C.input");
-		ROBOTICK_REQUIRE_ERROR_MSG(model.connect("B.output", "C.input"), ("already has an incoming connection"));
-	}
+			model.connect("A.output", "C.input");
+			ROBOTICK_REQUIRE_ERROR_MSG(model.connect("B.output", "C.input"), ("already has an incoming connection"));
+		}
 
-	TEST_CASE("Unit/Framework/Data/Connection/Seeds are preserved for engine use")
-	{
-		Model model;
+		SECTION("Seeds are preserved for engine use")
+		{
+			Model_v1 model;
 
-		auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
-		auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
-		model.connect("A.output", "B.input");
+			auto a = model.add("DummyModelDataConnWorkload", "A", 10.0);
+			auto b = model.add("DummyModelDataConnWorkload", "B", 10.0);
+			model.connect("A.output", "B.input");
 
-		auto group = model.add("SequencedGroupWorkload", "Group", std::vector{a, b}, 10.0);
-		model.set_root(group);
+			auto group = model.add("SequencedGroupWorkload", "Group", std::vector{a, b}, 10.0);
+			model.set_root(group);
 
-		const auto& seeds = model.get_data_connection_seeds();
-		REQUIRE(seeds.size() == 1);
-		CHECK(seeds[0].source_field_path == "A.output");
-		CHECK(seeds[0].dest_field_path == "B.input");
+			const auto& seeds = model.get_data_connection_seeds();
+			REQUIRE(seeds.size() == 1);
+			CHECK(seeds[0].source_field_path == "A.output");
+			CHECK(seeds[0].dest_field_path == "B.input");
 
-		REQUIRE_NOTHROW(model.finalize());
+			REQUIRE_NOTHROW(model.finalize());
+		}
 	}
 
 } // namespace robotick::test

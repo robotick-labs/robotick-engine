@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 
 #include <string>
 #include <vector>
@@ -12,7 +12,7 @@ namespace robotick::test::model_helpers
 {
 
 	// Create a new SequencedGroupWorkload that wraps all existing top-level workloads
-	static void wrap_all_in_sequenced_group(Model& model, double tick_rate_hz = 100.0)
+	static void wrap_all_in_sequenced_group(Model_v1& model, double tick_rate_hz = 100.0)
 	{
 		const auto& seeds = model.get_workload_seeds();
 		std::vector<WorkloadHandle> all_handles;

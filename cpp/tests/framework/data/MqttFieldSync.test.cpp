@@ -5,7 +5,7 @@
 #include "../utils/BlackboardTestUtils.h"
 #include "../utils/EngineInspector.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
@@ -70,7 +70,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/Data/MqttFieldSync/MqttFieldSync can publish state and control fields")
 	{
-		Model model;
+		Model_v1 model;
 		auto test_workload_seed_handle = model.add("TestWorkload", "W1", 1.0);
 		model.set_root(test_workload_seed_handle);
 
@@ -113,7 +113,7 @@ namespace robotick::test
 
 	TEST_CASE("Unit/Framework/Data/MqttFieldSync/MqttFieldSync can apply control updates")
 	{
-		Model model;
+		Model_v1 model;
 		auto test_workload_seed_handle = model.add("TestWorkload", "W2", 1.0);
 		model.set_root(test_workload_seed_handle);
 
