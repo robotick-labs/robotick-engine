@@ -458,7 +458,7 @@ namespace robotick
 
 		for (const auto& remote_model_entry : remote_models)
 		{
-			const RemoteModelSeed& remote_model = remote_model_entry.second;
+			const RemoteModelSeed_v1& remote_model = remote_model_entry.second;
 
 			if (remote_model.remote_data_connection_seeds.size() == 0)
 			{
@@ -505,7 +505,7 @@ namespace robotick
 
 	void Engine::run(const AtomicFlag& stop_after_next_tick_flag)
 	{
-		const WorkloadHandle root_handle = state->m_loaded_model.get_root();
+		const WorkloadHandle_v1 root_handle = state->m_loaded_model.get_root();
 		if (root_handle.index >= state->instances.size())
 			ROBOTICK_FATAL_EXIT("Invalid root workload handle");
 

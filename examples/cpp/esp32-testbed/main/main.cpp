@@ -35,7 +35,7 @@ namespace robotick
 
 void populate_model(robotick::Model_v1& model)
 {
-	std::vector<robotick::WorkloadHandle> children = {model.add("BaseXWorkload", "basex"), model.add("ConsoleTelemetryWorkload", "console"),
+	std::vector<robotick::WorkloadHandle_v1> children = {model.add("BaseXWorkload", "basex"), model.add("ConsoleTelemetryWorkload", "console"),
 		model.add("FaceDisplayWorkload", "face_display"), model.add("SteeringMixerWorkload", "steering"),
 		model.add("TimingDiagnosticsWorkload", "timing")};
 

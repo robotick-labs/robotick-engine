@@ -21,7 +21,7 @@ void populate_model_hello_world(robotick::Model_v1& model)
 	auto test_state_2 = model.add(
 		"PythonWorkload", "test_state_2", 1.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
 
-	std::vector<robotick::WorkloadHandle> children = {console, test_state_1, test_state_2};
+	std::vector<robotick::WorkloadHandle_v1> children = {console, test_state_1, test_state_2};
 	auto root = model.add("SyncedGroupWorkload", "root_group", children, 1000.0);
 	model.set_root(root);
 }
@@ -32,7 +32,7 @@ void populate_model_hello_mqtt(robotick::Model_v1& model)
 	auto mqtt_client = model.add("MqttClientWorkload", "mqtt_client", 30.0, {{"broker_url", "mqtt://192.168.5.14"}});
 	auto console_telem = model.add("ConsoleTelemetryWorkload", "console", 5.0);
 
-	std::vector<robotick::WorkloadHandle> children = {console_telem, remote_control, mqtt_client};
+	std::vector<robotick::WorkloadHandle_v1> children = {console_telem, remote_control, mqtt_client};
 	auto root = model.add("SyncedGroupWorkload", "root_group", children, 30.0);
 	model.set_root(root);
 }

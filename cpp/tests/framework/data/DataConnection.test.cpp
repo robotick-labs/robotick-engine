@@ -69,8 +69,8 @@ namespace robotick::test
 		SECTION("Resolves non-blackboard to non-blackboard")
 		{
 			Model_v1 model;
-			const WorkloadHandle handle_a = model.add("DummyA", "A", 1.0);
-			const WorkloadHandle handle_b = model.add("DummyB", "B", 1.0);
+			const WorkloadHandle_v1 handle_a = model.add("DummyA", "A", 1.0);
+			const WorkloadHandle_v1 handle_b = model.add("DummyB", "B", 1.0);
 			model_helpers::wrap_all_in_sequenced_group(model);
 
 			Engine engine;
@@ -81,7 +81,7 @@ namespace robotick::test
 			a->outputs.x = 42;
 			a->outputs.y = 3.14;
 
-			std::vector<DataConnectionSeed> seeds = {
+			std::vector<DataConnectionSeed_v1> seeds = {
 				{"A.outputs.x", "B.inputs.x"},
 				{"A.outputs.y", "B.inputs.y"},
 			};
@@ -105,8 +105,8 @@ namespace robotick::test
 		SECTION("Resolves non-blackboard to blackboard")
 		{
 			Model_v1 model;
-			const WorkloadHandle handle_a = model.add("DummyA", "A", 1.0);
-			const WorkloadHandle handle_b = model.add("DummyB", "B", 1.0);
+			const WorkloadHandle_v1 handle_a = model.add("DummyA", "A", 1.0);
+			const WorkloadHandle_v1 handle_b = model.add("DummyB", "B", 1.0);
 			model_helpers::wrap_all_in_sequenced_group(model);
 
 			Engine engine;
@@ -117,7 +117,7 @@ namespace robotick::test
 			a->outputs.x = 42;
 			a->outputs.y = 3.14;
 
-			std::vector<DataConnectionSeed> seeds = {
+			std::vector<DataConnectionSeed_v1> seeds = {
 				{"A.outputs.x", "B.inputs.in_blackboard.x"},
 				{"A.outputs.y", "B.inputs.in_blackboard.y"},
 			};
@@ -153,7 +153,7 @@ namespace robotick::test
 			a->outputs.out_blackboard.set("x", (int)42);
 			a->outputs.out_blackboard.set("y", (double)3.14);
 
-			std::vector<DataConnectionSeed> seeds = {
+			std::vector<DataConnectionSeed_v1> seeds = {
 				{"A.outputs.out_blackboard.x", "B.inputs.x"},
 				{"A.outputs.out_blackboard.y", "B.inputs.y"},
 			};
@@ -189,7 +189,7 @@ namespace robotick::test
 			a->outputs.out_blackboard.set("x", (int)42);
 			a->outputs.out_blackboard.set("y", (double)3.14);
 
-			std::vector<DataConnectionSeed> seeds = {
+			std::vector<DataConnectionSeed_v1> seeds = {
 				{"A.outputs.out_blackboard.x", "B.inputs.in_blackboard.x"},
 				{"A.outputs.out_blackboard.y", "B.inputs.in_blackboard.y"},
 			};
@@ -224,33 +224,33 @@ namespace robotick::test
 
 			SECTION("Invalid workload name")
 			{
-				std::vector<DataConnectionSeed> seeds = {{"Z.outputs.x", "B.inputs.x"}};
+				std::vector<DataConnectionSeed_v1> seeds = {{"Z.outputs.x", "B.inputs.x"}};
 				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), ("Z"));
 			}
 
 			SECTION("Invalid section")
 			{
-				std::vector<DataConnectionSeed> seeds = {{"A.wrong.x", "B.inputs.x"}};
+				std::vector<DataConnectionSeed_v1> seeds = {{"A.wrong.x", "B.inputs.x"}};
 				ROBOTICK_REQUIRE_ERROR_MSG(
 					DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), ("Invalid section"));
 			}
 
 			SECTION("Missing field")
 			{
-				std::vector<DataConnectionSeed> seeds = {{"A.outputs.missing", "B.inputs.x"}};
+				std::vector<DataConnectionSeed_v1> seeds = {{"A.outputs.missing", "B.inputs.x"}};
 				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), ("field"));
 			}
 
 			SECTION("Mismatched types")
 			{
-				std::vector<DataConnectionSeed> seeds = {{"A.outputs.x", "B.inputs.y"}}; // int -> double
+				std::vector<DataConnectionSeed_v1> seeds = {{"A.outputs.x", "B.inputs.y"}}; // int -> double
 				ROBOTICK_REQUIRE_ERROR_MSG(
 					DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), ("Type mismatch"));
 			}
 
 			SECTION("Duplicate destination")
 			{
-				std::vector<DataConnectionSeed> seeds = {{"A.outputs.x", "B.inputs.x"}, {"A.outputs.x", "B.inputs.x"}};
+				std::vector<DataConnectionSeed_v1> seeds = {{"A.outputs.x", "B.inputs.x"}, {"A.outputs.x", "B.inputs.x"}};
 				ROBOTICK_REQUIRE_ERROR_MSG(
 					DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, infos), ("Duplicate"));
 			}
@@ -264,8 +264,8 @@ namespace robotick::test
 		SECTION("Unidirectional copy")
 		{
 			Model_v1 model;
-			const WorkloadHandle handle_a = model.add("DummyA", "A", 1.0);
-			const WorkloadHandle handle_b = model.add("DummyB", "B", 1.0);
+			const WorkloadHandle_v1 handle_a = model.add("DummyA", "A", 1.0);
+			const WorkloadHandle_v1 handle_b = model.add("DummyB", "B", 1.0);
 			model_helpers::wrap_all_in_sequenced_group(model);
 
 			Engine engine;
@@ -277,7 +277,7 @@ namespace robotick::test
 			a->outputs.x = 123;
 			b->inputs.x = 999; // Should get overwritten
 
-			std::vector<DataConnectionSeed> seeds = {{"A.outputs.x", "B.inputs.x"}};
+			std::vector<DataConnectionSeed_v1> seeds = {{"A.outputs.x", "B.inputs.x"}};
 			std::vector<DataConnectionInfo> resolved =
 				DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine));
 
@@ -298,7 +298,7 @@ namespace robotick::test
 			Engine engine;
 			engine.load(model);
 
-			std::vector<DataConnectionSeed> seeds = {{"A.outputs.out_blackboard.missing", "B.inputs.in_blackboard.x"}};
+			std::vector<DataConnectionSeed_v1> seeds = {{"A.outputs.out_blackboard.missing", "B.inputs.in_blackboard.x"}};
 
 			ROBOTICK_REQUIRE_ERROR_MSG(
 				DataConnectionsFactory::create(EngineInspector::get_workloads_buffer(engine), seeds, EngineInspector::get_all_instance_info(engine)),
@@ -315,7 +315,7 @@ namespace robotick::test
 			Engine engine;
 			engine.load(model);
 
-			std::vector<DataConnectionSeed> seeds = {
+			std::vector<DataConnectionSeed_v1> seeds = {
 				{"A.outputs.out_blackboard.x", "B.inputs.in_blackboard.x"},
 				{"A.outputs.out_blackboard.y", "B.inputs.in_blackboard.y"},
 			};

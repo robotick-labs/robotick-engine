@@ -28,7 +28,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEBUG",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEBUG -DROBOTICK_ENABLE_MODEL_HEAP",
                 "ROBOTICK_BUILD_TESTS": "ON"
             }
         },
@@ -38,7 +38,7 @@
             "description": "Ubuntu Development build (optimized with probes)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-                "CMAKE_CXX_FLAGS_DEBUG": "-g -O1 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEV",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O1 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEV -DROBOTICK_ENABLE_MODEL_HEAP",
                 "ROBOTICK_BUILD_CONFIG_DEVELOPMENT": "ON"
             }
         },
@@ -48,7 +48,7 @@
             "description": "Ubuntu Release build (stripped, fastest)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_CXX_FLAGS_DEBUG": "-DNDEBUG -DROBOTICK_RELEASE",
+                "CMAKE_CXX_FLAGS_DEBUG": "-DNDEBUG -DROBOTICK_RELEASE -DROBOTICK_ENABLE_MODEL_HEAP",
                 "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
                 "ROBOTICK_STRIP_PROBES": "ON"
             }

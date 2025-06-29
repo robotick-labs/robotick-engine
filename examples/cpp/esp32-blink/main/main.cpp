@@ -33,7 +33,7 @@ void create_threaded_model(robotick::Model_v1& model)
 	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0);
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "timing_diag");
 
-	std::vector<robotick::WorkloadHandle> children = {console, test_state_1};
+	std::vector<robotick::WorkloadHandle_v1> children = {console, test_state_1};
 
 	auto root = model.add("SyncedGroupWorkload", "root", children, 100.0);
 	model.set_root(root);
@@ -44,7 +44,7 @@ void create_non_threaded_model(robotick::Model_v1& model)
 	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0);
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "timing_diag");
 
-	std::vector<robotick::WorkloadHandle> children = {console, test_state_1};
+	std::vector<robotick::WorkloadHandle_v1> children = {console, test_state_1};
 
 	auto root = model.add("SequencedGroupWorkload", "root", children, 100.0);
 	model.set_root(root);

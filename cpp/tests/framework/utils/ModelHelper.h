@@ -15,7 +15,7 @@ namespace robotick::test::model_helpers
 	static void wrap_all_in_sequenced_group(Model_v1& model, double tick_rate_hz = 100.0)
 	{
 		const auto& seeds = model.get_workload_seeds();
-		std::vector<WorkloadHandle> all_handles;
+		std::vector<WorkloadHandle_v1> all_handles;
 
 		for (uint32_t i = 0; i < static_cast<uint32_t>(seeds.size()); ++i)
 		{

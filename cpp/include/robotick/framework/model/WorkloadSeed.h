@@ -18,21 +18,19 @@ namespace robotick
 {
 	using ConfigEntry = Pair<FixedString64, FixedString64>;
 
-	struct WorkloadSeed_v2
+	struct WorkloadSeed
 	{
-		WorkloadSeed_v2() = default;
+		WorkloadSeed() = default;
 
-		WorkloadSeed_v2(const WorkloadRegistryEntry* type, const char* name) : type(type), name(name)
-		{
-		}
+		WorkloadSeed(const TypeDescriptor& type, const char* name) : type(&type), name(name) {}
 
 		// Public data access
-		const WorkloadRegistryEntry* type = nullptr;
+		const TypeDescriptor* type = nullptr;
 		StringView name = nullptr;
 
 		float tick_rate_hz = 0.0f;
 
-		ArrayView<const WorkloadSeed_v2*> children;
+		ArrayView<const WorkloadSeed*> children;
 
 		ArrayView<ConfigEntry> config;
 		ArrayView<ConfigEntry> inputs;
@@ -40,24 +38,26 @@ namespace robotick
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 		// Dynamic Setters (for use on platforms where we can afford the heap-usage)
-		WorkloadSeed_v2& set_tick_rate_hz(float rate);
+		WorkloadSeed& set_tick_rate_hz(float rate);
 
-		template <size_t N> WorkloadSeed_v2& set_children(const WorkloadSeed_v2* const (&in_children)[N]);
-		template <size_t N> WorkloadSeed_v2& set_config(const ConfigEntry (&in_config)[N]);
-		template <size_t N> WorkloadSeed_v2& set_inputs(const ConfigEntry (&in_inputs)[N]);
+		template <size_t N> WorkloadSeed& set_children(const WorkloadSeed* const (&in_children)[N]);
+		template <size_t N> WorkloadSeed& set_config(const ConfigEntry (&in_config)[N]);
+		template <size_t N> WorkloadSeed& set_inputs(const ConfigEntry (&in_inputs)[N]);
 
 	  private:
 		FixedString64 type_storage;
 		FixedString64 name_storage;
 
-		HeapVector<const WorkloadSeed_v2*> children_storage;
+		HeapVector<const WorkloadSeed*> children_storage;
 		HeapVector<ConfigEntry> config_storage;
 		HeapVector<ConfigEntry> inputs_storage;
 
 #endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 	};
 
-	template <size_t N> WorkloadSeed_v2& WorkloadSeed_v2::set_children(const WorkloadSeed_v2* const (&in_children)[N])
+#ifdef ROBOTICK_ENABLE_MODEL_HEAP
+
+	template <size_t N> WorkloadSeed& WorkloadSeed::set_children(const WorkloadSeed* const (&in_children)[N])
 	{
 		if (children_storage.size() > 0)
 			ROBOTICK_FATAL_EXIT("set_children() may only be called once");
@@ -71,7 +71,7 @@ namespace robotick
 		return *this;
 	}
 
-	template <size_t N> WorkloadSeed_v2& WorkloadSeed_v2::set_config(const ConfigEntry (&in_config)[N])
+	template <size_t N> WorkloadSeed& WorkloadSeed::set_config(const ConfigEntry (&in_config)[N])
 	{
 		if (config_storage.size() > 0)
 			ROBOTICK_FATAL_EXIT("set_config() may only be called once");
@@ -85,7 +85,7 @@ namespace robotick
 		return *this;
 	}
 
-	template <size_t N> WorkloadSeed_v2& WorkloadSeed_v2::set_inputs(const ConfigEntry (&in_inputs)[N])
+	template <size_t N> WorkloadSeed& WorkloadSeed::set_inputs(const ConfigEntry (&in_inputs)[N])
 	{
 		if (inputs_storage.size() > 0)
 			ROBOTICK_FATAL_EXIT("set_inputs() may only be called once");
@@ -98,5 +98,7 @@ namespace robotick
 
 		return *this;
 	}
+
+#endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 } // namespace robotick

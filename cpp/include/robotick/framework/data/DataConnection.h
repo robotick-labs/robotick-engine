@@ -21,7 +21,7 @@ namespace robotick
 	class WorkloadInstanceInfo;
 	struct WorkloadsBuffer;
 
-	struct DataConnectionSeed
+	struct DataConnectionSeed_v1
 	{
 		std::string source_field_path;
 		std::string dest_field_path;
@@ -29,7 +29,7 @@ namespace robotick
 
 	struct DataConnectionInfo
 	{
-		const DataConnectionSeed seed; // intentional copy of the original seed for safety
+		const DataConnectionSeed_v1 seed; // intentional copy of the original seed for safety
 		const void* source_ptr = nullptr;
 		void* dest_ptr = nullptr;
 		const WorkloadInstanceInfo* source_workload = nullptr;
@@ -73,7 +73,7 @@ namespace robotick
 	{
 	  public:
 		static std::vector<DataConnectionInfo> create(
-			WorkloadsBuffer& workloads_buffer, const std::vector<DataConnectionSeed>& seeds, const std::vector<WorkloadInstanceInfo>& instances);
+			WorkloadsBuffer& workloads_buffer, const std::vector<DataConnectionSeed_v1>& seeds, const std::vector<WorkloadInstanceInfo>& instances);
 	};
 
 } // namespace robotick

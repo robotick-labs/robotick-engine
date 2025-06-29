@@ -7,7 +7,7 @@
 #include "robotick/framework/common/ArrayView.h"
 #include "robotick/framework/common/List.h"
 #include "robotick/framework/common/StringView.h"
-#include "robotick/framework/model_v2/DataConnectionSeed.h"
+#include "robotick/framework/model/DataConnectionSeed.h"
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 #include "robotick/framework/common/FixedString.h"
@@ -16,11 +16,11 @@
 
 namespace robotick
 {
-	class Model_v2;
+	class Model;
 
 	struct RemoteModelSeed_v2
 	{
-		friend class Model_v2;
+		friend class Model;
 
 		StringView model_name = nullptr;
 
@@ -32,7 +32,7 @@ namespace robotick
 		} comms_mode = Mode::Local;
 
 		StringView comms_channel = nullptr; // e.g. "/dev/ttyUSB0", "192.168.1.42", etc.
-		const Model_v2* model = nullptr;
+		const Model* model = nullptr;
 
 		ArrayView<DataConnectionSeed_v2*> remote_data_connection_seeds;
 

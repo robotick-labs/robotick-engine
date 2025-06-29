@@ -35,7 +35,7 @@ namespace robotick
 			ROBOTICK_FATAL_EXIT("Unknown remote model ID: %s", model_id.c_str());
 		}
 
-		RemoteModelSeed& remote_model = it->second;
+		RemoteModelSeed_v1& remote_model = it->second;
 
 		// Prevent duplicate incoming remote-connections
 		if (std::any_of(remote_model.remote_data_connection_seeds.begin(), remote_model.remote_data_connection_seeds.end(),
@@ -100,9 +100,9 @@ namespace robotick
 	{
 		ROBOTICK_ASSERT(root_workload.is_valid() && "Model_v1 root must be set before validation");
 
-		std::function<void(WorkloadHandle, double)> validate_recursively = [&](WorkloadHandle handle, double parent_tick_rate)
+		std::function<void(WorkloadHandle_v1, double)> validate_recursively = [&](WorkloadHandle_v1 handle, double parent_tick_rate)
 		{
-			WorkloadSeed& seed = workload_seeds[handle.index];
+			WorkloadSeed_v1& seed = workload_seeds[handle.index];
 
 			// Inherit tick rate if using TICK_RATE_FROM_PARENT (tick_rate_hz==0.0)
 			if (seed.tick_rate_hz == TICK_RATE_FROM_PARENT)
@@ -114,14 +114,14 @@ namespace robotick
 				ROBOTICK_FATAL_EXIT("Child workload cannot have faster tick rate than parent");
 			}
 			// Recurse through children
-			for (WorkloadHandle child : seed.children)
+			for (WorkloadHandle_v1 child : seed.children)
 			{
 				validate_recursively(child, seed.tick_rate_hz);
 			}
 		};
 
 		// Root can run at any tick rate, but must be explicitly set
-		WorkloadSeed& root_seed = workload_seeds[root_workload.index];
+		WorkloadSeed_v1& root_seed = workload_seeds[root_workload.index];
 		if (root_seed.tick_rate_hz == TICK_RATE_FROM_PARENT)
 		{
 			ROBOTICK_FATAL_EXIT("Root workload must have an explicit tick rate");
@@ -131,7 +131,7 @@ namespace robotick
 
 		// validate data-connections:
 		std::set<std::string> connected_inputs;
-		for (const DataConnectionSeed& data_connection_seed : data_connection_seeds)
+		for (const DataConnectionSeed_v1& data_connection_seed : data_connection_seeds)
 		{
 			// (1) only a single incoming connection to any given input
 			const bool dest_already_has_connection = connected_inputs.find(data_connection_seed.dest_field_path) != connected_inputs.end();
@@ -153,19 +153,19 @@ namespace robotick
 		}
 	}
 
-	WorkloadHandle Model_v1::add(
+	WorkloadHandle_v1 Model_v1::add(
 		const std::string& type, const std::string& name, double tick_rate_hz, const std::map<std::string, std::string>& config)
 	{
 		if (root_workload.is_valid())
 			ROBOTICK_FATAL_EXIT("Cannot add workloads after root has been set. Model_v1 root must be set last.");
 
-		const std::vector<WorkloadHandle> children = {};
+		const std::vector<WorkloadHandle_v1> children = {};
 		workload_seeds.push_back({type, name, tick_rate_hz, children, config});
 		return {static_cast<uint32_t>(workload_seeds.size() - 1)};
 	}
 
-	WorkloadHandle Model_v1::add(const std::string& type, const std::string& name, const std::vector<WorkloadHandle>& children, double tick_rate_hz,
-		const std::map<std::string, std::string>& config)
+	WorkloadHandle_v1 Model_v1::add(const std::string& type, const std::string& name, const std::vector<WorkloadHandle_v1>& children,
+		double tick_rate_hz, const std::map<std::string, std::string>& config)
 	{
 		if (root_workload.is_valid())
 			ROBOTICK_FATAL_EXIT("Cannot add workloads after root has been set. Model_v1 root must be set last.");
@@ -206,12 +206,12 @@ namespace robotick
 		const std::string mode = comms_channel.substr(0, separator);
 		const std::string address = comms_channel.substr(separator + 1);
 
-		RemoteModelSeed seed;
+		RemoteModelSeed_v1 seed;
 		seed.model_name = model_name;
 
 		if (mode == "ip")
 		{
-			seed.comms_mode = RemoteModelSeed::Mode::IP;
+			seed.comms_mode = RemoteModelSeed_v1::Mode::IP;
 		}
 		else
 		{
@@ -224,7 +224,7 @@ namespace robotick
 		remote_models[model_name] = std::move(seed);
 	}
 
-	void Model_v1::set_root(WorkloadHandle handle, const bool auto_finalize)
+	void Model_v1::set_root(WorkloadHandle_v1 handle, const bool auto_finalize)
 	{
 		root_workload = handle; // no more changes once root has been set, so good time to validate the model...
 		if (auto_finalize)
