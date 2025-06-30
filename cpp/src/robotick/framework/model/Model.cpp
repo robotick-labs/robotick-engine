@@ -13,21 +13,25 @@ namespace robotick
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
-	WorkloadSeed& Model::add(const char* type, const char* name)
+	WorkloadSeed& Model::add()
 	{
 		if (root_workload)
 		{
 			ROBOTICK_FATAL_EXIT("Cannot add workloads after root has been set. Root must be set last.");
 		}
 
+		if (workload_seeds.size() > 0)
+		{
+			ROBOTICK_FATAL_EXIT("Model::add() (dynamic models) called after Model::use_workload_seeds() (non-dynamic models) has been called");
+		}
+
 		WorkloadSeed& seed = workload_seeds_storage.push_back();
-		seed.type = TypeRegistry::get().find_by_id(TypeId(type));
-		seed.name = strings_storage.push_back(FixedString64(name)).c_str();
-
-		if (!seed.type)
-			ROBOTICK_FATAL_EXIT("Unable to find type '%s' for workload '%s'", type, name);
-
 		return seed;
+	}
+
+	WorkloadSeed& Model::add(const char* type_name, const char* name)
+	{
+		return add().set_type_name(type_name).set_name(name);
 	}
 
 	void Model::connect(const char* source_field_path, const char* dest_field_path)
@@ -194,9 +198,25 @@ namespace robotick
 
 #endif // ROBOTICK_ENABLE_MODEL_HEAP
 
-	void Model::set_workloads(const WorkloadSeed** all_workloads, size_t num_workloads)
+	void Model::use_workload_seeds(const WorkloadSeed** all_workloads, size_t num_workloads)
 	{
+		if (workload_seeds_storage.size() > 0)
+		{
+			ROBOTICK_FATAL_EXIT("Model::use_workload_seeds() (non-dynamic models) called after Model::add() (dynamic models) has been called");
+		}
+
 		workload_seeds = ArrayView<const WorkloadSeed*>(all_workloads, num_workloads);
+	}
+
+	void Model::use_data_connection_seeds(const DataConnectionSeed** in_connections, size_t num_connections)
+	{
+		if (data_connection_seeds_storage.size() > 0)
+		{
+			ROBOTICK_FATAL_EXIT(
+				"Model::use_data_connection_seeds() (non-dynamic models) called after Model::connect() (dynamic models) has been called");
+		}
+
+		data_connection_seeds = ArrayView<const DataConnectionSeed*>(in_connections, num_connections);
 	}
 
 	void Model::set_root_workload(const WorkloadSeed& root, bool auto_finalize)
@@ -215,9 +235,13 @@ namespace robotick
 			ROBOTICK_FATAL_EXIT("Model::validate: root workload must be set");
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
-		bake_dynamic_workloads();
-		bake_dynamic_data_connections();
-		bake_dynamic_remote_models();
+		const bool has_dynamic_workloads = workload_seeds_storage.size() > 0;
+		if (has_dynamic_workloads)
+		{
+			bake_dynamic_workloads();
+			bake_dynamic_data_connections();
+			bake_dynamic_remote_models();
+		}
 #endif
 
 		// Ensure unique input destinations
@@ -245,7 +269,10 @@ namespace robotick
 				if (child_workload->tick_rate_hz > parent_rate)
 				{
 					ROBOTICK_FATAL_EXIT("Child workload '%s' has faster tick rate (%.2f Hz) than parent '%s' (%.2f Hz).",
-						child_workload->name.c_str(), child_workload->tick_rate_hz, parent_workload->name.c_str(), parent_rate);
+						child_workload->name.c_str(),
+						child_workload->tick_rate_hz,
+						parent_workload->name.c_str(),
+						parent_rate);
 				}
 			}
 		}

@@ -1,8 +1,8 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/model/Model.h"
 #include "robotick/framework/Engine.h"
+#include "robotick/framework/model/Model.h"
 
 #include <catch2/catch_all.hpp>
 
@@ -68,11 +68,11 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 		REQUIRE(seeds.size() == 2);
 		REQUIRE(((seeds[0] == &one && seeds[1] == &two) || (seeds[1] == &one && seeds[0] == &two)));
 
-		REQUIRE(one.type->id == GET_TYPE_ID(DummyModelWorkload));
+		REQUIRE(one.type_id == TypeId("DummyModelWorkload"));
 		REQUIRE(one.name == "One");
 		REQUIRE(one.tick_rate_hz == s_tick_100hz);
 
-		REQUIRE(two.type->id == GET_TYPE_ID(DummyModelWorkload));
+		REQUIRE(two.type_id == TypeId("DummyModelWorkload"));
 		REQUIRE(two.name == "Two");
 		REQUIRE(two.tick_rate_hz == s_tick_200hz);
 	}
@@ -224,21 +224,21 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 			if (strcmp(seed->name.c_str(), "A") == 0)
 			{
 				found_a = seed;
-				CHECK(strcmp(seed->type->name.c_str(), "DummyModelWorkload") == 0);
+				CHECK(seed->type_id == TypeId("DummyModelWorkload"));
 				CHECK(seed->tick_rate_hz == s_tick_100hz);
 				CHECK(seed->children.size() == 0);
 			}
 			else if (strcmp(seed->name.c_str(), "B") == 0)
 			{
 				found_b = seed;
-				CHECK(strcmp(seed->type->name.c_str(), "DummyModelWorkload") == 0);
+				CHECK(seed->type_id == TypeId("DummyModelWorkload"));
 				CHECK(seed->tick_rate_hz == s_tick_100hz);
 				CHECK(seed->children.size() == 0);
 			}
 			else if (strcmp(seed->name.c_str(), "Group") == 0)
 			{
 				found_group = seed;
-				CHECK(strcmp(seed->type->name.c_str(), "DummyModelWorkload") == 0);
+				CHECK(seed->type_id == TypeId("DummyModelWorkload"));
 				CHECK(seed->tick_rate_hz == s_tick_100hz);
 			}
 			else

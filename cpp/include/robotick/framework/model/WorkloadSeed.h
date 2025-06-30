@@ -22,20 +22,59 @@ namespace robotick
 	{
 		WorkloadSeed() = default;
 
-		WorkloadSeed(const TypeDescriptor& type, const char* name) : type(&type), name(name) {}
+		WorkloadSeed(const char* type_name, const char* name)
+			: type_id(type_name)
+			, name(name)
+		{
+		}
+
+		WorkloadSeed(const TypeId& type_id,
+			const StringView& name,
+			float tick_rate_hz,
+			const ArrayView<const WorkloadSeed*>& children = {},
+			const ArrayView<const ConfigEntry>& config = {},
+			const ArrayView<const ConfigEntry>& inputs = {})
+			: type_id(type_id)
+			, name(name)
+			, tick_rate_hz(tick_rate_hz)
+			, children(children)
+			, config(config)
+			, inputs(inputs)
+		{
+		}
 
 		// Public data access
-		const TypeDescriptor* type = nullptr;
+		TypeId type_id;
 		StringView name = nullptr;
 
 		float tick_rate_hz = 0.0f;
 
 		ArrayView<const WorkloadSeed*> children;
 
-		ArrayView<ConfigEntry> config;
-		ArrayView<ConfigEntry> inputs;
+		ArrayView<const ConfigEntry> config;
+		ArrayView<const ConfigEntry> inputs;
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
+
+		WorkloadSeed& set_type_name(const char* type_name)
+		{
+			if (!TypeRegistry::get().find_by_id(TypeId(type_name)))
+				ROBOTICK_FATAL_EXIT("Unable to find type '%s' for workload", type_name);
+
+			type_id = TypeId(type_name);
+			return *this;
+		}
+
+		WorkloadSeed& set_name(const char* in_name)
+		{
+			if (!in_name || !*in_name)
+				ROBOTICK_FATAL_EXIT("Null or empty name specified for workload-seed");
+
+			name_storage = in_name;
+			name = name_storage.c_str();
+
+			return *this;
+		}
 
 		// Dynamic Setters (for use on platforms where we can afford the heap-usage)
 		WorkloadSeed& set_tick_rate_hz(const float in_tick_rate_hz)
@@ -53,7 +92,6 @@ namespace robotick
 		template <size_t N> WorkloadSeed& set_inputs(const ConfigEntry (&in_inputs)[N]);
 
 	  private:
-		FixedString64 type_storage;
 		FixedString64 name_storage;
 
 		HeapVector<const WorkloadSeed*> children_storage;
@@ -88,7 +126,7 @@ namespace robotick
 		for (size_t i = 0; i < N; ++i)
 			config_storage.data()[i] = in_config[i];
 
-		config.use(config_storage);
+		config.use(config_storage.data(), config_storage.size());
 
 		return *this;
 	}
@@ -102,7 +140,7 @@ namespace robotick
 		for (size_t i = 0; i < N; ++i)
 			inputs_storage.data()[i] = in_inputs[i];
 
-		inputs.use(inputs_storage);
+		inputs.use(inputs_storage.data(), inputs_storage.size());
 
 		return *this;
 	}

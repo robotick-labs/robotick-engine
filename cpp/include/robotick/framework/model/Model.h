@@ -24,24 +24,36 @@ namespace robotick
 	{
 	  public:
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
-		WorkloadSeed& add(const char* type, const char* name);
+		// dynamic modifiers and accessor(s):
+		WorkloadSeed& add();
+		WorkloadSeed& add(const char* type_name, const char* name);
 		void connect(const char* source_field_path, const char* dest_field_path);
 		void add_remote_model(const Model& remote_model, const char* model_name, const char* comms_channel);
 
+		const List<WorkloadSeed>& get_workload_seeds_storage() const { return workload_seeds_storage; }
+
 #endif
-		void set_workloads(const WorkloadSeed** all_workloads, size_t num_workloads);
+		// non-dynamic modifiers:
+		template <size_t N> void use_workload_seeds(const WorkloadSeed* (&in_seeds)[N]) { use_workload_seeds(in_seeds, N); }
+		void use_workload_seeds(const WorkloadSeed** all_workloads, size_t num_workloads);
+
+		template <size_t N> void use_data_connection_seeds(const DataConnectionSeed* (&in_connections)[N])
+		{
+			use_data_connection_seeds(in_connections, N);
+		}
+		void use_data_connection_seeds(const DataConnectionSeed** in_connections, size_t num_connections);
 
 		void set_root_workload(const WorkloadSeed& root_workload, bool auto_finalize_and_validate = true);
 
+		// general-purpose finalise function (bakes and validates as needed):
+		void finalize();
+
+		// accessors:
 		const ArrayView<const WorkloadSeed*>& get_workload_seeds() const { return workload_seeds; }
-
 		const ArrayView<const DataConnectionSeed*>& get_data_connection_seeds() const { return data_connection_seeds; }
-
 		const ArrayView<const RemoteModelSeed*>& get_remote_models() const { return remote_models; }
 
 		const WorkloadSeed* get_root_workload() const { return root_workload; }
-
-		void finalize();
 
 	  protected:
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
@@ -63,7 +75,6 @@ namespace robotick
 		List<WorkloadSeed> workload_seeds_storage;
 		List<DataConnectionSeed> data_connection_seeds_storage;
 		List<RemoteModelSeed> remote_models_storage;
-		List<FixedString64> strings_storage;
 
 		HeapVector<const WorkloadSeed*> baked_workload_ptrs;
 		HeapVector<const DataConnectionSeed*> baked_data_connection_ptrs;

@@ -14,3 +14,9 @@ AlignAfterOpenBracket: DontAlign
 AllowShortLambdasOnASingleLine: Empty
 BreakBeforeBraces: Allman
 AlignConsecutiveDeclarations: false
+
+# Struct init formatting
+Cpp11BracedListStyle: true
+BinPackArguments: false
+BinPackParameters: false
+BreakConstructorInitializers: BeforeComma

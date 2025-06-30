@@ -14,6 +14,14 @@ namespace robotick
 {
 	struct DataConnectionSeed
 	{
+		DataConnectionSeed() = default;
+
+		DataConnectionSeed(const char* source_field_path, const char* dest_field_path)
+			: source_field_path(source_field_path)
+			, dest_field_path(dest_field_path)
+		{
+		}
+
 		StringView source_field_path = nullptr;
 		StringView dest_field_path = nullptr;
 
