@@ -6,42 +6,45 @@
 
 namespace robotick::test
 {
-	TEST_CASE("Unit/Framework/Common/FixedString/Construct and compare")
+	TEST_CASE("Unit/Framework/Common/FixedString")
 	{
-		FixedString32 a("hello");
-		FixedString32 b("hello");
-		FixedString32 c("world");
+		SECTION("Construct and compare")
+		{
+			FixedString32 a("hello");
+			FixedString32 b("hello");
+			FixedString32 c("world");
 
-		CHECK(a == b);
-		CHECK(a != c);
-		CHECK(!(a < b));
-		CHECK(a < c);
-		CHECK(strcmp(a.c_str(), "hello") == 0);
-	}
+			CHECK(a == b);
+			CHECK(a != c);
+			CHECK(!(a < b));
+			CHECK(a < c);
+			CHECK(strcmp(a.c_str(), "hello") == 0);
+		}
 
-	TEST_CASE("Unit/Framework/Common/FixedString/Assignment and truncation")
-	{
-		FixedString8 s;
-		s = "toolongname"; // will truncate
-		CHECK(s.length() == 7);
-		CHECK(s == "toolong");
-	}
+		SECTION("Assignment and truncation")
+		{
+			FixedString8 s;
+			s = "toolongname"; // will truncate
+			CHECK(s.length() == 7);
+			CHECK(s == "toolong");
+		}
 
-	TEST_CASE("Unit/Framework/Common/FixedString/Empty and length")
-	{
-		FixedString64 s;
-		CHECK(s.empty());
+		SECTION("Empty and length")
+		{
+			FixedString64 s;
+			CHECK(s.empty());
 
-		s = "abc";
-		CHECK(!s.empty());
-		CHECK(s.length() == 3);
-	}
+			s = "abc";
+			CHECK(!s.empty());
+			CHECK(s.length() == 3);
+		}
 
-	TEST_CASE("Unit/Framework/Common/FixedString/Hash consistent for equal strings")
-	{
-		FixedString32 a("matchme");
-		FixedString32 b("matchme");
+		SECTION("Hash consistent for equal strings")
+		{
+			FixedString32 a("matchme");
+			FixedString32 b("matchme");
 
-		CHECK(hash(a) == hash(b));
+			CHECK(hash(a) == hash(b));
+		}
 	}
 } // namespace robotick::test

@@ -126,7 +126,7 @@ namespace robotick
 	};
 
 	std::vector<DataConnectionInfo> DataConnectionsFactory::create(
-		WorkloadsBuffer& workloads_buffer, const std::vector<DataConnectionSeed>& seeds, const std::vector<WorkloadInstanceInfo>& instances)
+		WorkloadsBuffer& workloads_buffer, const std::vector<DataConnectionSeed_v1>& seeds, const std::vector<WorkloadInstanceInfo>& instances)
 	{
 		std::vector<DataConnectionInfo> results;
 		std::unordered_set<std::string> seen_destinations;

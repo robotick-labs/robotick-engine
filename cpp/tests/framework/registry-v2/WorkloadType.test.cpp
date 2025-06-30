@@ -2,6 +2,8 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/api.h"
+
 #include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/data/Blackboard_v2.h"
 #include "robotick/framework/math/Vec3.h"

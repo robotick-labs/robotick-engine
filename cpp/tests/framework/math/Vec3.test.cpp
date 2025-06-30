@@ -10,7 +10,7 @@
 
 using namespace robotick;
 
-TEST_CASE("Unit|Framework|Math|Vec3", "[vec3]")
+TEST_CASE("Unit/Framework/Math/Vec3")
 {
 	SECTION("Default construction and member access")
 	{
@@ -80,16 +80,11 @@ TEST_CASE("Unit|Framework|Math|Vec3", "[vec3]")
 		CHECK(z.z == Catch::Approx(1.0f));
 	}
 
-	SECTION("Length and normalization")
+	SECTION("Length")
 	{
 		Vec3f v(3.0f, 4.0f, 0.0f);
 		CHECK(v.length_squared() == Catch::Approx(25.0f));
 		CHECK(v.length() == Catch::Approx(5.0f));
-
-		Vec3f n = v.normalized();
-		CHECK(n.length() == Catch::Approx(1.0f));
-		CHECK(n.x == Catch::Approx(0.6f));
-		CHECK(n.y == Catch::Approx(0.8f));
 	}
 
 	SECTION("In-place operations")

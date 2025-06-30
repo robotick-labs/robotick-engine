@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "robotick/api.h"
+#include <cstddef>
 
 namespace robotick
 {
@@ -90,7 +90,7 @@ namespace robotick
 
 		T& push_back(T&& value)
 		{
-			Node* node = new Node{std::move(value), nullptr};
+			Node* node = new Node{static_cast<T&&>(value), nullptr};
 			if (tail)
 			{
 				tail->next = node;

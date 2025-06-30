@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "robotick/framework/registry-v2/TypeRegistry.h"
+#include "robotick/framework/registry-v2/TypeDescriptor.h"
 #include "robotick/framework/registry-v2/WorkloadTypeHelpers.h"
 
 namespace robotick
@@ -11,9 +11,8 @@ namespace robotick
 	/// @brief AutoRegisterType - type-registration helper common to all the below macros
 	struct AutoRegisterType
 	{
-		explicit AutoRegisterType(const TypeDescriptor& desc) { TypeRegistry::get().register_type(desc); }
+		explicit AutoRegisterType(const TypeDescriptor& desc);
 	};
-
 } // namespace robotick
 
 /// @brief Macro to register Primitives:

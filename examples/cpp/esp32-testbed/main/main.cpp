@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/platform/EntryPoint.h"
 #include "robotick/platform/NetworkManager.h"
@@ -33,16 +33,11 @@ namespace robotick
 
 } // namespace robotick
 
-void populate_model(robotick::Model& model)
+void populate_model(robotick::Model_v1& model)
 {
-	std::vector<robotick::WorkloadHandle> children = 
-	{
-		model.add("BaseXWorkload", "basex"),
-		model.add("ConsoleTelemetryWorkload", "console"),
-		model.add("FaceDisplayWorkload", "face_display"),
-		model.add("SteeringMixerWorkload", "steering"),
-		model.add("TimingDiagnosticsWorkload", "timing")
-	};
+	std::vector<robotick::WorkloadHandle_v1> children = {model.add("BaseXWorkload", "basex"), model.add("ConsoleTelemetryWorkload", "console"),
+		model.add("FaceDisplayWorkload", "face_display"), model.add("SteeringMixerWorkload", "steering"),
+		model.add("TimingDiagnosticsWorkload", "timing")};
 
 	auto root = model.add("SequencedGroupWorkload", "root", children, 100.0);
 	model.set_root(root);
@@ -54,7 +49,7 @@ void run_engine_on_core1(void* param)
 
 	auto* engine = static_cast<robotick::Engine*>(param);
 
-	robotick::Model model;
+	robotick::Model_v1 model;
 	populate_model(model);
 
 	ROBOTICK_INFO("esp32-testbed - Loading Robotick model...");
@@ -84,14 +79,14 @@ ROBOTICK_ENTRYPOINT
 
 	robotick::NetworkClientConfig client_config;
 	client_config.type = hotspot_config.type;
-    client_config.iface = "wlan0"; // TBC - may not even be needed on ESP?
-    client_config.ssid = hotspot_config.ssid;
-    client_config.password = hotspot_config.password;
+	client_config.iface = "wlan0"; // TBC - may not even be needed on ESP?
+	client_config.ssid = hotspot_config.ssid;
+	client_config.password = hotspot_config.password;
 
 	ROBOTICK_INFO("==============================================================\n");
 	ROBOTICK_INFO("BARR.e Brain - connecting to wifi hotspot...");
 	const bool hotspot_success = robotick::NetworkClient::connect(client_config);
-	if(!hotspot_success)
+	if (!hotspot_success)
 	{
 		ROBOTICK_FATAL_EXIT("BARR.e Brain - Failed to connect to wifi-hotspot!");
 	}

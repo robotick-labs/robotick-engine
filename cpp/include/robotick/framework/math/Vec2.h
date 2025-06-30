@@ -27,92 +27,83 @@ namespace robotick
 
 	// --- Templated base class ---
 
-	template <typename TDerived, typename TReal> struct Vec3Base
+	template <typename TDerived, typename TReal> struct Vec2Base
 	{
 		using TElement = TReal;
 
 		TReal x = static_cast<TReal>(0);
 		TReal y = static_cast<TReal>(0);
-		TReal z = static_cast<TReal>(0);
 
-		Vec3Base() = default;
-		Vec3Base(TReal x, TReal y, TReal z)
+		Vec2Base() = default;
+		Vec2Base(TReal x, TReal y)
 			: x(x)
 			, y(y)
-			, z(z)
 		{
 		}
 
-		TDerived operator+(const TDerived& rhs) const { return TDerived(x + rhs.x, y + rhs.y, z + rhs.z); }
-		TDerived operator-(const TDerived& rhs) const { return TDerived(x - rhs.x, y - rhs.y, z - rhs.z); }
-		TDerived operator*(TReal scalar) const { return TDerived(x * scalar, y * scalar, z * scalar); }
+		TDerived operator+(const TDerived& rhs) const { return TDerived(x + rhs.x, y + rhs.y); }
+		TDerived operator-(const TDerived& rhs) const { return TDerived(x - rhs.x, y - rhs.y); }
+		TDerived operator*(TReal scalar) const { return TDerived(x * scalar, y * scalar); }
 		TDerived operator/(TReal scalar) const
 		{
 			ROBOTICK_ASSERT_MSG((fabsf((float)scalar) > kFloatEpsilon), "Divide by zero requested!");
-			return TDerived(x / scalar, y / scalar, z / scalar);
+			return TDerived(x / scalar, y / scalar);
 		}
 
 		TDerived& operator+=(const TDerived& rhs)
 		{
 			x += rhs.x;
 			y += rhs.y;
-			z += rhs.z;
 			return static_cast<TDerived&>(*this);
 		}
 		TDerived& operator-=(const TDerived& rhs)
 		{
 			x -= rhs.x;
 			y -= rhs.y;
-			z -= rhs.z;
 			return static_cast<TDerived&>(*this);
 		}
 		TDerived& operator*=(TReal scalar)
 		{
 			x *= scalar;
 			y *= scalar;
-			z *= scalar;
 			return static_cast<TDerived&>(*this);
 		}
 		TDerived& operator/=(TReal scalar)
 		{
 			ROBOTICK_ASSERT_MSG((fabsf((float)scalar) > kFloatEpsilon), "Divide by zero requested (in-place)!");
-
 			x /= scalar;
 			y /= scalar;
-			z /= scalar;
 			return static_cast<TDerived&>(*this);
 		}
 
-		TReal dot(const TDerived& rhs) const { return x * rhs.x + y * rhs.y + z * rhs.z; }
+		TReal dot(const TDerived& rhs) const { return x * rhs.x + y * rhs.y; }
 
-		TDerived cross(const TDerived& rhs) const { return TDerived(y * rhs.z - z * rhs.y, z * rhs.x - x * rhs.z, x * rhs.y - y * rhs.x); }
-
-		TReal length_squared() const { return x * x + y * y + z * z; }
+		TReal length_squared() const { return x * x + y * y; }
 
 		TReal length() const { return internal::SqrtFn<TReal>::apply(length_squared()); }
 	};
 
 	// --- Final types (can be forward-declared) ---
 
-	struct Vec3f : public Vec3Base<Vec3f, float>
+	struct Vec2f : public Vec2Base<Vec2f, float>
 	{
-		using Vec3Base::Vec3Base;
+		using Vec2Base::Vec2Base;
 	};
 
-	struct Vec3d : public Vec3Base<Vec3d, double>
+	struct Vec2d : public Vec2Base<Vec2d, double>
 	{
-		using Vec3Base::Vec3Base;
+		using Vec2Base::Vec2Base;
 	};
 
 #if defined(ROBOTICK_DEFAULT_REAL_IS_DOUBLE)
-	struct Vec3 : public Vec3Base<Vec3, double>
+	struct Vec2 : public Vec2Base<Vec2, double>
 	{
-		using Vec3Base::Vec3Base;
+		using Vec2Base::Vec2Base;
 	};
 #else
-	struct Vec3 : public Vec3Base<Vec3, float>
+	struct Vec2 : public Vec2Base<Vec2, float>
 	{
-		using Vec3Base::Vec3Base;
+		using Vec2Base::Vec2Base;
 	};
 #endif
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/platform/Threading.h"
 
@@ -28,29 +28,29 @@ namespace robotick
 
 } // namespace robotick
 
-void create_threaded_model(robotick::Model& model)
+void create_threaded_model(robotick::Model_v1& model)
 {
 	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0);
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "timing_diag");
 
-	std::vector<robotick::WorkloadHandle> children = {console, test_state_1};
+	std::vector<robotick::WorkloadHandle_v1> children = {console, test_state_1};
 
 	auto root = model.add("SyncedGroupWorkload", "root", children, 100.0);
 	model.set_root(root);
 }
 
-void create_non_threaded_model(robotick::Model& model)
+void create_non_threaded_model(robotick::Model_v1& model)
 {
 	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0);
 	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "timing_diag");
 
-	std::vector<robotick::WorkloadHandle> children = {console, test_state_1};
+	std::vector<robotick::WorkloadHandle_v1> children = {console, test_state_1};
 
 	auto root = model.add("SequencedGroupWorkload", "root", children, 100.0);
 	model.set_root(root);
 }
 
-void create_simple_model(robotick::Model& model)
+void create_simple_model(robotick::Model_v1& model)
 {
 	auto root = model.add("HeartbeatDisplayWorkload", "heartbeat", 30.0);
 	model.set_root(root);
@@ -64,7 +64,7 @@ void run_engine_on_core1(void* param)
 
 	auto* engine = static_cast<robotick::Engine*>(param);
 
-	robotick::Model model;
+	robotick::Model_v1 model;
 	// create_threaded_model(model);
 	create_simple_model(model);
 

@@ -4,7 +4,7 @@
 #include "robotick/framework/Engine.h"
 
 #include "robotick/api.h"
-#include "robotick/framework/Model.h"
+#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
@@ -30,7 +30,7 @@ namespace robotick
 {
 	struct Engine::State
 	{
-		Model m_loaded_model;
+		Model_v1 m_loaded_model;
 		bool is_running = false;
 
 		WorkloadsBuffer workloads_buffer;
@@ -161,10 +161,10 @@ namespace robotick
 		}
 	}
 
-	void Engine::load(const Model& model)
+	void Engine::load(const Model_v1& model)
 	{
 		if (!model.get_root().is_valid())
-			ROBOTICK_FATAL_EXIT("Model has no root workload");
+			ROBOTICK_FATAL_EXIT("Model_v1 has no root workload");
 
 		state->instances.clear();
 		state->data_connections_all.clear();
@@ -449,7 +449,7 @@ namespace robotick
 			});
 	}
 
-	void Engine::setup_remote_engine_senders(const Model& model)
+	void Engine::setup_remote_engine_senders(const Model_v1& model)
 	{
 		const auto& remote_models = model.get_remote_models();
 
@@ -458,7 +458,7 @@ namespace robotick
 
 		for (const auto& remote_model_entry : remote_models)
 		{
-			const RemoteModelSeed& remote_model = remote_model_entry.second;
+			const RemoteModelSeed_v1& remote_model = remote_model_entry.second;
 
 			if (remote_model.remote_data_connection_seeds.size() == 0)
 			{
@@ -505,7 +505,7 @@ namespace robotick
 
 	void Engine::run(const AtomicFlag& stop_after_next_tick_flag)
 	{
-		const WorkloadHandle root_handle = state->m_loaded_model.get_root();
+		const WorkloadHandle_v1 root_handle = state->m_loaded_model.get_root();
 		if (root_handle.index >= state->instances.size())
 			ROBOTICK_FATAL_EXIT("Invalid root workload handle");
 

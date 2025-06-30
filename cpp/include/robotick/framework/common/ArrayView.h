@@ -28,11 +28,23 @@ namespace robotick
 		/// @brief Default constructor: empty view
 		constexpr ArrayView() = default;
 
+		/// @brief Copy constructor
+		constexpr ArrayView(const ArrayView& other) = default;
+
 		/// @brief Construct from pointer and size
-		constexpr ArrayView(T* data_in, size_t size_in) : data(data_in), array_size(size_in) {}
+		constexpr ArrayView(T* data_in, size_t size_in)
+			: data(data_in)
+			, array_size(size_in)
+		{
+		}
 
 		/// @brief Construct from fixed-size C-style array
-		template <size_t N> constexpr ArrayView(T (&arr)[N]) : data(arr), array_size(N) {}
+		template <size_t N>
+		constexpr ArrayView(T (&arr)[N])
+			: data(arr)
+			, array_size(N)
+		{
+		}
 
 		/// @brief Assignment operator
 		constexpr ArrayView& operator=(const ArrayView& other) noexcept
@@ -51,15 +63,6 @@ namespace robotick
 			data = data_in;
 			array_size = size_in;
 		}
-
-#ifdef ROBOTICK_ENABLE_MODEL_HEAP
-		/// @brief Assign from HeapVector
-		void use(HeapVector<T>& source_in)
-		{
-			data = source_in.data();
-			array_size = source_in.size();
-		}
-#endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 		/// @brief Access raw pointer to data
 		T* data_ptr() { return data; }

@@ -99,7 +99,7 @@ namespace robotick
 		void tick(const TickInfo&)
 		{
 			// note - we don't use the supplied TickInfo as we don't need if for ourselves, and our children are allowed to tick at their requested
-			// rate (as long as equal to or slower than our tick rate).  That is enforced in Model validation code.
+			// rate (as long as equal to or slower than our tick rate).  That is enforced in Model_v1 validation code.
 
 			for (auto& child : children)
 			{
