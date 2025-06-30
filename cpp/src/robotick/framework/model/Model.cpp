@@ -200,21 +200,25 @@ namespace robotick
 
 	void Model::use_workload_seeds(const WorkloadSeed** all_workloads, size_t num_workloads)
 	{
+#ifdef ROBOTICK_ENABLE_MODEL_HEAP
 		if (workload_seeds_storage.size() > 0)
 		{
 			ROBOTICK_FATAL_EXIT("Model::use_workload_seeds() (non-dynamic models) called after Model::add() (dynamic models) has been called");
 		}
+#endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 		workload_seeds = ArrayView<const WorkloadSeed*>(all_workloads, num_workloads);
 	}
 
 	void Model::use_data_connection_seeds(const DataConnectionSeed** in_connections, size_t num_connections)
 	{
+#ifdef ROBOTICK_ENABLE_MODEL_HEAP
 		if (data_connection_seeds_storage.size() > 0)
 		{
 			ROBOTICK_FATAL_EXIT(
 				"Model::use_data_connection_seeds() (non-dynamic models) called after Model::connect() (dynamic models) has been called");
 		}
+#endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 		data_connection_seeds = ArrayView<const DataConnectionSeed*>(in_connections, num_connections);
 	}
