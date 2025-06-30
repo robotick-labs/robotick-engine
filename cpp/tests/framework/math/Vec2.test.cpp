@@ -63,16 +63,11 @@ TEST_CASE("Unit/Framework/Math/Vec2")
 		CHECK(c.dot(c) == Catch::Approx(13.0f));
 	}
 
-	SECTION("Length and normalization")
+	SECTION("Length")
 	{
 		Vec2f v(3.0f, 4.0f);
 		CHECK(v.length_squared() == Catch::Approx(25.0f));
 		CHECK(v.length() == Catch::Approx(5.0f));
-
-		Vec2f n = v.normalized();
-		CHECK(n.length() == Catch::Approx(1.0f));
-		CHECK(n.x == Catch::Approx(0.6f));
-		CHECK(n.y == Catch::Approx(0.8f));
 	}
 
 	SECTION("In-place operations")

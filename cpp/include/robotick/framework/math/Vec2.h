@@ -46,7 +46,7 @@ namespace robotick
 		TDerived operator*(TReal scalar) const { return TDerived(x * scalar, y * scalar); }
 		TDerived operator/(TReal scalar) const
 		{
-			ROBOTICK_ASSERT_MSG((scalar != TReal(0)), "Divide by zero requested!");
+			ROBOTICK_ASSERT_MSG((fabsf((float)scalar) > kFloatEpsilon), "Divide by zero requested!");
 			return TDerived(x / scalar, y / scalar);
 		}
 
@@ -70,7 +70,7 @@ namespace robotick
 		}
 		TDerived& operator/=(TReal scalar)
 		{
-			ROBOTICK_ASSERT_MSG((scalar != TReal(0)), "Divide by zero requested (in-place)!");
+			ROBOTICK_ASSERT_MSG((fabsf((float)scalar) > kFloatEpsilon), "Divide by zero requested (in-place)!");
 			x /= scalar;
 			y /= scalar;
 			return static_cast<TDerived&>(*this);
@@ -81,22 +81,6 @@ namespace robotick
 		TReal length_squared() const { return x * x + y * y; }
 
 		TReal length() const { return internal::SqrtFn<TReal>::apply(length_squared()); }
-
-		TDerived normalized() const
-		{
-			TReal len = length();
-			return (len > TReal(0)) ? (*static_cast<const TDerived*>(this) / len) : TDerived();
-		}
-
-		void normalize()
-		{
-			TReal len = length();
-			if (len > TReal(0))
-			{
-				x /= len;
-				y /= len;
-			}
-		}
 	};
 
 	// --- Final types (can be forward-declared) ---

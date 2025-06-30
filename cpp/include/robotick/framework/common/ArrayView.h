@@ -28,7 +28,7 @@ namespace robotick
 		/// @brief Default constructor: empty view
 		constexpr ArrayView() = default;
 
-		/// @brief Default constructor: empty view
+		/// @brief Copy constructor
 		constexpr ArrayView(const ArrayView& other) = default;
 
 		/// @brief Construct from pointer and size

@@ -58,6 +58,7 @@ namespace robotick
 			for (auto& seed : remote_data_connection_seeds_storage)
 			{
 				baked_remote_data_connections[index] = &seed;
+				++index;
 			}
 
 			remote_data_connection_seeds.use(baked_remote_data_connections.data(), baked_remote_data_connections.size());
