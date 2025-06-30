@@ -20,7 +20,7 @@ namespace
 TEST_CASE("Unit/Framework/Model-Dynamic")
 {
 	static const float s_tick_100hz(100.f);
-	static const float s_tick_200hz(100.f);
+	static const float s_tick_200hz(200.f);
 
 	SECTION("Throws if child tick rate faster than parent")
 	{
@@ -30,7 +30,7 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 		const auto& parent = model.add("DummyModelWorkload", "Parent").set_tick_rate_hz(s_tick_100hz).set_children({&child});
 
 		model.set_root_workload(parent, false);
-		ROBOTICK_REQUIRE_ERROR_MSG(model.validate(), "Child workload cannot have faster tick rate than parent");
+		ROBOTICK_REQUIRE_ERROR_MSG(model.finalize(), "faster tick rate");
 	}
 
 	SECTION("Add workloads and retrieve them")
@@ -39,6 +39,9 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 
 		const auto& one = model.add("DummyModelWorkload", "One").set_tick_rate_hz(s_tick_100hz);
 		const auto& two = model.add("DummyModelWorkload", "Two").set_tick_rate_hz(s_tick_200hz);
+
+		const bool auto_finalise_and_validate = true;
+		model.set_root_workload(one, auto_finalise_and_validate);
 
 		const auto& seeds = model.get_workload_seeds();
 		REQUIRE(seeds.size() == 2);
@@ -59,6 +62,9 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 
 		const auto& child = model.add("DummyModelWorkload", "Child").set_tick_rate_hz(s_tick_100hz);
 		const auto& parent = model.add("DummyModelWorkload", "Parent").set_children({&child}).set_tick_rate_hz(s_tick_200hz);
+
+		const bool auto_finalise_and_validate = true;
+		model.set_root_workload(parent, auto_finalise_and_validate);
 
 		REQUIRE(parent.children.size() == 1);
 		REQUIRE(parent.children[0] == &child);
@@ -83,7 +89,7 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 		auto root = model.add("DummyModelWorkload", "Root").set_children({&a, &b}).set_tick_rate_hz(s_tick_200hz);
 		model.set_root_workload(root);
 
-		ROBOTICK_REQUIRE_ERROR_MSG(model.connect("A.outputs.x", "B.inputs.x"), "Model root must be set last");
+		ROBOTICK_REQUIRE_ERROR_MSG(model.connect("A.outputs.x", "B.inputs.x"), "Root must be set last");
 	}
 
 	SECTION("Remote source field path throws")
@@ -97,12 +103,20 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 
 	SECTION("Connect to remote model")
 	{
+		// create spine remote-model:
 		Model spine;
-		spine.add("DummyModelWorkload", "Steering").set_tick_rate_hz(s_tick_100hz);
+		const auto& steering = spine.add("DummyModelWorkload", "Steering").set_tick_rate_hz(s_tick_100hz);
 
+		const bool auto_finalise_and_validate = true;
+		spine.set_root_workload(steering, auto_finalise_and_validate);
+
+		// create brain local-model:
 		Model brain;
+		const auto& controller = brain.add("DummyModelWorkload", "Controller").set_tick_rate_hz(s_tick_100hz);
 		brain.add_remote_model(spine, "spine", "ip:127.0.0.1");
 		brain.connect("Controller.outputs.turn", "|spine|Steering.inputs.turn_rate");
+
+		brain.set_root_workload(controller, auto_finalise_and_validate);
 
 		const auto& remote_models = brain.get_remote_models();
 		REQUIRE((remote_models.size() == 1 && remote_models[0]->model_name == "spine"));
@@ -123,9 +137,12 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 	SECTION("Duplicate remote connection throws")
 	{
 		Model remote;
-		remote.add("DummyModelWorkload", "R").set_tick_rate_hz(s_tick_100hz);
+		const auto& remote_workload = remote.add("DummyModelWorkload", "R").set_tick_rate_hz(s_tick_100hz);
+		remote.set_root_workload(remote_workload);
 
 		Model local;
+		local.add("DummyModelWorkload", "X").set_tick_rate_hz(s_tick_100hz);
+		local.add("DummyModelWorkload", "Y").set_tick_rate_hz(s_tick_100hz);
 		local.add_remote_model(remote, "spine", "ip:123.0.0.123");
 
 		local.connect("X.outputs.x", "|spine|R.inputs.a");
@@ -136,24 +153,24 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 	{
 		Model model;
 
-		auto a = model.add("DummyModelDataConnWorkload", "A").set_tick_rate_hz(s_tick_100hz);
-		auto b = model.add("DummyModelDataConnWorkload", "B").set_tick_rate_hz(s_tick_100hz);
+		auto a = model.add("DummyModelWorkload", "A").set_tick_rate_hz(s_tick_100hz);
+		auto b = model.add("DummyModelWorkload", "B").set_tick_rate_hz(s_tick_100hz);
 
 		model.connect("A.output", "B.input");
 
-		auto group = model.add("SequencedGroupWorkload", "Group").set_children({&a, &b}).set_tick_rate_hz(s_tick_100hz);
-		model.set_root_workload(group);
+		auto group = model.add("DummyModelWorkload", "Group").set_children({&a, &b}).set_tick_rate_hz(s_tick_100hz);
+		model.set_root_workload(group, false);
 
-		REQUIRE_NOTHROW(model.validate());
+		REQUIRE_NOTHROW(model.finalize());
 	}
 
 	SECTION("Duplicate inputs throw with clear error")
 	{
 		Model model;
 
-		model.add("DummyModelDataConnWorkload", "A").set_tick_rate_hz(s_tick_100hz);
-		model.add("DummyModelDataConnWorkload", "B").set_tick_rate_hz(s_tick_100hz);
-		model.add("DummyModelDataConnWorkload", "C").set_tick_rate_hz(s_tick_100hz);
+		model.add("DummyModelWorkload", "A").set_tick_rate_hz(s_tick_100hz);
+		model.add("DummyModelWorkload", "B").set_tick_rate_hz(s_tick_100hz);
+		model.add("DummyModelWorkload", "C").set_tick_rate_hz(s_tick_100hz);
 
 		model.connect("A.output", "C.input");
 		ROBOTICK_REQUIRE_ERROR_MSG(model.connect("B.output", "C.input"), ("already has an incoming connection"));
@@ -163,18 +180,19 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 	{
 		Model model;
 
-		auto a = model.add("DummyModelDataConnWorkload", "A").set_tick_rate_hz(s_tick_100hz);
-		auto b = model.add("DummyModelDataConnWorkload", "B").set_tick_rate_hz(s_tick_100hz);
+		auto a = model.add("DummyModelWorkload", "A").set_tick_rate_hz(s_tick_100hz);
+		auto b = model.add("DummyModelWorkload", "B").set_tick_rate_hz(s_tick_100hz);
 		model.connect("A.output", "B.input");
 
-		auto group = model.add("SequencedGroupWorkload", "Group").set_children({&a, &b}).set_tick_rate_hz(s_tick_100hz);
+		auto group = model.add("DummyModelWorkload", "Group").set_children({&a, &b}).set_tick_rate_hz(s_tick_100hz);
 		model.set_root_workload(group);
 
-		const auto& seeds = model.get_data_connection_seeds();
-		REQUIRE(seeds.size() == 1);
-		CHECK(seeds[0]->source_field_path == "A.output");
-		CHECK(seeds[0]->dest_field_path == "B.input");
+		const auto& workload_seeds = model.get_workload_seeds();
+		REQUIRE(workload_seeds.size() == 3);
 
-		REQUIRE_NOTHROW(model.validate());
+		const auto& data_connection_seeds = model.get_data_connection_seeds();
+		REQUIRE(data_connection_seeds.size() == 1);
+		CHECK(data_connection_seeds[0]->source_field_path == "A.output");
+		CHECK(data_connection_seeds[0]->dest_field_path == "B.input");
 	}
 }

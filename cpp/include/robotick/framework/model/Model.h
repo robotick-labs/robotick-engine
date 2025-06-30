@@ -31,17 +31,17 @@ namespace robotick
 #endif
 		void set_workloads(const WorkloadSeed** all_workloads, size_t num_workloads);
 
-		void set_root_workload(const WorkloadSeed& root_workload, bool auto_finalize = true);
+		void set_root_workload(const WorkloadSeed& root_workload, bool auto_finalize_and_validate = true);
 
 		const ArrayView<const WorkloadSeed*>& get_workload_seeds() const { return workload_seeds; }
 
-		const ArrayView<const DataConnectionSeed_v2*>& get_data_connection_seeds() const { return data_connection_seeds; }
+		const ArrayView<const DataConnectionSeed*>& get_data_connection_seeds() const { return data_connection_seeds; }
 
-		const ArrayView<const RemoteModelSeed_v2*>& get_remote_models() const { return remote_models; }
+		const ArrayView<const RemoteModelSeed*>& get_remote_models() const { return remote_models; }
 
 		const WorkloadSeed* get_root_workload() const { return root_workload; }
 
-		void validate();
+		void finalize();
 
 	  protected:
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
@@ -54,19 +54,20 @@ namespace robotick
 
 	  private:
 		ArrayView<const WorkloadSeed*> workload_seeds;
-		ArrayView<const DataConnectionSeed_v2*> data_connection_seeds;
-		ArrayView<const RemoteModelSeed_v2*> remote_models;
+		ArrayView<const DataConnectionSeed*> data_connection_seeds;
+		ArrayView<const RemoteModelSeed*> remote_models;
 
 		const WorkloadSeed* root_workload = nullptr;
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 		List<WorkloadSeed> workload_seeds_storage;
-		List<DataConnectionSeed_v2> data_connection_seeds_storage;
-		List<RemoteModelSeed_v2> remote_models_storage;
+		List<DataConnectionSeed> data_connection_seeds_storage;
+		List<RemoteModelSeed> remote_models_storage;
+		List<FixedString64> strings_storage;
 
 		HeapVector<const WorkloadSeed*> baked_workload_ptrs;
-		HeapVector<const DataConnectionSeed_v2*> baked_data_connection_ptrs;
-		HeapVector<const RemoteModelSeed_v2*> baked_remote_model_ptrs;
+		HeapVector<const DataConnectionSeed*> baked_data_connection_ptrs;
+		HeapVector<const RemoteModelSeed*> baked_remote_model_ptrs;
 #endif
 	};
 

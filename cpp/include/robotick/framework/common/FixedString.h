@@ -38,6 +38,19 @@ namespace robotick
 			data[len] = '\0';
 		}
 
+		FixedString(const char* str, const size_t max_copy_length)
+		{
+			if (!str)
+			{
+				data[0] = '\0';
+				return;
+			}
+
+			const size_t len = min_val(fixed_strlen(str), min_val(max_copy_length, N - 1));
+			memcpy(data, str, len);
+			data[len] = '\0';
+		}
+
 		FixedString& operator=(const char* str)
 		{
 			const size_t len = min_val(fixed_strlen(str), N - 1);

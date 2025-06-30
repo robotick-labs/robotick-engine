@@ -38,7 +38,15 @@ namespace robotick
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 		// Dynamic Setters (for use on platforms where we can afford the heap-usage)
-		WorkloadSeed& set_tick_rate_hz(float rate);
+		WorkloadSeed& set_tick_rate_hz(const float in_tick_rate_hz)
+		{
+			if (in_tick_rate_hz < 0)
+				ROBOTICK_FATAL_EXIT("tick_rate_hz must be >= 0: %f", in_tick_rate_hz);
+
+			tick_rate_hz = in_tick_rate_hz;
+
+			return *this;
+		};
 
 		template <size_t N> WorkloadSeed& set_children(const WorkloadSeed* const (&in_children)[N]);
 		template <size_t N> WorkloadSeed& set_config(const ConfigEntry (&in_config)[N]);
