@@ -68,78 +68,81 @@ namespace robotick::test
 		};
 	} // namespace
 
-	TEST_CASE("Unit/Framework/Data/MqttFieldSync/MqttFieldSync can publish state and control fields")
+	TEST_CASE("Unit/Framework/Data/MqttFieldSync")
 	{
-		Model_v1 model;
-		auto test_workload_seed_handle = model.add("TestWorkload", "W1", 1.0);
-		model.set_root(test_workload_seed_handle);
+		SECTION("MqttFieldSync can publish state and control fields")
+		{
+			Model_v1 model;
+			auto test_workload_seed_handle = model.add("TestWorkload", "W1", 1.0);
+			model.set_root(test_workload_seed_handle);
 
-		Engine engine;
-		engine.load(model);
+			Engine engine;
+			engine.load(model);
 
-		// initialize our input fields & blackboard-fields:
-		const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed_handle.index);
-		auto* test_workload_ptr = static_cast<TestWorkload*>((void*)info.get_ptr(engine));
-		test_workload_ptr->inputs.value = 42;
-		test_workload_ptr->inputs.blackboard.set("flag", 2);
-		test_workload_ptr->inputs.blackboard.set("ratio", 3.14);
+			// initialize our input fields & blackboard-fields:
+			const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed_handle.index);
+			auto* test_workload_ptr = static_cast<TestWorkload*>((void*)info.get_ptr(engine));
+			test_workload_ptr->inputs.value = 42;
+			test_workload_ptr->inputs.blackboard.set("flag", 2);
+			test_workload_ptr->inputs.blackboard.set("ratio", 3.14);
 
-		WorkloadsBuffer mirror_buf;
-		mirror_buf.create_mirror_from(EngineInspector::get_workloads_buffer(engine));
+			WorkloadsBuffer mirror_buf;
+			mirror_buf.create_mirror_from(EngineInspector::get_workloads_buffer(engine));
 
-		DummyMqttClient dummy_client;
-		std::string root_topic_name = "robotick";
-		MqttFieldSync sync(engine, root_topic_name, dummy_client);
+			DummyMqttClient dummy_client;
+			std::string root_topic_name = "robotick";
+			MqttFieldSync sync(engine, root_topic_name, dummy_client);
 
-		sync.subscribe_and_sync_startup();
+			sync.subscribe_and_sync_startup();
 
-		// Check retained messages contain both state and control for inputs
-		CHECK(dummy_client.retained.count("robotick/state/W1/inputs/value"));
-		CHECK(dummy_client.retained.count("robotick/state/W1/inputs/text"));
-		CHECK(dummy_client.retained.count("robotick/state/W1/inputs/blackboard/flag"));
-		CHECK(dummy_client.retained.count("robotick/state/W1/inputs/blackboard/ratio"));
+			// Check retained messages contain both state and control for inputs
+			CHECK(dummy_client.retained.count("robotick/state/W1/inputs/value"));
+			CHECK(dummy_client.retained.count("robotick/state/W1/inputs/text"));
+			CHECK(dummy_client.retained.count("robotick/state/W1/inputs/blackboard/flag"));
+			CHECK(dummy_client.retained.count("robotick/state/W1/inputs/blackboard/ratio"));
 
-		CHECK(dummy_client.retained.count("robotick/control/W1/inputs/value"));
-		CHECK(dummy_client.retained.count("robotick/control/W1/inputs/text"));
-		CHECK(dummy_client.retained.count("robotick/control/W1/inputs/blackboard/flag"));
-		CHECK(dummy_client.retained.count("robotick/control/W1/inputs/blackboard/ratio"));
+			CHECK(dummy_client.retained.count("robotick/control/W1/inputs/value"));
+			CHECK(dummy_client.retained.count("robotick/control/W1/inputs/text"));
+			CHECK(dummy_client.retained.count("robotick/control/W1/inputs/blackboard/flag"));
+			CHECK(dummy_client.retained.count("robotick/control/W1/inputs/blackboard/ratio"));
 
-		// Clear retained and test publish_state_fields only
-		dummy_client.retained.clear();
-		sync.publish_state_fields();
-		CHECK(dummy_client.retained.count("robotick/state/W1/inputs/value"));
-		CHECK_FALSE(dummy_client.retained.count("robotick/control/W1/inputs/value"));
-	}
+			// Clear retained and test publish_state_fields only
+			dummy_client.retained.clear();
+			sync.publish_state_fields();
+			CHECK(dummy_client.retained.count("robotick/state/W1/inputs/value"));
+			CHECK_FALSE(dummy_client.retained.count("robotick/control/W1/inputs/value"));
+		}
 
-	TEST_CASE("Unit/Framework/Data/MqttFieldSync/MqttFieldSync can apply control updates")
-	{
-		Model_v1 model;
-		auto test_workload_seed_handle = model.add("TestWorkload", "W2", 1.0);
-		model.set_root(test_workload_seed_handle);
+		SECTION("MqttFieldSync can apply control updates")
+		{
+			Model_v1 model;
+			auto test_workload_seed_handle = model.add("TestWorkload", "W2", 1.0);
+			model.set_root(test_workload_seed_handle);
 
-		Engine engine;
-		engine.load(model);
+			Engine engine;
+			engine.load(model);
 
-		const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed_handle.index);
-		auto* test_workload_ptr = static_cast<TestWorkload*>((void*)info.get_ptr(engine));
-		test_workload_ptr->inputs.load();
+			const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed_handle.index);
+			auto* test_workload_ptr = static_cast<TestWorkload*>((void*)info.get_ptr(engine));
+			test_workload_ptr->inputs.load();
 
-		DummyMqttClient dummy_client;
-		std::string root_topic_name = "robotick";
-		MqttFieldSync sync(engine, root_topic_name, dummy_client);
+			DummyMqttClient dummy_client;
+			std::string root_topic_name = "robotick";
+			MqttFieldSync sync(engine, root_topic_name, dummy_client);
 
-		nlohmann::json json_val = 99;
-		nlohmann::json json_subint = 5;
-		sync.get_updated_topics()["robotick/control/W2/inputs/value"] = json_val;
-		sync.get_updated_topics()["robotick/control/W2/inputs/blackboard/flag"] = json_subint;
+			nlohmann::json json_val = 99;
+			nlohmann::json json_subint = 5;
+			sync.get_updated_topics()["robotick/control/W2/inputs/value"] = json_val;
+			sync.get_updated_topics()["robotick/control/W2/inputs/blackboard/flag"] = json_subint;
 
-		sync.apply_control_updates();
+			sync.apply_control_updates();
 
-		int val = test_workload_ptr->inputs.value;
-		int flag = test_workload_ptr->inputs.blackboard.get<int>("flag");
+			int val = test_workload_ptr->inputs.value;
+			int flag = test_workload_ptr->inputs.blackboard.get<int>("flag");
 
-		CHECK(val == 99);
-		CHECK(flag == 5);
+			CHECK(val == 99);
+			CHECK(flag == 5);
+		}
 	}
 
 } // namespace robotick::test

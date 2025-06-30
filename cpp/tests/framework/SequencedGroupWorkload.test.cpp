@@ -100,40 +100,43 @@ namespace
 	static SlowTickRegister s_register_slow;
 } // namespace
 
-TEST_CASE("Unit/Workloads/SequencedGroupWorkload/Child ticks are invoked in sequence")
+TEST_CASE("Unit/Workloads/SequencedGroupWorkload")
 {
-	DummyTickingWorkload::reset();
+	SECTION("Child ticks are invoked in sequence")
+	{
+		DummyTickingWorkload::reset();
 
-	Model_v1 model;
-	const auto child1 = model.add("DummyTickingWorkload", "child1", 50.0);
-	const auto child2 = model.add("DummyTickingWorkload", "child2", 50.0);
-	const auto group = model.add("SequencedGroupWorkload", "group", {child1, child2}, 50.0);
-	model.set_root(group);
+		Model_v1 model;
+		const auto child1 = model.add("DummyTickingWorkload", "child1", 50.0);
+		const auto child2 = model.add("DummyTickingWorkload", "child2", 50.0);
+		const auto group = model.add("SequencedGroupWorkload", "group", {child1, child2}, 50.0);
+		model.set_root(group);
 
-	Engine engine;
-	engine.load(model);
+		Engine engine;
+		engine.load(model);
 
-	const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
-	auto* group_ptr = group_info.get_ptr(engine);
-	REQUIRE(group_ptr != nullptr);
+		const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
+		auto* group_ptr = group_info.get_ptr(engine);
+		REQUIRE(group_ptr != nullptr);
 
-	REQUIRE_NOTHROW(group_info.type->start_fn(group_ptr, 50.0));
-	REQUIRE_NOTHROW(group_info.type->tick_fn(group_ptr, TICK_INFO_FIRST_10MS_100HZ));
-	REQUIRE_NOTHROW(group_info.type->stop_fn(group_ptr));
+		REQUIRE_NOTHROW(group_info.type->start_fn(group_ptr, 50.0));
+		REQUIRE_NOTHROW(group_info.type->tick_fn(group_ptr, TICK_INFO_FIRST_10MS_100HZ));
+		REQUIRE_NOTHROW(group_info.type->stop_fn(group_ptr));
 
-	CHECK(DummyTickingWorkload::tick_count == 2);
-}
+		CHECK(DummyTickingWorkload::tick_count == 2);
+	}
 
-TEST_CASE("Unit/Workloads/SequencedGroupWorkload/Overrun logs if exceeded")
-{
-	Model_v1 model;
-	const auto handle = model.add("SlowTickWorkload", "slow", 50.0);
-	const auto group = model.add("SequencedGroupWorkload", "group", {handle}, 1000.0);
-	model.set_root(group);
+	SECTION("Overrun logs if exceeded")
+	{
+		Model_v1 model;
+		const auto handle = model.add("SlowTickWorkload", "slow", 50.0);
+		const auto group = model.add("SequencedGroupWorkload", "group", {handle}, 1000.0);
+		model.set_root(group);
 
-	Engine engine;
-	engine.load(model);
+		Engine engine;
+		engine.load(model);
 
-	const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
-	REQUIRE_NOTHROW(group_info.type->tick_fn(group_info.get_ptr(engine), TICK_INFO_FIRST_1MS_1KHZ)); // 1ms budget, expect warning log
+		const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
+		REQUIRE_NOTHROW(group_info.type->tick_fn(group_info.get_ptr(engine), TICK_INFO_FIRST_1MS_1KHZ)); // 1ms budget, expect warning log
+	}
 }

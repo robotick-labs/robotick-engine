@@ -48,82 +48,85 @@ namespace robotick::test
 		ROBOTICK_DEFINE_WORKLOAD(CountingDataConnWorkload, void, CountingDataConnInputs, CountingDataConnOutputs)
 	} // namespace
 
-	TEST_CASE("Unit/Framework/Data/Connection/ExpectedHandler set for synced group children")
+	TEST_CASE("Unit/Framework/Data/Connection-Resolving")
 	{
-		Model_v1 model;
-		auto a = model.add("CountingDataConnWorkload", "A", 10.0);
-		auto b = model.add("CountingDataConnWorkload", "B", 10.0);
-		model.connect("A.outputs.output_value", "B.inputs.input_value");
-
-		auto group = model.add("SyncedGroupWorkload", "Group", {a, b}, 10.0);
-		model.set_root(group);
-
-		Engine engine;
-		engine.load(model);
-
-		const auto& connections = EngineInspector::get_all_data_connections(engine);
-		bool found = false;
-		for (const auto& conn : connections)
+		SECTION("ExpectedHandler set for synced group children")
 		{
-			if (conn.seed.source_field_path == "A.outputs.output_value" && conn.seed.dest_field_path == "B.inputs.input_value")
+			Model_v1 model;
+			auto a = model.add("CountingDataConnWorkload", "A", 10.0);
+			auto b = model.add("CountingDataConnWorkload", "B", 10.0);
+			model.connect("A.outputs.output_value", "B.inputs.input_value");
+
+			auto group = model.add("SyncedGroupWorkload", "Group", {a, b}, 10.0);
+			model.set_root(group);
+
+			Engine engine;
+			engine.load(model);
+
+			const auto& connections = EngineInspector::get_all_data_connections(engine);
+			bool found = false;
+			for (const auto& conn : connections)
 			{
-				CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine);
-				found = true;
+				if (conn.seed.source_field_path == "A.outputs.output_value" && conn.seed.dest_field_path == "B.inputs.input_value")
+				{
+					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine);
+					found = true;
+				}
 			}
+			REQUIRE(found);
 		}
-		REQUIRE(found);
-	}
 
-	TEST_CASE("Unit/Framework/Data/Connection/ExpectedHandler set for external connections")
-	{
-		Model_v1 model;
-		auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
-		auto child2 = model.add("CountingDataConnWorkload", "Child2", 10.0);
-
-		model.connect("Child1.outputs.output_value", "Child2.inputs.input_value");
-		auto group = model.add("SyncedGroupWorkload", "Group", {child1, child2}, 10.0);
-		model.set_root(group);
-
-		Engine engine;
-		engine.load(model);
-
-		const auto& connections = EngineInspector::get_all_data_connections(engine);
-		bool found = false;
-		for (const auto& conn : connections)
+		SECTION("ExpectedHandler set for external connections")
 		{
-			if (conn.seed.source_field_path == "Child1.outputs.output_value" && conn.seed.dest_field_path == "Child2.inputs.input_value")
+			Model_v1 model;
+			auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
+			auto child2 = model.add("CountingDataConnWorkload", "Child2", 10.0);
+
+			model.connect("Child1.outputs.output_value", "Child2.inputs.input_value");
+			auto group = model.add("SyncedGroupWorkload", "Group", {child1, child2}, 10.0);
+			model.set_root(group);
+
+			Engine engine;
+			engine.load(model);
+
+			const auto& connections = EngineInspector::get_all_data_connections(engine);
+			bool found = false;
+			for (const auto& conn : connections)
 			{
-				CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine);
-				found = true;
+				if (conn.seed.source_field_path == "Child1.outputs.output_value" && conn.seed.dest_field_path == "Child2.inputs.input_value")
+				{
+					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine);
+					found = true;
+				}
 			}
+			REQUIRE(found);
 		}
-		REQUIRE(found);
-	}
 
-	TEST_CASE("Unit/Framework/Data/Connection/ExpectedHandler set to SequencedGroupWorkload for internal connections")
-	{
-		Model_v1 model;
-		auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
-		auto child2 = model.add("CountingDataConnWorkload", "Child2", 10.0);
-
-		model.connect("Child1.outputs.output_value", "Child2.inputs.input_value");
-		auto group = model.add("SequencedGroupWorkload", "Group", {child1, child2}, 10.0);
-		model.set_root(group);
-
-		Engine engine;
-		engine.load(model);
-
-		const auto& connections = EngineInspector::get_all_data_connections(engine);
-		bool found = false;
-		for (const auto& conn : connections)
+		SECTION("ExpectedHandler set to SequencedGroupWorkload for internal connections")
 		{
-			if (conn.seed.source_field_path == "Child1.outputs.output_value" && conn.seed.dest_field_path == "Child2.inputs.input_value")
+			Model_v1 model;
+			auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
+			auto child2 = model.add("CountingDataConnWorkload", "Child2", 10.0);
+
+			model.connect("Child1.outputs.output_value", "Child2.inputs.input_value");
+			auto group = model.add("SequencedGroupWorkload", "Group", {child1, child2}, 10.0);
+			model.set_root(group);
+
+			Engine engine;
+			engine.load(model);
+
+			const auto& connections = EngineInspector::get_all_data_connections(engine);
+			bool found = false;
+			for (const auto& conn : connections)
 			{
-				CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload);
-				found = true;
+				if (conn.seed.source_field_path == "Child1.outputs.output_value" && conn.seed.dest_field_path == "Child2.inputs.input_value")
+				{
+					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload);
+					found = true;
+				}
 			}
+			REQUIRE(found);
 		}
-		REQUIRE(found);
 	}
 
 } // namespace robotick::test

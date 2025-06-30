@@ -10,7 +10,7 @@
 
 using namespace robotick;
 
-TEST_CASE("Unit|Framework|Math|Vec3", "[vec3]")
+TEST_CASE("Unit/Framework/Math/Vec3")
 {
 	SECTION("Default construction and member access")
 	{
