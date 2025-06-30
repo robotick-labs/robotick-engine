@@ -112,7 +112,7 @@ namespace robotick
 		for (size_t i = 0; i < N; ++i)
 			children_storage.data()[i] = in_children[i];
 
-		children.use(children_storage);
+		children.use(children_storage.data(), children_storage.size());
 
 		return *this;
 	}

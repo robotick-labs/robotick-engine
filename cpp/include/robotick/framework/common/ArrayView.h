@@ -64,13 +64,6 @@ namespace robotick
 			array_size = size_in;
 		}
 
-		/// @brief Assign from compatible HeapVector
-		void use(HeapVector<T>& source_in)
-		{
-			data = source_in.data();
-			array_size = source_in.size();
-		}
-
 		/// @brief Access raw pointer to data
 		T* data_ptr() { return data; }
 		const T* data_ptr() const { return data; }

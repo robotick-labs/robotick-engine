@@ -60,7 +60,7 @@ namespace robotick
 				baked_remote_data_connections[index] = &seed;
 			}
 
-			remote_data_connection_seeds.use(baked_remote_data_connections);
+			remote_data_connection_seeds.use(baked_remote_data_connections.data(), baked_remote_data_connections.size());
 		}
 
 	  protected:
