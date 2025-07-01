@@ -48,7 +48,7 @@ namespace robotick
 		TDerived operator*(TReal scalar) const { return TDerived(x * scalar, y * scalar, z * scalar); }
 		TDerived operator/(TReal scalar) const
 		{
-			ROBOTICK_ASSERT_MSG((fabsf((float)scalar) > kFloatEpsilon), "Divide by zero requested!");
+			ROBOTICK_ASSERT_MSG((fabs(scalar) > static_cast<TReal>(kFloatEpsilon)), "Divide by zero requested!");
 			return TDerived(x / scalar, y / scalar, z / scalar);
 		}
 
@@ -75,7 +75,7 @@ namespace robotick
 		}
 		TDerived& operator/=(TReal scalar)
 		{
-			ROBOTICK_ASSERT_MSG((fabsf((float)scalar) > kFloatEpsilon), "Divide by zero requested (in-place)!");
+			ROBOTICK_ASSERT_MSG((fabs(scalar) > static_cast<TReal>(kFloatEpsilon)), "Divide by zero requested (in-place)!");
 
 			x /= scalar;
 			y /= scalar;

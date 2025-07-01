@@ -45,7 +45,8 @@ namespace robotick
 		RemoteEngineConnection remote_engines_receiver;								// one receiver in case any engines need to send data to us
 	};
 
-	Engine::Engine() : state(std::make_unique<Engine::State>())
+	Engine::Engine()
+		: state(new Engine::State())
 	{
 	}
 
@@ -60,6 +61,7 @@ namespace robotick
 				instance.type->destruct(instance_ptr);
 			}
 		}
+		delete state;
 	}
 
 	const WorkloadInstanceInfo* Engine::get_root_instance_info() const
@@ -284,7 +286,8 @@ namespace robotick
 		if (root_instance->type->set_children_fn)
 			root_instance->type->set_children_fn(root_instance->get_ptr(*this), root_instance->children, pending);
 
-		auto new_end = std::remove_if(pending.begin(), pending.end(),
+		auto new_end = std::remove_if(pending.begin(),
+			pending.end(),
 			[this](DataConnectionInfo* conn)
 			{
 				if (conn->expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine)
