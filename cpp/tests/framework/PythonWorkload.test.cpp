@@ -3,13 +3,8 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
-
-#include "utils/EngineInspector.h"
 
 #include <catch2/catch_all.hpp>
 
@@ -43,7 +38,7 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 
 	SECTION("Python tick executes")
 	{
-		Model_v1 model;
+		Model model;
 		const auto handle = model.add(
 			"PythonWorkload", "test2", 1.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
 		model.set_root(handle);
@@ -62,8 +57,10 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 
 	SECTION("Output reflects Python computation")
 	{
-		Model_v1 model;
-		const auto handle = model.add("PythonWorkload", "py", 1.0,
+		Model model;
+		const auto handle = model.add("PythonWorkload",
+			"py",
+			1.0,
 			{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}, {"example_in", "21.0"}});
 		model.set_root(handle);
 
@@ -113,7 +110,7 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 
 	SECTION("start/stop hooks are optional and safe")
 	{
-		Model_v1 model;
+		Model model;
 		const auto handle = model.add(
 			"PythonWorkload", "test", 10.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
 		model.set_root(handle);

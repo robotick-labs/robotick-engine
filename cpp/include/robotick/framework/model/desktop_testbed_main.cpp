@@ -35,7 +35,7 @@ void populate_model_hello_world_dynamic(robotick::Model& model)
 
 void populate_model_hello_world_constexpr(Model& model)
 {
-	static constexpr robotick::ConfigEntry test_state_2_config[] = {
+	static constexpr robotick::FieldConfigEntry test_state_2_config[] = {
 		{"script_name", "robotick.workloads.optional.test.hello_workload"},
 		{"class_name", "HelloWorkload"},
 	};

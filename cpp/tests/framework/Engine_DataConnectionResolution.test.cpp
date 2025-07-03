@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/DataConnection.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
-#include "utils/EngineInspector.h"
 
 #include <catch2/catch_all.hpp>
 
@@ -19,18 +16,18 @@ namespace robotick::test
 			int input_value = 0;
 		};
 
-		ROBOTICK_BEGIN_FIELDS(CountingDataConnInputs)
-		ROBOTICK_FIELD(CountingDataConnInputs, int, input_value)
-		ROBOTICK_END_FIELDS()
+		ROBOTICK_REGISTER_STRUCT_BEGIN(CountingDataConnInputs)
+		ROBOTICK_STRUCT_FIELD(CountingDataConnInputs, int, input_value)
+		ROBOTICK_REGISTER_STRUCT_END(CountingDataConnInputs)
 
 		struct CountingDataConnOutputs
 		{
 			int output_value = 0;
 		};
 
-		ROBOTICK_BEGIN_FIELDS(CountingDataConnOutputs)
-		ROBOTICK_FIELD(CountingDataConnOutputs, int, output_value)
-		ROBOTICK_END_FIELDS()
+		ROBOTICK_REGISTER_STRUCT_BEGIN(CountingDataConnOutputs)
+		ROBOTICK_STRUCT_FIELD(CountingDataConnOutputs, int, output_value)
+		ROBOTICK_REGISTER_STRUCT_END(CountingDataConnOutputs)
 
 		struct CountingDataConnWorkload
 		{
@@ -45,14 +42,14 @@ namespace robotick::test
 			}
 		};
 
-		ROBOTICK_DEFINE_WORKLOAD(CountingDataConnWorkload, void, CountingDataConnInputs, CountingDataConnOutputs)
+		ROBOTICK_REGISTER_WORKLOAD(CountingDataConnWorkload, void, CountingDataConnInputs, CountingDataConnOutputs)
 	} // namespace
 
 	TEST_CASE("Unit/Framework/Data/Connection-Resolving")
 	{
 		SECTION("ExpectedHandler set for synced group children")
 		{
-			Model_v1 model;
+			Model model;
 			auto a = model.add("CountingDataConnWorkload", "A", 10.0);
 			auto b = model.add("CountingDataConnWorkload", "B", 10.0);
 			model.connect("A.outputs.output_value", "B.inputs.input_value");
@@ -63,13 +60,13 @@ namespace robotick::test
 			Engine engine;
 			engine.load(model);
 
-			const auto& connections = EngineInspector::get_all_data_connections(engine);
+			const auto& connections = engine.get_all_data_connections();
 			bool found = false;
 			for (const auto& conn : connections)
 			{
 				if (conn.seed.source_field_path == "A.outputs.output_value" && conn.seed.dest_field_path == "B.inputs.input_value")
 				{
-					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine);
+					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::DelegateToParent);
 					found = true;
 				}
 			}
@@ -78,7 +75,7 @@ namespace robotick::test
 
 		SECTION("ExpectedHandler set for external connections")
 		{
-			Model_v1 model;
+			Model model;
 			auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
 			auto child2 = model.add("CountingDataConnWorkload", "Child2", 10.0);
 
@@ -89,13 +86,13 @@ namespace robotick::test
 			Engine engine;
 			engine.load(model);
 
-			const auto& connections = EngineInspector::get_all_data_connections(engine);
+			const auto& connections = engine.get_all_data_connections();
 			bool found = false;
 			for (const auto& conn : connections)
 			{
 				if (conn.seed.source_field_path == "Child1.outputs.output_value" && conn.seed.dest_field_path == "Child2.inputs.input_value")
 				{
-					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine);
+					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::DelegateToParent);
 					found = true;
 				}
 			}
@@ -104,7 +101,7 @@ namespace robotick::test
 
 		SECTION("ExpectedHandler set to SequencedGroupWorkload for internal connections")
 		{
-			Model_v1 model;
+			Model model;
 			auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
 			auto child2 = model.add("CountingDataConnWorkload", "Child2", 10.0);
 
@@ -115,7 +112,7 @@ namespace robotick::test
 			Engine engine;
 			engine.load(model);
 
-			const auto& connections = EngineInspector::get_all_data_connections(engine);
+			const auto& connections = engine.get_all_data_connections();
 			bool found = false;
 			for (const auto& conn : connections)
 			{

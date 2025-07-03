@@ -4,8 +4,8 @@ from pathlib import Path
 CPP_ROOT = Path("cpp")
 
 # Regex patterns
-begin_fields_re = re.compile(r"ROBOTICK_BEGIN_FIELDS\((\w+)\)")
-define_workload_re = re.compile(r"ROBOTICK_DEFINE_WORKLOAD(?:_[1-4])?\(([^)]*)\)")
+begin_fields_re = re.compile(r"ROBOTICK_REGISTER_STRUCT_BEGIN\((\w+)\)")
+define_workload_re = re.compile(r"ROBOTICK_REGISTER_WORKLOAD(?:_[1-4])?\(([^)]*)\)")
 workload_struct_re = re.compile(r"struct\s+(\w+Workload)\b")
 
 def classify_field_type(name: str):
@@ -45,7 +45,7 @@ def main():
                 suggested = [args[0]]
                 for role in ("config", "inputs", "outputs"):
                     suggested.append(role_map.get(role, "void"))
-                print(f"  Suggest replacing with: ROBOTICK_DEFINE_WORKLOAD({', '.join(suggested)})\n")
+                print(f"  Suggest replacing with: ROBOTICK_REGISTER_WORKLOAD({', '.join(suggested)})\n")
 
 if __name__ == "__main__":
     main()

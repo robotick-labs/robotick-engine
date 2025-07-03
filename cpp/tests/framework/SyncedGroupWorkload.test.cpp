@@ -3,10 +3,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
-#include "utils/EngineInspector.h"
 
 #include <atomic>
 #include <catch2/catch_all.hpp>
@@ -44,7 +41,10 @@ namespace
 	{
 		CountingRegister()
 		{
-			const WorkloadRegistryEntry entry = {"CountingWorkload", GET_TYPE_ID(CountingWorkload), sizeof(CountingWrapper), alignof(CountingWrapper),
+			const WorkloadRegistryEntry entry = {"CountingWorkload",
+				GET_TYPE_ID(CountingWorkload),
+				sizeof(CountingWrapper),
+				alignof(CountingWrapper),
 				[](void* p)
 				{
 					new (p) CountingWrapper();
@@ -53,7 +53,15 @@ namespace
 				{
 					static_cast<CountingWrapper*>(p)->~CountingWrapper();
 				},
-				nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
 				[](void* p, const TickInfo& tick_info)
 				{
 					static_cast<CountingWrapper*>(p)->tick(tick_info);
@@ -88,7 +96,10 @@ namespace
 	{
 		SlowRegister()
 		{
-			const WorkloadRegistryEntry entry = {"SlowWorkload", GET_TYPE_ID(SlowWorkload), sizeof(SlowWrapper), alignof(SlowWrapper),
+			const WorkloadRegistryEntry entry = {"SlowWorkload",
+				GET_TYPE_ID(SlowWorkload),
+				sizeof(SlowWrapper),
+				alignof(SlowWrapper),
 				[](void* p)
 				{
 					new (p) SlowWrapper();
@@ -97,7 +108,15 @@ namespace
 				{
 					static_cast<SlowWrapper*>(p)->~SlowWrapper();
 				},
-				nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
 				[](void* p, const TickInfo& tick_info)
 				{
 					static_cast<SlowWrapper*>(p)->tick(tick_info);
@@ -118,7 +137,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		const double tick_rate_hz = 1.0 / tick_info.delta_time;
 		const int tick_count = 5;
 
-		Model_v1 model;
+		Model model;
 		const auto a = model.add("CountingWorkload", "a", tick_rate_hz);
 		const auto b = model.add("CountingWorkload", "b", tick_rate_hz);
 		const auto group = model.add("SyncedGroupWorkload", "group", {a, b}, tick_rate_hz);
@@ -161,7 +180,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		const double tick_rate_hz = 1.0 / tick_info.delta_time;
 		constexpr int num_ticks = 5;
 
-		Model_v1 model;
+		Model model;
 		const auto s1 = model.add("SlowWorkload", "s1", tick_rate_hz);
 		const auto s2 = model.add("SlowWorkload", "s2", tick_rate_hz);
 		const auto group = model.add("SyncedGroupWorkload", "group", {s1, s2}, tick_rate_hz);
@@ -205,7 +224,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		const TickInfo tick_info = TICK_INFO_FIRST_10MS_100HZ;
 		const double tick_rate_hz = 1.0 / tick_info.delta_time;
 
-		Model_v1 model;
+		Model model;
 		const auto h = model.add("CountingWorkload", "ticky", tick_rate_hz);
 		const auto group = model.add("SyncedGroupWorkload", "group", {h}, tick_rate_hz);
 		model.set_root(group);
@@ -247,7 +266,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		const double group_tick_rate_hz = 1.0 / group_tick_info.delta_time;
 		const double child_tick_rate_hz = 1.0 / TICK_INFO_FIRST_100MS_10HZ.delta_time; // child wants to tick 10x slower than group - we should let it
 
-		Model_v1 model;
+		Model model;
 		const auto h = model.add("CountingWorkload", "slower", child_tick_rate_hz);
 		const auto group = model.add("SyncedGroupWorkload", "group", {h}, group_tick_rate_hz);
 		model.set_root(group);

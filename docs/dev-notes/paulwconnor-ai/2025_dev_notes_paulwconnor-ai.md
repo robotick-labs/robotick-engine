@@ -24,7 +24,7 @@
 
 - Started serious C++ implementation of Robotick
 - Defined first core concepts: tick loop, workload types, reflection via macros
-- Built FieldRegistry, macro system (`ROBOTICK_DEFINE_WORKLOAD` and `...FIELDS`)
+- Built FieldRegistry, macro system (`ROBOTICK_REGISTER_WORKLOAD` and `...FIELDS`)
 
 ---
 

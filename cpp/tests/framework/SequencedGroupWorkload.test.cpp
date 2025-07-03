@@ -3,10 +3,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
-#include "utils/EngineInspector.h"
 
 #include <atomic>
 #include <catch2/catch_all.hpp>
@@ -38,7 +35,9 @@ namespace
 	{
 		DummyTickingRegister()
 		{
-			const WorkloadRegistryEntry entry = {"DummyTickingWorkload", GET_TYPE_ID(DummyTickingWrapper), sizeof(DummyTickingWrapper),
+			const WorkloadRegistryEntry entry = {"DummyTickingWorkload",
+				GET_TYPE_ID(DummyTickingWrapper),
+				sizeof(DummyTickingWrapper),
 				alignof(DummyTickingWrapper),
 				[](void* p)
 				{
@@ -48,7 +47,15 @@ namespace
 				{
 					static_cast<DummyTickingWrapper*>(p)->~DummyTickingWrapper();
 				},
-				nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
 				[](void* p, const TickInfo& tick_info)
 				{
 					static_cast<DummyTickingWrapper*>(p)->tick(tick_info);
@@ -77,7 +84,9 @@ namespace
 	{
 		SlowTickRegister()
 		{
-			const WorkloadRegistryEntry entry = {"SlowTickWorkload", GET_TYPE_ID(SlowTickWorkload), sizeof(SlowTickWorkload),
+			const WorkloadRegistryEntry entry = {"SlowTickWorkload",
+				GET_TYPE_ID(SlowTickWorkload),
+				sizeof(SlowTickWorkload),
 				alignof(SlowTickWorkload),
 				[](void* p)
 				{
@@ -87,7 +96,15 @@ namespace
 				{
 					static_cast<SlowWrapper*>(p)->~SlowWrapper();
 				},
-				nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
 				[](void* p, const TickInfo& tick_info)
 				{
 					static_cast<SlowWrapper*>(p)->tick(tick_info);
@@ -106,7 +123,7 @@ TEST_CASE("Unit/Workloads/SequencedGroupWorkload")
 	{
 		DummyTickingWorkload::reset();
 
-		Model_v1 model;
+		Model model;
 		const auto child1 = model.add("DummyTickingWorkload", "child1", 50.0);
 		const auto child2 = model.add("DummyTickingWorkload", "child2", 50.0);
 		const auto group = model.add("SequencedGroupWorkload", "group", {child1, child2}, 50.0);
@@ -128,7 +145,7 @@ TEST_CASE("Unit/Workloads/SequencedGroupWorkload")
 
 	SECTION("Overrun logs if exceeded")
 	{
-		Model_v1 model;
+		Model model;
 		const auto handle = model.add("SlowTickWorkload", "slow", 50.0);
 		const auto group = model.add("SequencedGroupWorkload", "group", {handle}, 1000.0);
 		model.set_root(group);

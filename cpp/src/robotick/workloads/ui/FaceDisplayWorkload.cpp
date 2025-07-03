@@ -15,22 +15,22 @@ namespace robotick
 		float blink_min_interval_sec = 1.5f;
 		float blink_max_interval_sec = 4.0f;
 	};
-	ROBOTICK_BEGIN_FIELDS(FaceDisplayConfig)
-	ROBOTICK_FIELD(FaceDisplayConfig, float, blink_min_interval_sec)
-	ROBOTICK_FIELD(FaceDisplayConfig, float, blink_max_interval_sec)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(FaceDisplayConfig)
+	ROBOTICK_STRUCT_FIELD(FaceDisplayConfig, float, blink_min_interval_sec)
+	ROBOTICK_STRUCT_FIELD(FaceDisplayConfig, float, blink_max_interval_sec)
+	ROBOTICK_REGISTER_STRUCT_END(FaceDisplayConfig)
 
 	struct FaceDisplayInputs
 	{
 	};
-	ROBOTICK_BEGIN_FIELDS(FaceDisplayInputs)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(FaceDisplayInputs)
+	ROBOTICK_REGISTER_STRUCT_END(FaceDisplayInputs)
 
 	struct FaceDisplayOutputs
 	{
 	};
-	ROBOTICK_BEGIN_FIELDS(FaceDisplayOutputs)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(FaceDisplayOutputs)
+	ROBOTICK_REGISTER_STRUCT_END(FaceDisplayOutputs)
 
 	struct FaceDisplayState
 	{
@@ -155,6 +155,6 @@ namespace robotick
 #endif // #if defined(ROBOTICK_PLATFORM_ESP32)
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(FaceDisplayWorkload, FaceDisplayConfig, FaceDisplayInputs, FaceDisplayOutputs)
+	ROBOTICK_REGISTER_WORKLOAD(FaceDisplayWorkload, FaceDisplayConfig, FaceDisplayInputs, FaceDisplayOutputs)
 
 } // namespace robotick

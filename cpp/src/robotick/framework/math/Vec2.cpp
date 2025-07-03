@@ -3,7 +3,7 @@
 
 #include "robotick/framework/math/Vec2.h"
 
-#include "robotick/framework/registry-v2/TypeMacros.h"
+#include "robotick/framework/registry/TypeMacros.h"
 
 using namespace robotick;
 

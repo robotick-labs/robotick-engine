@@ -28,7 +28,7 @@ namespace robotick
 
 		void set_engine(const Engine& engine_in) { engine = &engine_in; }
 
-		void set_children(const std::vector<const WorkloadInstanceInfo*>& child_workloads, std::vector<DataConnectionInfo*>& pending_connections)
+		void set_children(const HeapVector<const WorkloadInstanceInfo*>& child_workloads, const HeapVector<DataConnectionInfo>& pending_connections)
 		{
 			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set by now");
 
@@ -52,10 +52,13 @@ namespace robotick
 			}
 
 			// iterate + classify connections
-			std::vector<DataConnectionInfo*> remaining;
-			remaining.reserve(pending_connections.size());
 			for (DataConnectionInfo* conn : pending_connections)
 			{
+				if (conn->expected_handler != DataConnectionInfo::ExpectedHandler::Unassigned)
+				{
+					continue;
+				}
+
 				const auto src_it = workload_to_child.find(conn->source_workload);
 				const auto dst_it = workload_to_child.find(conn->dest_workload);
 				const bool src_is_local = src_it != workload_to_child.end();
@@ -64,17 +67,16 @@ namespace robotick
 				if (src_is_local && dst_is_local)
 				{
 					dst_it->second->connections_in.push_back(conn);
-					ROBOTICK_ASSERT(conn->expected_handler == DataConnectionInfo::ExpectedHandler::Unassigned);
 					conn->expected_handler = DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload;
 				}
 				else
 				{
 					if (dst_is_local)
-						conn->expected_handler = DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine;
-					remaining.push_back(conn);
+					{
+						conn->expected_handler = DataConnectionInfo::ExpectedHandler::DelegateToParent;
+					}
 				}
 			}
-			pending_connections.swap(remaining);
 		}
 
 		void tick(const TickInfo& tick_info)
@@ -118,7 +120,10 @@ namespace robotick
 	{
 		SequencedGroupWorkloadImpl* impl = nullptr;
 
-		SequencedGroupWorkload() : impl(new SequencedGroupWorkloadImpl()) {}
+		SequencedGroupWorkload()
+			: impl(new SequencedGroupWorkloadImpl())
+		{
+		}
 		~SequencedGroupWorkload()
 		{
 			stop();
@@ -127,7 +132,7 @@ namespace robotick
 
 		void set_engine(const Engine& engine_in) { impl->set_engine(engine_in); }
 
-		void set_children(const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& pending_connections)
+		void set_children(const HeapVector<const WorkloadInstanceInfo*>& children, const HeapVector<DataConnectionInfo>& pending_connections)
 		{
 			impl->set_children(children, pending_connections);
 		}
@@ -139,6 +144,6 @@ namespace robotick
 		void stop() { /* placeholder for consistency with SequencedGroup*/ }
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(SequencedGroupWorkload)
+	ROBOTICK_REGISTER_WORKLOAD(SequencedGroupWorkload)
 
 } // namespace robotick

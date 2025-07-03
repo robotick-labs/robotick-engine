@@ -42,9 +42,9 @@ namespace
 
 	void populate_model_static_const(Model& model)
 	{
-		static const ConfigEntry config_entries[] = {{"entry_float", "2.0f"}, {"entry_bool", "false"}};
+		static const FieldConfigEntry config_entries[] = {{"entry_float", "2.0f"}, {"entry_bool", "false"}};
 
-		static const ConfigEntry input_entries[] = {{"entry_int", "10"}, {"entry_string", "there"}};
+		static const FieldConfigEntry input_entries[] = {{"entry_int", "10"}, {"entry_string", "there"}};
 
 		// Declare workloads A and B
 		static const WorkloadSeed workload_a{

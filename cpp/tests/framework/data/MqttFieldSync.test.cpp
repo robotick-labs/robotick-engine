@@ -3,12 +3,9 @@
 
 #include "robotick/framework/data/MqttFieldSync.h"
 #include "../utils/BlackboardTestUtils.h"
-#include "../utils/EngineInspector.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 
@@ -39,17 +36,17 @@ namespace robotick::test
 				blackboard.set("ratio", 0.5);
 			}
 		};
-		ROBOTICK_BEGIN_FIELDS(TestInputs)
-		ROBOTICK_FIELD(TestInputs, int, value)
-		ROBOTICK_FIELD(TestInputs, FixedString64, text)
-		ROBOTICK_FIELD(TestInputs, Blackboard, blackboard)
-		ROBOTICK_END_FIELDS()
+		ROBOTICK_REGISTER_STRUCT_BEGIN(TestInputs)
+		ROBOTICK_STRUCT_FIELD(TestInputs, int, value)
+		ROBOTICK_STRUCT_FIELD(TestInputs, FixedString64, text)
+		ROBOTICK_STRUCT_FIELD(TestInputs, Blackboard, blackboard)
+		ROBOTICK_REGISTER_STRUCT_END(TestInputs)
 
 		struct TestWorkload
 		{
 			TestInputs inputs;
 		};
-		ROBOTICK_DEFINE_WORKLOAD(TestWorkload, void, TestInputs, void)
+		ROBOTICK_REGISTER_WORKLOAD(TestWorkload, void, TestInputs, void)
 
 		struct DummyMqttClient : public IMqttClient
 		{
@@ -72,7 +69,7 @@ namespace robotick::test
 	{
 		SECTION("MqttFieldSync can publish state and control fields")
 		{
-			Model_v1 model;
+			Model model;
 			auto test_workload_seed_handle = model.add("TestWorkload", "W1", 1.0);
 			model.set_root(test_workload_seed_handle);
 
@@ -87,7 +84,7 @@ namespace robotick::test
 			test_workload_ptr->inputs.blackboard.set("ratio", 3.14);
 
 			WorkloadsBuffer mirror_buf;
-			mirror_buf.create_mirror_from(EngineInspector::get_workloads_buffer(engine));
+			mirror_buf.create_mirror_from(engine.get_workloads_buffer());
 
 			DummyMqttClient dummy_client;
 			std::string root_topic_name = "robotick";
@@ -115,7 +112,7 @@ namespace robotick::test
 
 		SECTION("MqttFieldSync can apply control updates")
 		{
-			Model_v1 model;
+			Model model;
 			auto test_workload_seed_handle = model.add("TestWorkload", "W2", 1.0);
 			model.set_root(test_workload_seed_handle);
 

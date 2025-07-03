@@ -3,8 +3,8 @@
 
 #include "robotick/framework/math/Vec2.h"
 
-#include "robotick/framework/registry-v2/TypeDescriptor.h"
-#include "robotick/framework/registry-v2/TypeRegistry.h"
+#include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/registry/TypeRegistry.h"
 
 #include <catch2/catch_all.hpp>
 
@@ -98,7 +98,7 @@ TEST_CASE("Unit/Framework/Math/Vec2")
 		{
 			CHECK(type_descriptor_vec2f->name == GET_TYPE_NAME(Vec2f));
 			CHECK(type_descriptor_vec2f->id == GET_TYPE_ID(Vec2f));
-			CHECK(type_descriptor_vec2f->type_category == TypeDescriptor::TypeCategory::Struct);
+			CHECK(type_descriptor_vec2f->type_category == TypeCategory::Struct);
 			CHECK(type_descriptor_vec2f->type_category_desc.struct_desc != nullptr);
 			if (type_descriptor_vec2f->type_category_desc.struct_desc)
 			{
@@ -113,7 +113,7 @@ TEST_CASE("Unit/Framework/Math/Vec2")
 		{
 			CHECK(type_descriptor_vec2d->name == GET_TYPE_NAME(Vec2d));
 			CHECK(type_descriptor_vec2d->id == GET_TYPE_ID(Vec2d));
-			CHECK(type_descriptor_vec2d->type_category == TypeDescriptor::TypeCategory::Struct);
+			CHECK(type_descriptor_vec2d->type_category == TypeCategory::Struct);
 			CHECK(type_descriptor_vec2d->type_category_desc.struct_desc != nullptr);
 			if (type_descriptor_vec2d->type_category_desc.struct_desc)
 			{
@@ -128,7 +128,7 @@ TEST_CASE("Unit/Framework/Math/Vec2")
 		{
 			CHECK(type_descriptor_vec2->name == GET_TYPE_NAME(Vec2));
 			CHECK(type_descriptor_vec2->id == GET_TYPE_ID(Vec2));
-			CHECK(type_descriptor_vec2->type_category == TypeDescriptor::TypeCategory::Struct);
+			CHECK(type_descriptor_vec2->type_category == TypeCategory::Struct);
 			CHECK(type_descriptor_vec2->type_category_desc.struct_desc != nullptr);
 			if (type_descriptor_vec2->type_category_desc.struct_desc)
 			{

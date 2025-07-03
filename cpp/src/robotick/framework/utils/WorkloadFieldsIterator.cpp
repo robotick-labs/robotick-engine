@@ -5,7 +5,6 @@
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 
 namespace robotick
 {
@@ -18,8 +17,10 @@ namespace robotick
 		}
 	}
 
-	void WorkloadFieldsIterator::for_each_field_in_workload(const Engine& engine, const WorkloadInstanceInfo& instance,
-		WorkloadsBuffer* workloads_override, std::function<void(const WorkloadFieldView&)> callback)
+	void WorkloadFieldsIterator::for_each_field_in_workload(const Engine& engine,
+		const WorkloadInstanceInfo& instance,
+		WorkloadsBuffer* workloads_override,
+		std::function<void(const WorkloadFieldView&)> callback)
 	{
 		auto& workloads_buffer = workloads_override ? *workloads_override : engine.get_workloads_buffer();
 		const WorkloadRegistryEntry* type = instance.type;

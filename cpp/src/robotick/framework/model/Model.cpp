@@ -29,9 +29,9 @@ namespace robotick
 		return seed;
 	}
 
-	WorkloadSeed& Model::add(const char* type_name, const char* name)
+	WorkloadSeed& Model::add(const char* type_name, const char* unique_name)
 	{
-		return add().set_type_name(type_name).set_name(name);
+		return add().set_type_name(type_name).set_unique_name(unique_name);
 	}
 
 	void Model::connect(const char* source_field_path, const char* dest_field_path)
@@ -273,9 +273,9 @@ namespace robotick
 				if (child_workload->tick_rate_hz > parent_rate)
 				{
 					ROBOTICK_FATAL_EXIT("Child workload '%s' has faster tick rate (%.2f Hz) than parent '%s' (%.2f Hz).",
-						child_workload->name.c_str(),
+						child_workload->unique_name.c_str(),
 						child_workload->tick_rate_hz,
-						parent_workload->name.c_str(),
+						parent_workload->unique_name.c_str(),
 						parent_rate);
 				}
 			}

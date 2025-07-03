@@ -55,20 +55,20 @@ namespace robotick
 
 		struct ConnectionConfig
 		{
-			std::string host;
+			FixedString64 host;
 			int port;
 		};
 
 		struct Field
 		{
-			std::string path;
+			FixedString64 path;
 			const void* send_ptr = nullptr;
 			void* recv_ptr = nullptr;
 			size_t size = 0;
-			uint64_t type_hash = 0;
+			uint32_t type_hash;
 		};
 
-		using BinderCallback = std::function<bool(const std::string& path, Field& out_field)>;
+		using BinderCallback = std::function<bool(const char* path, Field& out_field)>;
 
 		RemoteEngineConnection() = default;
 		~RemoteEngineConnection() noexcept { disconnect(); }

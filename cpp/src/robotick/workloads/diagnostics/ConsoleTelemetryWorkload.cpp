@@ -23,11 +23,11 @@ namespace robotick
 		bool enable_demo = false;
 	};
 
-	ROBOTICK_BEGIN_FIELDS(ConsoleTelemetryConfig)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_pretty_print)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_unicode)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_demo)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(ConsoleTelemetryConfig)
+	ROBOTICK_STRUCT_FIELD(ConsoleTelemetryConfig, bool, enable_pretty_print)
+	ROBOTICK_STRUCT_FIELD(ConsoleTelemetryConfig, bool, enable_unicode)
+	ROBOTICK_STRUCT_FIELD(ConsoleTelemetryConfig, bool, enable_demo)
+	ROBOTICK_REGISTER_STRUCT_END(ConsoleTelemetryConfig)
 
 	class ConsoleTelemetryCollector
 	{
@@ -105,7 +105,9 @@ namespace robotick
 
 			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set and checked by now");
 
-			WorkloadFieldsIterator::for_each_field_in_workload(*engine, info, &mirror_buffer,
+			WorkloadFieldsIterator::for_each_field_in_workload(*engine,
+				info,
+				&mirror_buffer,
 				[&](const WorkloadFieldView& view)
 				{
 					std::ostringstream entry;
@@ -222,8 +224,14 @@ namespace robotick
 				input_oss << "input_" << i << "=" << val_dist(gen);
 				output_oss << "output_" << i << "=" << val_dist(gen);
 
-				rows.push_back(ConsoleTelemetryRow{"DummyType" + std::to_string(i), "Workload" + std::to_string(i), config_oss.str(), input_oss.str(),
-					output_oss.str(), tick_ms, goal_ms, percent});
+				rows.push_back(ConsoleTelemetryRow{"DummyType" + std::to_string(i),
+					"Workload" + std::to_string(i),
+					config_oss.str(),
+					input_oss.str(),
+					output_oss.str(),
+					tick_ms,
+					goal_ms,
+					percent});
 			}
 
 			return rows;
@@ -255,6 +263,6 @@ namespace robotick
 		}
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(ConsoleTelemetryWorkload, ConsoleTelemetryConfig);
+	ROBOTICK_REGISTER_WORKLOAD(ConsoleTelemetryWorkload, ConsoleTelemetryConfig);
 
 } // namespace robotick

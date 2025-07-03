@@ -55,7 +55,7 @@ namespace robotick
 		TemplateInputs inputs;
 		TemplateOutputs outputs;
 
-		void set_children(const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& connections)
+		void set_children(const HeapVector<const WorkloadInstanceInfo*>& children, const HeapVector<DataConnectionInfo>& connections)
 		{
 			// Handle child linkage (if applicable - typically only used for compositional workloads
 			// e.g. AsyncPairWorkload, SyncedGroupWorkloads, SequencedGroupWorkload)

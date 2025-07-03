@@ -25,27 +25,27 @@ namespace robotick
 		FixedString64 class_name;
 		Blackboard blackboard;
 	};
-	ROBOTICK_BEGIN_FIELDS(PythonConfig)
-	ROBOTICK_FIELD(PythonConfig, FixedString128, script_name)
-	ROBOTICK_FIELD(PythonConfig, FixedString64, class_name)
-	ROBOTICK_FIELD(PythonConfig, Blackboard, blackboard)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(PythonConfig)
+	ROBOTICK_STRUCT_FIELD(PythonConfig, FixedString128, script_name)
+	ROBOTICK_STRUCT_FIELD(PythonConfig, FixedString64, class_name)
+	ROBOTICK_STRUCT_FIELD(PythonConfig, Blackboard, blackboard)
+	ROBOTICK_REGISTER_STRUCT_END(PythonConfig)
 
 	struct PythonInputs
 	{
 		Blackboard blackboard;
 	};
-	ROBOTICK_BEGIN_FIELDS(PythonInputs)
-	ROBOTICK_FIELD(PythonInputs, Blackboard, blackboard)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(PythonInputs)
+	ROBOTICK_STRUCT_FIELD(PythonInputs, Blackboard, blackboard)
+	ROBOTICK_REGISTER_STRUCT_END(PythonInputs)
 
 	struct PythonOutputs
 	{
 		Blackboard blackboard;
 	};
-	ROBOTICK_BEGIN_FIELDS(PythonOutputs)
-	ROBOTICK_FIELD(PythonOutputs, Blackboard, blackboard)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(PythonOutputs)
+	ROBOTICK_STRUCT_FIELD(PythonOutputs, Blackboard, blackboard)
+	ROBOTICK_REGISTER_STRUCT_END(PythonOutputs)
 
 	struct __attribute__((visibility("hidden"))) PythonInternalState
 	{
@@ -62,7 +62,10 @@ namespace robotick
 
 		std::unique_ptr<PythonInternalState> internal_state;
 
-		PythonWorkload() : internal_state(std::make_unique<PythonInternalState>()) {}
+		PythonWorkload()
+			: internal_state(std::make_unique<PythonInternalState>())
+		{
+		}
 
 		~PythonWorkload()
 		{
@@ -215,7 +218,8 @@ namespace robotick
 				auto val = item.second;
 
 				const auto& schema = outputs.blackboard.get_schema();
-				auto it = std::find_if(schema.begin(), schema.end(),
+				auto it = std::find_if(schema.begin(),
+					schema.end(),
 					[&](const BlackboardFieldInfo& f)
 					{
 						return key == f.name.c_str();
@@ -235,6 +239,6 @@ namespace robotick
 		}
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(PythonWorkload, PythonConfig, PythonInputs, PythonOutputs)
+	ROBOTICK_REGISTER_WORKLOAD(PythonWorkload, PythonConfig, PythonInputs, PythonOutputs)
 
 } // namespace robotick

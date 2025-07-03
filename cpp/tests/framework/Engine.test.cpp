@@ -2,12 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/platform/Threading.h"
-
-#include "utils/EngineInspector.h"
-#include "utils/ModelHelper.h"
 
 #include <atomic>
 #include <catch2/catch_all.hpp>
@@ -25,9 +20,9 @@ namespace robotick::test
 		{
 			int value = 0;
 		};
-		ROBOTICK_BEGIN_FIELDS(DummyConfig)
-		ROBOTICK_FIELD(DummyConfig, int, value)
-		ROBOTICK_END_FIELDS()
+		ROBOTICK_REGISTER_STRUCT_BEGIN(DummyConfig)
+		ROBOTICK_STRUCT_FIELD(DummyConfig, int, value)
+		ROBOTICK_REGISTER_STRUCT_END(DummyConfig)
 
 		struct DummyWorkload
 		{
@@ -36,7 +31,7 @@ namespace robotick::test
 
 			void load() { loaded_value = config.value; }
 		};
-		ROBOTICK_DEFINE_WORKLOAD(DummyWorkload, DummyConfig)
+		ROBOTICK_REGISTER_WORKLOAD(DummyWorkload, DummyConfig)
 
 		// === TickCounterWorkload ===
 
@@ -45,7 +40,7 @@ namespace robotick::test
 			int count = 0;
 			void tick(const TickInfo&) { count++; }
 		};
-		ROBOTICK_DEFINE_WORKLOAD(TickCounterWorkload)
+		ROBOTICK_REGISTER_WORKLOAD(TickCounterWorkload)
 
 	} // namespace
 
@@ -55,7 +50,7 @@ namespace robotick::test
 	{
 		SECTION("DummyWorkload stores tick rate correctly")
 		{
-			Model_v1 model;
+			Model model;
 			auto handle = model.add("DummyWorkload", "A", 123.0, {});
 			model.set_root(handle);
 
@@ -68,7 +63,7 @@ namespace robotick::test
 
 		SECTION("DummyWorkload config is loaded via load()")
 		{
-			Model_v1 model;
+			Model model;
 			auto handle = model.add("DummyWorkload", "A", 1.0, {{"value", "42"}});
 			model.set_root(handle);
 
@@ -81,7 +76,7 @@ namespace robotick::test
 
 		SECTION("Rejects unknown workload type")
 		{
-			Model_v1 model;
+			Model model;
 			auto handle = model.add("UnknownType", "fail", 1.0, {});
 			model.set_root(handle);
 
@@ -91,7 +86,7 @@ namespace robotick::test
 
 		SECTION("Multiple workloads supported")
 		{
-			Model_v1 model;
+			Model model;
 			model.add("DummyWorkload", "one", 1.0, {{"value", "1"}});
 			model.add("DummyWorkload", "two", 2.0, {{"value", "2"}});
 			model_helpers::wrap_all_in_sequenced_group(model);
@@ -108,7 +103,7 @@ namespace robotick::test
 
 		SECTION("Workloads receive tick call")
 		{
-			Model_v1 model;
+			Model model;
 			auto handle = model.add("TickCounterWorkload", "ticky", 200.0, {});
 			model.set_root(handle);
 

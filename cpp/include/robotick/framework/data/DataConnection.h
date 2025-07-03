@@ -5,6 +5,8 @@
 
 #include "robotick/api_base.h"
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/Map.h"
+#include "robotick/framework/common/Pair.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <cassert>
@@ -17,19 +19,13 @@
 
 namespace robotick
 {
-
 	class WorkloadInstanceInfo;
+	struct DataConnectionSeed;
 	struct WorkloadsBuffer;
-
-	struct DataConnectionSeed_v1
-	{
-		std::string source_field_path;
-		std::string dest_field_path;
-	};
 
 	struct DataConnectionInfo
 	{
-		const DataConnectionSeed_v1 seed; // intentional copy of the original seed for safety
+		const DataConnectionSeed* seed = nullptr;
 		const void* source_ptr = nullptr;
 		void* dest_ptr = nullptr;
 		const WorkloadInstanceInfo* source_workload = nullptr;
@@ -41,7 +37,8 @@ namespace robotick
 		{
 			Unassigned,
 			SequencedGroupWorkload,
-			ParentGroupOrEngine // set by a child-group if it wants parent-group (or Engine) to handle this update for them
+			Engine,
+			DelegateToParent // set by a child-group if it wants parent-group (or Engine) to handle this update for them
 		};
 		ExpectedHandler expected_handler = ExpectedHandler::Unassigned;
 
@@ -56,24 +53,29 @@ namespace robotick
 		}
 	};
 
-	struct ParsedFieldPath
-	{
-		FixedString64 workload_name;
-		FixedString64 section_name; // workload_name/section_name/field_path[0](/field_path[1])
-		std::vector<FixedString64> field_path;
-	};
-
 	class FieldPathParseError : public std::runtime_error
 	{
 	  public:
 		explicit FieldPathParseError(const std::string& msg);
 	};
 
-	class DataConnectionsFactory
+	using FieldConfigEntry = Pair<FixedString64, FixedString64>;
+
+	class DataConnectionUtils
 	{
 	  public:
-		static std::vector<DataConnectionInfo> create(
-			WorkloadsBuffer& workloads_buffer, const std::vector<DataConnectionSeed_v1>& seeds, const std::vector<WorkloadInstanceInfo>& instances);
+		/// @brief Creates and resolves data connections between workload instances based on the provided connection seeds.
+		static void create(HeapVector<DataConnectionInfo>& out_connections,
+			WorkloadsBuffer& workloads_buffer,
+			const ArrayView<const DataConnectionSeed*>& seeds,
+			const Map<StringView, WorkloadInstanceInfo*>& instances);
+
+		/// @brief Applies a set of field configuration overrides to a given struct by matching and writing string-based field values.
+		static void apply_struct_field_values(
+			void* struct_ptr, const TypeDescriptor& struct_type_desc, const ArrayView<const FieldConfigEntry>& field_config_entries);
+
+		/// @brief Given a dot-separated field path (e.g. "MyWorkload.outputs.x"), returns the raw pointer, size in bytes, and type hash.
+		static std::tuple<void*, size_t, const FieldDescriptor*> find_field_info(const Engine& engine, const std::string& path);
 	};
 
 } // namespace robotick

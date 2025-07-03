@@ -4,90 +4,53 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/utils/Constants.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <cstdint>
-#include <limits>
-#include <memory>
-#include <string>
-#include <typeindex>
-#include <unordered_map>
-#include <vector>
 
 namespace robotick
 {
 	class Blackboard;
-	class Engine;
-	struct BlackboardTestUtils;
-	struct DataConnectionUtils;
-	struct DataConnectionsFactory;
-	struct MqttFieldSync;
-	struct PythonWorkload;
-	struct WorkloadFieldsIterator;
-
-	struct BlackboardFieldInfo
-	{
-		FixedString64 name;
-		TypeId type;
-		size_t offset_from_datablock = 0;
-		size_t size = 0;
-
-		uint8_t* get_data_ptr(Blackboard& blackboard) const;
-		const uint8_t* get_data_ptr(const Blackboard& blackboard) const;
-
-		BlackboardFieldInfo(const FixedString64& name, TypeId type) : name(name), type(type) {}
-	};
 
 	struct BlackboardInfo
 	{
-		std::vector<BlackboardFieldInfo> schema;
-		std::unordered_map<std::string, size_t> schema_index_by_name;
+		StructDescriptor struct_descriptor;
 
-		size_t total_datablock_size = 0;
 		size_t datablock_offset_from_blackboard = OFFSET_UNBOUND;
 
-		bool has_field(const std::string& key) const;
-		const BlackboardFieldInfo* find_field(const std::string& key) const;
-		void verify_type_by_size(const std::string& key, size_t expected_size) const;
-		void* get_field_ptr(Blackboard* bb, const std::string& key) const;
-		const void* get_field_ptr(const Blackboard* bb, const std::string& key) const;
+		bool has_field(const char* key) const;
+		const FieldDescriptor* find_field(const char* key) const;
 
-		static std::pair<size_t, size_t> type_size_and_align(TypeId type);
+		void* get_field_ptr(Blackboard* blackboard, const char* key) const;
+		const void* get_field_ptr(const Blackboard* blackboard, const char* key) const;
 	};
 
 	class Blackboard
 	{
-		friend class Engine;
-		friend struct BlackboardFieldInfo;
-		friend struct BlackboardInfo;
-		friend struct BlackboardTestUtils;
-		friend struct DataConnectionUtils;
-		friend struct DataConnectionsFactory;
-		friend struct MqttFieldSync;
-		friend struct PythonWorkload;
-		friend struct WorkloadFieldsIterator;
-
 	  public:
 		Blackboard() = default;
-		explicit Blackboard(const std::vector<BlackboardFieldInfo>& schema);
 
-		Blackboard(const Blackboard&) = default;
-		Blackboard& operator=(const Blackboard&) = default;
+		Blackboard(const Blackboard&) = delete;
+		Blackboard& operator=(const Blackboard&) = delete;
 
-		bool has(const std::string& key) const { return info && info->has_field(key); }
+		void initialize_fields(const ArrayView<FieldDescriptor>& fields);
+
 		template <typename T> void set(const std::string& key, const T& value);
 		template <typename T> T get(const std::string& key) const;
 
+		static const StructDescriptor* resolve_descriptor(const void* instance);
+
 	  protected:
 		void bind(size_t datablock_offset);
+
 		size_t get_datablock_offset() const;
 
-		const std::vector<BlackboardFieldInfo>& get_schema() const;
-		const BlackboardInfo* get_info() const;
-		const BlackboardFieldInfo* get_field_info(const std::string& key) const;
+		const StructDescriptor& get_struct_descriptor() const { return info.struct_descriptor; };
+		const BlackboardInfo& get_info() const { return info; };
 
 	  private:
-		std::shared_ptr<BlackboardInfo> info = nullptr;
+		BlackboardInfo info;
 	};
 } // namespace robotick

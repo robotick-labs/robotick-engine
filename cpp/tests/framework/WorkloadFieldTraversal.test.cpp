@@ -3,14 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
-#include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
-#include "utils/EngineInspector.h"
 
 #include <catch2/catch_all.hpp>
 
@@ -23,18 +19,18 @@ namespace robotick::test
 			int input_value = 0;
 		};
 
-		ROBOTICK_BEGIN_FIELDS(SimpleInputs)
-		ROBOTICK_FIELD(SimpleInputs, int, input_value)
-		ROBOTICK_END_FIELDS()
+		ROBOTICK_REGISTER_STRUCT_BEGIN(SimpleInputs)
+		ROBOTICK_STRUCT_FIELD(SimpleInputs, int, input_value)
+		ROBOTICK_REGISTER_STRUCT_END(SimpleInputs)
 
 		struct SimpleOutputs
 		{
 			int output_value = 0;
 		};
 
-		ROBOTICK_BEGIN_FIELDS(SimpleOutputs)
-		ROBOTICK_FIELD(SimpleOutputs, int, output_value)
-		ROBOTICK_END_FIELDS()
+		ROBOTICK_REGISTER_STRUCT_BEGIN(SimpleOutputs)
+		ROBOTICK_STRUCT_FIELD(SimpleOutputs, int, output_value)
+		ROBOTICK_REGISTER_STRUCT_END(SimpleOutputs)
 
 		struct SimpleWorkload
 		{
@@ -44,24 +40,24 @@ namespace robotick::test
 			void tick(const TickInfo&) { outputs.output_value = inputs.input_value + 1; }
 		};
 
-		ROBOTICK_DEFINE_WORKLOAD(SimpleWorkload, void, SimpleInputs, SimpleOutputs)
+		ROBOTICK_REGISTER_WORKLOAD(SimpleWorkload, void, SimpleInputs, SimpleOutputs)
 	} // namespace
 
 	TEST_CASE("Unit/Framework/FieldWalker")
 	{
 		SECTION("Field pointers match expected values and buffers")
 		{
-			Model_v1 model;
+			Model model;
 			auto w = model.add("SimpleWorkload", "W", 10.0);
 			model.set_root(w);
 
 			Engine engine;
 			engine.load(model);
 
-			const auto& workload_infos = EngineInspector::get_all_instance_info(engine);
+			const auto& workload_infos = engine.get_all_instance_info();
 			REQUIRE(workload_infos.size() == 1);
 
-			const auto& workloads_buf = EngineInspector::get_workloads_buffer(engine);
+			const auto& workloads_buf = engine.get_workloads_buffer();
 
 			// Set known values in workload memory
 			auto* workload_ptr = static_cast<SimpleWorkload*>((void*)workload_infos[0].get_ptr(engine));
@@ -71,7 +67,8 @@ namespace robotick::test
 			bool found_input = false;
 			bool found_output = false;
 
-			WorkloadFieldsIterator::for_each_workload_field(engine, nullptr,
+			WorkloadFieldsIterator::for_each_workload_field(engine,
+				nullptr,
 				[&](const WorkloadFieldView& view)
 				{
 					CHECK(view.workload_info->unique_name == "W");
@@ -98,15 +95,15 @@ namespace robotick::test
 
 		SECTION("Override buffer works correctly")
 		{
-			Model_v1 model;
+			Model model;
 			auto w = model.add("SimpleWorkload", "W", 10.0);
 			model.set_root(w);
 
 			Engine engine;
 			engine.load(model);
 
-			// const auto& original = EngineInspector::get_all_instance_info(engine);
-			const auto& original_buf = EngineInspector::get_workloads_buffer(engine);
+			// const auto& original = engine.get_all_instance_info();
+			const auto& original_buf = engine.get_workloads_buffer();
 
 			WorkloadsBuffer mirror_buf(original_buf.get_size());
 			std::memcpy(mirror_buf.raw_ptr(), original_buf.raw_ptr(), original_buf.get_size());
@@ -118,7 +115,8 @@ namespace robotick::test
 			bool found_input = false;
 			bool found_output = false;
 
-			WorkloadFieldsIterator::for_each_workload_field(engine, &mirror_buf,
+			WorkloadFieldsIterator::for_each_workload_field(engine,
+				&mirror_buf,
 				[&](const WorkloadFieldView& view)
 				{
 					CHECK(view.workload_info->unique_name == "W");
@@ -144,7 +142,7 @@ namespace robotick::test
 
 		SECTION("for_each_workload returns all instances")
 		{
-			Model_v1 model;
+			Model model;
 			auto w1 = model.add("SimpleWorkload", "W1", 10.0);
 			model.add("SimpleWorkload", "W2", 10.0);
 			model.set_root(w1);
@@ -166,17 +164,19 @@ namespace robotick::test
 
 		SECTION("for_each_field_in_workload walks individual workload fields")
 		{
-			Model_v1 model;
+			Model model;
 			auto w = model.add("SimpleWorkload", "Solo", 10.0);
 			model.set_root(w);
 
 			Engine engine;
 			engine.load(model);
 
-			const auto& info = EngineInspector::get_all_instance_info(engine)[0];
+			const auto& info = engine.get_all_instance_info()[0];
 
 			std::set<std::string> found_fields;
-			WorkloadFieldsIterator::for_each_field_in_workload(engine, info, nullptr,
+			WorkloadFieldsIterator::for_each_field_in_workload(engine,
+				info,
+				nullptr,
 				[&](const WorkloadFieldView& view)
 				{
 					found_fields.insert(view.field_info->name.c_str());
@@ -192,22 +192,23 @@ namespace robotick::test
 			{
 				Blackboard blackboard;
 
-				BBInputs() : blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))})
+				BBInputs()
+					: blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))})
 				{
 				}
 			};
-			ROBOTICK_BEGIN_FIELDS(BBInputs)
-			ROBOTICK_FIELD(BBInputs, Blackboard, blackboard)
-			ROBOTICK_END_FIELDS()
+			ROBOTICK_REGISTER_STRUCT_BEGIN(BBInputs)
+			ROBOTICK_STRUCT_FIELD(BBInputs, Blackboard, blackboard)
+			ROBOTICK_REGISTER_STRUCT_END(BBInputs)
 
 			struct BBWorkload
 			{
 				BBInputs inputs;
 				void tick(const TickInfo&) {}
 			};
-			ROBOTICK_DEFINE_WORKLOAD(BBWorkload, void, BBInputs, void)
+			ROBOTICK_REGISTER_WORKLOAD(BBWorkload, void, BBInputs, void)
 
-			Model_v1 model;
+			Model model;
 			auto handle = model.add("BBWorkload", "BB", 10.0);
 			model.set_root(handle);
 
@@ -215,7 +216,8 @@ namespace robotick::test
 			engine.load(model);
 
 			std::set<std::string> seen_fields;
-			WorkloadFieldsIterator::for_each_workload_field(engine, nullptr,
+			WorkloadFieldsIterator::for_each_workload_field(engine,
+				nullptr,
 				[&](const WorkloadFieldView& view)
 				{
 					if (view.subfield_info)

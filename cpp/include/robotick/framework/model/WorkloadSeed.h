@@ -6,36 +6,35 @@
 #include "robotick/api.h"
 
 #include "robotick/framework/common/ArrayView.h"
+#include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/common/Pair.h"
 #include "robotick/framework/common/StringView.h"
+#include "robotick/framework/data/DataConnection.h"
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
-#include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/common/HeapVector.h"
 #endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 namespace robotick
 {
-	using ConfigEntry = Pair<FixedString64, FixedString64>;
-
 	struct WorkloadSeed
 	{
 		WorkloadSeed() = default;
 
-		WorkloadSeed(const char* type_name, const char* name)
+		WorkloadSeed(const char* type_name, const char* unique_name)
 			: type_id(type_name)
-			, name(name)
+			, unique_name(unique_name)
 		{
 		}
 
 		WorkloadSeed(const TypeId& type_id,
-			const StringView& name,
+			const StringView& unique_name,
 			float tick_rate_hz,
 			const ArrayView<const WorkloadSeed*>& children = {},
-			const ArrayView<const ConfigEntry>& config = {},
-			const ArrayView<const ConfigEntry>& inputs = {})
+			const ArrayView<const FieldConfigEntry>& config = {},
+			const ArrayView<const FieldConfigEntry>& inputs = {})
 			: type_id(type_id)
-			, name(name)
+			, unique_name(unique_name)
 			, tick_rate_hz(tick_rate_hz)
 			, children(children)
 			, config(config)
@@ -45,14 +44,14 @@ namespace robotick
 
 		// Public data access
 		TypeId type_id;
-		StringView name = nullptr;
+		StringView unique_name = nullptr;
 
 		float tick_rate_hz = 0.0f;
 
 		ArrayView<const WorkloadSeed*> children;
 
-		ArrayView<const ConfigEntry> config;
-		ArrayView<const ConfigEntry> inputs;
+		ArrayView<const FieldConfigEntry> config;
+		ArrayView<const FieldConfigEntry> inputs;
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
@@ -65,13 +64,13 @@ namespace robotick
 			return *this;
 		}
 
-		WorkloadSeed& set_name(const char* in_name)
+		WorkloadSeed& set_unique_name(const char* in_unique_name)
 		{
-			if (!in_name || !*in_name)
+			if (!in_unique_name || !*in_unique_name)
 				ROBOTICK_FATAL_EXIT("Null or empty name specified for workload-seed");
 
-			name_storage = in_name;
-			name = name_storage.c_str();
+			unique_name_storage = in_unique_name;
+			unique_name = unique_name_storage.c_str();
 
 			return *this;
 		}
@@ -88,15 +87,15 @@ namespace robotick
 		};
 
 		template <size_t N> WorkloadSeed& set_children(const WorkloadSeed* const (&in_children)[N]);
-		template <size_t N> WorkloadSeed& set_config(const ConfigEntry (&in_config)[N]);
-		template <size_t N> WorkloadSeed& set_inputs(const ConfigEntry (&in_inputs)[N]);
+		template <size_t N> WorkloadSeed& set_config(const FieldConfigEntry (&in_config)[N]);
+		template <size_t N> WorkloadSeed& set_inputs(const FieldConfigEntry (&in_inputs)[N]);
 
 	  private:
-		FixedString64 name_storage;
+		FixedString64 unique_name_storage;
 
 		HeapVector<const WorkloadSeed*> children_storage;
-		HeapVector<ConfigEntry> config_storage;
-		HeapVector<ConfigEntry> inputs_storage;
+		HeapVector<FieldConfigEntry> config_storage;
+		HeapVector<FieldConfigEntry> inputs_storage;
 
 #endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 	};
@@ -117,7 +116,7 @@ namespace robotick
 		return *this;
 	}
 
-	template <size_t N> WorkloadSeed& WorkloadSeed::set_config(const ConfigEntry (&in_config)[N])
+	template <size_t N> WorkloadSeed& WorkloadSeed::set_config(const FieldConfigEntry (&in_config)[N])
 	{
 		if (config_storage.size() > 0)
 			ROBOTICK_FATAL_EXIT("set_config() may only be called once");
@@ -131,7 +130,7 @@ namespace robotick
 		return *this;
 	}
 
-	template <size_t N> WorkloadSeed& WorkloadSeed::set_inputs(const ConfigEntry (&in_inputs)[N])
+	template <size_t N> WorkloadSeed& WorkloadSeed::set_inputs(const FieldConfigEntry (&in_inputs)[N])
 	{
 		if (inputs_storage.size() > 0)
 			ROBOTICK_FATAL_EXIT("set_inputs() may only be called once");

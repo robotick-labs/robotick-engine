@@ -14,11 +14,10 @@
 #include "robotick/framework/TickInfo.h"
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/data/State.h"
-#include "robotick/framework/registry-v2/TypeMacros.h"
-
-// old registry
-#include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/framework/math/Vec2.h"
+#include "robotick/framework/math/Vec3.h"
+#include "robotick/framework/registry/TypeMacros.h"
+#include "robotick/framework/registry/TypeRegistry.h"
 
 #if defined(_WIN32)
 #if defined(ROBOTICK_EXPORTS)

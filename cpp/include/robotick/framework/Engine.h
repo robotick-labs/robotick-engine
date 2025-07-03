@@ -4,7 +4,6 @@
 #pragma once
 
 #include "robotick/api.h"
-#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
 
 #include <atomic>
@@ -15,13 +14,12 @@ namespace robotick
 {
 	class AtomicFlag;
 	class ConsoleTelemetryCollector;
+	class Model;
 	class WorkloadsBuffer;
 	struct DataConnectionInfo;
 	struct MqttFieldSync;
-	struct StructRegistryEntry;
 	struct WorkloadFieldsIterator;
 	struct WorkloadInstanceInfo;
-	struct WorkloadRegistryEntry;
 
 	namespace test
 	{
@@ -30,17 +28,16 @@ namespace robotick
 
 	class ROBOTICK_API Engine
 	{
-		friend struct robotick::test::EngineInspector;
 		friend struct robotick::ConsoleTelemetryCollector;
 		friend struct robotick::MqttFieldSync;
 		friend struct robotick::WorkloadFieldsIterator;
 		friend struct robotick::WorkloadInstanceInfo;
 
-	  public:
+	  public: // main api accessors
 		Engine();
 		~Engine();
 
-		void load(const Model_v1& model);
+		void load(const Model& model);
 
 		// The stop_flag must outlive this call. Do not pass temporaries.
 		void run(const AtomicFlag& stop_after_next_tick_flag);
@@ -49,25 +46,24 @@ namespace robotick
 
 		bool is_running() const;
 
-	  protected:
+	  public: // internal public accessors
 		const WorkloadInstanceInfo* get_root_instance_info() const;
-		const WorkloadInstanceInfo& get_instance_info(size_t index) const;
 		const WorkloadInstanceInfo* find_instance_info(const char* unique_name) const;
-		const std::vector<WorkloadInstanceInfo>& get_all_instance_info() const;
-		const std::vector<DataConnectionInfo>& get_all_data_connections() const;
+		const HeapVector<WorkloadInstanceInfo>& get_all_instance_info() const;
+		const HeapVector<DataConnectionInfo>& get_all_data_connections() const;
 
-		std::tuple<void*, size_t, TypeId> find_field_info(const std::string& path) const;
+		std::tuple<void*, size_t, TypeId> find_field_info(const char* path) const;
 
 		WorkloadsBuffer& get_workloads_buffer() const;
 
 	  private:
 		void bind_blackboards_in_struct(
 			WorkloadInstanceInfo& workload_instance_info, const StructRegistryEntry& struct_entry, size_t& blackboard_storage_offset);
-		void bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances, const size_t blackboards_data_start_offset);
+		void bind_blackboards_for_instances(HeapVector<WorkloadInstanceInfo>& instances, const size_t blackboards_data_start_offset);
 
-		size_t compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances);
+		size_t compute_blackboard_memory_requirements(const HeapVector<WorkloadInstanceInfo>& instances);
 
-		void setup_remote_engine_senders(const Model_v1& model);
+		void setup_remote_engine_senders(const Model& model);
 		void setup_remote_engines_receiver();
 
 		void tick_remote_engine_connections(const TickInfo& tick_info);

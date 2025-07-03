@@ -49,15 +49,15 @@ namespace robotick
 		const TypeDescriptor* inputs_desc = nullptr;
 		const TypeDescriptor* outputs_desc = nullptr;
 
-		size_t config_offset = SIZE_MAX; // from start of host-workload
-		size_t input_offset = SIZE_MAX;	 // ditto
-		size_t output_offset = SIZE_MAX; // ditto
+		size_t config_offset = OFFSET_UNBOUND; // from start of host-workload
+		size_t input_offset = OFFSET_UNBOUND;  // ditto
+		size_t output_offset = OFFSET_UNBOUND; // ditto
 
 		// function pointers
 		void (*construct_fn)(void*) = nullptr;
 		void (*destruct_fn)(void*) = nullptr;
 
-		void (*set_children_fn)(void*, const std::vector<const WorkloadInstanceInfo*>&, std::vector<DataConnectionInfo*>&) = nullptr;
+		void (*set_children_fn)(void*, const HeapVector<const WorkloadInstanceInfo*>&, const HeapVector<DataConnectionInfo>&) = nullptr;
 		void (*set_engine_fn)(void*, const Engine&) = nullptr;
 		void (*pre_load_fn)(void*) = nullptr;
 		void (*load_fn)(void*) = nullptr;
@@ -67,6 +67,14 @@ namespace robotick
 		void (*stop_fn)(void*) = nullptr;
 	};
 
+	enum class TypeCategory
+	{
+		Primitive,
+		Struct,
+		DynamicStruct,
+		Workload
+	};
+
 	struct TypeDescriptor
 	{
 		StringView name;  // e.g. "int"
@@ -74,13 +82,7 @@ namespace robotick
 		size_t size;	  // Size in bytes
 		size_t alignment; // Alignment in bytes
 
-		enum class TypeCategory
-		{
-			Primitive,
-			Struct,
-			DynamicStruct,
-			Workload
-		} type_category;
+		TypeCategory type_category;
 
 		union TypeCategoryDesc
 		{

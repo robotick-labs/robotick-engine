@@ -109,12 +109,12 @@ It registers each field’s name and offset for use by the reflection and data-p
 
 ---
 
-### ✅ `ROBOTICK_DEFINE_WORKLOAD(...)`
+### ✅ `ROBOTICK_REGISTER_WORKLOAD(...)`
 
 This macro registers a workload and automatically infers its associated config, input, and output types using template deduction.
 
 ```cpp
-ROBOTICK_DEFINE_WORKLOAD(HelloWorkload)
+ROBOTICK_REGISTER_WORKLOAD(HelloWorkload)
 ```
 
 This expands to:

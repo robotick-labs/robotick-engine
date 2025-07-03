@@ -3,11 +3,10 @@
 
 #include "robotick/framework/WorkloadInstanceInfo.h"
 
+#include "robotick/api_base.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
-
-#include <cassert>
+#include "robotick/framework/registry/TypeDescriptor.h"
 
 namespace robotick
 {

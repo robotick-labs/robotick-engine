@@ -3,15 +3,15 @@
 
 #pragma once
 
-#include "robotick/framework/registry-v2/TypeDescriptor.h"
-#include "robotick/framework/registry-v2/TypeRegistry.h"
+#include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/registry/TypeRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <cstddef>
 #include <type_traits>
 #include <vector>
 
-namespace robotick::registry_v2
+namespace robotick::registry
 {
 
 	// --- Method traits ---
@@ -20,8 +20,9 @@ namespace robotick::registry_v2
 	{
 	};
 	template <typename T>
-	struct has_set_children<T, std::void_t<decltype(std::declval<T>().set_children(std::declval<const std::vector<const WorkloadInstanceInfo*>&>(),
-								   std::declval<std::vector<DataConnectionInfo*>&>()))>> : std::true_type
+	struct has_set_children<T,
+		std::void_t<decltype(std::declval<T>().set_children(
+			std::declval<const HeapVector<const WorkloadInstanceInfo*>&>(), std::declval<const HeapVector<DataConnectionInfo>&>()))>> : std::true_type
 	{
 	};
 
@@ -142,7 +143,7 @@ namespace robotick::registry_v2
 	}
 
 	template <typename T>
-	static void set_children_fn(void* self, const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& pending)
+	static void set_children_fn(void* self, const HeapVector<const WorkloadInstanceInfo*>& children, const HeapVector<DataConnectionInfo>& pending)
 	{
 		static_cast<T*>(self)->set_children(children, pending);
 	}
@@ -247,4 +248,4 @@ namespace robotick::registry_v2
 		return desc;
 	}
 
-} // namespace robotick::registry_v2
+} // namespace robotick::registry

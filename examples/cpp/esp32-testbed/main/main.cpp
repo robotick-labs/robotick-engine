@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/platform/EntryPoint.h"
 #include "robotick/platform/NetworkManager.h"
 #include "robotick/platform/Threading.h"
@@ -33,7 +31,7 @@ namespace robotick
 
 } // namespace robotick
 
-void populate_model(robotick::Model_v1& model)
+void populate_model(robotick::Model& model)
 {
 	std::vector<robotick::WorkloadHandle_v1> children = {model.add("BaseXWorkload", "basex"), model.add("ConsoleTelemetryWorkload", "console"),
 		model.add("FaceDisplayWorkload", "face_display"), model.add("SteeringMixerWorkload", "steering"),
@@ -49,7 +47,7 @@ void run_engine_on_core1(void* param)
 
 	auto* engine = static_cast<robotick::Engine*>(param);
 
-	robotick::Model_v1 model;
+	robotick::Model model;
 	populate_model(model);
 
 	ROBOTICK_INFO("esp32-testbed - Loading Robotick model...");

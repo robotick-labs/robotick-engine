@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/registry-v2/TypeDescriptor.h"
-#include "robotick/framework/registry-v2/TypeMacros.h"
-#include "robotick/framework/registry-v2/TypeRegistry.h"
+#include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/registry/TypeMacros.h"
+#include "robotick/framework/registry/TypeRegistry.h"
 
 #include <cstdio>
 #include <ctype.h>
@@ -141,8 +141,7 @@ namespace robotick
 	template <size_t N> static constexpr TypeDescriptor make_fixed_string_desc(const char* name)
 	{
 		using FS = FixedString<N>;
-		return {name, TypeId(name), sizeof(FS), alignof(FS), TypeDescriptor::TypeCategory::Primitive, {}, &fixed_string_to_string<N>,
-			&fixed_string_from_string<N>};
+		return {name, TypeId(name), sizeof(FS), alignof(FS), TypeCategory::Primitive, {}, &fixed_string_to_string<N>, &fixed_string_from_string<N>};
 	}
 
 #define REGISTER_FIXED_STRING(N)                                                                                                                     \

@@ -36,31 +36,33 @@ namespace robotick
 
 		void set_engine(const Engine& engine_in) { engine = &engine_in; }
 
-		void set_children(const std::vector<const WorkloadInstanceInfo*>& child_workloads, std::vector<DataConnectionInfo*>& pending_connections)
+		void set_children(const HeapVector<const WorkloadInstanceInfo*>& child_workloads, const HeapVector<DataConnectionInfo>& pending_connections)
 		{
 			ROBOTICK_ASSERT(engine != nullptr);
 
 			children.reserve(child_workloads.size());
-			std::unordered_map<const WorkloadInstanceInfo*, ChildWorkloadInfo*> workload_to_child;
 
 			for (const WorkloadInstanceInfo* child_workload : child_workloads)
 			{
 				ChildWorkloadInfo& info = children.emplace_back();
 				info.workload_info = child_workload;
 				info.workload_ptr = child_workload->get_ptr(*engine);
-				workload_to_child[child_workload] = &info;
 
 				if (auto fn = child_workload->type ? child_workload->type->set_children_fn : nullptr)
 				{
 					fn(info.workload_ptr, child_workload->children, pending_connections);
 				}
-			}
 
-			for (DataConnectionInfo* conn : pending_connections)
-			{
-				if (workload_to_child.count(conn->dest_workload))
+				for (DataConnectionInfo* conn : pending_connections)
 				{
-					conn->expected_handler = DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine;
+					if (conn->expected_handler != DataConnectionInfo::ExpectedHandler::Unassigned)
+					{
+						continue;
+					}
+					else if (conn->dest_workload == info.workload_ptr)
+					{
+						conn->expected_handler = DataConnectionInfo::ExpectedHandler::DelegateToParent;
+					}
 				}
 			}
 		}
@@ -92,14 +94,16 @@ namespace robotick
 						ctx->impl->child_tick_loop(*ctx->child);
 						delete ctx;
 					},
-					ctx, child.workload_info->unique_name.substr(0, 15), 2);
+					ctx,
+					child.workload_info->unique_name.substr(0, 15),
+					2);
 			}
 		}
 
 		void tick(const TickInfo&)
 		{
 			// note - we don't use the supplied TickInfo as we don't need if for ourselves, and our children are allowed to tick at their requested
-			// rate (as long as equal to or slower than our tick rate).  That is enforced in Model_v1 validation code.
+			// rate (as long as equal to or slower than our tick rate).  That is enforced in Model validation code.
 
 			for (auto& child : children)
 			{
@@ -189,7 +193,10 @@ namespace robotick
 	{
 		SyncedGroupWorkloadImpl* impl = nullptr;
 
-		SyncedGroupWorkload() : impl(new SyncedGroupWorkloadImpl()) {}
+		SyncedGroupWorkload()
+			: impl(new SyncedGroupWorkloadImpl())
+		{
+		}
 		~SyncedGroupWorkload()
 		{
 			stop();
@@ -197,7 +204,7 @@ namespace robotick
 		}
 
 		void set_engine(const Engine& engine_in) { impl->set_engine(engine_in); }
-		void set_children(const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& pending_connections)
+		void set_children(const HeapVector<const WorkloadInstanceInfo*>& children, const HeapVector<DataConnectionInfo>& pending_connections)
 		{
 			impl->set_children(children, pending_connections);
 		}
@@ -206,6 +213,6 @@ namespace robotick
 		void stop() { impl->stop(); }
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(SyncedGroupWorkload)
+	ROBOTICK_REGISTER_WORKLOAD(SyncedGroupWorkload)
 
 } // namespace robotick

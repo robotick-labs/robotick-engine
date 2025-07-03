@@ -7,18 +7,19 @@
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
-#include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
-#include <cstdint>
-#include <cstring>
-#include <sstream>
-#include <stdexcept>
-#include <unordered_set>
+#include "robotick/framework/model/DataConnectionSeed.h"
 
 namespace robotick
 {
+	struct ParsedFieldPath
+	{
+		FixedString64 workload_name;
+		FixedString64 section_name; // workload_name/section_name/field_path[0](/field_path[1])
+		std::vector<FixedString64> field_path;
+	};
 
-	FieldPathParseError::FieldPathParseError(const std::string& msg) : std::runtime_error(msg)
+	FieldPathParseError::FieldPathParseError(const std::string& msg)
+		: std::runtime_error(msg)
 	{
 	}
 
@@ -54,7 +55,8 @@ namespace robotick
 			const bool has_subfield = tokens.size() == 4;
 			if (has_subfield)
 			{
-				return ParsedFieldPath{FixedString64(tokens[0].c_str()), FixedString64(tokens[1].c_str()),
+				return ParsedFieldPath{FixedString64(tokens[0].c_str()),
+					FixedString64(tokens[1].c_str()),
 					{FixedString64(tokens[2].c_str()), FixedString64(tokens[3].c_str())}};
 			}
 
@@ -112,8 +114,11 @@ namespace robotick
 			return found_field;
 		}
 
-		static const BlackboardFieldInfo* resolve_blackboard_field_ptr(WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& inst,
-			const StructRegistryEntry& struct_info, const FieldInfo& blackboard_field, const std::string& blackboard_subfield_name)
+		static const BlackboardFieldInfo* resolve_blackboard_field_ptr(WorkloadsBuffer& workloads_buffer,
+			const WorkloadInstanceInfo& inst,
+			const StructRegistryEntry& struct_info,
+			const FieldInfo& blackboard_field,
+			const std::string& blackboard_subfield_name)
 		{
 			if (blackboard_field.type != GET_TYPE_ID(Blackboard))
 			{
@@ -125,25 +130,21 @@ namespace robotick
 		}
 	};
 
-	std::vector<DataConnectionInfo> DataConnectionsFactory::create(
-		WorkloadsBuffer& workloads_buffer, const std::vector<DataConnectionSeed_v1>& seeds, const std::vector<WorkloadInstanceInfo>& instances)
+	void DataConnectionUtils::create(HeapVector<DataConnectionInfo>& out_connections,
+		WorkloadsBuffer& workloads_buffer,
+		const ArrayView<const DataConnectionSeed*>& seeds,
+		const Map<StringView, WorkloadInstanceInfo*>& instances)
 	{
-		std::vector<DataConnectionInfo> results;
-		std::unordered_set<std::string> seen_destinations;
-
-		std::unordered_map<std::string_view, const WorkloadInstanceInfo*> idx;
-		for (const auto& inst : instances)
-			idx.emplace(inst.unique_name.c_str(), &inst);
-
-		for (const auto& seed : seeds)
+		for (const DataConnectionSeed* seed_ptr : seeds)
 		{
-			ParsedFieldPath src = DataConnectionUtils::parse_field_path(seed.source_field_path);
-			ParsedFieldPath dst = DataConnectionUtils::parse_field_path(seed.dest_field_path);
+			ROBOTICK_ASSERT(seed_ptr != nullptr);
+			const DataConnectionSeed& seed = *seed_ptr;
 
-			const auto src_it = idx.find(src.workload_name.c_str());
-			const auto dst_it = idx.find(dst.workload_name.c_str());
-			const WorkloadInstanceInfo* src_inst = src_it != idx.end() ? src_it->second : nullptr;
-			const WorkloadInstanceInfo* dst_inst = dst_it != idx.end() ? dst_it->second : nullptr;
+			const ParsedFieldPath src = DataConnectionUtils::parse_field_path(seed.source_field_path);
+			const ParsedFieldPath dst = DataConnectionUtils::parse_field_path(seed.dest_field_path);
+
+			const WorkloadInstanceInfo* src_inst = instances.find(src.workload_name.c_str());
+			const WorkloadInstanceInfo* dst_inst = instances.find(dst.workload_name.c_str());
 
 			if (!src_inst)
 			{
