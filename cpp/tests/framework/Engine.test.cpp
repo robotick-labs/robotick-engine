@@ -52,7 +52,7 @@ namespace robotick::test
 		{
 			Model model;
 			auto handle = model.add("DummyWorkload", "A", 123.0, {});
-			model.set_root(handle);
+			model.set_root_workload(handle);
 
 			Engine engine;
 			engine.load(model);
@@ -65,7 +65,7 @@ namespace robotick::test
 		{
 			Model model;
 			auto handle = model.add("DummyWorkload", "A", 1.0, {{"value", "42"}});
-			model.set_root(handle);
+			model.set_root_workload(handle);
 
 			Engine engine;
 			engine.load(model);
@@ -78,7 +78,7 @@ namespace robotick::test
 		{
 			Model model;
 			auto handle = model.add("UnknownType", "fail", 1.0, {});
-			model.set_root(handle);
+			model.set_root_workload(handle);
 
 			Engine engine;
 			REQUIRE_THROWS(engine.load(model));
@@ -105,7 +105,7 @@ namespace robotick::test
 		{
 			Model model;
 			auto handle = model.add("TickCounterWorkload", "ticky", 200.0, {});
-			model.set_root(handle);
+			model.set_root_workload(handle);
 
 			Engine engine;
 			engine.load(model);

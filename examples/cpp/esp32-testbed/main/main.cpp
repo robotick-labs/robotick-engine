@@ -38,7 +38,7 @@ void populate_model(robotick::Model& model)
 		model.add("TimingDiagnosticsWorkload", "timing")};
 
 	auto root = model.add("SequencedGroupWorkload", "root", children, 100.0);
-	model.set_root(root);
+	model.set_root_workload(root);
 }
 
 void run_engine_on_core1(void* param)

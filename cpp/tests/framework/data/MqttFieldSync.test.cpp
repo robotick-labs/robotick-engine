@@ -71,7 +71,7 @@ namespace robotick::test
 		{
 			Model model;
 			auto test_workload_seed_handle = model.add("TestWorkload", "W1", 1.0);
-			model.set_root(test_workload_seed_handle);
+			model.set_root_workload(test_workload_seed_handle);
 
 			Engine engine;
 			engine.load(model);
@@ -114,7 +114,7 @@ namespace robotick::test
 		{
 			Model model;
 			auto test_workload_seed_handle = model.add("TestWorkload", "W2", 1.0);
-			model.set_root(test_workload_seed_handle);
+			model.set_root_workload(test_workload_seed_handle);
 
 			Engine engine;
 			engine.load(model);

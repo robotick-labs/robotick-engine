@@ -24,48 +24,7 @@ namespace
 		static void reset() { tick_count = 0; }
 	};
 
-	struct DummyTickingWrapper
-	{
-		DummyTickingWorkload* impl = new DummyTickingWorkload();
-		~DummyTickingWrapper() { delete impl; }
-		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
-	};
-
-	struct DummyTickingRegister
-	{
-		DummyTickingRegister()
-		{
-			const WorkloadRegistryEntry entry = {"DummyTickingWorkload",
-				GET_TYPE_ID(DummyTickingWrapper),
-				sizeof(DummyTickingWrapper),
-				alignof(DummyTickingWrapper),
-				[](void* p)
-				{
-					new (p) DummyTickingWrapper();
-				},
-				[](void* p)
-				{
-					static_cast<DummyTickingWrapper*>(p)->~DummyTickingWrapper();
-				},
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				[](void* p, const TickInfo& tick_info)
-				{
-					static_cast<DummyTickingWrapper*>(p)->tick(tick_info);
-				},
-				nullptr};
-
-			WorkloadRegistry::get().register_entry(entry);
-		}
-	};
-	static DummyTickingRegister s_register_dummy;
+	ROBOTICK_REGISTER_WORKLOAD(DummyTickingWorkload);
 
 	// === SlowTickWorkload ===
 
@@ -74,47 +33,8 @@ namespace
 		void tick(const TickInfo&) { std::this_thread::sleep_for(std::chrono::milliseconds(20)); }
 	};
 
-	struct SlowWrapper
-	{
-		SlowTickWorkload impl;
-		void tick(const TickInfo& tick_info) { impl.tick(tick_info); }
-	};
+	ROBOTICK_REGISTER_WORKLOAD(SlowTickWorkload);
 
-	struct SlowTickRegister
-	{
-		SlowTickRegister()
-		{
-			const WorkloadRegistryEntry entry = {"SlowTickWorkload",
-				GET_TYPE_ID(SlowTickWorkload),
-				sizeof(SlowTickWorkload),
-				alignof(SlowTickWorkload),
-				[](void* p)
-				{
-					new (p) SlowWrapper();
-				},
-				[](void* p)
-				{
-					static_cast<SlowWrapper*>(p)->~SlowWrapper();
-				},
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				[](void* p, const TickInfo& tick_info)
-				{
-					static_cast<SlowWrapper*>(p)->tick(tick_info);
-				},
-				nullptr};
-
-			WorkloadRegistry::get().register_entry(entry);
-		}
-	};
-	static SlowTickRegister s_register_slow;
 } // namespace
 
 TEST_CASE("Unit/Workloads/SequencedGroupWorkload")
@@ -124,10 +44,10 @@ TEST_CASE("Unit/Workloads/SequencedGroupWorkload")
 		DummyTickingWorkload::reset();
 
 		Model model;
-		const auto child1 = model.add("DummyTickingWorkload", "child1", 50.0);
-		const auto child2 = model.add("DummyTickingWorkload", "child2", 50.0);
+		const const WorkloadSeed& child1 = model.add("DummyTickingWorkload", "child1", 50.0);
+		const const WorkloadSeed& child2 = model.add("DummyTickingWorkload", "child2", 50.0);
 		const auto group = model.add("SequencedGroupWorkload", "group", {child1, child2}, 50.0);
-		model.set_root(group);
+		model.set_root_workload(group);
 
 		Engine engine;
 		engine.load(model);
@@ -148,7 +68,7 @@ TEST_CASE("Unit/Workloads/SequencedGroupWorkload")
 		Model model;
 		const auto handle = model.add("SlowTickWorkload", "slow", 50.0);
 		const auto group = model.add("SequencedGroupWorkload", "group", {handle}, 1000.0);
-		model.set_root(group);
+		model.set_root_workload(group);
 
 		Engine engine;
 		engine.load(model);

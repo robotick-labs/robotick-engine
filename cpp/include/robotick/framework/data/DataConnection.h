@@ -4,9 +4,12 @@
 #pragma once
 
 #include "robotick/api_base.h"
+#include "robotick/framework/common/ArrayView.h"
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/common/Map.h"
 #include "robotick/framework/common/Pair.h"
+#include "robotick/framework/common/StringView.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <cassert>
@@ -19,6 +22,7 @@
 
 namespace robotick
 {
+	class Engine;
 	class WorkloadInstanceInfo;
 	struct DataConnectionSeed;
 	struct WorkloadsBuffer;

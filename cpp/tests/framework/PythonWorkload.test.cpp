@@ -21,27 +21,12 @@ using namespace robotick::test;
 
 TEST_CASE("Unit/Workloads/PythonWorkload")
 {
-	SECTION("Metadata is registered correctly")
-	{
-		const auto* cfg = FieldRegistry::get().get_struct("PythonConfig");
-		const auto* in = FieldRegistry::get().get_struct("PythonInputs");
-		const auto* out = FieldRegistry::get().get_struct("PythonOutputs");
-
-		REQUIRE(cfg != nullptr);
-		REQUIRE(in != nullptr);
-		REQUIRE(out != nullptr);
-
-		REQUIRE(cfg->fields.size() == 3);
-		REQUIRE(in->fields.size() == 1);
-		REQUIRE(out->fields.size() == 1);
-	}
-
 	SECTION("Python tick executes")
 	{
 		Model model;
 		const auto handle = model.add(
 			"PythonWorkload", "test2", 1.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
-		model.set_root(handle);
+		model.set_root_workload(handle);
 
 		Engine engine;
 		engine.load(model);
@@ -62,7 +47,7 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 			"py",
 			1.0,
 			{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}, {"example_in", "21.0"}});
-		model.set_root(handle);
+		model.set_root_workload(handle);
 
 		Engine engine;
 		engine.load(model);
@@ -113,7 +98,7 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 		Model model;
 		const auto handle = model.add(
 			"PythonWorkload", "test", 10.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
-		model.set_root(handle);
+		model.set_root_workload(handle);
 
 		Engine engine;
 		engine.load(model);

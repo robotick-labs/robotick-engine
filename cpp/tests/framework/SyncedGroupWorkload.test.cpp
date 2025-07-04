@@ -29,49 +29,7 @@ namespace
 			tick_count.fetch_add(1);
 		}
 	};
-
-	struct CountingWrapper
-	{
-		CountingWorkload* impl = new CountingWorkload();
-		~CountingWrapper() { delete impl; }
-		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
-	};
-
-	struct CountingRegister
-	{
-		CountingRegister()
-		{
-			const WorkloadRegistryEntry entry = {"CountingWorkload",
-				GET_TYPE_ID(CountingWorkload),
-				sizeof(CountingWrapper),
-				alignof(CountingWrapper),
-				[](void* p)
-				{
-					new (p) CountingWrapper();
-				},
-				[](void* p)
-				{
-					static_cast<CountingWrapper*>(p)->~CountingWrapper();
-				},
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				[](void* p, const TickInfo& tick_info)
-				{
-					static_cast<CountingWrapper*>(p)->tick(tick_info);
-				},
-				nullptr};
-
-			WorkloadRegistry::get().register_entry(entry);
-		}
-	};
-	static CountingRegister s_register_counting;
+	ROBOTICK_REGISTER_WORKLOAD(CountingWorkload);
 
 	// === SlowWorkload ===
 
@@ -84,49 +42,8 @@ namespace
 			std::this_thread::sleep_for(std::chrono::milliseconds(30));
 		}
 	};
+	ROBOTICK_REGISTER_WORKLOAD(SlowWorkload);
 
-	struct SlowWrapper
-	{
-		SlowWorkload* impl = new SlowWorkload();
-		~SlowWrapper() { delete impl; }
-		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
-	};
-
-	struct SlowRegister
-	{
-		SlowRegister()
-		{
-			const WorkloadRegistryEntry entry = {"SlowWorkload",
-				GET_TYPE_ID(SlowWorkload),
-				sizeof(SlowWrapper),
-				alignof(SlowWrapper),
-				[](void* p)
-				{
-					new (p) SlowWrapper();
-				},
-				[](void* p)
-				{
-					static_cast<SlowWrapper*>(p)->~SlowWrapper();
-				},
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				nullptr,
-				[](void* p, const TickInfo& tick_info)
-				{
-					static_cast<SlowWrapper*>(p)->tick(tick_info);
-				},
-				nullptr};
-
-			WorkloadRegistry::get().register_entry(entry);
-		}
-	};
-	static SlowRegister s_register_slow;
 } // namespace
 
 TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
@@ -141,7 +58,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		const auto a = model.add("CountingWorkload", "a", tick_rate_hz);
 		const auto b = model.add("CountingWorkload", "b", tick_rate_hz);
 		const auto group = model.add("SyncedGroupWorkload", "group", {a, b}, tick_rate_hz);
-		model.set_root(group);
+		model.set_root_workload(group);
 
 		Engine engine;
 		engine.load(model);
@@ -184,7 +101,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		const auto s1 = model.add("SlowWorkload", "s1", tick_rate_hz);
 		const auto s2 = model.add("SlowWorkload", "s2", tick_rate_hz);
 		const auto group = model.add("SyncedGroupWorkload", "group", {s1, s2}, tick_rate_hz);
-		model.set_root(group);
+		model.set_root_workload(group);
 
 		Engine engine;
 		engine.load(model);
@@ -227,7 +144,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		Model model;
 		const auto h = model.add("CountingWorkload", "ticky", tick_rate_hz);
 		const auto group = model.add("SyncedGroupWorkload", "group", {h}, tick_rate_hz);
-		model.set_root(group);
+		model.set_root_workload(group);
 
 		Engine engine;
 		engine.load(model);
@@ -269,7 +186,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		Model model;
 		const auto h = model.add("CountingWorkload", "slower", child_tick_rate_hz);
 		const auto group = model.add("SyncedGroupWorkload", "group", {h}, group_tick_rate_hz);
-		model.set_root(group);
+		model.set_root_workload(group);
 
 		Engine engine;
 		engine.load(model);

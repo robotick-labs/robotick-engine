@@ -4,6 +4,7 @@
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/DataConnection.h"
+#include "robotick/framework/model/Model.h"
 
 #include <catch2/catch_all.hpp>
 
@@ -50,12 +51,12 @@ namespace robotick::test
 		SECTION("ExpectedHandler set for synced group children")
 		{
 			Model model;
-			auto a = model.add("CountingDataConnWorkload", "A", 10.0);
-			auto b = model.add("CountingDataConnWorkload", "B", 10.0);
+			const WorkloadSeed& a = model.add("CountingDataConnWorkload", "A").set_tick_rate_hz(10.0f);
+			const WorkloadSeed& b = model.add("CountingDataConnWorkload", "B").set_tick_rate_hz(10.0f);
 			model.connect("A.outputs.output_value", "B.inputs.input_value");
 
-			auto group = model.add("SyncedGroupWorkload", "Group", {a, b}, 10.0);
-			model.set_root(group);
+			const WorkloadSeed& group = model.add("SyncedGroupWorkload", "Group").set_children({&a, &b}).set_tick_rate_hz(10.0f);
+			model.set_root_workload(group);
 
 			Engine engine;
 			engine.load(model);
@@ -76,12 +77,12 @@ namespace robotick::test
 		SECTION("ExpectedHandler set for external connections")
 		{
 			Model model;
-			auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
-			auto child2 = model.add("CountingDataConnWorkload", "Child2", 10.0);
+			const WorkloadSeed& child1 = model.add("CountingDataConnWorkload", "Child1").set_tick_rate_hz(10.0f);
+			const WorkloadSeed& child2 = model.add("CountingDataConnWorkload", "Child2").set_tick_rate_hz(10.0f);
 
 			model.connect("Child1.outputs.output_value", "Child2.inputs.input_value");
-			auto group = model.add("SyncedGroupWorkload", "Group", {child1, child2}, 10.0);
-			model.set_root(group);
+			const WorkloadSeed& group = model.add("SyncedGroupWorkload", "Group").set_children({&child1, &child2}).set_tick_rate_hz(10.0f);
+			model.set_root_workload(group);
 
 			Engine engine;
 			engine.load(model);
@@ -102,12 +103,12 @@ namespace robotick::test
 		SECTION("ExpectedHandler set to SequencedGroupWorkload for internal connections")
 		{
 			Model model;
-			auto child1 = model.add("CountingDataConnWorkload", "Child1", 10.0);
-			auto child2 = model.add("CountingDataConnWorkload", "Child2", 10.0);
+			const WorkloadSeed& child1 = model.add("CountingDataConnWorkload", "Child1").set_tick_rate_hz(10.0f);
+			const WorkloadSeed& child2 = model.add("CountingDataConnWorkload", "Child2").set_tick_rate_hz(10.0f);
 
 			model.connect("Child1.outputs.output_value", "Child2.inputs.input_value");
-			auto group = model.add("SequencedGroupWorkload", "Group", {child1, child2}, 10.0);
-			model.set_root(group);
+			const WorkloadSeed& group = model.add("SequencedGroupWorkload", "Group").set_children({&child1, &child2}).set_tick_rate_hz(10.0f);
+			model.set_root_workload(group);
 
 			Engine engine;
 			engine.load(model);

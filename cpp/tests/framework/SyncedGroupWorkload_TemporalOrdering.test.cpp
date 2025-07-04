@@ -56,7 +56,7 @@ namespace robotick::test
 			auto group = model.add("SyncedGroupWorkload", "group", {sender, receiver}, tick_rate);
 
 			model.connect("sender.outputs.output", "receiver.inputs.input");
-			model.set_root(group);
+			model.set_root_workload(group);
 
 			Engine engine;
 			engine.load(model);

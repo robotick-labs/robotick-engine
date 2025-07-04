@@ -87,9 +87,7 @@ namespace robotick
 			const auto* seed = seeds[i];
 			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
 
-			ROBOTICK_ASSERT(workload_type != nullptr && workload_type->type_category == TypeCategory::Workload);
-
-			const auto* workload_desc = workload_type->type_category_desc.workload_desc;
+			const auto* workload_desc = workload_type->get_workload_desc();
 			ROBOTICK_ASSERT(workload_desc != nullptr);
 
 			uint8_t* ptr = buffer_ptr + offsets[i];

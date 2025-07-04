@@ -34,7 +34,7 @@ void create_threaded_model(robotick::Model& model)
 	std::vector<robotick::WorkloadHandle_v1> children = {console, test_state_1};
 
 	auto root = model.add("SyncedGroupWorkload", "root", children, 100.0);
-	model.set_root(root);
+	model.set_root_workload(root);
 }
 
 void create_non_threaded_model(robotick::Model& model)
@@ -45,13 +45,13 @@ void create_non_threaded_model(robotick::Model& model)
 	std::vector<robotick::WorkloadHandle_v1> children = {console, test_state_1};
 
 	auto root = model.add("SequencedGroupWorkload", "root", children, 100.0);
-	model.set_root(root);
+	model.set_root_workload(root);
 }
 
 void create_simple_model(robotick::Model& model)
 {
 	auto root = model.add("HeartbeatDisplayWorkload", "heartbeat", 30.0);
-	model.set_root(root);
+	model.set_root_workload(root);
 }
 
 void run_engine_on_core1(void* param)

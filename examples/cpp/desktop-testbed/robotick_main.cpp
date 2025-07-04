@@ -22,7 +22,7 @@ void populate_model_hello_world(robotick::Model& model)
 
 	std::vector<robotick::WorkloadHandle_v1> children = {console, test_state_1, test_state_2};
 	auto root = model.add("SyncedGroupWorkload", "root_group", children, 1000.0);
-	model.set_root(root);
+	model.set_root_workload(root);
 }
 
 void populate_model_hello_mqtt(robotick::Model& model)
@@ -33,7 +33,7 @@ void populate_model_hello_mqtt(robotick::Model& model)
 
 	std::vector<robotick::WorkloadHandle_v1> children = {console_telem, remote_control, mqtt_client};
 	auto root = model.add("SyncedGroupWorkload", "root_group", children, 30.0);
-	model.set_root(root);
+	model.set_root_workload(root);
 }
 
 ROBOTICK_ENTRYPOINT

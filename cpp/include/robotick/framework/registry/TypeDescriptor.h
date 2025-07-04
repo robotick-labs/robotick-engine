@@ -100,6 +100,19 @@ namespace robotick
 		// Parses string and stores result in out_data.
 		bool (*from_string)(const char* str, void* out_data);
 
+		// --- misc helpers: ---
+		const WorkloadDescriptor* get_workload_desc() const
+		{
+			return (type_category == TypeCategory::Workload ? type_category_desc.workload_desc : nullptr);
+		}
+
+		const StructDescriptor* get_struct_desc() const { return (type_category == TypeCategory::Struct ? type_category_desc.struct_desc : nullptr); }
+
+		const DynamicStructDescriptor* get_dynamic_struct_desc() const
+		{
+			return (type_category == TypeCategory::DynamicStruct ? type_category_desc.dynamic_struct_desc : nullptr);
+		}
+
 		// --- templated string helpers: ---
 
 		template <typename TData, typename TString> inline bool to_string_typed(const TData& value, TString& output) const
