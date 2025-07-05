@@ -24,7 +24,10 @@ namespace robotick
 {
 	class Engine;
 	class WorkloadInstanceInfo;
+
 	struct DataConnectionSeed;
+	struct FieldDescriptor;
+	struct TypeDescriptor;
 	struct WorkloadsBuffer;
 
 	struct DataConnectionInfo

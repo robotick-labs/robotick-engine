@@ -3,12 +3,10 @@
 
 #pragma once
 
+#include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/utils/Constants.h"
 
-#include <atomic>
 #include <cstdint>
-#include <string>
-#include <vector>
 
 namespace robotick
 {

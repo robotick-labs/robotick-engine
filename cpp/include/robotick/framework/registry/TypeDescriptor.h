@@ -26,14 +26,36 @@ namespace robotick
 	{
 		StringView name;
 		TypeId type_id;
-		size_t offset = OFFSET_UNBOUND; // from start of host-struct
+		size_t offset = OFFSET_UNBOUND; // from start of host-struct (TODO - make this explicit in naming - ditto for parents)
 
 		const TypeDescriptor* find_type_descriptor() const;
+
+		uint8_t* get_data_ptr(WorkloadsBuffer& workloads_buffer,
+			const WorkloadInstanceInfo& instance,
+			const TypeDescriptor& struct_type,
+			const size_t struct_offset) const;
+
+		template <typename T>
+		inline T& get_data(WorkloadsBuffer& workloads_buffer,
+			const WorkloadInstanceInfo& instance,
+			const TypeDescriptor& struct_type,
+			const size_t struct_offset) const
+		{
+			uint8_t* ptr = get_data_ptr(workloads_buffer, instance, struct_type, struct_offset);
+			if (!ptr)
+			{
+				ROBOTICK_FATAL_EXIT("FieldInfo::get<T>() null pointer access for field '%s'", name.c_str());
+			}
+
+			return *static_cast<T*>((void*)ptr);
+		}
 	};
 
 	struct StructDescriptor
 	{
 		ArrayView<FieldDescriptor> fields;
+
+		const FieldDescriptor* find_field(const char* field_name) const;
 	};
 
 	struct DynamicStructDescriptor
@@ -49,9 +71,9 @@ namespace robotick
 		const TypeDescriptor* inputs_desc = nullptr;
 		const TypeDescriptor* outputs_desc = nullptr;
 
-		size_t config_offset = OFFSET_UNBOUND; // from start of host-workload
-		size_t input_offset = OFFSET_UNBOUND;  // ditto
-		size_t output_offset = OFFSET_UNBOUND; // ditto
+		size_t config_offset = OFFSET_UNBOUND;	// from start of host-workload
+		size_t inputs_offset = OFFSET_UNBOUND;	// ditto
+		size_t outputs_offset = OFFSET_UNBOUND; // ditto
 
 		// function pointers
 		void (*construct_fn)(void*) = nullptr;

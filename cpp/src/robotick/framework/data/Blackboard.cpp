@@ -17,6 +17,12 @@ namespace robotick
 
 	ROBOTICK_REGISTER_DYNAMIC_STRUCT(Blackboard, Blackboard::resolve_descriptor)
 
+	void Blackboard::initialize_fields(const HeapVector<FieldDescriptor>& fields)
+	{
+		// TODO - remove the const-cast - should work fine as const (StructDescriptor may need some adjusting)
+		info.struct_descriptor.fields.use(const_cast<FieldDescriptor*>(fields.data()), fields.size());
+	}
+
 	void Blackboard::initialize_fields(const ArrayView<FieldDescriptor>& fields)
 	{
 		info.struct_descriptor.fields = fields;

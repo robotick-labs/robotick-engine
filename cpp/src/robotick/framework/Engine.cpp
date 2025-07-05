@@ -123,8 +123,8 @@ namespace robotick
 
 			if (seed->inputs.size() > 0 && workload_desc->inputs_desc)
 			{
-				ROBOTICK_ASSERT(workload_desc->input_offset != OFFSET_UNBOUND);
-				DataConnectionUtils::apply_struct_field_values(ptr + workload_desc->input_offset, *workload_desc->inputs_desc, seed->inputs);
+				ROBOTICK_ASSERT(workload_desc->inputs_offset != OFFSET_UNBOUND);
+				DataConnectionUtils::apply_struct_field_values(ptr + workload_desc->inputs_offset, *workload_desc->inputs_desc, seed->inputs);
 			}
 
 			if (workload_desc->pre_load_fn)
@@ -473,8 +473,8 @@ namespace robotick
 			};
 
 			accumulate(workload_descriptor->config_desc, workload_descriptor->config_offset);
-			accumulate(workload_descriptor->inputs_desc, workload_descriptor->input_offset);
-			accumulate(workload_descriptor->outputs_desc, workload_descriptor->output_offset);
+			accumulate(workload_descriptor->inputs_desc, workload_descriptor->inputs_offset);
+			accumulate(workload_descriptor->outputs_desc, workload_descriptor->outputs_offset);
 		}
 		return total;
 	}

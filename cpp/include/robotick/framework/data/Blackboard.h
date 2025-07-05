@@ -29,12 +29,13 @@ namespace robotick
 
 	class Blackboard
 	{
-	  public:
+	  public: // common accessors (part of API)
 		Blackboard() = default;
 
 		Blackboard(const Blackboard&) = delete;
 		Blackboard& operator=(const Blackboard&) = delete;
 
+		void initialize_fields(const HeapVector<FieldDescriptor>& fields);
 		void initialize_fields(const ArrayView<FieldDescriptor>& fields);
 
 		template <typename T> void set(const std::string& key, const T& value);
@@ -42,7 +43,7 @@ namespace robotick
 
 		static const StructDescriptor* resolve_descriptor(const void* instance);
 
-	  protected:
+	  public: // non-API accessors - used for setup and lower-level querying of Blackboard
 		void bind(size_t datablock_offset);
 
 		size_t get_datablock_offset() const;

@@ -70,6 +70,13 @@ namespace robotick
 	ROBOTICK_STRUCT_FIELD(TemplateOutputs, bool, has_called_stop)
 	ROBOTICK_REGISTER_STRUCT_END(TemplateOutputs)
 
+	struct TemplateState
+	{
+		HeapVector<FieldDescriptor> blackboard_fields_config;
+		HeapVector<FieldDescriptor> blackboard_fields_input;
+		HeapVector<FieldDescriptor> blackboard_fields_output;
+	};
+
 	//------------------------------------------------------------------------------
 	// TemplateWorkload: demonstrates full function pointer coverage
 	//------------------------------------------------------------------------------
@@ -79,6 +86,8 @@ namespace robotick
 		TemplateConfig config;
 		TemplateInputs inputs;
 		TemplateOutputs outputs;
+
+		State<TemplateState> state;
 
 		void set_children(const HeapVector<const WorkloadInstanceInfo*>& children, const HeapVector<DataConnectionInfo>& connections)
 		{
@@ -103,12 +112,19 @@ namespace robotick
 			// Called before blackboards or memory allocated...
 
 			// ... meaning it is the correct place to set the schema for each of our blackboards, for example:
-			config.blackboard = Blackboard({BlackboardFieldInfo("my_config_double", GET_TYPE_ID(double))});
 
-			inputs.blackboard = Blackboard(
-				{BlackboardFieldInfo("my_config_int", GET_TYPE_ID(int)), BlackboardFieldInfo("my_config_string", GET_TYPE_ID(FixedString64))});
+			state->blackboard_fields_config.initialize(1);
+			state->blackboard_fields_config[0] = FieldDescriptor{"my_config_double", GET_TYPE_ID(double)};
+			config.blackboard.initialize_fields(state->blackboard_fields_config);
 
-			outputs.blackboard = Blackboard({BlackboardFieldInfo("my_config_string", GET_TYPE_ID(FixedString64))});
+			state->blackboard_fields_input.initialize(1);
+			state->blackboard_fields_input[0] = FieldDescriptor{"my_config_int", GET_TYPE_ID(int)};
+			state->blackboard_fields_input[1] = FieldDescriptor{"my_config_string", GET_TYPE_ID(FixedString64)};
+			config.blackboard.initialize_fields(state->blackboard_fields_input);
+
+			state->blackboard_fields_output.initialize(1);
+			state->blackboard_fields_output[0] = FieldDescriptor{"my_config_string", GET_TYPE_ID(FixedString64)};
+			config.blackboard.initialize_fields(state->blackboard_fields_output);
 
 			outputs.has_called_pre_load = true; // (for unit-testing of this template - not for illustrating suggested usage!)
 		}

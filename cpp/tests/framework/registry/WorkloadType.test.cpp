@@ -64,9 +64,7 @@ namespace robotick::test
 				state->blackboard_fields[0] = FieldDescriptor{"counter", GET_TYPE_ID(int)};
 				state->blackboard_fields[1] = FieldDescriptor{"target_position", GET_TYPE_ID(Vec3)};
 
-				const ArrayView<FieldDescriptor> fields_view(state->blackboard_fields.data(), state->blackboard_fields.size());
-
-				outputs.output_blackboard.initialize_fields(fields_view);
+				outputs.output_blackboard.initialize_fields(state->blackboard_fields);
 			}
 
 			void tick(const TickInfo&) { outputs.output_value_1 = inputs.input_value + 1; }
@@ -97,8 +95,8 @@ namespace robotick::test
 			REQUIRE(desc != nullptr);
 			CHECK(desc->start_fn == nullptr);
 			CHECK(desc->tick_fn != nullptr);
-			CHECK(desc->input_offset != SIZE_MAX);
-			CHECK(desc->output_offset != SIZE_MAX);
+			CHECK(desc->inputs_offset != SIZE_MAX);
+			CHECK(desc->outputs_offset != SIZE_MAX);
 		}
 
 		SECTION("Can find 'RegistryTestInputs' struct in the registry with correct metadata")

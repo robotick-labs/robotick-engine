@@ -203,24 +203,24 @@ namespace robotick::registry
 
 		if constexpr (has_member_inputs<T>::value)
 		{
-			desc.input_offset = offsetof(T, inputs);
+			desc.inputs_offset = offsetof(T, inputs);
 			desc.inputs_desc = inputs_type;
 			ROBOTICK_ASSERT(desc.inputs_desc);
 		}
 		else
 		{
-			desc.input_offset = SIZE_MAX;
+			desc.inputs_offset = SIZE_MAX;
 		}
 
 		if constexpr (has_member_outputs<T>::value)
 		{
-			desc.output_offset = offsetof(T, outputs);
+			desc.outputs_offset = offsetof(T, outputs);
 			desc.outputs_desc = outputs_type;
 			ROBOTICK_ASSERT(desc.outputs_desc);
 		}
 		else
 		{
-			desc.output_offset = SIZE_MAX;
+			desc.outputs_offset = SIZE_MAX;
 		}
 
 		// init function pointers:
