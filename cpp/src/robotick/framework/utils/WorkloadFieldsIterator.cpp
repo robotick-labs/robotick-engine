@@ -3,6 +3,7 @@
 
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 
+#include "robotick/api.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/Blackboard.h"
 
@@ -23,40 +24,52 @@ namespace robotick
 		std::function<void(const WorkloadFieldView&)> callback)
 	{
 		auto& workloads_buffer = workloads_override ? *workloads_override : engine.get_workloads_buffer();
-		const WorkloadRegistryEntry* type = instance.type;
 
-		auto walk_struct = [&](const StructRegistryEntry* struct_info)
+		const TypeDescriptor* workload_type = instance.type;
+		ROBOTICK_ASSERT(workload_type != nullptr);
+
+		const WorkloadDescriptor* workload_desc = workload_type->get_workload_desc();
+		ROBOTICK_ASSERT(workload_desc != nullptr);
+
+		auto walk_struct = [&](const TypeDescriptor* struct_type, const size_t struct_offset)
 		{
-			if (!struct_info)
+			if (!struct_type)
 				return;
 
-			for (const FieldInfo& field : struct_info->fields)
+			const StructDescriptor* struct_desc = struct_type->get_struct_desc();
+			ROBOTICK_ASSERT(struct_desc);
+
+			for (const FieldDescriptor& field_desc : struct_desc->fields)
 			{
-				void* base_ptr = field.get_data_ptr(workloads_buffer, instance, *struct_info);
+				void* base_ptr = field_desc.get_data_ptr(workloads_buffer, instance, *struct_type, struct_offset);
 				if (!base_ptr)
 					continue;
 
-				if (field.type == GET_TYPE_ID(Blackboard))
+				if (field_desc.type_id == GET_TYPE_ID(Blackboard))
 				{
 					Blackboard& blackboard = *static_cast<Blackboard*>(base_ptr);
 					const StructDescriptor& blackboard_struct_desc = blackboard.get_struct_descriptor();
 					for (const FieldDescriptor& blackboard_field : blackboard_struct_desc.fields)
 					{
-						WorkloadFieldView view{&instance, struct_info, &field, &blackboard_field, blackboard_field.get_data_ptr(blackboard)};
+						(void)blackboard_field;
+						ROBOTICK_FATAL_EXIT("!TODO - implement the below");
+						WorkloadFieldView view; /*{
+							&instance, struct_desc, &field_desc, &blackboard_field, nullptr};*/ // blackboard_field.get_data_ptr(blackboard)};
 						callback(view);
 					}
 				}
 				else
 				{
-					WorkloadFieldView view{&instance, struct_info, &field, nullptr, base_ptr};
+					ROBOTICK_FATAL_EXIT("!TODO - implement the below");
+					WorkloadFieldView view; /*{&instance, struct_desc, &field_desc, nullptr, base_ptr};*/
 					callback(view);
 				}
 			}
 		};
 
-		walk_struct(type->config_struct);
-		walk_struct(type->input_struct);
-		walk_struct(type->output_struct);
+		walk_struct(workload_desc->config_desc, workload_desc->config_offset);
+		walk_struct(workload_desc->inputs_desc, workload_desc->inputs_offset);
+		walk_struct(workload_desc->outputs_desc, workload_desc->outputs_offset);
 	}
 
 } // namespace robotick

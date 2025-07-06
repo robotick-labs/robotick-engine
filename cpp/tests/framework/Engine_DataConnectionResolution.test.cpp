@@ -65,7 +65,7 @@ namespace robotick::test
 			bool found = false;
 			for (const auto& conn : connections)
 			{
-				if (conn.seed.source_field_path == "A.outputs.output_value" && conn.seed.dest_field_path == "B.inputs.input_value")
+				if (conn.seed->source_field_path == "A.outputs.output_value" && conn.seed->dest_field_path == "B.inputs.input_value")
 				{
 					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::DelegateToParent);
 					found = true;
@@ -91,7 +91,7 @@ namespace robotick::test
 			bool found = false;
 			for (const auto& conn : connections)
 			{
-				if (conn.seed.source_field_path == "Child1.outputs.output_value" && conn.seed.dest_field_path == "Child2.inputs.input_value")
+				if (conn.seed->source_field_path == "Child1.outputs.output_value" && conn.seed->dest_field_path == "Child2.inputs.input_value")
 				{
 					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::DelegateToParent);
 					found = true;
@@ -117,7 +117,7 @@ namespace robotick::test
 			bool found = false;
 			for (const auto& conn : connections)
 			{
-				if (conn.seed.source_field_path == "Child1.outputs.output_value" && conn.seed.dest_field_path == "Child2.inputs.input_value")
+				if (conn.seed->source_field_path == "Child1.outputs.output_value" && conn.seed->dest_field_path == "Child2.inputs.input_value")
 				{
 					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload);
 					found = true;

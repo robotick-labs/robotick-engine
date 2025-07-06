@@ -75,7 +75,7 @@ namespace robotick::test
 					const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
 					// Verify pointer lies within workloads buffer
-					CHECK(workloads_buf.contains_object(field_ptr, view.field_info->size));
+					CHECK(workloads_buf.contains_object(field_ptr, view.field_info->find_type_descriptor()->size));
 
 					if (view.field_info->name == "input_value")
 					{
@@ -122,7 +122,7 @@ namespace robotick::test
 					CHECK(view.workload_info->seed->unique_name == "W");
 					const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
-					CHECK(mirror_buf.contains_object(field_ptr, view.field_info->size));
+					CHECK(mirror_buf.contains_object(field_ptr, view.field_info->find_type_descriptor()->size));
 
 					if (view.field_info->name == "input_value")
 					{
@@ -210,7 +210,7 @@ namespace robotick::test
 
 			Model model;
 			WorkloadSeed& workload_seed = model.add("BBWorkload", "BB").set_tick_rate_hz(10.0f);
-			model.set_root_workload(handle);
+			model.set_root_workload(workload_seed);
 
 			Engine engine;
 			engine.load(model);

@@ -46,7 +46,7 @@ namespace robotick
 				workload_to_child[child_workload] = &info;
 
 				ROBOTICK_ASSERT(info.workload_info && info.workload_info->type);
-				WorkloadDescriptor* workload_desc = info.workload_info->type->get_workload_desc();
+				const WorkloadDescriptor* workload_desc = info.workload_info->type->get_workload_desc();
 				ROBOTICK_ASSERT(workload_desc);
 
 				if (workload_desc->set_children_fn)

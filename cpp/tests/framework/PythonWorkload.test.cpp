@@ -51,23 +51,25 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 		Engine engine;
 		engine.load(model);
 
-		const auto& info = engine.find_instance_info(root.unique_name);
+		const auto& info = *engine.find_instance_info(root.unique_name);
 		auto* inst_ptr = info.get_ptr(engine);
 		REQUIRE(inst_ptr != nullptr);
 		REQUIRE(info.type != nullptr);
-		REQUIRE(info.type->tick_fn != nullptr);
+		REQUIRE(info.type->get_workload_desc()->tick_fn != nullptr);
 
 		// Execute tick
-		info.type->tick_fn(inst_ptr, TICK_INFO_FIRST_10MS_100HZ);
+		info.type->get_workload_desc()->tick_fn(inst_ptr, TICK_INFO_FIRST_10MS_100HZ);
 
 		// === Find the output blackboard ===
-		const auto* output_struct = info.type->output_struct;
-		REQUIRE(output_struct != nullptr);
+		const auto* outputs_desc = info.type->get_workload_desc()->outputs_desc;
+		const size_t outputs_offset = info.type->get_workload_desc()->outputs_offset;
+		REQUIRE(outputs_desc != nullptr);
+		REQUIRE(outputs_offset != OFFSET_UNBOUND);
 
-		const void* output_base = static_cast<const uint8_t*>(inst_ptr) + output_struct->offset_within_workload;
+		const void* output_base = static_cast<const uint8_t*>(inst_ptr) + outputs_offset;
 
 		const robotick::Blackboard* output_blackboard = nullptr;
-		for (const auto& field : output_struct->fields)
+		for (const auto& field : outputs_desc->get_struct_desc()->fields)
 		{
 			if (field.name == "blackboard")
 			{
@@ -104,19 +106,19 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 		Engine engine;
 		engine.load(model);
 
-		const auto& info = engine.find_instance_info(root.unique_name);
+		const auto& info = *engine.find_instance_info(root.unique_name);
 		auto* inst_ptr = info.get_ptr(engine);
 
 		REQUIRE(inst_ptr != nullptr);
 		REQUIRE(info.type != nullptr);
 
-		if (info.type->start_fn)
+		if (info.type->get_workload_desc()->start_fn)
 		{
-			REQUIRE_NOTHROW(info.type->start_fn(inst_ptr, 10.0));
+			REQUIRE_NOTHROW(info.type->get_workload_desc()->start_fn(inst_ptr, 10.0));
 		}
-		if (info.type->stop_fn)
+		if (info.type->get_workload_desc()->stop_fn)
 		{
-			REQUIRE_NOTHROW(info.type->stop_fn(inst_ptr));
+			REQUIRE_NOTHROW(info.type->get_workload_desc()->stop_fn(inst_ptr));
 		}
 	}
 }

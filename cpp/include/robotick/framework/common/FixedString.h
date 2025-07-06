@@ -80,7 +80,7 @@ namespace robotick
 			const size_t str_length = length();
 			for (size_t i = 0; i < str_length; ++i)
 			{
-				if (data()[i] == query_char)
+				if (data[i] == query_char)
 					return true;
 			}
 			return false;

@@ -51,8 +51,8 @@ namespace robotick::test
 			Model model;
 			const float tick_rate = 100.0f;
 
-			const WorkloadSeed& sender = model.add("SenderWorkload", "sender", tick_rate);
-			const WorkloadSeed& receiver = model.add("ReceiverWorkload", "receiver", tick_rate);
+			const WorkloadSeed& sender = model.add("SenderWorkload", "sender").set_tick_rate_hz(tick_rate);
+			const WorkloadSeed& receiver = model.add("ReceiverWorkload", "receiver").set_tick_rate_hz(tick_rate);
 			const WorkloadSeed& group_seed = model.add("SyncedGroupWorkload", "group").set_children({&sender, &receiver}).set_tick_rate_hz(tick_rate);
 
 			model.connect("sender.outputs.output", "receiver.inputs.input");

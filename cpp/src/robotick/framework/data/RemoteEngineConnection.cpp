@@ -371,7 +371,7 @@ namespace robotick
 
 					Field field;
 
-					if (!binder(path, field))
+					if (!binder(path.c_str(), field))
 					{
 						ROBOTICK_WARNING("Failed to bind field: %s", path.c_str());
 						failed_count++;

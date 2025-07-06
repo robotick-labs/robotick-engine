@@ -15,7 +15,7 @@ void signal_handler()
 
 void populate_model_hello_world(robotick::Model& model)
 {
-	const WorkloadSeed& console = model.add("ConsoleTelemetryWorkload", "console", 5.0);
+	const WorkloadSeed& console = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(5.0f);
 	const WorkloadSeed& test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
 	const WorkloadSeed& test_state_2 = model.add(
 		"PythonWorkload", "test_state_2", 1.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
