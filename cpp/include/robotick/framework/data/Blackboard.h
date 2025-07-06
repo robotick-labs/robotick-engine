@@ -39,6 +39,7 @@ namespace robotick
 		void initialize_fields(const HeapVector<FieldDescriptor>& fields);
 		void initialize_fields(const ArrayView<FieldDescriptor>& fields);
 
+		bool has(const char* field_name) const;
 		template <typename T> void set(const char* field_name, const T& value);
 		template <typename T> T get(const char* field_name) const;
 

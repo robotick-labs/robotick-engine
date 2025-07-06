@@ -63,15 +63,15 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		Engine engine;
 		engine.load(model);
 
-		const auto& info = EngineInspector::get_instance_info(engine, group.index);
+		const auto& info = *engine.find_instance_info(group_seed.unique_name);
 		auto* group_ptr = info.get_ptr(engine);
 
 		REQUIRE(group_ptr != nullptr);
 
 		info.type->start_fn(group_ptr, tick_rate_hz);
 
-		const auto& child_a = EngineInspector::get_instance_info(engine, a.index);
-		const auto& child_b = EngineInspector::get_instance_info(engine, b.index);
+		const auto& child_a = engine.find_instance_ref(a.unique_name);
+		const auto& child_b = engine.find_instance_ref(b.unique_name);
 		auto* wa = static_cast<CountingWrapper*>((void*)child_a.get_ptr(engine));
 		auto* wb = static_cast<CountingWrapper*>((void*)child_b.get_ptr(engine));
 
@@ -106,7 +106,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		Engine engine;
 		engine.load(model);
 
-		const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
+		const auto& group_info = *engine.find_instance_info(group_seed.unique_name);
 		auto* group_ptr = group_info.get_ptr(engine);
 
 		REQUIRE(group_ptr != nullptr);
@@ -121,8 +121,8 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 
 		group_info.type->stop_fn(group_ptr);
 
-		const auto& s1_info = EngineInspector::get_instance_info(engine, s1.index);
-		const auto& s2_info = EngineInspector::get_instance_info(engine, s2.index);
+		const auto& s1_info = engine.find_instance_ref(s1.unique_name);
+		const auto& s2_info = engine.find_instance_ref(s2.unique_name);
 		auto* w1 = static_cast<SlowWrapper*>((void*)s1_info.get_ptr(engine));
 		auto* w2 = static_cast<SlowWrapper*>((void*)s2_info.get_ptr(engine));
 
@@ -149,8 +149,8 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		Engine engine;
 		engine.load(model);
 
-		const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
-		const auto& child_info = EngineInspector::get_instance_info(engine, h.index);
+		const auto& group_info = engine.find_instance_ref(group_seed.unique_name);
+		const auto& child_info = engine.find_instance_ref(h.unique_name);
 		auto* counting = static_cast<CountingWrapper*>((void*)child_info.get_ptr(engine));
 
 		auto* group_ptr = group_info.get_ptr(engine);
@@ -191,8 +191,8 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		Engine engine;
 		engine.load(model);
 
-		const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
-		const auto& child_info = EngineInspector::get_instance_info(engine, h.index);
+		const auto& group_info = *engine.find_instance_info(group_seed.unique_name);
+		const auto& child_info = *engine.find_instance_info(h.unique_name);
 		auto* counting = static_cast<CountingWrapper*>((void*)child_info.get_ptr(engine));
 		auto* group_ptr = group_info.get_ptr(engine);
 

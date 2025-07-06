@@ -71,7 +71,7 @@ namespace robotick::test
 				nullptr,
 				[&](const WorkloadFieldView& view)
 				{
-					CHECK(view.workload_info->unique_name == "W");
+					CHECK(view.workload_info->seed->unique_name == "W");
 					const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
 					// Verify pointer lies within workloads buffer
@@ -119,7 +119,7 @@ namespace robotick::test
 				&mirror_buf,
 				[&](const WorkloadFieldView& view)
 				{
-					CHECK(view.workload_info->unique_name == "W");
+					CHECK(view.workload_info->seed->unique_name == "W");
 					const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
 					CHECK(mirror_buf.contains_object(field_ptr, view.field_info->size));
@@ -154,7 +154,7 @@ namespace robotick::test
 			WorkloadFieldsIterator::for_each_workload(engine,
 				[&](const WorkloadInstanceInfo& info)
 				{
-					seen_names.push_back(std::string(info.unique_name.c_str()));
+					seen_names.push_back(std::string(info.seed->unique_name.c_str()));
 				});
 
 			REQUIRE(seen_names.size() == 2);

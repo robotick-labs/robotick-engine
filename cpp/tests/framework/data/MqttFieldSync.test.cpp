@@ -77,7 +77,7 @@ namespace robotick::test
 			engine.load(model);
 
 			// initialize our input fields & blackboard-fields:
-			const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed.index);
+			const auto& info = *engine.find_instance_info(test_workload_seed.unique_name);
 			auto* test_workload_ptr = static_cast<TestWorkload*>((void*)info.get_ptr(engine));
 			test_workload_ptr->inputs.value = 42;
 			test_workload_ptr->inputs.blackboard.set("flag", 2);
@@ -119,7 +119,7 @@ namespace robotick::test
 			Engine engine;
 			engine.load(model);
 
-			const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed.index);
+			const auto& info = *engine.find_instance_info(test_workload_seed.unique_name);
 			auto* test_workload_ptr = static_cast<TestWorkload*>((void*)info.get_ptr(engine));
 			test_workload_ptr->inputs.load();
 

@@ -106,11 +106,11 @@ TEST_CASE("Unit/Framework/Model-StaticConst")
 
 		for (auto* seed : seeds)
 		{
-			if (seed->name == "A")
+			if (seed->unique_name == "A")
 				found_a = seed;
-			if (seed->name == "B")
+			if (seed->unique_name == "B")
 				found_b = seed;
-			if (seed->name == "Group")
+			if (seed->unique_name == "Group")
 				found_group = seed;
 		}
 
