@@ -12,7 +12,6 @@
 #include <vector>
 
 using namespace robotick;
-using namespace robotick::test;
 
 namespace
 {
