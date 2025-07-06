@@ -425,7 +425,7 @@ namespace robotick
 		const WorkloadInstanceInfo* found_instance_info = find_instance_info(unique_name);
 		if (found_instance_info)
 		{
-			return found_info->get_ptr(*this);
+			return found_instance_info->get_ptr(*this);
 		}
 
 		return nullptr;
@@ -463,22 +463,24 @@ namespace robotick
 				if (!struct_type_desc)
 					return;
 
-				if (struct_type_desc->type_category != TypeCategory::Struct || !struct_type_desc->type_category_desc.struct_desc)
+				const StructDescriptor* struct_desc = struct_type_desc->get_struct_desc();
+				if (!struct_desc)
 				{
 					ROBOTICK_FATAL_EXIT("Workload '%s' has invalid struct descriptor of type '%s'",
 						instance.seed->unique_name.c_str(),
 						struct_type_desc->name.c_str());
 				}
 
-				const uint8_t* struct_ptr = static_cast<uint8_t*>(instance_ptr) + struct_offset;
-
-				for (const FieldDescriptor& field : struct_type_desc->type_category_desc.struct_desc->fields)
+				for (const FieldDescriptor& field : struct_desc->fields)
 				{
 					if (field.type_id == GET_TYPE_ID(Blackboard))
 					{
 						ROBOTICK_ASSERT(field.offset != OFFSET_UNBOUND);
-						const auto* blackboard = reinterpret_cast<const Blackboard*>(struct_ptr + field.offset);
-						total += blackboard->get_info()->total_datablock_size;
+
+						const Blackboard& blackboard =
+							field.get_data<Blackboard>(state->workloads_buffer, instance, *struct_type_desc, struct_offset);
+						total += blackboard.get_info().total_datablock_size;
+						ROBOTICK_ASSERT(blackboard.get_info().total_datablock_size > 0);
 					}
 				}
 			};
@@ -490,15 +492,18 @@ namespace robotick
 		return total;
 	}
 
-	void Engine::bind_blackboards_in_struct(WorkloadInstanceInfo& instance, const StructRegistryEntry& struct_entry, size_t& offset)
+	void Engine::bind_blackboards_in_struct(
+		WorkloadInstanceInfo& instance, const TypeDescriptor& struct_type_desc, const size_t struct_offset, const size_t blackboard_storage_offset)
 	{
-		for (const FieldInfo& field : struct_entry.fields)
+		const StructDescriptor* struct_desc = struct_type_desc.get_struct_desc();
+		ROBOTICK_ASSERT(struct_desc != nullptr);
+
+		for (const FieldDescriptor& field : struct_desc->fields)
 		{
-			if (field.type == GET_TYPE_ID(Blackboard))
+			if (field.type_id == GET_TYPE_ID(Blackboard))
 			{
-				Blackboard& blackboard = field.get_data<Blackboard>(state->workloads_buffer, instance, struct_entry);
-				blackboard.bind(offset);
-				offset += blackboard.get_info()->total_datablock_size;
+				Blackboard& blackboard = field.get_data<Blackboard>(state->workloads_buffer, instance, struct_type_desc, struct_offset);
+				blackboard.bind(blackboard_storage_offset);
 			}
 		}
 	}
@@ -512,11 +517,11 @@ namespace robotick
 				continue;
 
 			if (workload_desc->config_desc)
-				bind_blackboards_in_struct(instance, *workload_desc->config_desc, start_offset);
+				bind_blackboards_in_struct(instance, *workload_desc->config_desc, workload_desc->config_offset, start_offset);
 			if (workload_desc->inputs_desc)
-				bind_blackboards_in_struct(instance, *workload_desc->inputs_desc, start_offset);
+				bind_blackboards_in_struct(instance, *workload_desc->inputs_desc, workload_desc->inputs_offset, start_offset);
 			if (workload_desc->outputs_desc)
-				bind_blackboards_in_struct(instance, *workload_desc->outputs_desc, start_offset);
+				bind_blackboards_in_struct(instance, *workload_desc->outputs_desc, workload_desc->outputs_offset, start_offset);
 		}
 	}
 

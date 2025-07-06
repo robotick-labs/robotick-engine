@@ -19,6 +19,7 @@ namespace robotick
 		StructDescriptor struct_descriptor;
 
 		size_t datablock_offset_from_blackboard = OFFSET_UNBOUND;
+		size_t total_datablock_size = 0;
 
 		bool has_field(const char* key) const;
 		const FieldDescriptor* find_field(const char* key) const;
@@ -38,8 +39,8 @@ namespace robotick
 		void initialize_fields(const HeapVector<FieldDescriptor>& fields);
 		void initialize_fields(const ArrayView<FieldDescriptor>& fields);
 
-		template <typename T> void set(const std::string& key, const T& value);
-		template <typename T> T get(const std::string& key) const;
+		template <typename T> void set(const char* field_name, const T& value);
+		template <typename T> T get(const char* field_name) const;
 
 		static const StructDescriptor* resolve_descriptor(const void* instance);
 
