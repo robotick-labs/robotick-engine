@@ -10,9 +10,19 @@
 
 namespace robotick
 {
+	const TypeDescriptor s_type_desc_void{
+		"void",
+		GET_TYPE_ID(void),
+		0,
+		1,
+		TypeCategory::Primitive,
+		{},		 // .workload_desc etc. unused for primitives
+		nullptr, // .to_string
+		nullptr	 // .from_string
+	};
 
 	uint8_t* FieldDescriptor::get_data_ptr(
-		WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& instance, const TypeDescriptor& struct_type, const size_t struct_offset) const
+		WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& instance, const TypeDescriptor&, const size_t struct_offset) const
 	{
 		ROBOTICK_ASSERT(
 			instance.offset_in_workloads_buffer != OFFSET_UNBOUND && "Workload object instance offset should have been correctly set by now");
@@ -36,7 +46,7 @@ namespace robotick
 		{
 			if (field.name == field_name)
 			{
-				return &field
+				return &field;
 			}
 		}
 

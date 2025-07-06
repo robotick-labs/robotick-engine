@@ -150,4 +150,6 @@ namespace robotick
 		}
 	};
 
+	extern const TypeDescriptor s_type_desc_void;
+
 } // namespace robotick

@@ -41,7 +41,7 @@ namespace robotick
 
 		const WorkloadInstanceInfo* find_instance_info(const char* unique_name) const;
 		void* find_instance(const char* unique_name) const;
-		template <T> T* find_instance(const char* unique_name) const { return static_cast<T*>(find_instance(unique_name)); }
+		template <typename T> T* find_instance(const char* unique_name) const { return static_cast<T*>(this->find_instance(unique_name)); }
 
 		const HeapVector<WorkloadInstanceInfo>& get_all_instance_info() const;
 		const HeapVector<DataConnectionInfo>& get_all_data_connections() const;

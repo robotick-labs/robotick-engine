@@ -180,12 +180,12 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		using namespace std::chrono;
 
 		const TickInfo group_tick_info = TICK_INFO_FIRST_10MS_100HZ;
-		const double group_tick_rate_hz = 1.0 / group_tick_info.delta_time;
-		const double child_tick_rate_hz = 1.0 / TICK_INFO_FIRST_100MS_10HZ.delta_time; // child wants to tick 10x slower than group - we should let it
+		const float group_tick_rate_hz = 1.0f / group_tick_info.delta_time;
+		const float child_tick_rate_hz = 1.0f / TICK_INFO_FIRST_100MS_10HZ.delta_time; // child wants to tick 10x slower than group - we should let it
 
 		Model model;
-		const WorkloadSeed& h = model.add("CountingWorkload", "slower", child_tick_rate_hz);
-		const WorkloadSeed& group_seed = model.add("SyncedGroupWorkload", "group", {h}, group_tick_rate_hz);
+		const WorkloadSeed& h = model.add("CountingWorkload", "slower").set_tick_rate_hz(child_tick_rate_hz);
+		const WorkloadSeed& group_seed = model.add("SyncedGroupWorkload", "group", {h}).set_tick_rate_hz(group_tick_rate_hz);
 		model.set_root_workload(group);
 
 		Engine engine;

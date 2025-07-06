@@ -485,7 +485,7 @@ namespace robotick
 
 			accumulate(workload_descriptor->config_desc, workload_descriptor->config_offset);
 			accumulate(workload_descriptor->inputs_desc, workload_descriptor->inputs_offset);
-			accumulate(workload_descriptor->outputs_desc, workload_descriptor->output_offset);
+			accumulate(workload_descriptor->outputs_desc, workload_descriptor->outputs_offset);
 		}
 		return total;
 	}
@@ -507,16 +507,16 @@ namespace robotick
 	{
 		for (auto& instance : instances)
 		{
-			const TypeDescriptor* type = instance.type;
-			if (!type)
+			const WorkloadDescriptor* workload_desc = instance.workload_descriptor;
+			if (!workload_desc)
 				continue;
 
-			if (type->config_struct)
-				bind_blackboards_in_struct(instance, *type->config_struct, start_offset);
-			if (type->input_struct)
-				bind_blackboards_in_struct(instance, *type->input_struct, start_offset);
-			if (type->output_struct)
-				bind_blackboards_in_struct(instance, *type->output_struct, start_offset);
+			if (workload_desc->config_desc)
+				bind_blackboards_in_struct(instance, *workload_desc->config_desc, start_offset);
+			if (workload_desc->inputs_desc)
+				bind_blackboards_in_struct(instance, *workload_desc->inputs_desc, start_offset);
+			if (workload_desc->outputs_desc)
+				bind_blackboards_in_struct(instance, *workload_desc->outputs_desc, start_offset);
 		}
 	}
 

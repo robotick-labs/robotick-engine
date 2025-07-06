@@ -18,7 +18,7 @@ namespace robotick
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(TimingDiagnosticsConfig)
 	ROBOTICK_STRUCT_FIELD(TimingDiagnosticsConfig, int, log_rate_hz)
-	ROBOTICK_REGISTER_STRUCT_END(TimingDiagnosticsConfig
+	ROBOTICK_REGISTER_STRUCT_END(TimingDiagnosticsConfig)
 
 	struct TimingDiagnosticsInputs
 	{

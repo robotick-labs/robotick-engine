@@ -48,9 +48,11 @@ namespace robotick
 				info.workload_info = child_workload;
 				info.workload_ptr = child_workload->get_ptr(*engine);
 
-				if (auto fn = child_workload->type ? child_workload->type->set_children_fn : nullptr)
+				ROBOTICK_ASSERT(child_workload->workload_descriptor != nullptr);
+
+				if (child_workload->workload_descriptor->set_children_fn != nullptr)
 				{
-					fn(info.workload_ptr, child_workload->children, pending_connections);
+					child_workload->workload_descriptor->set_children_fn(info.workload_ptr, child_workload->children, pending_connections);
 				}
 
 				for (DataConnectionInfo* conn : pending_connections)
@@ -73,8 +75,8 @@ namespace robotick
 
 			for (auto& child : children)
 			{
-				if (!child.workload_info || !child.workload_info->type || !child.workload_info->type->tick_fn ||
-					child.workload_info->tick_rate_hz == 0.0)
+				if (!child.workload_info || !child.workload_info->workload_descriptor || !child.workload_info->workload_descriptor->tick_fn ||
+					child.workload_info->seed->tick_rate_hz == 0.0)
 				{
 					continue;
 				}
@@ -87,6 +89,8 @@ namespace robotick
 
 				ThreadContext* ctx = new ThreadContext{this, &child};
 
+				const std::string thread_name(child.workload_info->seed->unique_name.c_str(), 15);
+
 				child.thread = Thread(
 					[](void* raw)
 					{
@@ -95,7 +99,7 @@ namespace robotick
 						delete ctx;
 					},
 					ctx,
-					child.workload_info->unique_name.substr(0, 15),
+					thread_name,
 					2);
 			}
 		}
@@ -133,17 +137,19 @@ namespace robotick
 			ROBOTICK_ASSERT(child_info.workload_info);
 			const auto& child = *child_info.workload_info;
 
-			ROBOTICK_ASSERT(child.type && child.type->tick_fn && child.tick_rate_hz > 0.0);
+			ROBOTICK_ASSERT(child.type && child.workload_descriptor->tick_fn && child.seed->tick_rate_hz > 0.0);
 
 			uint32_t last_tick = 0;
 			const auto child_start_time = std::chrono::steady_clock::now();
 			auto last_tick_time = child_start_time;
 			auto next_tick_time = child_start_time;
 
-			const auto tick_interval_sec = std::chrono::duration<double>(1.0 / child.tick_rate_hz);
+			const auto tick_interval_sec = std::chrono::duration<double>(1.0 / child.seed->tick_rate_hz);
 			const auto tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(tick_interval_sec);
 
-			Thread::set_name(child.unique_name.substr(0, 15));
+			std::string thread_name(child.seed->unique_name.c_str(), 15);
+
+			Thread::set_name(thread_name);
 			Thread::set_affinity(2);
 			Thread::set_priority_high();
 
@@ -177,12 +183,15 @@ namespace robotick
 
 				std::atomic_thread_fence(std::memory_order_acquire);
 
-				child.type->tick_fn(child_info.workload_ptr, tick_info);
+				child.workload_descriptor->tick_fn(child_info.workload_ptr, tick_info);
 				next_tick_time += tick_interval;
 
 				const auto now_post = std::chrono::steady_clock::now();
-				child.mutable_stats.last_tick_duration = std::chrono::duration<double>(now_post - now).count();
-				child.mutable_stats.last_time_delta = tick_info.delta_time;
+				child.mutable_stats.last_tick_duration_ns =
+					static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(now_post - now).count());
+
+				constexpr float NanosecondsPerSecond = 1e9f;
+				child.mutable_stats.last_time_delta_ns = static_cast<uint32_t>(tick_info.delta_time * NanosecondsPerSecond);
 
 				Thread::hybrid_sleep_until(std::chrono::time_point_cast<std::chrono::steady_clock::duration>(next_tick_time));
 			}

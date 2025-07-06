@@ -79,7 +79,9 @@ namespace robotick
 		else if (state == State::ReadyForHandshake)
 		{
 			ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForHandshake] - socket-connection established, ready for handshake%s",
-				color_start, mode_str, color_end);
+				color_start,
+				mode_str,
+				color_end);
 		}
 		else if (state == State::ReadyForFieldsRequest)
 		{
@@ -87,8 +89,11 @@ namespace robotick
 			if (show_always || prev_state != State::ReadyForFields) // only show after connecting, to minimise spam
 			{
 				const char* field_data_str = is_receiver ? "send" : "receive";
-				ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFieldsRequest] - ready to %s fields-request!%s", color_start,
-					mode_str, field_data_str, color_end);
+				ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFieldsRequest] - ready to %s fields-request!%s",
+					color_start,
+					mode_str,
+					field_data_str,
+					color_end);
 			}
 		}
 		else if (state == State::ReadyForFields)
@@ -97,8 +102,11 @@ namespace robotick
 			if (show_always)
 			{
 				const char* field_data_str = is_receiver ? "receive" : "send";
-				ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFields] - ready to %s fields-data!%s", color_start, mode_str,
-					field_data_str, color_end);
+				ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFields] - ready to %s fields-data!%s",
+					color_start,
+					mode_str,
+					field_data_str,
+					color_end);
 			}
 		}
 		else
@@ -290,7 +298,7 @@ namespace robotick
 
 			for (const auto& field : fields)
 			{
-				if (field.path.find('\n') != std::string::npos)
+				if (field.path.contains('\n'))
 				{
 					ROBOTICK_FATAL_EXIT("Field path contains newline character - this will break handshake data: %s", field.path.c_str());
 				}
@@ -299,7 +307,8 @@ namespace robotick
 				{
 					payload.push_back('\n');
 				}
-				payload.insert(payload.end(), field.path.begin(), field.path.end());
+				payload.insert(payload.end(), &field.path.data[0], &field.path.data[0] + field.path.length());
+
 				is_first_field = false;
 			}
 
@@ -505,7 +514,8 @@ namespace robotick
 				{
 					ROBOTICK_FATAL_EXIT(
 						"RemoteEngineConnection::receive_into_fields() - buffer received is too small (%zu bytes) for all expected fields (%zu)",
-						payload_size, (offset + field.size));
+						payload_size,
+						(offset + field.size));
 
 					break;
 				}

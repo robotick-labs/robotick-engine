@@ -19,11 +19,6 @@ namespace robotick::test
 			int x = 0;
 			double y = 0.0;
 			Blackboard out_blackboard;
-
-			DummyAOutput()
-				: out_blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))})
-			{
-			}
 		};
 		ROBOTICK_REGISTER_STRUCT_BEGIN(DummyAOutput)
 		ROBOTICK_STRUCT_FIELD(DummyAOutput, Blackboard, out_blackboard)
@@ -36,11 +31,6 @@ namespace robotick::test
 			Blackboard in_blackboard;
 			double y = 0.0;
 			int x = 0;
-
-			DummyBInput()
-				: in_blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))})
-			{
-			}
 		};
 		ROBOTICK_REGISTER_STRUCT_BEGIN(DummyBInput)
 		ROBOTICK_STRUCT_FIELD(DummyBInput, Blackboard, in_blackboard)
@@ -48,15 +38,48 @@ namespace robotick::test
 		ROBOTICK_STRUCT_FIELD(DummyBInput, int, x)
 		ROBOTICK_REGISTER_STRUCT_END(DummyBInput)
 
+		struct DummyState
+		{
+			HeapVector<FieldDescriptor> blackboard_fields;
+		};
+
 		struct DummyA
 		{
 			DummyAOutput outputs;
+			State<DummyState> state;
+
+			void pre_load()
+			{
+				state->blackboard_fields.initialize(2);
+				//
+				FieldDescriptor& field_desc_0 = state->blackboard_fields[0];
+				field_desc_0.name = "x";
+				field_desc_0.type_id = GET_TYPE_ID(int);
+				//
+				FieldDescriptor& field_desc_1 = state->blackboard_fields[1];
+				field_desc_1.name = "y";
+				field_desc_1.type_id = GET_TYPE_ID(double);
+			}
 		};
 		ROBOTICK_REGISTER_WORKLOAD(DummyA, void, void, DummyAOutput)
 
 		struct DummyB
 		{
 			DummyBInput inputs;
+			State<DummyState> state;
+
+			void pre_load()
+			{
+				state->blackboard_fields.initialize(2);
+				//
+				FieldDescriptor& field_desc_0 = state->blackboard_fields[0];
+				field_desc_0.name = "x";
+				field_desc_0.type_id = GET_TYPE_ID(int);
+				//
+				FieldDescriptor& field_desc_1 = state->blackboard_fields[1];
+				field_desc_1.name = "y";
+				field_desc_1.type_id = GET_TYPE_ID(double);
+			}
 		};
 		ROBOTICK_REGISTER_WORKLOAD(DummyB, void, DummyBInput)
 	} // namespace

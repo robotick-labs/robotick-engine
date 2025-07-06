@@ -56,8 +56,6 @@ namespace robotick
 
 /// @brief Macros to register Workloads:
 #define ROBOTICK_REGISTER_WORKLOAD_BASE(WorkloadTypeName, ConfigTypePtr, InputTypePtr, OutputTypePtr)                                                \
-	static const ::robotick::TypeDescriptor s_type_desc_void{                                                                                        \
-		"void", GET_TYPE_ID(void), 0, 1, robotick::TypeCategory::Primitive, {}, nullptr, nullptr};                                                   \
 	static const ::robotick::WorkloadDescriptor s_workload_desc_##WorkloadTypeName =                                                                 \
 		::robotick::registry::make_workload_descriptor<WorkloadTypeName>(ConfigTypePtr, InputTypePtr, OutputTypePtr);                                \
 	static const ::robotick::TypeDescriptor s_type_desc_##WorkloadTypeName = {#WorkloadTypeName,                                                     \

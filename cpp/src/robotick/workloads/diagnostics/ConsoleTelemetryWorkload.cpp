@@ -97,7 +97,7 @@ namespace robotick
 		void populate_row(ConsoleTelemetryRow& row, size_t depth, const WorkloadInstanceInfo& info)
 		{
 			row.type = depth_prefix(depth, info.type->name.c_str());
-			row.name = info.unique_name;
+			row.name = info.seed->unique_name.c_str();
 
 			std::vector<std::string> config_entries;
 			std::vector<std::string> input_entries;
@@ -152,9 +152,9 @@ namespace robotick
 							entry << "<?>";
 					}
 
-					if (view.struct_info == view.workload_info->type->config_struct)
+					if (view.struct_info == view.workload_info->workload_descriptor->config_desc)
 						config_entries.push_back(entry.str());
-					else if (view.struct_info == view.workload_info->type->input_struct)
+					else if (view.struct_info == view.workload_info->workload_descriptor->inputs_desc)
 						input_entries.push_back(entry.str());
 					else
 						output_entries.push_back(entry.str());
@@ -164,9 +164,11 @@ namespace robotick
 			row.inputs = input_entries.empty() ? "-" : join(input_entries, "\n");
 			row.outputs = output_entries.empty() ? "-" : join(output_entries, "\n");
 
-			row.tick_duration_ms = info.mutable_stats.last_tick_duration * 1000.0;
-			row.tick_delta_ms = info.mutable_stats.last_time_delta * 1000.0;
-			row.goal_interval_ms = info.tick_rate_hz > 0.0 ? 1000.0 / info.tick_rate_hz : -1.0;
+			constexpr double NanosecondsPerMillisecond = 1e6;
+
+			row.tick_duration_ms = NanosecondsPerMillisecond * (double)info.mutable_stats.last_tick_duration_ns;
+			row.tick_delta_ms = NanosecondsPerMillisecond * (double)info.mutable_stats.last_time_delta_ns;
+			row.goal_interval_ms = info.seed->tick_rate_hz > 0.0 ? 1000.0 / info.seed->tick_rate_hz : -1.0;
 		}
 
 		static std::string depth_prefix(size_t depth, const std::string& name)

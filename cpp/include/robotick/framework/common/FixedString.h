@@ -75,6 +75,17 @@ namespace robotick
 
 		bool empty() const { return data[0] == '\0'; }
 
+		bool contains(const char query_char) const
+		{
+			const size_t str_length = length();
+			for (size_t i = 0; i < str_length; ++i)
+			{
+				if (data()[i] == query_char)
+					return true;
+			}
+			return false;
+		}
+
 		size_t length() const { return fixed_strlen(data); };
 
 		constexpr size_t capacity() const { return N; }

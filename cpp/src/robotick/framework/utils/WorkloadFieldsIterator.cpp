@@ -39,8 +39,8 @@ namespace robotick
 				if (field.type == GET_TYPE_ID(Blackboard))
 				{
 					Blackboard& blackboard = *static_cast<Blackboard*>(base_ptr);
-
-					for (const BlackboardFieldInfo& blackboard_field : blackboard.get_schema())
+					const StructDescriptor& blackboard_struct_desc = blackboard.get_struct_descriptor();
+					for (const FieldDescriptor& blackboard_field : blackboard_struct_desc.fields)
 					{
 						WorkloadFieldView view{&instance, struct_info, &field, &blackboard_field, blackboard_field.get_data_ptr(blackboard)};
 						callback(view);
