@@ -5,6 +5,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include <atomic>
 #include <memory>
@@ -13,26 +14,15 @@
 namespace robotick
 {
 	class AtomicFlag;
-	class ConsoleTelemetryCollector;
 	class Model;
 	class WorkloadsBuffer;
 	struct DataConnectionInfo;
-	struct MqttFieldSync;
-	struct WorkloadFieldsIterator;
+	struct StructRegistryEntry;
+	struct TickInfo;
 	struct WorkloadInstanceInfo;
-
-	namespace test
-	{
-		struct EngineInspector;
-	}
 
 	class ROBOTICK_API Engine
 	{
-		friend struct robotick::ConsoleTelemetryCollector;
-		friend struct robotick::MqttFieldSync;
-		friend struct robotick::WorkloadFieldsIterator;
-		friend struct robotick::WorkloadInstanceInfo;
-
 	  public: // main api accessors
 		Engine();
 		~Engine();
@@ -48,7 +38,11 @@ namespace robotick
 
 	  public: // internal public accessors
 		const WorkloadInstanceInfo* get_root_instance_info() const;
+
 		const WorkloadInstanceInfo* find_instance_info(const char* unique_name) const;
+		void* find_instance(const char* unique_name) const;
+		template <T> T* find_instance(const char* unique_name) const { return static_cast<T*>(find_instance(unique_name)); }
+
 		const HeapVector<WorkloadInstanceInfo>& get_all_instance_info() const;
 		const HeapVector<DataConnectionInfo>& get_all_data_connections() const;
 

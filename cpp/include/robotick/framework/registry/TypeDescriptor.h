@@ -18,6 +18,8 @@ namespace robotick
 	struct TypeDescriptor;
 
 	class Engine;
+	class WorkloadsBuffer;
+
 	struct DataConnectionInfo;
 	struct TickInfo;
 	struct WorkloadInstanceInfo;

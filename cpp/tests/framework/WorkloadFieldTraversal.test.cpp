@@ -48,7 +48,7 @@ namespace robotick::test
 		SECTION("Field pointers match expected values and buffers")
 		{
 			Model model;
-			auto w = model.add("SimpleWorkload", "W").set_tick_rate_hz(10.0f);
+			const WorkloadSeed& w = model.add("SimpleWorkload", "W").set_tick_rate_hz(10.0f);
 			model.set_root_workload(w);
 
 			Engine engine;
@@ -96,7 +96,7 @@ namespace robotick::test
 		SECTION("Override buffer works correctly")
 		{
 			Model model;
-			auto w = model.add("SimpleWorkload", "W").set_tick_rate_hz(10.0f);
+			const WorkloadSeed& w = model.add("SimpleWorkload", "W").set_tick_rate_hz(10.0f);
 			model.set_root_workload(w);
 
 			Engine engine;
@@ -143,7 +143,7 @@ namespace robotick::test
 		SECTION("for_each_workload returns all instances")
 		{
 			Model model;
-			auto w1 = model.add("SimpleWorkload", "W1").set_tick_rate_hz(10.0f);
+			const WorkloadSeed& w1 = model.add("SimpleWorkload", "W1").set_tick_rate_hz(10.0f);
 			model.add("SimpleWorkload", "W2").set_tick_rate_hz(10.0f);
 			model.set_root_workload(w1);
 
@@ -165,7 +165,7 @@ namespace robotick::test
 		SECTION("for_each_field_in_workload walks individual workload fields")
 		{
 			Model model;
-			auto w = model.add("SimpleWorkload", "Solo").set_tick_rate_hz(10.0f);
+			const WorkloadSeed& w = model.add("SimpleWorkload", "Solo").set_tick_rate_hz(10.0f);
 			model.set_root_workload(w);
 
 			Engine engine;
@@ -209,7 +209,7 @@ namespace robotick::test
 			ROBOTICK_REGISTER_WORKLOAD(BBWorkload, void, BBInputs, void)
 
 			Model model;
-			auto handle = model.add("BBWorkload", "BB").set_tick_rate_hz(10.0f);
+			WorkloadSeed& workload_seed = model.add("BBWorkload", "BB").set_tick_rate_hz(10.0f);
 			model.set_root_workload(handle);
 
 			Engine engine;

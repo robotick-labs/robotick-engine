@@ -115,7 +115,7 @@ namespace robotick
 			size_t size;
 		};
 
-		ResolvedField resolve_field_ptr(const char* path, const Map<StringView, WorkloadInstanceInfo*>& instances, WorkloadsBuffer& buffer)
+		ResolvedField resolve_field_ptr(const char* path, const Map<const char*, WorkloadInstanceInfo*>& instances, WorkloadsBuffer& buffer)
 		{
 			const char* path_cursor = path;
 
@@ -142,7 +142,7 @@ namespace robotick
 
 			// Step 1: workload
 			const FixedString64 workload_token = next_token();
-			WorkloadInstanceInfo* const* found_workload_ptr = instances.find(StringView(workload_token.c_str()));
+			WorkloadInstanceInfo* const* found_workload_ptr = instances.find(workload_token.c_str());
 			const WorkloadInstanceInfo* workload = found_workload_ptr ? *found_workload_ptr : nullptr;
 			if (!workload)
 				ROBOTICK_FATAL_EXIT("Unknown workload: %s", workload_token.c_str());
@@ -193,7 +193,7 @@ namespace robotick
 	void DataConnectionUtils::create(HeapVector<DataConnectionInfo>& out_connections,
 		WorkloadsBuffer& workloads_buffer,
 		const ArrayView<const DataConnectionSeed*>& seeds,
-		const Map<StringView, WorkloadInstanceInfo*>& instances)
+		const Map<const char*, WorkloadInstanceInfo*>& instances)
 	{
 		// TODO - ensure we're not duplicating connections to any inputs
 

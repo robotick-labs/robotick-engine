@@ -56,28 +56,28 @@ namespace robotick
 			}
 
 			// iterate + classify connections
-			for (DataConnectionInfo* conn : pending_connections)
+			for (DataConnectionInfo& conn : pending_connections)
 			{
-				if (conn->expected_handler != DataConnectionInfo::ExpectedHandler::Unassigned)
+				if (conn.expected_handler != DataConnectionInfo::ExpectedHandler::Unassigned)
 				{
 					continue;
 				}
 
-				const auto src_it = workload_to_child.find(conn->source_workload);
-				const auto dst_it = workload_to_child.find(conn->dest_workload);
+				const auto src_it = workload_to_child.find(conn.source_workload);
+				const auto dst_it = workload_to_child.find(conn.dest_workload);
 				const bool src_is_local = src_it != workload_to_child.end();
 				const bool dst_is_local = dst_it != workload_to_child.end();
 
 				if (src_is_local && dst_is_local)
 				{
 					dst_it->second->connections_in.push_back(conn);
-					conn->expected_handler = DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload;
+					conn.expected_handler = DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload;
 				}
 				else
 				{
 					if (dst_is_local)
 					{
-						conn->expected_handler = DataConnectionInfo::ExpectedHandler::DelegateToParent;
+						conn.expected_handler = DataConnectionInfo::ExpectedHandler::DelegateToParent;
 					}
 				}
 			}

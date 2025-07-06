@@ -1,7 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#if defined(ROBOTICK_PLATFORM_DESKTOP)
+#if defined(ROBOTICK_PLATFORM_DESKTOP) && 0 // TODO - reinstate once rest of engine reactor is complete
 
 #include "robotick/framework/data/MqttFieldSync.h"
 #include "robotick/api.h"
@@ -10,13 +10,19 @@ namespace robotick
 {
 	// Constructor for tests: only publisher lambda
 	MqttFieldSync::MqttFieldSync(const std::string& root_ns, PublisherFn publisher)
-		: root(root_ns), publisher(std::move(publisher)), mqtt_ptr(nullptr), engine_ptr(nullptr)
+		: root(root_ns)
+		, publisher(std::move(publisher))
+		, mqtt_ptr(nullptr)
+		, engine_ptr(nullptr)
 	{
 	}
 
 	// Constructor for real use: Engine + root namespace + IMqttClient
 	MqttFieldSync::MqttFieldSync(Engine& engine, const std::string& root_ns, IMqttClient& mqtt_client)
-		: root(root_ns), publisher(nullptr), mqtt_ptr(&mqtt_client), engine_ptr(&engine)
+		: root(root_ns)
+		, publisher(nullptr)
+		, mqtt_ptr(&mqtt_client)
+		, engine_ptr(&engine)
 	{
 		try
 		{
@@ -206,7 +212,8 @@ namespace robotick
 		// WorkloadFieldsIterator currently requires non-const buffer
 		WorkloadsBuffer& non_const_buf = const_cast<WorkloadsBuffer&>(buffer);
 
-		WorkloadFieldsIterator::for_each_workload_field(engine, &non_const_buf,
+		WorkloadFieldsIterator::for_each_workload_field(engine,
+			&non_const_buf,
 			[&](const WorkloadFieldView& view)
 			{
 				if (!view.workload_info || !view.struct_info || !view.field_info)

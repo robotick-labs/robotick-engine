@@ -22,13 +22,15 @@ void populate_model_hello_world_load(robotick::Model& model)
 
 void populate_model_hello_world_dynamic(robotick::Model& model)
 {
-	auto& console = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(5.0f);
-	auto& test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
-	auto& test_state_2 = model.add("PythonWorkload", "test_state_2")
-							 .set_tick_rate_hz(1.0f)
-							 .set_config({{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
+	const WorkloadSeed& console = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(5.0f);
+	const WorkloadSeed& test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
+	const WorkloadSeed& test_state_2 =
+		model.add("PythonWorkload", "test_state_2")
+			.set_tick_rate_hz(1.0f)
+			.set_config({{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
 
-	auto& root = model.add("SyncedGroupWorkload", "root_group").set_tick_rate_hz(1000.0f).set_children({&console, &test_state_1, &test_state_2});
+	const WorkloadSeed& root =
+		model.add("SyncedGroupWorkload", "root_group").set_tick_rate_hz(1000.0f).set_children({&console, &test_state_1, &test_state_2});
 
 	model.set_root_workload(root);
 }

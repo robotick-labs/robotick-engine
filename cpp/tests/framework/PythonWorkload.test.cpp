@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/api.h"
-#include "robotick/framework/Engine.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/utils/TypeId.h"
 
@@ -24,13 +23,12 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 	SECTION("Python tick executes")
 	{
 		Model model;
-		const auto handle = model.add(
-			"PythonWorkload", "test2", 1.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
-		model.set_root_workload(handle);
+		const WorkloadSeed& python_workload = model.add( "PythonWorkload", "test2").set_tick_rate_hz(1.0f).set_config{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
+		model.set_root_workload(python_workload);
 
 		Engine engine;
 		engine.load(model);
-		const auto& info = EngineInspector::get_instance_info(engine, handle.index);
+		const auto& info = engine.find_instance_info(python_workload.);
 		auto* inst_ptr = info.get_ptr(engine);
 
 		REQUIRE(inst_ptr);
@@ -43,16 +41,17 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 	SECTION("Output reflects Python computation")
 	{
 		Model model;
-		const auto handle = model.add("PythonWorkload",
-			"py",
-			1.0,
-			{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}, {"example_in", "21.0"}});
-		model.set_root_workload(handle);
+		const WorkloadSeed& root =
+			model.add("PythonWorkload", "py")
+				.set_tick_rate_hz(1.0f)
+				.set_config(
+					{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}, {"example_in", "21.0"}});
+		model.set_root_workload(root);
 
 		Engine engine;
 		engine.load(model);
 
-		const auto& info = EngineInspector::get_instance_info(engine, handle.index);
+		const auto& info = engine.find_instance_info(root.unique_name);
 		auto* inst_ptr = info.get_ptr(engine);
 		REQUIRE(inst_ptr != nullptr);
 		REQUIRE(info.type != nullptr);
@@ -96,14 +95,16 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 	SECTION("start/stop hooks are optional and safe")
 	{
 		Model model;
-		const auto handle = model.add(
-			"PythonWorkload", "test", 10.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
-		model.set_root_workload(handle);
+		const WorkloadSeed& root =
+			model.add("PythonWorkload", "test")
+				.set_tick_rate_hz(10.0f)
+				.set_config({{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
+		model.set_root_workload(root);
 
 		Engine engine;
 		engine.load(model);
 
-		const auto& info = EngineInspector::get_instance_info(engine, handle.index);
+		const auto& info = engine.find_instance_info(root.unique_name);
 		auto* inst_ptr = info.get_ptr(engine);
 
 		REQUIRE(inst_ptr != nullptr);

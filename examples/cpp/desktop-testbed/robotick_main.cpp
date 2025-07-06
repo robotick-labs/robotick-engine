@@ -15,24 +15,24 @@ void signal_handler()
 
 void populate_model_hello_world(robotick::Model& model)
 {
-	auto console = model.add("ConsoleTelemetryWorkload", "console", 5.0);
-	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
-	auto test_state_2 = model.add(
+	const WorkloadSeed& console = model.add("ConsoleTelemetryWorkload", "console", 5.0);
+	const WorkloadSeed& test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
+	const WorkloadSeed& test_state_2 = model.add(
 		"PythonWorkload", "test_state_2", 1.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
 
 	std::vector<robotick::WorkloadHandle_v1> children = {console, test_state_1, test_state_2};
-	auto root = model.add("SyncedGroupWorkload", "root_group", children, 1000.0);
+	const WorkloadSeed& root = model.add("SyncedGroupWorkload", "root_group", children, 1000.0);
 	model.set_root_workload(root);
 }
 
 void populate_model_hello_mqtt(robotick::Model& model)
 {
-	auto remote_control = model.add("RemoteControlWorkload", "remote_control", 30.0);
-	auto mqtt_client = model.add("MqttClientWorkload", "mqtt_client", 30.0, {{"broker_url", "mqtt://192.168.5.14"}});
-	auto console_telem = model.add("ConsoleTelemetryWorkload", "console", 5.0);
+	const WorkloadSeed& remote_control = model.add("RemoteControlWorkload", "remote_control", 30.0);
+	const WorkloadSeed& mqtt_client = model.add("MqttClientWorkload", "mqtt_client", 30.0, {{"broker_url", "mqtt://192.168.5.14"}});
+	const WorkloadSeed& console_telem = model.add("ConsoleTelemetryWorkload", "console", 5.0);
 
 	std::vector<robotick::WorkloadHandle_v1> children = {console_telem, remote_control, mqtt_client};
-	auto root = model.add("SyncedGroupWorkload", "root_group", children, 30.0);
+	const WorkloadSeed& root = model.add("SyncedGroupWorkload", "root_group", children, 30.0);
 	model.set_root_workload(root);
 }
 

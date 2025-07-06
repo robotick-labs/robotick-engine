@@ -4,6 +4,8 @@
 #include "robotick/framework/registry/TypeDescriptor.h"
 
 #include "robotick/api_base.h"
+#include "robotick/framework/WorkloadInstanceInfo.h"
+#include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/TypeRegistry.h"
 
 namespace robotick

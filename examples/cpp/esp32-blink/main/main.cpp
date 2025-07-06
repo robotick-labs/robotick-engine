@@ -28,29 +28,29 @@ namespace robotick
 
 void create_threaded_model(robotick::Model& model)
 {
-	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0);
-	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "timing_diag");
+	const WorkloadSeed& console = model.add("ConsoleTelemetryWorkload", "console", 2.0);
+	const WorkloadSeed& test_state_1 = model.add("TimingDiagnosticsWorkload", "timing_diag");
 
 	std::vector<robotick::WorkloadHandle_v1> children = {console, test_state_1};
 
-	auto root = model.add("SyncedGroupWorkload", "root", children, 100.0);
+	const WorkloadSeed& root = model.add("SyncedGroupWorkload", "root", children, 100.0);
 	model.set_root_workload(root);
 }
 
 void create_non_threaded_model(robotick::Model& model)
 {
-	auto console = model.add("ConsoleTelemetryWorkload", "console", 2.0);
-	auto test_state_1 = model.add("TimingDiagnosticsWorkload", "timing_diag");
+	const WorkloadSeed& console = model.add("ConsoleTelemetryWorkload", "console", 2.0);
+	const WorkloadSeed& test_state_1 = model.add("TimingDiagnosticsWorkload", "timing_diag");
 
 	std::vector<robotick::WorkloadHandle_v1> children = {console, test_state_1};
 
-	auto root = model.add("SequencedGroupWorkload", "root", children, 100.0);
+	const WorkloadSeed& root = model.add("SequencedGroupWorkload", "root", children, 100.0);
 	model.set_root_workload(root);
 }
 
 void create_simple_model(robotick::Model& model)
 {
-	auto root = model.add("HeartbeatDisplayWorkload", "heartbeat", 30.0);
+	const WorkloadSeed& root = model.add("HeartbeatDisplayWorkload", "heartbeat", 30.0);
 	model.set_root_workload(root);
 }
 

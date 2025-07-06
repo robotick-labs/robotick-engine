@@ -10,6 +10,7 @@
 #include "robotick/framework/common/Pair.h"
 #include "robotick/framework/common/StringView.h"
 #include "robotick/framework/data/DataConnection.h"
+#include "robotick/framework/registry/TypeRegistry.h"
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 #include "robotick/framework/common/HeapVector.h"

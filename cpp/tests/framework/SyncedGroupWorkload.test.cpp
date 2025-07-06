@@ -55,9 +55,9 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		const int tick_count = 5;
 
 		Model model;
-		const auto a = model.add("CountingWorkload", "a", tick_rate_hz);
-		const auto b = model.add("CountingWorkload", "b", tick_rate_hz);
-		const auto group = model.add("SyncedGroupWorkload", "group", {a, b}, tick_rate_hz);
+		const WorkloadSeed& a = model.add("CountingWorkload", "a", tick_rate_hz);
+		const WorkloadSeed& b = model.add("CountingWorkload", "b", tick_rate_hz);
+		const WorkloadSeed& group_seed = model.add("SyncedGroupWorkload", "group", {a, b}, tick_rate_hz);
 		model.set_root_workload(group);
 
 		Engine engine;
@@ -98,10 +98,10 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		constexpr int num_ticks = 5;
 
 		Model model;
-		const auto s1 = model.add("SlowWorkload", "s1", tick_rate_hz);
-		const auto s2 = model.add("SlowWorkload", "s2", tick_rate_hz);
-		const auto group = model.add("SyncedGroupWorkload", "group", {s1, s2}, tick_rate_hz);
-		model.set_root_workload(group);
+		const WorkloadSeed& s1 = model.add("SlowWorkload", "s1", tick_rate_hz);
+		const WorkloadSeed& s2 = model.add("SlowWorkload", "s2", tick_rate_hz);
+		const WorkloadSeed& group_seed = model.add("SyncedGroupWorkload", "group", {s1, s2}, tick_rate_hz);
+		model.set_root_workload(group_seed);
 
 		Engine engine;
 		engine.load(model);
@@ -142,8 +142,8 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		const double tick_rate_hz = 1.0 / tick_info.delta_time;
 
 		Model model;
-		const auto h = model.add("CountingWorkload", "ticky", tick_rate_hz);
-		const auto group = model.add("SyncedGroupWorkload", "group", {h}, tick_rate_hz);
+		const WorkloadSeed& h = model.add("CountingWorkload", "ticky", tick_rate_hz);
+		const WorkloadSeed& group_seed = model.add("SyncedGroupWorkload", "group", {h}, tick_rate_hz);
 		model.set_root_workload(group);
 
 		Engine engine;
@@ -184,8 +184,8 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		const double child_tick_rate_hz = 1.0 / TICK_INFO_FIRST_100MS_10HZ.delta_time; // child wants to tick 10x slower than group - we should let it
 
 		Model model;
-		const auto h = model.add("CountingWorkload", "slower", child_tick_rate_hz);
-		const auto group = model.add("SyncedGroupWorkload", "group", {h}, group_tick_rate_hz);
+		const WorkloadSeed& h = model.add("CountingWorkload", "slower", child_tick_rate_hz);
+		const WorkloadSeed& group_seed = model.add("SyncedGroupWorkload", "group", {h}, group_tick_rate_hz);
 		model.set_root_workload(group);
 
 		Engine engine;

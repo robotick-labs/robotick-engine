@@ -66,15 +66,15 @@ namespace robotick::test
 		SECTION("Resolves non-blackboard to non-blackboard")
 		{
 			Model model;
-			const WorkloadHandle_v1 handle_a = model.add("DummyA", "A", 1.0);
-			const WorkloadHandle_v1 handle_b = model.add("DummyB", "B", 1.0);
+			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
 			model_helpers::wrap_all_in_sequenced_group(model);
 
 			Engine engine;
 			engine.load(model);
 
 			// Modify live instance values
-			auto* a = EngineInspector::get_instance<DummyA>(engine, handle_a.index);
+			auto* a = engine.find_instance<DummyA>(seed_a.unique_name);
 			a->outputs.x = 42;
 			a->outputs.y = 3.14;
 
@@ -94,7 +94,7 @@ namespace robotick::test
 				conn.do_data_copy();
 			}
 
-			const DummyB* b = EngineInspector::get_instance<DummyB>(engine, handle_b.index);
+			const DummyB* b = engine.find_instance<DummyB>(seed_b.unique_name);
 			REQUIRE(b->inputs.x == 42);
 			REQUIRE(b->inputs.y == Catch::Approx(3.14));
 		}
@@ -102,15 +102,15 @@ namespace robotick::test
 		SECTION("Resolves non-blackboard to blackboard")
 		{
 			Model model;
-			const WorkloadHandle_v1 handle_a = model.add("DummyA", "A", 1.0);
-			const WorkloadHandle_v1 handle_b = model.add("DummyB", "B", 1.0);
+			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
 			model_helpers::wrap_all_in_sequenced_group(model);
 
 			Engine engine;
 			engine.load(model);
 
 			// Modify live instance values
-			auto* a = EngineInspector::get_instance<DummyA>(engine, handle_a.index);
+			auto* a = engine.find_instance<DummyA>(seed_a.unique_name);
 			a->outputs.x = 42;
 			a->outputs.y = 3.14;
 
@@ -123,7 +123,7 @@ namespace robotick::test
 				DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, engine.get_all_instance_info());
 			REQUIRE(resolved.size() == 2);
 
-			const DummyB* b = EngineInspector::get_instance<DummyB>(engine, handle_b.index);
+			const DummyB* b = engine.find_instance<DummyB>(seed_b.unique_name);
 
 			// Execute copy
 			for (const auto& conn : resolved)
@@ -138,15 +138,15 @@ namespace robotick::test
 		SECTION("Resolves blackboard to non-blackboard")
 		{
 			Model model;
-			model.add("DummyA", "A", 1.0);
-			model.add("DummyB", "B", 1.0);
+			model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			model.add("DummyB", "B").set_tick_rate_hz(1.0f);
 			model_helpers::wrap_all_in_sequenced_group(model);
 
 			Engine engine;
 			engine.load(model);
 
 			// Modify live instance values
-			auto* a = EngineInspector::get_instance<DummyA>(engine, 0);
+			auto* a = engine.find_instance<DummyA>("A");
 			a->outputs.out_blackboard.set("x", (int)42);
 			a->outputs.out_blackboard.set("y", (double)3.14);
 
@@ -166,7 +166,7 @@ namespace robotick::test
 				conn.do_data_copy();
 			}
 
-			const DummyB* b = EngineInspector::get_instance<DummyB>(engine, 1);
+			const DummyB* b = engine.find_instance<DummyB>("B");
 			REQUIRE(b->inputs.x == 42);
 			REQUIRE(b->inputs.y == Catch::Approx(3.14));
 		}
@@ -174,15 +174,15 @@ namespace robotick::test
 		SECTION("Resolves blackboard to blackboard")
 		{
 			Model model;
-			model.add("DummyA", "A", 1.0);
-			model.add("DummyB", "B", 1.0);
+			model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			model.add("DummyB", "B").set_tick_rate_hz(1.0f);
 			model_helpers::wrap_all_in_sequenced_group(model);
 
 			Engine engine;
 			engine.load(model);
 
 			// Modify live instance values
-			auto* a = EngineInspector::get_instance<DummyA>(engine, 0);
+			auto* a = engine.find_instance<DummyA>("A");
 			a->outputs.out_blackboard.set("x", (int)42);
 			a->outputs.out_blackboard.set("y", (double)3.14);
 
@@ -202,7 +202,7 @@ namespace robotick::test
 				conn.do_data_copy();
 			}
 
-			const DummyB* b = EngineInspector::get_instance<DummyB>(engine, 1);
+			const DummyB* b = engine.find_instance<DummyB>("B");
 
 			REQUIRE(b->inputs.in_blackboard.get<int>("x") == 42);
 			REQUIRE(b->inputs.in_blackboard.get<double>("y") == Catch::Approx(3.14));
@@ -211,8 +211,8 @@ namespace robotick::test
 		SECTION("Errors on invalid connections")
 		{
 			Model model;
-			model.add("DummyA", "A", 1.0);
-			model.add("DummyB", "B", 1.0);
+			model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			model.add("DummyB", "B").set_tick_rate_hz(1.0f);
 			model_helpers::wrap_all_in_sequenced_group(model);
 
 			Engine engine;
@@ -258,15 +258,15 @@ namespace robotick::test
 		SECTION("Unidirectional copy")
 		{
 			Model model;
-			const WorkloadHandle_v1 handle_a = model.add("DummyA", "A", 1.0);
-			const WorkloadHandle_v1 handle_b = model.add("DummyB", "B", 1.0);
+			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
 			model_helpers::wrap_all_in_sequenced_group(model);
 
 			Engine engine;
 			engine.load(model);
 
-			auto* a = EngineInspector::get_instance<DummyA>(engine, handle_a.index);
-			auto* b = EngineInspector::get_instance<DummyB>(engine, handle_b.index);
+			auto* a = engine.find_instance<DummyA>(seed_a.unique_name);
+			auto* b = engine.find_instance<DummyB>(seed_b.unique_name);
 
 			a->outputs.x = 123;
 			b->inputs.x = 999; // Should get overwritten
@@ -285,8 +285,8 @@ namespace robotick::test
 		SECTION("Throws for blackboard subfield not found")
 		{
 			Model model;
-			model.add("DummyA", "A", 1.0);
-			model.add("DummyB", "B", 1.0);
+			model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			model.add("DummyB", "B").set_tick_rate_hz(1.0f);
 			model_helpers::wrap_all_in_sequenced_group(model);
 
 			Engine engine;
@@ -301,8 +301,8 @@ namespace robotick::test
 		SECTION("Different subfields allowed")
 		{
 			Model model;
-			model.add("DummyA", "A", 1.0);
-			model.add("DummyB", "B", 1.0);
+			model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			model.add("DummyB", "B").set_tick_rate_hz(1.0f);
 			model_helpers::wrap_all_in_sequenced_group(model);
 
 			Engine engine;

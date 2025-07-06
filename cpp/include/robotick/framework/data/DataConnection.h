@@ -75,7 +75,7 @@ namespace robotick
 		static void create(HeapVector<DataConnectionInfo>& out_connections,
 			WorkloadsBuffer& workloads_buffer,
 			const ArrayView<const DataConnectionSeed*>& seeds,
-			const Map<StringView, WorkloadInstanceInfo*>& instances);
+			const Map<const char*, WorkloadInstanceInfo*>& instances);
 
 		/// @brief Applies a set of field configuration overrides to a given struct by matching and writing string-based field values.
 		static void apply_struct_field_values(

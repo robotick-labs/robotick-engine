@@ -49,11 +49,11 @@ namespace robotick::test
 		SECTION("Data connections are propagated correctly")
 		{
 			Model model;
-			const double tick_rate = 100.0;
+			const float tick_rate = 100.0f;
 
-			auto sender = model.add("SenderWorkload", "sender", tick_rate);
-			auto receiver = model.add("ReceiverWorkload", "receiver", tick_rate);
-			auto group = model.add("SyncedGroupWorkload", "group", {sender, receiver}, tick_rate);
+			const WorkloadSeed& sender = model.add("SenderWorkload", "sender", tick_rate);
+			const WorkloadSeed& receiver = model.add("ReceiverWorkload", "receiver", tick_rate);
+			const WorkloadSeed& group_seed = model.add("SyncedGroupWorkload", "group").set_children({&sender, &receiver}).set_tick_rate_hz(tick_rate);
 
 			model.connect("sender.outputs.output", "receiver.inputs.input");
 			model.set_root_workload(group);

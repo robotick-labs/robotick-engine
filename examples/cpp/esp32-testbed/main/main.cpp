@@ -37,7 +37,7 @@ void populate_model(robotick::Model& model)
 		model.add("FaceDisplayWorkload", "face_display"), model.add("SteeringMixerWorkload", "steering"),
 		model.add("TimingDiagnosticsWorkload", "timing")};
 
-	auto root = model.add("SequencedGroupWorkload", "root", children, 100.0);
+	const WorkloadSeed& root = model.add("SequencedGroupWorkload", "root", children, 100.0);
 	model.set_root_workload(root);
 }
 

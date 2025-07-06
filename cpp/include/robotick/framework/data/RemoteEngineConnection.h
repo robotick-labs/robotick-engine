@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/data/InProgressMessage.h"
 
 #include <cstdint>

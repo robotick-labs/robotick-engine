@@ -70,14 +70,14 @@ namespace robotick::test
 		SECTION("MqttFieldSync can publish state and control fields")
 		{
 			Model model;
-			auto test_workload_seed_handle = model.add("TestWorkload", "W1", 1.0);
-			model.set_root_workload(test_workload_seed_handle);
+			const WorkloadSeed& test_workload_seed = model.add("TestWorkload", "W1").set_tick_rate_hz(1.0f);
+			model.set_root_workload(test_workload_seed);
 
 			Engine engine;
 			engine.load(model);
 
 			// initialize our input fields & blackboard-fields:
-			const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed_handle.index);
+			const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed.index);
 			auto* test_workload_ptr = static_cast<TestWorkload*>((void*)info.get_ptr(engine));
 			test_workload_ptr->inputs.value = 42;
 			test_workload_ptr->inputs.blackboard.set("flag", 2);
@@ -113,13 +113,13 @@ namespace robotick::test
 		SECTION("MqttFieldSync can apply control updates")
 		{
 			Model model;
-			auto test_workload_seed_handle = model.add("TestWorkload", "W2", 1.0);
-			model.set_root_workload(test_workload_seed_handle);
+			const WorkloadSeed& test_workload_seed = model.add("TestWorkload", "W2").set_tick_rate_hz(1.0f);
+			model.set_root_workload(test_workload_seed);
 
 			Engine engine;
 			engine.load(model);
 
-			const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed_handle.index);
+			const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed.index);
 			auto* test_workload_ptr = static_cast<TestWorkload*>((void*)info.get_ptr(engine));
 			test_workload_ptr->inputs.load();
 

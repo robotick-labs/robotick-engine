@@ -52,6 +52,10 @@ namespace robotick
 		py::object py_module;
 		py::object py_class;
 		py::object py_instance;
+
+		HeapVector<FieldDescriptor> config_fields;
+		HeapVector<FieldDescriptor> input_fields;
+		HeapVector<FieldDescriptor> output_fields;
 	};
 
 	struct __attribute__((visibility("hidden"))) PythonWorkload
@@ -78,33 +82,52 @@ namespace robotick
 		PythonWorkload(PythonWorkload&&) noexcept = default;
 		PythonWorkload& operator=(PythonWorkload&&) noexcept = default;
 
-		std::vector<BlackboardFieldInfo> parse_blackboard_schema(const py::dict& desc_dict)
+		void parse_blackboard_schema(const py::dict& desc_dict, HeapVector<FieldDescriptor>& fields)
 		{
-			std::vector<BlackboardFieldInfo> fields;
+			size_t field_offset = 0;
+			size_t field_index = 0;
+			fields.initialize(desc_dict.size());
 
 			for (auto item : desc_dict)
 			{
-				std::string name = py::str(item.first);
-				std::string type_str = py::str(item.second);
-				std::transform(type_str.begin(), type_str.end(), type_str.begin(), ::tolower);
+				FieldDescriptor& field_desc = fields[field_index];
 
-				TypeId type(GET_TYPE_ID(void));
+				// Extract field name
+				const std::string name_str = py::str(item.first).cast<std::string>();
+				field_desc.name = name_str.c_str(); // safe: copied into FixedString
 
+				// Extract and parse type string
+				const std::string type_str_raw = py::str(item.second).cast<std::string>();
+				const FixedString64 type_str = type_str_raw.c_str();
+
+				// Set type_id based on known strings
 				if (type_str == "int")
-					type = TypeId(GET_TYPE_ID(int));
+					field_desc.type_id = TypeId(GET_TYPE_ID(int));
 				else if (type_str == "double")
-					type = TypeId(GET_TYPE_ID(double));
+					field_desc.type_id = TypeId(GET_TYPE_ID(double));
 				else if (type_str == "fixedstring64")
-					type = TypeId(GET_TYPE_ID(FixedString64));
+					field_desc.type_id = TypeId(GET_TYPE_ID(FixedString64));
 				else if (type_str == "fixedstring128")
-					type = TypeId(GET_TYPE_ID(FixedString128));
+					field_desc.type_id = TypeId(GET_TYPE_ID(FixedString128));
 				else
 					ROBOTICK_FATAL_EXIT("Unsupported field type: %s", type_str.c_str());
 
-				fields.emplace_back(FixedString64(name.c_str()), type);
-			}
+				// Resolve TypeDescriptor
+				const TypeDescriptor* field_type = field_desc.find_type_descriptor();
+				if (!field_type)
+				{
+					ROBOTICK_FATAL_EXIT(
+						"Could not find type '%s' for Blackboard field: %s", field_desc.type_id.get_debug_name(), field_desc.name.c_str());
+				}
 
-			return fields;
+				// Align field_offset based on required alignment
+				const size_t align = field_type->alignment;
+				field_offset = (field_offset + align - 1) & ~(align - 1);
+
+				field_desc.offset = field_offset;
+				field_offset += field_type->size;
+				field_index++;
+			}
 		}
 
 		void initialize_blackboards(py::object& py_class)
@@ -122,9 +145,14 @@ namespace robotick
 				ROBOTICK_FATAL_EXIT("Python class '%s' describe() failed: %s", config.class_name.c_str(), e.what());
 			}
 
-			config.blackboard = Blackboard(parse_blackboard_schema(desc["config"]));
-			inputs.blackboard = Blackboard(parse_blackboard_schema(desc["inputs"]));
-			outputs.blackboard = Blackboard(parse_blackboard_schema(desc["outputs"]));
+			parse_blackboard_schema(desc["config"], internal_state->config_fields);
+			config.blackboard.initialize_fields(internal_state->config_fields);
+
+			parse_blackboard_schema(desc["inputs"], internal_state->input_fields);
+			inputs.blackboard.initialize_fields(internal_state->input_fields);
+
+			parse_blackboard_schema(desc["outputs"], internal_state->output_fields);
+			outputs.blackboard.initialize_fields(internal_state->output_fields);
 		}
 
 		void pre_load()
@@ -146,11 +174,13 @@ namespace robotick
 			robotick::ensure_python_runtime();
 			py::gil_scoped_acquire gil;
 
+			const StructDescriptor& struct_desc = config.blackboard.get_struct_descriptor();
+
 			py::dict py_cfg;
-			for (const auto& field : config.blackboard.get_schema())
+			for (const auto& field : struct_desc.fields)
 			{
 				const std::string key = field.name.c_str();
-				const auto& type = field.type;
+				const auto& type = field.type_id;
 
 				if (type == GET_TYPE_ID(int))
 					py_cfg[key.c_str()] = config.blackboard.get<int>(key);
@@ -186,10 +216,12 @@ namespace robotick
 			py::dict py_in;
 			py::dict py_out;
 
-			for (const auto& field : inputs.blackboard.get_schema())
+			const StructDescriptor& struct_desc = inputs.blackboard.get_struct_descriptor();
+
+			for (const auto& field : struct_desc.fields)
 			{
 				const std::string key = field.name.c_str();
-				const auto& type = field.type;
+				const auto& type = field.type_id;
 
 				if (type == GET_TYPE_ID(int))
 					py_in[key.c_str()] = inputs.blackboard.get<int>(key);
@@ -217,23 +249,19 @@ namespace robotick
 				std::string key = py::str(item.first);
 				auto val = item.second;
 
-				const auto& schema = outputs.blackboard.get_schema();
-				auto it = std::find_if(schema.begin(),
-					schema.end(),
-					[&](const BlackboardFieldInfo& f)
-					{
-						return key == f.name.c_str();
-					});
-				if (it == schema.end())
+				const StructDescriptor& struct_desc = outputs.blackboard.get_struct_descriptor();
+				const FieldDescriptor* found_field = struct_desc.find_field(key.c_str());
+
+				if (!found_field)
 					continue;
 
-				if (it->type == GET_TYPE_ID(int))
+				if (found_field->type_id == GET_TYPE_ID(int))
 					outputs.blackboard.set<int>(key, val.cast<int>());
-				else if (it->type == GET_TYPE_ID(double))
+				else if (found_field->type_id == GET_TYPE_ID(double))
 					outputs.blackboard.set<double>(key, val.cast<double>());
-				else if (it->type == GET_TYPE_ID(FixedString64))
+				else if (found_field->type_id == GET_TYPE_ID(FixedString64))
 					outputs.blackboard.set<FixedString64>(key, FixedString64(val.cast<std::string>().c_str()));
-				else if (it->type == GET_TYPE_ID(FixedString128))
+				else if (found_field->type_id == GET_TYPE_ID(FixedString128))
 					outputs.blackboard.set<FixedString128>(key, FixedString128(val.cast<std::string>().c_str()));
 			}
 		}

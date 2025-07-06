@@ -23,7 +23,7 @@ namespace robotick
 
 		const WorkloadInstanceInfo* root_instance = nullptr;
 		HeapVector<WorkloadInstanceInfo> instances;
-		Map<StringView, WorkloadInstanceInfo*> instances_by_unique_name;
+		Map<const char*, WorkloadInstanceInfo*> instances_by_unique_name;
 		HeapVector<DataConnectionInfo> data_connections_all;
 		HeapVector<DataConnectionInfo*> data_connections_acquired;
 
@@ -99,7 +99,7 @@ namespace robotick
 			workload_instance_info.seed = seed;
 
 			// add it to our map for quick lookup by name
-			state->instances_by_unique_name.insert(seed->unique_name, &workload_instance_info);
+			state->instances_by_unique_name.insert(seed->unique_name.c_str(), &workload_instance_info);
 
 			if (workload_desc->construct_fn)
 				workload_desc->construct_fn(ptr);
@@ -420,6 +420,17 @@ namespace robotick
 		return found_instance_info ? *found_instance_info : nullptr;
 	}
 
+	void* Engine::find_instance(const char* unique_name) const
+	{
+		const WorkloadInstanceInfo* found_instance_info = find_instance_info(unique_name);
+		if (found_instance_info)
+		{
+			return found_info->get_ptr(*this);
+		}
+
+		return nullptr;
+	}
+
 	const HeapVector<WorkloadInstanceInfo>& Engine::get_all_instance_info() const
 	{
 		return state->instances;
@@ -474,7 +485,7 @@ namespace robotick
 
 			accumulate(workload_descriptor->config_desc, workload_descriptor->config_offset);
 			accumulate(workload_descriptor->inputs_desc, workload_descriptor->inputs_offset);
-			accumulate(workload_descriptor->outputs_desc, workload_descriptor->outputs_offset);
+			accumulate(workload_descriptor->outputs_desc, workload_descriptor->output_offset);
 		}
 		return total;
 	}
@@ -496,7 +507,7 @@ namespace robotick
 	{
 		for (auto& instance : instances)
 		{
-			const auto* type = instance.type;
+			const TypeDescriptor* type = instance.type;
 			if (!type)
 				continue;
 
