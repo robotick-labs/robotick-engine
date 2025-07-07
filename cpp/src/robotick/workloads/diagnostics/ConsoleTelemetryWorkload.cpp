@@ -120,9 +120,9 @@ namespace robotick
 
 					if (view.subfield_info)
 					{
-						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.subfield_info->size));
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.subfield_info->find_type_descriptor()->size));
 
-						const TypeId& type = view.subfield_info->type;
+						const TypeId& type = view.subfield_info->type_id;
 						if (type == GET_TYPE_ID(int))
 							entry << *static_cast<const int*>(view.field_ptr);
 						else if (type == GET_TYPE_ID(double))
@@ -136,10 +136,10 @@ namespace robotick
 					}
 					else
 					{
-						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.field_info->size));
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.field_info->find_type_descriptor()->size));
 
 						// fallback for top-level (non-blackboard) fields
-						const TypeId& type = view.field_info->type;
+						const TypeId& type = view.field_info->type_id;
 						if (type == GET_TYPE_ID(int))
 							entry << *static_cast<const int*>(view.field_ptr);
 						else if (type == GET_TYPE_ID(double))

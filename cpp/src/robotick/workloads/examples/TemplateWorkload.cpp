@@ -89,7 +89,7 @@ namespace robotick
 
 		State<TemplateState> state;
 
-		void set_children(const HeapVector<const WorkloadInstanceInfo*>& children, const HeapVector<DataConnectionInfo>& connections)
+		void set_children(const HeapVector<const WorkloadInstanceInfo*>& children, HeapVector<DataConnectionInfo>& connections)
 		{
 			// Handle child linkage (if applicable - typically only used for compositional workloads
 			// e.g. AsyncPairWorkload, SyncedGroupWorkloads, SequencedGroupWorkload)

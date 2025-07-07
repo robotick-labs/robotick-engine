@@ -11,7 +11,6 @@
 #include <thread>
 
 using namespace robotick;
-using namespace robotick::test;
 
 namespace
 {
@@ -44,9 +43,9 @@ TEST_CASE("Unit/Workloads/SequencedGroupWorkload")
 		DummyTickingWorkload::reset();
 
 		Model model;
-		const const WorkloadSeed& child1 = model.add("DummyTickingWorkload", "child1").set_tick_rate_hz(50.0);
-		const const WorkloadSeed& child2 = model.add("DummyTickingWorkload", "child2").set_tick_rate_hz(50.0);
-		const const WorkloadSeed& group = model.add("SequencedGroupWorkload", "group").set_children({&child1, &child2}).set_tick_rate_hz(50.0f);
+		const WorkloadSeed& child1 = model.add("DummyTickingWorkload", "child1").set_tick_rate_hz(50.0);
+		const WorkloadSeed& child2 = model.add("DummyTickingWorkload", "child2").set_tick_rate_hz(50.0);
+		const WorkloadSeed& group = model.add("SequencedGroupWorkload", "group").set_children({&child1, &child2}).set_tick_rate_hz(50.0f);
 		model.set_root_workload(group);
 
 		Engine engine;

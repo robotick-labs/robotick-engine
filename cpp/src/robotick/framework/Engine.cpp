@@ -257,10 +257,12 @@ namespace robotick
 		if (!root_ptr)
 			ROBOTICK_FATAL_EXIT("Root workload must have valid object-pointer - check it has been correctly registered");
 
-		if (root_info.seed->tick_rate_hz <= 0.0)
+		const float root_tick_rate_hz = root_info.seed->tick_rate_hz;
+		if (root_tick_rate_hz <= 0.0)
 			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_rate_hz>0.0 - check your model settings");
 
-		if (root_info.workload_descriptor->tick_fn == nullptr)
+		const auto root_tick_fn = root_info.workload_descriptor->tick_fn;
+		if (root_tick_fn == nullptr)
 			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_fn - check it has been correctly registered");
 
 		// Start all workloads
@@ -272,7 +274,7 @@ namespace robotick
 
 		state->is_running = true;
 
-		const auto child_tick_interval_sec = std::chrono::duration<double>(1.0 / root_info.seed->tick_rate_hz);
+		const auto child_tick_interval_sec = std::chrono::duration<double>(1.0 / root_tick_rate_hz);
 		const auto child_tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(child_tick_interval_sec);
 
 		const auto engine_start_time = std::chrono::steady_clock::now() - child_tick_interval;
@@ -309,7 +311,7 @@ namespace robotick
 
 			std::atomic_thread_fence(std::memory_order_release);
 
-			root_info.workload_descriptor->tick_fn(root_ptr, tick_info);
+			root_tick_fn(root_ptr, tick_info);
 
 			const auto now_post = std::chrono::steady_clock::now();
 			root_info.mutable_stats.last_tick_duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now_post - now).count();

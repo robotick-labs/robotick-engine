@@ -143,7 +143,7 @@ namespace robotick::registry
 	}
 
 	template <typename T>
-	static void set_children_fn(void* self, const HeapVector<const WorkloadInstanceInfo*>& children, const HeapVector<DataConnectionInfo>& pending)
+	static void set_children_fn(void* self, const HeapVector<const WorkloadInstanceInfo*>& children, HeapVector<DataConnectionInfo>& pending)
 	{
 		static_cast<T*>(self)->set_children(children, pending);
 	}

@@ -56,7 +56,7 @@ namespace robotick::test
 			const WorkloadSeed& group_seed = model.add("SyncedGroupWorkload", "group").set_children({&sender, &receiver}).set_tick_rate_hz(tick_rate);
 
 			model.connect("sender.outputs.output", "receiver.inputs.input");
-			model.set_root_workload(group);
+			model.set_root_workload(group_seed);
 
 			Engine engine;
 			engine.load(model);

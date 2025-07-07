@@ -27,7 +27,7 @@ namespace robotick
 		};
 
 		const Engine* engine = nullptr;
-		std::vector<ChildWorkloadInfo> children;
+		HeapVector<ChildWorkloadInfo> children;
 
 		std::condition_variable tick_cv;
 		std::mutex tick_mutex;
@@ -36,15 +36,32 @@ namespace robotick
 
 		void set_engine(const Engine& engine_in) { engine = &engine_in; }
 
-		void set_children(const HeapVector<const WorkloadInstanceInfo*>& child_workloads, const HeapVector<DataConnectionInfo>& pending_connections)
+		ChildWorkloadInfo* find_child_workload(const WorkloadInstanceInfo& query_child)
 		{
-			ROBOTICK_ASSERT(engine != nullptr);
+			for (ChildWorkloadInfo& child : children)
+			{
+				if (child.workload_info == &query_child)
+				{
+					return &child;
+				}
 
-			children.reserve(child_workloads.size());
+				return nullptr;
+			}
+		}
 
+		void set_children(const HeapVector<const WorkloadInstanceInfo*>& child_workloads, HeapVector<DataConnectionInfo>& pending_connections)
+		{
+			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set by now");
+
+			children.initialize(child_workloads.size());
+			size_t child_index = 0;
+
+			// add child workloads and call set_children_fn on each, if present:
 			for (const WorkloadInstanceInfo* child_workload : child_workloads)
 			{
-				ChildWorkloadInfo& info = children.emplace_back();
+				ChildWorkloadInfo& info = children[child_index];
+				child_index++;
+
 				info.workload_info = child_workload;
 				info.workload_ptr = child_workload->get_ptr(*engine);
 
@@ -55,15 +72,15 @@ namespace robotick
 					child_workload->workload_descriptor->set_children_fn(info.workload_ptr, child_workload->children, pending_connections);
 				}
 
-				for (DataConnectionInfo* conn : pending_connections)
+				for (DataConnectionInfo& conn : pending_connections)
 				{
-					if (conn->expected_handler != DataConnectionInfo::ExpectedHandler::Unassigned)
+					if (conn.expected_handler != DataConnectionInfo::ExpectedHandler::Unassigned)
 					{
 						continue;
 					}
-					else if (conn->dest_workload == info.workload_ptr)
+					else if (conn.dest_workload == info.workload_ptr)
 					{
-						conn->expected_handler = DataConnectionInfo::ExpectedHandler::DelegateToParent;
+						conn.expected_handler = DataConnectionInfo::ExpectedHandler::DelegateToParent;
 					}
 				}
 			}
@@ -155,6 +172,8 @@ namespace robotick
 
 			TickInfo tick_info;
 
+			auto workload_tick_fn = child.workload_descriptor->tick_fn;
+
 			while (true)
 			{
 				{
@@ -183,7 +202,7 @@ namespace robotick
 
 				std::atomic_thread_fence(std::memory_order_acquire);
 
-				child.workload_descriptor->tick_fn(child_info.workload_ptr, tick_info);
+				workload_tick_fn(child_info.workload_ptr, tick_info);
 				next_tick_time += tick_interval;
 
 				const auto now_post = std::chrono::steady_clock::now();
@@ -213,7 +232,7 @@ namespace robotick
 		}
 
 		void set_engine(const Engine& engine_in) { impl->set_engine(engine_in); }
-		void set_children(const HeapVector<const WorkloadInstanceInfo*>& children, const HeapVector<DataConnectionInfo>& pending_connections)
+		void set_children(const HeapVector<const WorkloadInstanceInfo*>& children, HeapVector<DataConnectionInfo>& pending_connections)
 		{
 			impl->set_children(children, pending_connections);
 		}

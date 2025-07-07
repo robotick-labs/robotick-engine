@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
+#include "robotick/framework/common/ArrayView.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/utils/TypeId.h"
@@ -191,11 +192,6 @@ namespace robotick::test
 			struct BBInputs
 			{
 				Blackboard blackboard;
-
-				BBInputs()
-					: blackboard({BlackboardFieldInfo("x", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("y", TypeId(GET_TYPE_ID(double)))})
-				{
-				}
 			};
 			ROBOTICK_REGISTER_STRUCT_BEGIN(BBInputs)
 			ROBOTICK_STRUCT_FIELD(BBInputs, Blackboard, blackboard)
@@ -204,6 +200,19 @@ namespace robotick::test
 			struct BBWorkload
 			{
 				BBInputs inputs;
+
+				FixedVector<FieldDescriptor, 2> blackboard_fields;
+
+				void pre_load()
+				{
+					blackboard_fields.fill();
+
+					blackboard_fields[0] = FieldDescriptor{"x", GET_TYPE_ID(int)};
+					blackboard_fields[1] = FieldDescriptor{"y", GET_TYPE_ID(double)};
+
+					inputs.blackboard.initialize_fields(ArrayView(blackboard_fields.begin(), blackboard_fields.size()));
+				}
+
 				void tick(const TickInfo&) {}
 			};
 			ROBOTICK_REGISTER_WORKLOAD(BBWorkload, void, BBInputs, void)

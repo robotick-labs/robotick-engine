@@ -79,8 +79,8 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 			std::this_thread::sleep_for(std::chrono::duration<double>(tick_info.delta_time));
 
 			// Confirm each child has exactly i + 1 ticks after this iteration
-			CHECK(wa->impl->tick_count == i + 1);
-			CHECK(wb->impl->tick_count == i + 1);
+			CHECK(wa->tick_count == i + 1);
+			CHECK(wb->tick_count == i + 1);
 		}
 
 		info.type->get_workload_desc()->stop_fn(group_ptr);
@@ -118,15 +118,15 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 
 		group_info.type->get_workload_desc()->stop_fn(group_ptr);
 
-		const auto* w1 = engine.find_instance<SlowWorkload>(a.unique_name);
-		const auto* w2 = engine.find_instance<SlowWorkload>(b.unique_name);
+		const auto* w1 = engine.find_instance<SlowWorkload>(s1.unique_name);
+		const auto* w2 = engine.find_instance<SlowWorkload>(s2.unique_name);
 
-		INFO("Tick count s1: " << w1->impl->tick_count);
-		INFO("Tick count s2: " << w2->impl->tick_count);
+		INFO("Tick count s1: " << w1->tick_count);
+		INFO("Tick count s2: " << w2->tick_count);
 
 		// We expect 5 ticks issued, 10ms between ticks, and slow-job taking 30ms → can only respond to every 3rd
-		CHECK(w1->impl->tick_count == 2);
-		CHECK(w2->impl->tick_count == 2);
+		CHECK(w1->tick_count == 2);
+		CHECK(w2->tick_count == 2);
 	}
 
 	SECTION("tick() passes real time_delta (child thread measures time elapsed since last actionable tick)")
@@ -157,7 +157,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		group_info.type->get_workload_desc()->tick_fn(group_ptr, tick_info);
 
 		std::this_thread::sleep_for(40ms);
-		const double first_dt = counting->impl->last_dt;
+		const double first_dt = counting->last_dt;
 
 		group_info.type->get_workload_desc()->tick_fn(group_ptr, tick_info);
 
@@ -167,8 +167,8 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		INFO("First time_delta (expected 0.02sec): " << first_dt);
 		CHECK_THAT(first_dt, Catch::Matchers::WithinAbs(0.02, 0.005)); // allow ±5ms - since we're not allowing for code-duration when sleeping above
 
-		INFO("Last time_delta (expected 0.04sec): " << counting->impl->last_dt);
-		CHECK_THAT(counting->impl->last_dt, Catch::Matchers::WithinAbs(0.04, 0.005)); // (ditto)
+		INFO("Last time_delta (expected 0.04sec): " << counting->last_dt);
+		CHECK_THAT(counting->last_dt, Catch::Matchers::WithinAbs(0.04, 0.005)); // (ditto)
 	}
 
 	SECTION("Child allowed to run at slower fixed tick rate than group")
@@ -182,14 +182,15 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		Model model;
 		const WorkloadSeed& h = model.add("CountingWorkload", "slower").set_tick_rate_hz(child_tick_rate_hz);
 		const WorkloadSeed& group_seed = model.add("SyncedGroupWorkload", "group").set_children({&h}).set_tick_rate_hz(group_tick_rate_hz);
-		model.set_root_workload(group);
+		model.set_root_workload(group_seed);
 
 		Engine engine;
 		engine.load(model);
 
 		const auto& group_info = *engine.find_instance_info(group_seed.unique_name);
 		const auto& child_info = *engine.find_instance_info(h.unique_name);
-		auto* counting = static_cast<CountingWrapper*>((void*)child_info.get_ptr(engine));
+
+		auto* counting = static_cast<CountingWorkload*>((void*)child_info.get_ptr(engine));
 		auto* group_ptr = group_info.get_ptr(engine);
 
 		group_info.type->get_workload_desc()->start_fn(group_ptr, group_tick_rate_hz);
@@ -204,7 +205,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		std::this_thread::sleep_for(20ms); // allow child time to complete final tick
 		group_info.type->get_workload_desc()->stop_fn(group_ptr);
 
-		INFO("Child tick count (expected ~2): " << counting->impl->tick_count);
-		CHECK(counting->impl->tick_count == 2);
+		INFO("Child tick count (expected ~2): " << counting->tick_count);
+		CHECK(counting->tick_count == 2);
 	}
 }

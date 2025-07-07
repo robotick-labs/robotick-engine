@@ -7,6 +7,7 @@ namespace robotick
 {
 	struct FieldDescriptor;
 	struct StructDescriptor;
+	struct TypeDescriptor;
 	struct WorkloadInstanceInfo;
 	class Engine;
 	class WorkloadsBuffer;
@@ -14,7 +15,7 @@ namespace robotick
 	struct WorkloadFieldView
 	{
 		const WorkloadInstanceInfo* workload_info = nullptr;
-		const StructDescriptor* struct_info = nullptr;
+		const TypeDescriptor* struct_info = nullptr;
 		const FieldDescriptor* field_info = nullptr;
 		const FieldDescriptor* subfield_info = nullptr;
 		void* field_ptr = nullptr;
