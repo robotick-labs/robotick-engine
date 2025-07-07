@@ -438,6 +438,11 @@ namespace robotick
 		return state->instances;
 	}
 
+	const Map<const char*, WorkloadInstanceInfo*>& Engine::get_all_instance_info_map() const
+	{
+		return state->instances_by_unique_name;
+	}
+
 	const HeapVector<DataConnectionInfo>& Engine::get_all_data_connections() const
 	{
 		return state->data_connections_all;

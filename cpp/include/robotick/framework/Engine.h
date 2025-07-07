@@ -5,6 +5,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
+#include "robotick/framework/common/Map.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <atomic>
@@ -50,6 +51,8 @@ namespace robotick
 		}
 
 		const HeapVector<WorkloadInstanceInfo>& get_all_instance_info() const;
+		const Map<const char*, WorkloadInstanceInfo*>& get_all_instance_info_map() const;
+
 		const HeapVector<DataConnectionInfo>& get_all_data_connections() const;
 
 		std::tuple<void*, size_t, TypeId> find_field_info(const char* path) const;

@@ -91,7 +91,8 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			model_helpers::wrap_all_in_sequenced_group(model);
+			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			model.set_root_workload(root);
 
 			Engine engine;
 			engine.load(model);
@@ -101,13 +102,18 @@ namespace robotick::test
 			a->outputs.x = 42;
 			a->outputs.y = 3.14;
 
-			std::vector<DataConnectionSeed_v1> seeds = {
-				{"A.outputs.x", "B.inputs.x"},
-				{"A.outputs.y", "B.inputs.y"},
+			static const DataConnectionSeed data_connection_1("A.outputs.x", "B.inputs.x");
+			static const DataConnectionSeed data_connection_2("A.outputs.y", "B.inputs.y");
+
+			static const DataConnectionSeed* connection_array[] = {
+				&data_connection_1,
+				&data_connection_2,
 			};
 
-			std::vector<DataConnectionInfo> resolved =
-				DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, engine.get_all_instance_info());
+			ArrayView<const DataConnectionSeed*> seeds(connection_array);
+
+			HeapVector<DataConnectionInfo> resolved;
+			DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, engine.get_all_instance_info_map());
 
 			REQUIRE(resolved.size() == 2);
 
@@ -127,7 +133,8 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			model_helpers::wrap_all_in_sequenced_group(model);
+			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			model.set_root_workload(root);
 
 			Engine engine;
 			engine.load(model);
@@ -137,13 +144,19 @@ namespace robotick::test
 			a->outputs.x = 42;
 			a->outputs.y = 3.14;
 
-			std::vector<DataConnectionSeed_v1> seeds = {
-				{"A.outputs.x", "B.inputs.in_blackboard.x"},
-				{"A.outputs.y", "B.inputs.in_blackboard.y"},
+			static const DataConnectionSeed data_connection_1("A.outputs.x", "B.inputs.in_blackboard.x");
+			static const DataConnectionSeed data_connection_2("A.outputs.y", "B.inputs.in_blackboard.y");
+
+			static const DataConnectionSeed* connection_array[] = {
+				&data_connection_1,
+				&data_connection_2,
 			};
 
-			std::vector<DataConnectionInfo> resolved =
-				DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, engine.get_all_instance_info());
+			ArrayView<const DataConnectionSeed*> seeds(connection_array);
+
+			HeapVector<DataConnectionInfo> resolved;
+			DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, engine.get_all_instance_info_map());
+
 			REQUIRE(resolved.size() == 2);
 
 			const DummyB* b = engine.find_instance<DummyB>(seed_b.unique_name);
@@ -161,9 +174,10 @@ namespace robotick::test
 		SECTION("Resolves blackboard to non-blackboard")
 		{
 			Model model;
-			model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			model_helpers::wrap_all_in_sequenced_group(model);
+			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			model.set_root_workload(root);
 
 			Engine engine;
 			engine.load(model);
@@ -173,13 +187,18 @@ namespace robotick::test
 			a->outputs.out_blackboard.set("x", (int)42);
 			a->outputs.out_blackboard.set("y", (double)3.14);
 
-			std::vector<DataConnectionSeed_v1> seeds = {
-				{"A.outputs.out_blackboard.x", "B.inputs.x"},
-				{"A.outputs.out_blackboard.y", "B.inputs.y"},
+			static const DataConnectionSeed data_connection_1("A.outputs.out_blackboard.x", "B.inputs.x");
+			static const DataConnectionSeed data_connection_2("A.outputs.out_blackboard.y", "B.inputs.y");
+
+			static const DataConnectionSeed* connection_array[] = {
+				&data_connection_1,
+				&data_connection_2,
 			};
 
-			std::vector<DataConnectionInfo> resolved =
-				DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, engine.get_all_instance_info());
+			ArrayView<const DataConnectionSeed*> seeds(connection_array);
+
+			HeapVector<DataConnectionInfo> resolved;
+			DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, engine.get_all_instance_info_map());
 
 			REQUIRE(resolved.size() == 2);
 
@@ -197,9 +216,10 @@ namespace robotick::test
 		SECTION("Resolves blackboard to blackboard")
 		{
 			Model model;
-			model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			model_helpers::wrap_all_in_sequenced_group(model);
+			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			model.set_root_workload(root);
 
 			Engine engine;
 			engine.load(model);
@@ -209,13 +229,18 @@ namespace robotick::test
 			a->outputs.out_blackboard.set("x", (int)42);
 			a->outputs.out_blackboard.set("y", (double)3.14);
 
-			std::vector<DataConnectionSeed_v1> seeds = {
-				{"A.outputs.out_blackboard.x", "B.inputs.in_blackboard.x"},
-				{"A.outputs.out_blackboard.y", "B.inputs.in_blackboard.y"},
+			static const DataConnectionSeed data_connection_1("A.outputs.out_blackboard.x", "B.inputs.in_blackboard.x");
+			static const DataConnectionSeed data_connection_2("A.outputs.out_blackboard.y", "B.inputs.in_blackboard.y");
+
+			static const DataConnectionSeed* connection_array[] = {
+				&data_connection_1,
+				&data_connection_2,
 			};
 
-			std::vector<DataConnectionInfo> resolved =
-				DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, engine.get_all_instance_info());
+			ArrayView<const DataConnectionSeed*> seeds(connection_array);
+
+			HeapVector<DataConnectionInfo> resolved;
+			DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, engine.get_all_instance_info_map());
 
 			REQUIRE(resolved.size() == 2);
 
@@ -234,42 +259,65 @@ namespace robotick::test
 		SECTION("Errors on invalid connections")
 		{
 			Model model;
-			model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			model_helpers::wrap_all_in_sequenced_group(model);
+			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			model.set_root_workload(root);
 
 			Engine engine;
 			engine.load(model);
-			std::vector<WorkloadInstanceInfo> infos = engine.get_all_instance_info();
+			const auto infos_map = engine.get_all_instance_info_map();
 
 			SECTION("Invalid workload name")
 			{
-				std::vector<DataConnectionSeed_v1> seeds = {{"Z.outputs.x", "B.inputs.x"}};
-				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, infos), ("Z"));
+				static const DataConnectionSeed conn_1("Z.outputs.x", "B.inputs.x");
+				static const DataConnectionSeed* connections[] = {&conn_1};
+				ArrayView<const DataConnectionSeed*> seeds(connections);
+
+				HeapVector<DataConnectionInfo> resolved;
+				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, infos_map), ("Z"));
 			}
 
 			SECTION("Invalid section")
 			{
-				std::vector<DataConnectionSeed_v1> seeds = {{"A.wrong.x", "B.inputs.x"}};
-				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, infos), ("Invalid section"));
+				static const DataConnectionSeed conn_1("A.wrong.x", "B.inputs.x");
+				static const DataConnectionSeed* connections[] = {&conn_1};
+				ArrayView<const DataConnectionSeed*> seeds(connections);
+
+				HeapVector<DataConnectionInfo> resolved;
+				ROBOTICK_REQUIRE_ERROR_MSG(
+					DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, infos_map), ("Invalid section"));
 			}
 
 			SECTION("Missing field")
 			{
-				std::vector<DataConnectionSeed_v1> seeds = {{"A.outputs.missing", "B.inputs.x"}};
-				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, infos), ("field"));
+				static const DataConnectionSeed conn_1("A.outputs.missing", "B.inputs.x");
+				static const DataConnectionSeed* connections[] = {&conn_1};
+				ArrayView<const DataConnectionSeed*> seeds(connections);
+
+				HeapVector<DataConnectionInfo> resolved;
+				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, infos_map), ("field"));
 			}
 
 			SECTION("Mismatched types")
 			{
-				std::vector<DataConnectionSeed_v1> seeds = {{"A.outputs.x", "B.inputs.y"}}; // int -> double
-				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, infos), ("Type mismatch"));
+				static const DataConnectionSeed conn_1("A.outputs.x", "B.inputs.y"); // int -> double
+				static const DataConnectionSeed* connections[] = {&conn_1};
+				ArrayView<const DataConnectionSeed*> seeds(connections);
+
+				HeapVector<DataConnectionInfo> resolved;
+				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, infos_map), ("Type mismatch"));
 			}
 
 			SECTION("Duplicate destination")
 			{
-				std::vector<DataConnectionSeed_v1> seeds = {{"A.outputs.x", "B.inputs.x"}, {"A.outputs.x", "B.inputs.x"}};
-				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, infos), ("Duplicate"));
+				static const DataConnectionSeed conn_1("A.outputs.x", "B.inputs.x");
+				static const DataConnectionSeed conn_2("A.outputs.x", "B.inputs.x");
+				static const DataConnectionSeed* connections[] = {&conn_1, &conn_2};
+				ArrayView<const DataConnectionSeed*> seeds(connections);
+
+				HeapVector<DataConnectionInfo> resolved;
+				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, infos_map), ("Duplicate"));
 			}
 		}
 
@@ -283,7 +331,8 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			model_helpers::wrap_all_in_sequenced_group(model);
+			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			model.set_root_workload(root);
 
 			Engine engine;
 			engine.load(model);
@@ -294,9 +343,12 @@ namespace robotick::test
 			a->outputs.x = 123;
 			b->inputs.x = 999; // Should get overwritten
 
-			std::vector<DataConnectionSeed_v1> seeds = {{"A.outputs.x", "B.inputs.x"}};
-			std::vector<DataConnectionInfo> resolved =
-				DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, engine.get_all_instance_info());
+			static const DataConnectionSeed conn_1("A.outputs.x", "B.inputs.x");
+			static const DataConnectionSeed* connections[] = {&conn_1};
+			ArrayView<const DataConnectionSeed*> seeds(connections);
+
+			HeapVector<DataConnectionInfo> resolved;
+			DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, engine.get_all_instance_info_map());
 
 			REQUIRE(resolved.size() == 1);
 			resolved[0].do_data_copy();
@@ -308,36 +360,46 @@ namespace robotick::test
 		SECTION("Throws for blackboard subfield not found")
 		{
 			Model model;
-			model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			model_helpers::wrap_all_in_sequenced_group(model);
+			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			model.set_root_workload(root);
 
 			Engine engine;
 			engine.load(model);
 
-			std::vector<DataConnectionSeed_v1> seeds = {{"A.outputs.out_blackboard.missing", "B.inputs.in_blackboard.x"}};
+			static const DataConnectionSeed conn_1("A.outputs.out_blackboard.missing", "B.inputs.in_blackboard.x");
+			static const DataConnectionSeed* connections[] = {&conn_1};
+			ArrayView<const DataConnectionSeed*> seeds(connections);
 
+			HeapVector<DataConnectionInfo> resolved;
 			ROBOTICK_REQUIRE_ERROR_MSG(
-				DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, engine.get_all_instance_info()), ("subfield"));
+				DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, engine.get_all_instance_info_map()), ("subfield"));
 		}
 
 		SECTION("Different subfields allowed")
 		{
 			Model model;
-			model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			model_helpers::wrap_all_in_sequenced_group(model);
+			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			model.set_root_workload(root);
 
 			Engine engine;
 			engine.load(model);
 
-			std::vector<DataConnectionSeed_v1> seeds = {
-				{"A.outputs.out_blackboard.x", "B.inputs.in_blackboard.x"},
-				{"A.outputs.out_blackboard.y", "B.inputs.in_blackboard.y"},
+			static const DataConnectionSeed conn_1("A.outputs.out_blackboard.x", "B.inputs.in_blackboard.x");
+			static const DataConnectionSeed conn_2("A.outputs.out_blackboard.y", "B.inputs.in_blackboard.y");
+
+			static const DataConnectionSeed* connections[] = {
+				&conn_1,
+				&conn_2,
 			};
 
-			std::vector<DataConnectionInfo> resolved =
-				DataConnectionUtils::create(engine.get_workloads_buffer(), seeds, engine.get_all_instance_info());
+			ArrayView<const DataConnectionSeed*> seeds(connections);
+
+			HeapVector<DataConnectionInfo> resolved;
+			DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, engine.get_all_instance_info_map());
 
 			REQUIRE(resolved.size() == 2);
 		}

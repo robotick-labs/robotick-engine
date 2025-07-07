@@ -52,7 +52,7 @@ namespace robotick::test
 		{
 			Model model;
 			const WorkloadSeed& workload_seed = model.add("DummyWorkload", "A").set_tick_rate_hz(123.0f);
-			model.set_root_workload(handle);
+			model.set_root_workload(workload_seed);
 
 			Engine engine;
 			engine.load(model);
@@ -78,7 +78,7 @@ namespace robotick::test
 		{
 			Model model;
 			const WorkloadSeed& workload_seed = model.add("UnknownType", "fail").set_tick_rate_hz(1.0f);
-			model.set_root_workload(handle);
+			model.set_root_workload(workload_seed);
 
 			Engine engine;
 			REQUIRE_THROWS(engine.load(model));
@@ -87,9 +87,10 @@ namespace robotick::test
 		SECTION("Multiple workloads supported")
 		{
 			Model model;
-			model.add("DummyWorkload", "one").set_tick_rate_hz(1.0f).set_config({{"value", "1"}});
-			model.add("DummyWorkload", "two").set_tick_rate_hz(1.0f).set_config({{"value", "2"}});
-			model_helpers::wrap_all_in_sequenced_group(model);
+			const WorkloadSeed& a = model.add("DummyWorkload", "one").set_tick_rate_hz(1.0f).set_config({{"value", "1"}});
+			const WorkloadSeed& b = model.add("DummyWorkload", "two").set_tick_rate_hz(1.0f).set_config({{"value", "2"}});
+			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&a, &b});
+			model.set_root_workload(root);
 
 			Engine engine;
 			engine.load(model);
