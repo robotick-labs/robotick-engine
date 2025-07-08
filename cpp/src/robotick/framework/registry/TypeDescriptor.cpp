@@ -21,7 +21,13 @@ namespace robotick
 		nullptr	 // .from_string
 	};
 
-	uint8_t* FieldDescriptor::get_data_ptr(
+	void* FieldDescriptor::get_data_ptr(void* container_ptr) const
+	{
+		uint8_t* data_ptr = (uint8_t*)container_ptr + this->offset;
+		return data_ptr;
+	}
+
+	void* FieldDescriptor::get_data_ptr(
 		WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& instance, const TypeDescriptor&, const size_t struct_offset) const
 	{
 		ROBOTICK_ASSERT(
@@ -32,7 +38,7 @@ namespace robotick
 		uint8_t* base_ptr = workloads_buffer.raw_ptr();
 		uint8_t* instance_ptr = base_ptr + instance.offset_in_workloads_buffer;
 		uint8_t* struct_ptr = instance_ptr + struct_offset;
-		return struct_ptr + this->offset;
+		return get_data_ptr(struct_ptr);
 	}
 
 	const TypeDescriptor* FieldDescriptor::find_type_descriptor() const

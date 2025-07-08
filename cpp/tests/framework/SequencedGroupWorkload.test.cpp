@@ -73,7 +73,8 @@ TEST_CASE("Unit/Workloads/SequencedGroupWorkload")
 		engine.load(model);
 
 		const auto* group_info = engine.find_instance_info(group_seed.unique_name);
-		REQUIRE_NOTHROW(group_info != nullptr && group_info->type->get_workload_desc()->tick_fn(
-													 group_info->get_ptr(engine), TICK_INFO_FIRST_1MS_1KHZ)); // 1ms budget, expect warning log
+		REQUIRE(group_info != nullptr);
+		REQUIRE_NOTHROW(
+			group_info->type->get_workload_desc()->tick_fn(group_info->get_ptr(engine), TICK_INFO_FIRST_1MS_1KHZ)); // 1ms budget, expect warning log
 	}
 }

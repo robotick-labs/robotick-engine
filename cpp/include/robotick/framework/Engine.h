@@ -55,8 +55,6 @@ namespace robotick
 
 		const HeapVector<DataConnectionInfo>& get_all_data_connections() const;
 
-		std::tuple<void*, size_t, TypeId> find_field_info(const char* path) const;
-
 		WorkloadsBuffer& get_workloads_buffer() const;
 
 	  private:

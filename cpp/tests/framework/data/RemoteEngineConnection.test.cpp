@@ -40,7 +40,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 				receiver.set_field_binder(
 					[&](const char* path, RemoteEngineConnection::Field& out)
 					{
-						if (path == "x")
+						if (strcmp(path, "x") == 0)
 						{
 							out.path = path;
 							out.recv_ptr = &recv_value;

@@ -32,10 +32,23 @@ namespace robotick
 
 		const TypeDescriptor* find_type_descriptor() const;
 
-		uint8_t* get_data_ptr(WorkloadsBuffer& workloads_buffer,
+		void* get_data_ptr(void* container_ptr) const;
+
+		void* get_data_ptr(WorkloadsBuffer& workloads_buffer,
 			const WorkloadInstanceInfo& instance,
 			const TypeDescriptor& struct_type,
 			const size_t struct_offset) const;
+
+		template <typename T> inline T& get_data(void* container_ptr) const
+		{
+			void* ptr = get_data_ptr(container_ptr);
+			if (!ptr)
+			{
+				ROBOTICK_FATAL_EXIT("FieldInfo::get<T>() null pointer access for field '%s'", name.c_str());
+			}
+
+			return *static_cast<T*>((void*)ptr);
+		}
 
 		template <typename T>
 		inline T& get_data(WorkloadsBuffer& workloads_buffer,
@@ -43,13 +56,13 @@ namespace robotick
 			const TypeDescriptor& struct_type,
 			const size_t struct_offset) const
 		{
-			uint8_t* ptr = get_data_ptr(workloads_buffer, instance, struct_type, struct_offset);
+			void* ptr = get_data_ptr(workloads_buffer, instance, struct_type, struct_offset);
 			if (!ptr)
 			{
 				ROBOTICK_FATAL_EXIT("FieldInfo::get<T>() null pointer access for field '%s'", name.c_str());
 			}
 
-			return *static_cast<T*>((void*)ptr);
+			return *static_cast<T*>(ptr);
 		}
 	};
 

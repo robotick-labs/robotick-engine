@@ -18,7 +18,7 @@ namespace robotick
 			Blackboard temp_blackboard;
 			temp_blackboard.initialize_fields(fields);
 
-			const size_t total_size = sizeof(Blackboard) + temp_blackboard.get_info()->total_datablock_size;
+			const size_t total_size = sizeof(Blackboard) + temp_blackboard.get_info().total_datablock_size;
 
 			// create a sufficiently large WorkloadsBuffer for actual Blackboard and its data
 			WorkloadsBuffer buffer(total_size);
@@ -30,13 +30,6 @@ namespace robotick
 			blackboard_ptr->bind(sizeof(Blackboard));
 			return {std::move(buffer), blackboard_ptr};
 		}
-
-		static const BlackboardInfo& get_info(Blackboard& blackboard) { return *blackboard.get_info(); }
-
-		static const BlackboardFieldInfo* get_field_info(const Blackboard& blackboard, const std::string& key)
-		{
-			return blackboard.get_field_info(key);
-		};
 	};
 
 } // namespace robotick

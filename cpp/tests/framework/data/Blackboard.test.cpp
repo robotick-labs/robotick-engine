@@ -25,7 +25,7 @@ namespace robotick
 
 			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
 
-			const auto& info = BlackboardTestUtils::get_info(*blackboard);
+			const auto& info = blackboard->get_info();
 
 			REQUIRE(info.struct_descriptor.fields.size() == 3);
 			REQUIRE(info.total_datablock_size >= sizeof(int) + sizeof(double) + sizeof(FixedString64));
@@ -76,7 +76,7 @@ namespace robotick
 			{
 				Blackboard temp;
 				temp.initialize_fields(blackboard_fields);
-				WorkloadsBuffer buffer(sizeof(Blackboard) + BlackboardTestUtils::get_info(temp).total_datablock_size);
+				WorkloadsBuffer buffer(sizeof(Blackboard) + temp.get_info().total_datablock_size);
 				Blackboard* blackboard_ptr = buffer.as<Blackboard>(0);
 				new (blackboard_ptr) Blackboard(); // Constructed but not bound
 				blackboard_ptr->initialize_fields(blackboard_fields);

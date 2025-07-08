@@ -79,10 +79,22 @@ namespace robotick
 
 		/// @brief Applies a set of field configuration overrides to a given struct by matching and writing string-based field values.
 		static void apply_struct_field_values(
-			void* struct_ptr, const TypeDescriptor& struct_type_desc, const ArrayView<const FieldConfigEntry>& field_config_entries);
+			void* struct_ptr, const TypeDescriptor& struct_type_desc, const ArrayView<const FieldConfigEntry>& field_config_entries)
+		{
+			(void)struct_ptr;
+			(void)struct_type_desc;
+			(void)field_config_entries;
+			ROBOTICK_FATAL_EXIT("Not implemented!");
+		}
 
-		/// @brief Given a dot-separated field path (e.g. "MyWorkload.outputs.x"), returns the raw pointer, size in bytes, and type hash.
-		static std::tuple<void*, size_t, const FieldDescriptor*> find_field_info(const Engine& engine, const std::string& path);
+		/// @brief Given a dot-separated field path (e.g. "MyWorkload.outputs.x"), returns the raw pointer, size in bytes, and field-descriptor
+		static std::tuple<void*, size_t, const FieldDescriptor*> find_field_info(const Engine& engine, const std::string& path)
+		{
+			(void)engine;
+			(void)path;
+			ROBOTICK_FATAL_EXIT("Not implemented!");
+			return std::tuple<void*, size_t, const FieldDescriptor*>();
+		}
 	};
 
 } // namespace robotick

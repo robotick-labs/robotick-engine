@@ -8,7 +8,6 @@
 #include <catch2/catch_all.hpp>
 
 using namespace robotick;
-using namespace robotick::test;
 
 #ifndef ROBOTICK_ENABLE_PYTHON
 #error "ROBOTICK_ENABLE_PYTHON must be defined (expected value: 1)"
@@ -23,19 +22,23 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 	SECTION("Python tick executes")
 	{
 		Model model;
-		const WorkloadSeed& python_workload = model.add( "PythonWorkload", "test2").set_tick_rate_hz(1.0f).set_config{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
+		const WorkloadSeed& python_workload =
+			model.add("PythonWorkload", "test2")
+				.set_tick_rate_hz(1.0f)
+				.set_config({{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
 		model.set_root_workload(python_workload);
 
 		Engine engine;
 		engine.load(model);
-		const auto& info = engine.find_instance_info(python_workload.);
+		const auto& info = *engine.find_instance_info(python_workload.unique_name);
 		auto* inst_ptr = info.get_ptr(engine);
 
 		REQUIRE(inst_ptr);
 		REQUIRE(info.type != nullptr);
-		REQUIRE(info.type->tick_fn != nullptr);
+		REQUIRE(info.type->get_workload_desc() != nullptr);
+		REQUIRE(info.type->get_workload_desc()->tick_fn != nullptr);
 
-		REQUIRE_NOTHROW(info.type->tick_fn(inst_ptr, TICK_INFO_FIRST_10MS_100HZ));
+		REQUIRE_NOTHROW(info.type->get_workload_desc()->tick_fn(inst_ptr, TICK_INFO_FIRST_10MS_100HZ));
 	}
 
 	SECTION("Output reflects Python computation")
@@ -73,9 +76,9 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 		{
 			if (field.name == "blackboard")
 			{
-				ROBOTICK_ASSERT(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+				ROBOTICK_ASSERT(field.offset != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
-				const void* field_ptr = static_cast<const uint8_t*>(output_base) + field.offset_within_struct;
+				const void* field_ptr = static_cast<const uint8_t*>(output_base) + field.offset;
 				output_blackboard = static_cast<const robotick::Blackboard*>(field_ptr);
 				break;
 			}

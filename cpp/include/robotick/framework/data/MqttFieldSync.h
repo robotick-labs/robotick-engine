@@ -3,7 +3,7 @@
 
 #pragma once
 
-#if defined(ROBOTICK_PLATFORM_DESKTOP)
+#if defined(ROBOTICK_PLATFORM_DESKTOP) && 0 // TODO - reinstate once rest of engine reactor is complete
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/Blackboard.h"
@@ -64,14 +64,15 @@ namespace robotick
 
 #else // !defined(ROBOTICK_PLATFORM_DESKTOP)
 
-
 #include <string>
 #include <unordered_map>
 
 namespace nlohmann
 {
-	struct json{}; // stub implementation for now
-}
+	struct json
+	{
+	}; // stub implementation for now
+} // namespace nlohmann
 
 namespace robotick
 {

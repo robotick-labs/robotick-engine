@@ -160,7 +160,7 @@ namespace robotick
 			if (!field)
 				ROBOTICK_FATAL_EXIT("Field '%s' not found in path: %s", field_token.c_str(), path);
 
-			const uint8_t* ptr = field->get_data_ptr(buffer, *workload, *struct_type, struct_offset);
+			const uint8_t* ptr = (uint8_t*)field->get_data_ptr(buffer, *workload, *struct_type, struct_offset);
 			TypeId type = field->type_id;
 			size_t size = field->find_type_descriptor()->size;
 

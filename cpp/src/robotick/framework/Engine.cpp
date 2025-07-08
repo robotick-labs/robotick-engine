@@ -389,7 +389,7 @@ namespace robotick
 			{
 				const char* source_field_path = remote_data_connection_seed->source_field_path.c_str();
 
-				auto [ptr, size, type] = find_field_info(source_field_path);
+				auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*this, source_field_path);
 				if (ptr == nullptr)
 				{
 					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engine_senders() - unable to resolve source field path: %s", source_field_path);
@@ -399,7 +399,7 @@ namespace robotick
 				remote_field.path = remote_data_connection_seed->dest_field_path.c_str();
 				remote_field.send_ptr = ptr;
 				remote_field.size = size;
-				remote_field.type_hash = type;
+				remote_field.type_hash = field_desc->type_id;
 
 				remote_engine_connection.register_field(remote_field);
 			}
