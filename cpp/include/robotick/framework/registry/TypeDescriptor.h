@@ -94,7 +94,7 @@ namespace robotick
 		void (*construct_fn)(void*) = nullptr;
 		void (*destruct_fn)(void*) = nullptr;
 
-		void (*set_children_fn)(void*, const HeapVector<const WorkloadInstanceInfo*>&, const HeapVector<DataConnectionInfo>&) = nullptr;
+		void (*set_children_fn)(void*, const HeapVector<const WorkloadInstanceInfo*>&, HeapVector<DataConnectionInfo>&) = nullptr;
 		void (*set_engine_fn)(void*, const Engine&) = nullptr;
 		void (*pre_load_fn)(void*) = nullptr;
 		void (*load_fn)(void*) = nullptr;

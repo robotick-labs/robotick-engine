@@ -56,6 +56,7 @@ namespace robotick
 		HeapVector<FieldDescriptor> config_fields;
 		HeapVector<FieldDescriptor> input_fields;
 		HeapVector<FieldDescriptor> output_fields;
+		List<FixedString64> string_storage;
 	};
 
 	struct __attribute__((visibility("hidden"))) PythonWorkload
@@ -82,7 +83,7 @@ namespace robotick
 		PythonWorkload(PythonWorkload&&) noexcept = default;
 		PythonWorkload& operator=(PythonWorkload&&) noexcept = default;
 
-		void parse_blackboard_schema(const py::dict& desc_dict, HeapVector<FieldDescriptor>& fields)
+		void parse_blackboard_schema(const py::dict& desc_dict, HeapVector<FieldDescriptor>& fields, List<FixedString64>& string_storage)
 		{
 			size_t field_offset = 0;
 			size_t field_index = 0;
@@ -94,10 +95,12 @@ namespace robotick
 
 				// Extract field name
 				const std::string name_str = py::str(item.first).cast<std::string>();
-				field_desc.name = name_str.c_str(); // safe: copied into FixedString
+				field_desc.name = string_storage.push_back(name_str.c_str()).c_str(); // safe: copied into FixedString
 
 				// Extract and parse type string
-				const std::string type_str_raw = py::str(item.second).cast<std::string>();
+				std::string type_str_raw = py::str(item.second).cast<std::string>();
+				std::transform(type_str_raw.begin(), type_str_raw.end(), type_str_raw.begin(), ::tolower);
+
 				const FixedString64 type_str = type_str_raw.c_str();
 
 				// Set type_id based on known strings
@@ -145,13 +148,13 @@ namespace robotick
 				ROBOTICK_FATAL_EXIT("Python class '%s' describe() failed: %s", config.class_name.c_str(), e.what());
 			}
 
-			parse_blackboard_schema(desc["config"], internal_state->config_fields);
+			parse_blackboard_schema(desc["config"], internal_state->config_fields, internal_state->string_storage);
 			config.blackboard.initialize_fields(internal_state->config_fields);
 
-			parse_blackboard_schema(desc["inputs"], internal_state->input_fields);
+			parse_blackboard_schema(desc["inputs"], internal_state->input_fields, internal_state->string_storage);
 			inputs.blackboard.initialize_fields(internal_state->input_fields);
 
-			parse_blackboard_schema(desc["outputs"], internal_state->output_fields);
+			parse_blackboard_schema(desc["outputs"], internal_state->output_fields, internal_state->string_storage);
 			outputs.blackboard.initialize_fields(internal_state->output_fields);
 		}
 

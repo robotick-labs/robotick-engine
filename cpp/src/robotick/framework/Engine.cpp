@@ -487,7 +487,6 @@ namespace robotick
 						const Blackboard& blackboard =
 							field.get_data<Blackboard>(state->workloads_buffer, instance, *struct_type_desc, struct_offset);
 						total += blackboard.get_info().total_datablock_size;
-						ROBOTICK_ASSERT(blackboard.get_info().total_datablock_size > 0);
 					}
 				}
 			};

@@ -55,9 +55,11 @@ TEST_CASE("Unit/Workloads/SequencedGroupWorkload")
 		auto* group_ptr = group_info.get_ptr(engine);
 		REQUIRE(group_ptr != nullptr);
 
-		REQUIRE_NOTHROW(group_info.type->get_workload_desc()->start_fn(group_ptr, 50.0));
-		REQUIRE_NOTHROW(group_info.type->get_workload_desc()->tick_fn(group_ptr, TICK_INFO_FIRST_10MS_100HZ));
-		REQUIRE_NOTHROW(group_info.type->get_workload_desc()->stop_fn(group_ptr));
+		const WorkloadDescriptor* workload_desc = group_info.type->get_workload_desc();
+
+		REQUIRE_NOTHROW(workload_desc->start_fn(group_ptr, 50.0));
+		REQUIRE_NOTHROW(workload_desc->tick_fn(group_ptr, TICK_INFO_FIRST_10MS_100HZ));
+		REQUIRE_NOTHROW(workload_desc->stop_fn(group_ptr));
 
 		CHECK(DummyTickingWorkload::tick_count == 2);
 	}

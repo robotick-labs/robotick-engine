@@ -22,7 +22,7 @@ namespace robotick::registry
 	template <typename T>
 	struct has_set_children<T,
 		std::void_t<decltype(std::declval<T>().set_children(
-			std::declval<const HeapVector<const WorkloadInstanceInfo*>&>(), std::declval<const HeapVector<DataConnectionInfo>&>()))>> : std::true_type
+			std::declval<const HeapVector<const WorkloadInstanceInfo*>&>(), std::declval<HeapVector<DataConnectionInfo>&>()))>> : std::true_type
 	{
 	};
 

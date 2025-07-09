@@ -36,9 +36,9 @@ namespace robotick
 				{
 					return &child;
 				}
-
-				return nullptr;
 			}
+
+			return nullptr;
 		}
 
 		void set_children(const HeapVector<const WorkloadInstanceInfo*>& child_workloads, HeapVector<DataConnectionInfo>& pending_connections)
