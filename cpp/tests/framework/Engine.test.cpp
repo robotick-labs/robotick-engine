@@ -14,7 +14,7 @@ namespace robotick::test
 
 	namespace
 	{
-		// === DummyWorkload (with config/load) ===
+		// === DummyWorkload (with config/inputs/load) ===
 
 		struct DummyConfig
 		{
@@ -24,14 +24,22 @@ namespace robotick::test
 		ROBOTICK_STRUCT_FIELD(DummyConfig, int, value)
 		ROBOTICK_REGISTER_STRUCT_END(DummyConfig)
 
+		struct DummyInputs
+		{
+			float input_float = 0.f;
+			FixedString64 input_string_64;
+		};
+		ROBOTICK_REGISTER_STRUCT_BEGIN(DummyInputs)
+		ROBOTICK_STRUCT_FIELD(DummyInputs, float, input_float)
+		ROBOTICK_STRUCT_FIELD(DummyInputs, FixedString64, input_string_64)
+		ROBOTICK_REGISTER_STRUCT_END(DummyInputs)
+
 		struct DummyWorkload
 		{
 			DummyConfig config;
-			int loaded_value = 0;
-
-			void load() { loaded_value = config.value; }
+			DummyInputs inputs;
 		};
-		ROBOTICK_REGISTER_WORKLOAD(DummyWorkload, DummyConfig)
+		ROBOTICK_REGISTER_WORKLOAD(DummyWorkload, DummyConfig, DummyInputs)
 
 		// === TickCounterWorkload ===
 
@@ -71,17 +79,22 @@ namespace robotick::test
 			engine.load(model);
 
 			const DummyWorkload* ptr = engine.find_instance<DummyWorkload>(workload_seed.unique_name);
-			REQUIRE(ptr->loaded_value == 42);
+			REQUIRE(ptr->config.value == 42);
 		}
 
-		SECTION("Rejects unknown workload type")
+		SECTION("DummyWorkload config is loaded via load()")
 		{
 			Model model;
-			const WorkloadSeed& workload_seed = model.add("UnknownType", "fail").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& workload_seed =
+				model.add("DummyWorkload", "A").set_tick_rate_hz(1.0f).set_inputs({{"input_string_64", "hello there"}, {"input_float", "1.234"}});
 			model.set_root_workload(workload_seed);
 
 			Engine engine;
-			REQUIRE_THROWS(engine.load(model));
+			engine.load(model);
+
+			const DummyWorkload* ptr = engine.find_instance<DummyWorkload>(workload_seed.unique_name);
+			REQUIRE(ptr->inputs.input_float == 1.234f);
+			REQUIRE(ptr->inputs.input_string_64 == "hello there");
 		}
 
 		SECTION("Multiple workloads supported")
@@ -95,11 +108,11 @@ namespace robotick::test
 			Engine engine;
 			engine.load(model);
 
-			const DummyWorkload* one = engine.find_instance<DummyWorkload>("1");
-			const DummyWorkload* two = engine.find_instance<DummyWorkload>("2");
+			const DummyWorkload* one = engine.find_instance<DummyWorkload>("one");
+			const DummyWorkload* two = engine.find_instance<DummyWorkload>("two");
 
-			REQUIRE(one->loaded_value == 1);
-			REQUIRE(two->loaded_value == 2);
+			REQUIRE(one->config.value == 1);
+			REQUIRE(two->config.value == 2);
 		}
 
 		SECTION("Workloads receive tick call")

@@ -73,4 +73,8 @@ namespace robotick
 	  private:
 		BlackboardInfo info;
 	};
+
+	static_assert(
+		std::is_trivially_copyable<Blackboard>::value, "Blackboard is not trivially copyable. It needs to be to be usable in workload structs");
+
 } // namespace robotick

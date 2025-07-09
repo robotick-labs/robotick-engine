@@ -10,9 +10,12 @@
 #include "robotick/framework/common/Map.h"
 #include "robotick/framework/common/Pair.h"
 #include "robotick/framework/common/StringView.h"
+#include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/registry/TypeRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <cassert>
+#include <charconv>
 #include <cstddef>
 #include <cstring>
 #include <stdexcept>
@@ -81,10 +84,34 @@ namespace robotick
 		static void apply_struct_field_values(
 			void* struct_ptr, const TypeDescriptor& struct_type_desc, const ArrayView<const FieldConfigEntry>& field_config_entries)
 		{
-			(void)struct_ptr;
-			(void)struct_type_desc;
-			(void)field_config_entries;
-			ROBOTICK_FATAL_EXIT("Not implemented!");
+			const StructDescriptor* struct_desc = struct_type_desc.get_struct_desc();
+			if (!struct_desc)
+			{
+				ROBOTICK_FATAL_EXIT("Struct with no struct desc");
+			}
+
+			for (const FieldConfigEntry& field_config_entry : field_config_entries)
+			{
+				const FieldDescriptor* found_field = struct_desc->find_field(field_config_entry.first.c_str());
+				if (!found_field)
+					continue;
+
+				ROBOTICK_ASSERT_MSG(found_field->offset != OFFSET_UNBOUND, "Field offset should have been correctly set by now");
+
+				void* field_ptr = static_cast<uint8_t*>(struct_ptr) + found_field->offset;
+				const FixedString64& value = field_config_entry.second;
+
+				const TypeDescriptor* field_type_desc = found_field->find_type_descriptor();
+				if (!field_type_desc)
+				{
+					ROBOTICK_FATAL_EXIT("Field offset should have been correctly set by now");
+				}
+
+				if (!field_type_desc->from_string(value.c_str(), field_ptr))
+				{
+					ROBOTICK_WARNING("Unable to parse value-string '%s' for field: %s", value.c_str(), found_field->name.c_str());
+				}
+			}
 		}
 
 		/// @brief Given a dot-separated field path (e.g. "MyWorkload.outputs.x"), returns the raw pointer, size in bytes, and field-descriptor

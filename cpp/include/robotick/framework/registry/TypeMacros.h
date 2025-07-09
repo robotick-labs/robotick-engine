@@ -17,6 +17,8 @@ namespace robotick
 
 /// @brief Macro to register Primitives:
 #define ROBOTICK_REGISTER_PRIMITIVE(TypeName, ToStringFn, FromStringFn)                                                                              \
+	static_assert(std::is_trivially_copyable<TypeName>::value,                                                                                       \
+		#TypeName " is not trivially copyable. Only trivially copyable items can be registered as primitive types.");                                \
 	static constexpr ::robotick::TypeDescriptor s_type_desc_##TypeName = {                                                                           \
 		#TypeName, GET_TYPE_ID(TypeName), sizeof(TypeName), alignof(TypeName), ::robotick::TypeCategory::Primitive, {}, ToStringFn, FromStringFn};   \
 	static const ::robotick::AutoRegisterType s_auto_register_##TypeName(s_type_desc_##TypeName);
@@ -29,6 +31,8 @@ namespace robotick
 #define ROBOTICK_REGISTER_STRUCT_END(StructType)                                                                                                     \
 	}                                                                                                                                                \
 	;                                                                                                                                                \
+	static_assert(std::is_trivially_copyable<StructType>::value,                                                                                     \
+		#StructType " is not trivially copyable. Only trivially copyable structs can be registered as field types.");                                \
 	static constexpr ::robotick::StructDescriptor s_struct_desc_##StructType = {::robotick::ArrayView<::robotick::FieldDescriptor>{                  \
 		s_fields_##StructType, sizeof(s_fields_##StructType) / sizeof(::robotick::FieldDescriptor)}};                                                \
 	static constexpr ::robotick::TypeDescriptor s_type_desc_##StructType = {#StructType,                                                             \

@@ -43,6 +43,12 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 	static const float s_tick_100hz(100.f);
 	static const float s_tick_200hz(200.f);
 
+	SECTION("Rejects unknown workload type")
+	{
+		Model model;
+		REQUIRE_THROWS(model.add("UnknownType", "fail").set_tick_rate_hz(s_tick_100hz));
+	}
+
 	SECTION("Throws if child tick rate faster than parent")
 	{
 		Model model;

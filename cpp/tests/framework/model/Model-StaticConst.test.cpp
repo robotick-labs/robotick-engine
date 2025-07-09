@@ -91,6 +91,30 @@ namespace
 
 TEST_CASE("Unit/Framework/Model-StaticConst")
 {
+	SECTION("Rejects unknown workload type")
+	{
+		// Declare workload with unknown type
+		static const WorkloadSeed workload_unknown{
+			TypeId("UnknownType"), // deliberately unknown type
+			StringView("fail"),	   // workload name
+			s_tick_100hz,		   // tick rate
+			{},					   // no children
+			{},					   // no config
+			{}					   // no inputs
+		};
+
+		// Updated all workload pointers to include it
+		static const WorkloadSeed* all[] = {&workload_unknown};
+
+		Model model;
+		REQUIRE_THROWS(model.use_workload_seeds(all));
+	}
+
+	SECTION("Other validation - should have parity with Model-Dynamic tests")
+	{
+		FAIL("!");
+	}
+
 	SECTION("Seeds are preserved for engine use")
 	{
 		Model model;

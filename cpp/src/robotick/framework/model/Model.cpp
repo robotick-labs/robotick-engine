@@ -208,6 +208,13 @@ namespace robotick
 #endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 		workload_seeds = ArrayView<const WorkloadSeed*>(all_workloads, num_workloads);
+
+		// validate workloads
+		for (const WorkloadSeed* workload_seed : workload_seeds)
+		{
+			if (!TypeRegistry::get().find_by_id(workload_seed->type_id))
+				ROBOTICK_FATAL_EXIT("Unable to find type '%s' for workload", workload_seed->type_id.get_debug_name());
+		}
 	}
 
 	void Model::use_data_connection_seeds(const DataConnectionSeed** in_connections, size_t num_connections)
