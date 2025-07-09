@@ -190,6 +190,19 @@ namespace robotick
 		}
 	} // namespace
 
+	static bool has_connection_to_field(const HeapVector<DataConnectionInfo>& query_connections, const void* query_dest_ptr)
+	{
+		for (const DataConnectionInfo& query_connection : query_connections)
+		{
+			if (query_connection.dest_ptr == query_dest_ptr)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	void DataConnectionUtils::create(HeapVector<DataConnectionInfo>& out_connections,
 		WorkloadsBuffer& workloads_buffer,
 		const ArrayView<const DataConnectionSeed*>& seeds,
@@ -213,6 +226,9 @@ namespace robotick
 
 			if (src.size != dst.size)
 				ROBOTICK_FATAL_EXIT("Size mismatch: %s vs %s", seed.source_field_path.c_str(), seed.dest_field_path.c_str());
+
+			if (has_connection_to_field(out_connections, dst.ptr))
+				ROBOTICK_FATAL_EXIT("Duplicate connection to field: %s", seed.dest_field_path.c_str());
 
 			out_connections[connection_index] =
 				DataConnectionInfo{&seed, src.ptr, const_cast<void*>(dst.ptr), src.workload, dst.workload, src.size, src.type};

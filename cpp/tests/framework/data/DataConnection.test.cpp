@@ -270,7 +270,7 @@ namespace robotick::test
 
 			Engine engine;
 			engine.load(model);
-			const auto infos_map = engine.get_all_instance_info_map();
+			const Map<const char*, WorkloadInstanceInfo*>& infos_map = engine.get_all_instance_info_map();
 
 			SECTION("Invalid workload name")
 			{
@@ -300,7 +300,8 @@ namespace robotick::test
 				ArrayView<const DataConnectionSeed*> seeds(connections);
 
 				HeapVector<DataConnectionInfo> resolved;
-				ROBOTICK_REQUIRE_ERROR_MSG(DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, infos_map), ("field"));
+				ROBOTICK_REQUIRE_ERROR_MSG(
+					DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, infos_map), ("Field 'missing' not found"));
 			}
 
 			SECTION("Mismatched types")
