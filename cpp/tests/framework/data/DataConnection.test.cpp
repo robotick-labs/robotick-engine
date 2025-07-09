@@ -59,6 +59,8 @@ namespace robotick::test
 				FieldDescriptor& field_desc_1 = state->blackboard_fields[1];
 				field_desc_1.name = "y";
 				field_desc_1.type_id = GET_TYPE_ID(double);
+				//
+				outputs.out_blackboard.initialize_fields(state->blackboard_fields);
 			}
 		};
 		ROBOTICK_REGISTER_WORKLOAD(DummyA, void, void, DummyAOutput)
@@ -79,6 +81,8 @@ namespace robotick::test
 				FieldDescriptor& field_desc_1 = state->blackboard_fields[1];
 				field_desc_1.name = "y";
 				field_desc_1.type_id = GET_TYPE_ID(double);
+				//
+				inputs.in_blackboard.initialize_fields(state->blackboard_fields);
 			}
 		};
 		ROBOTICK_REGISTER_WORKLOAD(DummyB, void, DummyBInput)
