@@ -80,6 +80,7 @@ namespace robotick
 				Blackboard* blackboard_ptr = buffer.as<Blackboard>(0);
 				new (blackboard_ptr) Blackboard(); // Constructed but not bound
 				blackboard_ptr->initialize_fields(blackboard_fields);
+				// intentionally don't call blackboard_ptr->bind();
 
 				ROBOTICK_REQUIRE_ERROR_MSG(blackboard_ptr->get<int>("alpha"), ("Blackboard"));
 			}

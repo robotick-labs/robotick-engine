@@ -57,6 +57,7 @@ namespace robotick
 				return *static_cast<T*>(found_value);
 			}
 
+			ROBOTICK_FATAL_EXIT("Blackboard::get called with unknown field-name: '%s'", field_name);
 			return T();
 		}
 
@@ -69,6 +70,9 @@ namespace robotick
 
 		const StructDescriptor& get_struct_descriptor() const { return info.struct_descriptor; };
 		const BlackboardInfo& get_info() const { return info; };
+
+	  protected:
+		void compute_total_datablock_size();
 
 	  private:
 		BlackboardInfo info;

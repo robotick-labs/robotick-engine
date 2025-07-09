@@ -213,7 +213,7 @@ namespace robotick
 		for (const WorkloadSeed* workload_seed : workload_seeds)
 		{
 			if (!TypeRegistry::get().find_by_id(workload_seed->type_id))
-				ROBOTICK_FATAL_EXIT("Unable to find type '%s' for workload", workload_seed->type_id.get_debug_name());
+				ROBOTICK_FATAL_EXIT("Unable to find workload type '%s'", workload_seed->type_id.get_debug_name());
 		}
 	}
 
