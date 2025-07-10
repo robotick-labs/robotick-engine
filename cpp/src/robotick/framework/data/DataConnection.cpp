@@ -115,62 +115,60 @@ namespace robotick
 			size_t size;
 		};
 
-		ResolvedField resolve_field_ptr(const char* path, const Map<const char*, WorkloadInstanceInfo*>& instances, WorkloadsBuffer& buffer)
+		inline FixedString64 extract_next_token(const char*& path_cursor)
+		{
+			FixedString64 token;
+			size_t i = 0;
+			while (*path_cursor && *path_cursor != '.')
+			{
+				if (i >= token.capacity() - 1)
+				{
+					ROBOTICK_WARNING("Token too long in path (max %zu): %s", token.capacity() - 1, path_cursor);
+					return {};
+				}
+				token.data[i++] = *path_cursor++;
+			}
+			token.data[i] = '\0';
+			if (*path_cursor == '.')
+				++path_cursor; // skip dot
+			return token;
+		}
+
+		ResolvedField resolve_field_ptr(const char* path, const Map<const char*, WorkloadInstanceInfo*>& instances, WorkloadsBuffer& workloads_buffer)
 		{
 			const char* path_cursor = path;
 
-			const auto next_token = [&]() -> FixedString64
-			{
-				FixedString64 current_token;
-
-				size_t index = 0;
-				while (*path_cursor && *path_cursor != '.')
-				{
-					if (index >= current_token.capacity() - 1)
-						ROBOTICK_FATAL_EXIT("Token too long in path: %s", path);
-
-					current_token.data[index++] = *path_cursor;
-					path_cursor++;
-				}
-				current_token.data[index] = '\0'; // Null-terminate
-
-				if (*path_cursor == '.')
-					++path_cursor; // Skip the dot
-
-				return current_token;
-			};
-
 			// Step 1: workload
-			const FixedString64 workload_token = next_token();
+			const FixedString64 workload_token = extract_next_token(path_cursor);
 			WorkloadInstanceInfo* const* found_workload_ptr = instances.find(workload_token.c_str());
 			const WorkloadInstanceInfo* workload = found_workload_ptr ? *found_workload_ptr : nullptr;
 			if (!workload)
 				ROBOTICK_FATAL_EXIT("Unknown workload: %s", workload_token.c_str());
 
 			// Step 2: section (config, inputs, outputs)
-			const FixedString64 section_token = next_token();
+			const FixedString64 section_token = extract_next_token(path_cursor);
 			size_t struct_offset = OFFSET_UNBOUND;
 			const TypeDescriptor* struct_type = DataConnectionHelpers::get_struct_entry(*workload, section_token.c_str(), struct_offset);
 			if (!struct_type)
 				ROBOTICK_FATAL_EXIT("Unknown section '%s' in path: %s", section_token.c_str(), path);
 
 			// Step 3: field
-			const FixedString64 field_token = next_token();
+			const FixedString64 field_token = extract_next_token(path_cursor);
 			const FieldDescriptor* field = DataConnectionHelpers::find_field(struct_type, field_token.c_str());
 			if (!field)
 				ROBOTICK_FATAL_EXIT("Field '%s' not found in path: %s", field_token.c_str(), path);
 
-			const uint8_t* ptr = (uint8_t*)field->get_data_ptr(buffer, *workload, *struct_type, struct_offset);
+			const uint8_t* ptr = (uint8_t*)field->get_data_ptr(workloads_buffer, *workload, *struct_type, struct_offset);
 			TypeId type = field->type_id;
 			size_t size = field->find_type_descriptor()->size;
 
 			// Step 4: optional subfield (only if Blackboard)
 			if (*path_cursor != '\0') // There’s still more of the path
 			{
-				const FixedString64 subfield_token = next_token();
+				const FixedString64 subfield_token = extract_next_token(path_cursor);
 
 				const FieldDescriptor* blackboard_field = DataConnectionHelpers::resolve_blackboard_field_ptr(
-					buffer, *workload, *struct_type, struct_offset, *field, subfield_token.c_str());
+					workloads_buffer, *workload, *struct_type, struct_offset, *field, subfield_token.c_str());
 
 				if (!blackboard_field)
 					ROBOTICK_FATAL_EXIT("Blackboard subfield '%s' not found in path: %s", subfield_token.c_str(), path);
@@ -184,7 +182,7 @@ namespace robotick
 			if (*path_cursor != '\0')
 				ROBOTICK_FATAL_EXIT("Too many path components in: %s", path);
 
-			ROBOTICK_ASSERT(buffer.contains_object(ptr, size) && "Resolved field must be within buffer");
+			ROBOTICK_ASSERT(workloads_buffer.contains_object(ptr, size) && "Resolved field must be within workloads_buffer");
 
 			return ResolvedField{workload, ptr, type, size};
 		}
@@ -233,6 +231,65 @@ namespace robotick
 
 			connection_index++;
 		}
+	}
+
+	std::tuple<void*, size_t, const FieldDescriptor*> DataConnectionUtils::find_field_info(const Engine& engine, const std::string& path)
+	{
+		const WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
+		const Map<const char*, WorkloadInstanceInfo*>& instances = engine.get_all_instance_info_map();
+		const char* path_cursor = path.c_str();
+
+		// workload.section.field[.blackboard_field]
+		const FixedString64 workload_token = extract_next_token(path_cursor);
+		auto* workload_info_ptr = instances.find(workload_token.c_str());
+		if (!workload_info_ptr)
+		{
+			ROBOTICK_WARNING("Unknown workload in field path: %s", workload_token.c_str());
+			return {nullptr, 0, nullptr};
+		}
+		const WorkloadInstanceInfo* workload_info = *workload_info_ptr;
+
+		const FixedString64 section_token = extract_next_token(path_cursor);
+		size_t struct_offset = OFFSET_UNBOUND;
+		const TypeDescriptor* struct_type = DataConnectionHelpers::get_struct_entry(*workload_info, section_token.c_str(), struct_offset);
+		if (!struct_type)
+		{
+			ROBOTICK_WARNING("Invalid section '%s' in field path: %s", section_token.c_str(), path.c_str());
+			return {nullptr, 0, nullptr};
+		}
+
+		const FixedString64 field_token = extract_next_token(path_cursor);
+		const FieldDescriptor* field = DataConnectionHelpers::find_field(struct_type, field_token.c_str());
+		if (!field)
+		{
+			ROBOTICK_WARNING("Field '%s' not found in path: %s", field_token.c_str(), path.c_str());
+			return {nullptr, 0, nullptr};
+		}
+
+		void* base_ptr = field->get_data_ptr(const_cast<WorkloadsBuffer&>(workloads_buffer), *workload_info, *struct_type, struct_offset);
+		size_t size = field->find_type_descriptor() ? field->find_type_descriptor()->size : 0;
+
+		// optional blackboard.subfield
+		if (*path_cursor != '\0')
+		{
+			const FixedString64 subfield_token = extract_next_token(path_cursor);
+
+			const FieldDescriptor* subfield = DataConnectionHelpers::resolve_blackboard_field_ptr(
+				const_cast<WorkloadsBuffer&>(workloads_buffer), *workload_info, *struct_type, struct_offset, *field, subfield_token.c_str());
+
+			if (!subfield)
+			{
+				ROBOTICK_WARNING("Blackboard subfield '%s' not found in path: %s", subfield_token.c_str(), path.c_str());
+				return {nullptr, 0, nullptr};
+			}
+
+			const Blackboard* blackboard = static_cast<const Blackboard*>((const void*)base_ptr);
+			base_ptr = (uint8_t*)base_ptr + blackboard->get_datablock_offset() + subfield->offset_within_container;
+			size = subfield->find_type_descriptor() ? subfield->find_type_descriptor()->size : 0;
+			field = subfield;
+		}
+
+		return {base_ptr, size, field};
 	}
 
 } // namespace robotick

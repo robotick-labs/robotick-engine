@@ -3,7 +3,7 @@
 
 #pragma once
 
-#if defined(ROBOTICK_PLATFORM_DESKTOP) && 0 // TODO - reinstate once rest of engine reactor is complete
+#if defined(ROBOTICK_PLATFORM_DESKTOP)
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/Blackboard.h"

@@ -1,8 +1,6 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#if 0 // TODO - reinstate once rest of engine reactor is complete
-
 #include "robotick/framework/data/MqttFieldSync.h"
 #include "../utils/BlackboardTestUtils.h"
 #include "robotick/framework/Engine.h"
@@ -26,17 +24,6 @@ namespace robotick::test
 			int value = 7;
 			FixedString64 text = "abc";
 			Blackboard blackboard;
-
-			TestInputs()
-				: blackboard({BlackboardFieldInfo("flag", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("ratio", TypeId(GET_TYPE_ID(double)))})
-			{
-			}
-
-			void load()
-			{
-				blackboard.set("flag", 1);
-				blackboard.set("ratio", 0.5);
-			}
 		};
 		ROBOTICK_REGISTER_STRUCT_BEGIN(TestInputs)
 		ROBOTICK_STRUCT_FIELD(TestInputs, int, value)
@@ -44,9 +31,29 @@ namespace robotick::test
 		ROBOTICK_STRUCT_FIELD(TestInputs, Blackboard, blackboard)
 		ROBOTICK_REGISTER_STRUCT_END(TestInputs)
 
+		struct TestState
+		{
+			HeapVector<FieldDescriptor> fields;
+		};
+
 		struct TestWorkload
 		{
 			TestInputs inputs;
+			State<TestState> state;
+
+			void pre_load()
+			{
+				state->fields.initialize(2);
+				state->fields[0] = FieldDescriptor{"flag", GET_TYPE_ID(int)};
+				state->fields[1] = FieldDescriptor{"ratio", GET_TYPE_ID(double)};
+				inputs.blackboard.initialize_fields(state->fields);
+			}
+
+			void load()
+			{
+				inputs.blackboard.set("flag", 1);
+				inputs.blackboard.set("ratio", 0.5);
+			}
 		};
 		ROBOTICK_REGISTER_WORKLOAD(TestWorkload, void, TestInputs, void)
 
@@ -123,7 +130,6 @@ namespace robotick::test
 
 			const auto& info = *engine.find_instance_info(test_workload_seed.unique_name);
 			auto* test_workload_ptr = static_cast<TestWorkload*>((void*)info.get_ptr(engine));
-			test_workload_ptr->inputs.load();
 
 			DummyMqttClient dummy_client;
 			std::string root_topic_name = "robotick";
@@ -145,5 +151,3 @@ namespace robotick::test
 	}
 
 } // namespace robotick::test
-
-#endif // #if 0
