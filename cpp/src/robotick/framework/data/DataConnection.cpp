@@ -208,8 +208,6 @@ namespace robotick
 		const ArrayView<const DataConnectionSeed*>& seeds,
 		const Map<const char*, WorkloadInstanceInfo*>& instances)
 	{
-		// TODO - ensure we're not duplicating connections to any inputs
-
 		size_t connection_index = 0;
 		out_connections.initialize(seeds.size());
 
@@ -232,6 +230,7 @@ namespace robotick
 
 			out_connections[connection_index] =
 				DataConnectionInfo{&seed, src.ptr, const_cast<void*>(dst.ptr), src.workload, dst.workload, src.size, src.type};
+
 			connection_index++;
 		}
 	}
