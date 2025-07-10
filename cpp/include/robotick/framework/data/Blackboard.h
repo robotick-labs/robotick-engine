@@ -39,6 +39,8 @@ namespace robotick
 		const FieldDescriptor* find_field(const char* field_name) const;
 		void* find_field_data(const char* field_name, const FieldDescriptor*& found_field) const;
 
+		void* get_field_data(const FieldDescriptor& field_desc) const;
+
 		bool has(const char* field_name) const;
 		bool set(const char* field_name, void* value, const size_t size);
 		void* get(const char* field_name, const size_t size) const;

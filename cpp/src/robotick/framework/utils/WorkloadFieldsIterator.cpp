@@ -51,17 +51,14 @@ namespace robotick
 					const StructDescriptor& blackboard_struct_desc = blackboard.get_struct_descriptor();
 					for (const FieldDescriptor& blackboard_field : blackboard_struct_desc.fields)
 					{
-						(void)blackboard_field;
-						ROBOTICK_FATAL_EXIT("!TODO - implement the below");
-						WorkloadFieldView view; /*{
-							&instance, struct_desc, &field_desc, &blackboard_field, nullptr};*/ // blackboard_field.get_data_ptr(blackboard)};
+						void* blackboard_field_data_ptr = blackboard.get_field_data(blackboard_field);
+						WorkloadFieldView view{&instance, struct_type, &field_desc, &blackboard_field, blackboard_field_data_ptr};
 						callback(view);
 					}
 				}
 				else
 				{
-					ROBOTICK_FATAL_EXIT("!TODO - implement the below");
-					WorkloadFieldView view; /*{&instance, struct_desc, &field_desc, nullptr, base_ptr};*/
+					WorkloadFieldView view{&instance, struct_type, &field_desc, nullptr, base_ptr};
 					callback(view);
 				}
 			}

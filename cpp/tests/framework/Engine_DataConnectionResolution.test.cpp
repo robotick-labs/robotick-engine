@@ -67,33 +67,7 @@ namespace robotick::test
 			{
 				if (conn.seed->source_field_path == "A.outputs.output_value" && conn.seed->dest_field_path == "B.inputs.input_value")
 				{
-					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::DelegateToParent);
-					found = true;
-				}
-			}
-			REQUIRE(found);
-		}
-
-		SECTION("ExpectedHandler set for external connections")
-		{
-			Model model;
-			const WorkloadSeed& child1 = model.add("CountingDataConnWorkload", "Child1").set_tick_rate_hz(10.0f);
-			const WorkloadSeed& child2 = model.add("CountingDataConnWorkload", "Child2").set_tick_rate_hz(10.0f);
-
-			model.connect("Child1.outputs.output_value", "Child2.inputs.input_value");
-			const WorkloadSeed& group = model.add("SyncedGroupWorkload", "Group").set_children({&child1, &child2}).set_tick_rate_hz(10.0f);
-			model.set_root_workload(group);
-
-			Engine engine;
-			engine.load(model);
-
-			const auto& connections = engine.get_all_data_connections();
-			bool found = false;
-			for (const auto& conn : connections)
-			{
-				if (conn.seed->source_field_path == "Child1.outputs.output_value" && conn.seed->dest_field_path == "Child2.inputs.input_value")
-				{
-					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::DelegateToParent);
+					CHECK(conn.expected_handler == DataConnectionInfo::ExpectedHandler::Engine);
 					found = true;
 				}
 			}

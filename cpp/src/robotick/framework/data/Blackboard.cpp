@@ -57,6 +57,17 @@ namespace robotick
 		}
 	}
 
+	void* Blackboard::get_field_data(const FieldDescriptor& field_desc) const
+	{
+		const size_t datablock_offset = get_datablock_offset();
+		ROBOTICK_ASSERT_MSG(datablock_offset != OFFSET_UNBOUND, "Blackboard data-block has not been bound");
+
+		uint8_t* datablock_ptr = (uint8_t*)this + datablock_offset;
+
+		void* field_data = field_desc.get_data_ptr(datablock_ptr);
+		return field_data;
+	}
+
 	const FieldDescriptor* Blackboard::find_field(const char* field_name) const
 	{
 		for (const auto& field : info.struct_descriptor.fields)
@@ -75,12 +86,7 @@ namespace robotick
 		found_field = find_field(field_name);
 		if (found_field)
 		{
-			const size_t datablock_offset = get_datablock_offset();
-			ROBOTICK_ASSERT_MSG(datablock_offset != OFFSET_UNBOUND, "Blackboard data-block has not been bound");
-
-			uint8_t* datablock_ptr = (uint8_t*)this + datablock_offset;
-
-			void* field_data = found_field->get_data_ptr(datablock_ptr);
+			void* field_data = get_field_data(*found_field);
 			return field_data;
 		}
 

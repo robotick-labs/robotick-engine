@@ -78,7 +78,7 @@ namespace robotick
 					{
 						continue;
 					}
-					else if (conn.dest_workload == info.workload_ptr)
+					else if (conn.dest_workload == info.workload_info)
 					{
 						conn.expected_handler = DataConnectionInfo::ExpectedHandler::DelegateToParent;
 					}
