@@ -28,7 +28,7 @@ namespace robotick
 	{
 		StringView name;
 		TypeId type_id;
-		size_t offset = OFFSET_UNBOUND; // from start of host-struct (TODO - make this explicit in naming - ditto for parents)
+		size_t offset_within_struct = OFFSET_UNBOUND; // from start of host-struct (TODO - make this explicit in naming - ditto for parents)
 
 		const TypeDescriptor* find_type_descriptor() const;
 

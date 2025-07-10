@@ -127,7 +127,7 @@ namespace robotick
 				const size_t align = field_type->alignment;
 				field_offset = (field_offset + align - 1) & ~(align - 1);
 
-				field_desc.offset = field_offset;
+				field_desc.offset_within_struct = field_offset;
 				field_offset += field_type->size;
 				field_index++;
 			}

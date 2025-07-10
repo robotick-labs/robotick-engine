@@ -482,7 +482,7 @@ namespace robotick
 				{
 					if (field.type_id == GET_TYPE_ID(Blackboard))
 					{
-						ROBOTICK_ASSERT(field.offset != OFFSET_UNBOUND);
+						ROBOTICK_ASSERT(field.offset_within_struct != OFFSET_UNBOUND);
 
 						const Blackboard& blackboard =
 							field.get_data<Blackboard>(state->workloads_buffer, instance, *struct_type_desc, struct_offset);
