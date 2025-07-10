@@ -6,6 +6,7 @@
 #include "robotick/api_base.h"
 
 #include "robotick/framework/common/ArrayView.h"
+#include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/common/StringView.h"
 #include "robotick/framework/utils/Constants.h"
 #include "robotick/framework/utils/TypeId.h"
