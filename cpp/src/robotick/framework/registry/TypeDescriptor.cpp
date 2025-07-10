@@ -23,7 +23,7 @@ namespace robotick
 
 	void* FieldDescriptor::get_data_ptr(void* container_ptr) const
 	{
-		uint8_t* data_ptr = (uint8_t*)container_ptr + this->offset_within_struct;
+		uint8_t* data_ptr = (uint8_t*)container_ptr + this->offset_within_container;
 		return data_ptr;
 	}
 
@@ -33,7 +33,7 @@ namespace robotick
 		ROBOTICK_ASSERT(
 			instance.offset_in_workloads_buffer != OFFSET_UNBOUND && "Workload object instance offset should have been correctly set by now");
 		ROBOTICK_ASSERT(struct_offset != OFFSET_UNBOUND && "struct offset should have been correctly set by now");
-		ROBOTICK_ASSERT(this->offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+		ROBOTICK_ASSERT(this->offset_within_container != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
 		uint8_t* base_ptr = workloads_buffer.raw_ptr();
 		uint8_t* instance_ptr = base_ptr + instance.offset_in_workloads_buffer;

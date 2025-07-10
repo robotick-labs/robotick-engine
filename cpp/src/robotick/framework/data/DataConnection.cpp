@@ -176,7 +176,7 @@ namespace robotick
 					ROBOTICK_FATAL_EXIT("Blackboard subfield '%s' not found in path: %s", subfield_token.c_str(), path);
 
 				const Blackboard* blackboard = static_cast<const Blackboard*>((const void*)ptr);
-				ptr = ptr + blackboard->get_datablock_offset() + blackboard_field->offset_within_struct;
+				ptr = ptr + blackboard->get_datablock_offset() + blackboard_field->offset_within_container;
 				type = blackboard_field->type_id;
 				size = blackboard_field->find_type_descriptor()->size;
 			}

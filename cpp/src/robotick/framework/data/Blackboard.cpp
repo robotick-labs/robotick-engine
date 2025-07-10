@@ -50,7 +50,7 @@ namespace robotick
 			info.total_datablock_size = align_up(info.total_datablock_size, align);
 
 			// Assign offset to the field for future access
-			field.offset_within_struct = info.total_datablock_size;
+			field.offset_within_container = info.total_datablock_size;
 
 			// Increment total size
 			info.total_datablock_size += size;

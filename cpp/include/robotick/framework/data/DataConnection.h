@@ -96,9 +96,9 @@ namespace robotick
 				if (!found_field)
 					continue;
 
-				ROBOTICK_ASSERT_MSG(found_field->offset_within_struct != OFFSET_UNBOUND, "Field offset should have been correctly set by now");
+				ROBOTICK_ASSERT_MSG(found_field->offset_within_container != OFFSET_UNBOUND, "Field offset should have been correctly set by now");
 
-				void* field_ptr = static_cast<uint8_t*>(struct_ptr) + found_field->offset_within_struct;
+				void* field_ptr = static_cast<uint8_t*>(struct_ptr) + found_field->offset_within_container;
 				const FixedString64& value = field_config_entry.second;
 
 				const TypeDescriptor* field_type_desc = found_field->find_type_descriptor();
