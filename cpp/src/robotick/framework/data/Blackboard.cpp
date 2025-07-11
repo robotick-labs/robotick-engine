@@ -70,15 +70,7 @@ namespace robotick
 
 	const FieldDescriptor* Blackboard::find_field(const char* field_name) const
 	{
-		for (const auto& field : info.struct_descriptor.fields)
-		{
-			if (field.name == field_name)
-			{
-				return &field;
-			}
-		}
-
-		return nullptr;
+		return info.find_field(field_name);
 	}
 
 	void* Blackboard::find_field_data(const char* field_name, const FieldDescriptor*& found_field) const

@@ -63,12 +63,6 @@ namespace robotick
 		}
 	};
 
-	class FieldPathParseError : public std::runtime_error
-	{
-	  public:
-		explicit FieldPathParseError(const std::string& msg);
-	};
-
 	using FieldConfigEntry = Pair<FixedString64, FixedString64>;
 
 	class DataConnectionUtils

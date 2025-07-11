@@ -36,6 +36,62 @@ namespace robotick
 
 	ROBOTICK_REGISTER_PRIMITIVE(int, int_to_string, int_from_string);
 
+	// register uint8_t: =====
+
+	static bool uint8_t_to_string(const void* data, char* out, size_t size)
+	{
+		return print_value(out, size, "%hhu", *reinterpret_cast<const uint8_t*>(data));
+	}
+
+	static bool uint8_t_from_string(const char* str, void* out)
+	{
+		return scan_value(str, "%hhu", reinterpret_cast<uint8_t*>(out));
+	}
+
+	ROBOTICK_REGISTER_PRIMITIVE(uint8_t, uint8_t_to_string, uint8_t_from_string);
+
+	// register uint16_t: =====
+
+	static bool uint16_t_to_string(const void* data, char* out, size_t size)
+	{
+		return print_value(out, size, "%hu", *reinterpret_cast<const uint16_t*>(data));
+	}
+
+	static bool uint16_t_from_string(const char* str, void* out)
+	{
+		return scan_value(str, "%hu", reinterpret_cast<uint16_t*>(out));
+	}
+
+	ROBOTICK_REGISTER_PRIMITIVE(uint16_t, uint16_t_to_string, uint16_t_from_string);
+
+	// register uint32_t: =====
+
+	static bool uint32_t_to_string(const void* data, char* out, size_t size)
+	{
+		return print_value(out, size, "%u", *reinterpret_cast<const uint32_t*>(data));
+	}
+
+	static bool uint32_t_from_string(const char* str, void* out)
+	{
+		return scan_value(str, "%u", reinterpret_cast<uint32_t*>(out));
+	}
+
+	ROBOTICK_REGISTER_PRIMITIVE(uint32_t, uint32_t_to_string, uint32_t_from_string);
+
+	// register uint64_t: =====
+
+	static bool uint64_t_to_string(const void* data, char* out, size_t size)
+	{
+		return print_value(out, size, "%llu", *reinterpret_cast<const uint64_t*>(data));
+	}
+
+	static bool uint64_t_from_string(const char* str, void* out)
+	{
+		return scan_value(str, "%llu", reinterpret_cast<uint64_t*>(out));
+	}
+
+	ROBOTICK_REGISTER_PRIMITIVE(uint64_t, uint64_t_to_string, uint64_t_from_string);
+
 	// register float: =====
 
 	static bool float_to_string(const void* data, char* out, size_t size)

@@ -12,18 +12,6 @@
 
 namespace robotick
 {
-	struct ParsedFieldPath
-	{
-		FixedString64 workload_name;
-		FixedString64 section_name; // workload_name/section_name/field_path[0](/field_path[1])
-		std::vector<FixedString64> field_path;
-	};
-
-	FieldPathParseError::FieldPathParseError(const std::string& msg)
-		: std::runtime_error(msg)
-	{
-	}
-
 	struct DataConnectionHelpers
 	{
 		static const TypeDescriptor* get_struct_entry(const WorkloadInstanceInfo& instance, const std::string& section, size_t& out_offset)
