@@ -2,8 +2,6 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#if 0
-
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/MqttFieldSync.h"
@@ -97,5 +95,3 @@ namespace robotick
 	ROBOTICK_REGISTER_WORKLOAD(MqttClientWorkload, MqttClientConfig)
 
 } // namespace robotick
-
-#endif // #if 0

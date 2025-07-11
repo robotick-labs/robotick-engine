@@ -120,36 +120,36 @@ namespace robotick
 
 					if (view.subfield_info)
 					{
-						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.subfield_info->find_type_descriptor()->size));
+						const TypeDescriptor* field_type_desc = view.subfield_info->find_type_descriptor();
+						ROBOTICK_ASSERT(field_type_desc);
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, field_type_desc->size));
 
-						const TypeId& type = view.subfield_info->type_id;
-						if (type == GET_TYPE_ID(int))
-							entry << *static_cast<const int*>(view.field_ptr);
-						else if (type == GET_TYPE_ID(double))
-							entry << *static_cast<const double*>(view.field_ptr);
-						else if (type == GET_TYPE_ID(FixedString64))
-							entry << "\"" << static_cast<const FixedString64*>(view.field_ptr)->c_str() << "\"";
-						else if (type == GET_TYPE_ID(FixedString128))
-							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
+						FixedString256 field_as_string;
+						if (field_type_desc->to_string(view.field_ptr, field_as_string.data, field_as_string.capacity()))
+						{
+							entry << field_as_string.c_str();
+						}
 						else
+						{
 							entry << "<?>";
+						}
 					}
 					else
 					{
-						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.field_info->find_type_descriptor()->size));
+						const TypeDescriptor* field_type_desc = view.field_info->find_type_descriptor();
+						ROBOTICK_ASSERT(field_type_desc);
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, field_type_desc->size));
 
 						// fallback for top-level (non-blackboard) fields
-						const TypeId& type = view.field_info->type_id;
-						if (type == GET_TYPE_ID(int))
-							entry << *static_cast<const int*>(view.field_ptr);
-						else if (type == GET_TYPE_ID(double))
-							entry << *static_cast<const double*>(view.field_ptr);
-						else if (type == GET_TYPE_ID(FixedString64))
-							entry << "\"" << static_cast<const FixedString64*>(view.field_ptr)->c_str() << "\"";
-						else if (type == GET_TYPE_ID(FixedString128))
-							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
+						FixedString256 field_as_string;
+						if (field_type_desc->to_string(view.field_ptr, field_as_string.data, field_as_string.capacity()))
+						{
+							entry << field_as_string.c_str();
+						}
 						else
+						{
 							entry << "<?>";
+						}
 					}
 
 					if (view.struct_info == view.workload_info->workload_descriptor->config_desc)
@@ -164,10 +164,10 @@ namespace robotick
 			row.inputs = input_entries.empty() ? "-" : join(input_entries, "\n");
 			row.outputs = output_entries.empty() ? "-" : join(output_entries, "\n");
 
-			constexpr double NanosecondsPerMillisecond = 1e6;
+			static constexpr double s_milliseconds_per_nanosecond = 1e-6;
 
-			row.tick_duration_ms = NanosecondsPerMillisecond * (double)info.mutable_stats.last_tick_duration_ns;
-			row.tick_delta_ms = NanosecondsPerMillisecond * (double)info.mutable_stats.last_time_delta_ns;
+			row.tick_duration_ms = s_milliseconds_per_nanosecond * (double)info.mutable_stats.last_tick_duration_ns;
+			row.tick_delta_ms = s_milliseconds_per_nanosecond * (double)info.mutable_stats.last_time_delta_ns;
 			row.goal_interval_ms = info.seed->tick_rate_hz > 0.0 ? 1000.0 / info.seed->tick_rate_hz : -1.0;
 		}
 
