@@ -70,7 +70,8 @@ namespace robotick
 		{.workload_desc = &s_workload_desc_##WorkloadTypeName},                                                                                      \
 		nullptr,                                                                                                                                     \
 		nullptr};                                                                                                                                    \
-	static const ::robotick::AutoRegisterType s_register_##WorkloadTypeName(s_type_desc_##WorkloadTypeName);
+	static const ::robotick::AutoRegisterType s_register_##WorkloadTypeName(s_type_desc_##WorkloadTypeName);                                         \
+	volatile bool g_##WorkloadTypeName##_NoDeadStrip = false;
 
 #define ROBOTICK_REGISTER_WORKLOAD_1(Type) ROBOTICK_REGISTER_WORKLOAD_BASE(Type, nullptr, nullptr, nullptr)
 #define ROBOTICK_REGISTER_WORKLOAD_2(Type, Config) ROBOTICK_REGISTER_WORKLOAD_BASE(Type, &s_type_desc_##Config, nullptr, nullptr)
@@ -85,3 +86,7 @@ namespace robotick
 	GET_ROBOTICK_REGISTER_WORKLOAD_MACRO(                                                                                                            \
 		__VA_ARGS__, ROBOTICK_REGISTER_WORKLOAD_4, ROBOTICK_REGISTER_WORKLOAD_3, ROBOTICK_REGISTER_WORKLOAD_2, ROBOTICK_REGISTER_WORKLOAD_1)         \
 	(__VA_ARGS__)
+
+#define ROBOTICK_KEEP_WORKLOAD(WorkloadTypeName)                                                                                                     \
+	extern volatile bool g_##WorkloadTypeName##_NoDeadStrip;                                                                                         \
+	g_##WorkloadTypeName##_NoDeadStrip = true;

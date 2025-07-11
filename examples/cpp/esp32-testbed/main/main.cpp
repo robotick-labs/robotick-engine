@@ -33,12 +33,36 @@ namespace robotick
 
 void populate_model(robotick::Model& model)
 {
-	std::vector<robotick::WorkloadHandle_v1> children = {model.add("BaseXWorkload", "basex"), model.add("ConsoleTelemetryWorkload", "console"),
-		model.add("FaceDisplayWorkload", "face_display"), model.add("SteeringMixerWorkload", "steering"),
-		model.add("TimingDiagnosticsWorkload", "timing")};
+	using namespace robotick;
 
-	const WorkloadSeed& root = model.add("SequencedGroupWorkload", "root", children, 100.0);
-	model.set_root_workload(root);
+	const float tick_rate_hz = 100.0f;
+
+	using namespace robotick;
+
+	// Static workload seeds
+	static const WorkloadSeed workload_basex{TypeId("BaseXWorkload"), StringView("basex"), tick_rate_hz};
+
+	static const WorkloadSeed workload_console{TypeId("ConsoleTelemetryWorkload"), StringView("console"), tick_rate_hz};
+
+	static const WorkloadSeed workload_face_display{TypeId("FaceDisplayWorkload"), StringView("face_display"), tick_rate_hz};
+
+	static const WorkloadSeed workload_steering{TypeId("SteeringMixerWorkload"), StringView("steering"), tick_rate_hz};
+
+	static const WorkloadSeed workload_timing{TypeId("TimingDiagnosticsWorkload"), StringView("timing"), tick_rate_hz};
+
+	// Static child list
+	static const WorkloadSeed* group_children[] = {&workload_basex, &workload_console, &workload_face_display, &workload_steering, &workload_timing};
+
+	// Root group
+	static const WorkloadSeed workload_root{TypeId("SequencedGroupWorkload"), StringView("root"), tick_rate_hz, group_children};
+
+	// All workloads
+	static const WorkloadSeed* all[] = {
+		&workload_basex, &workload_console, &workload_face_display, &workload_steering, &workload_timing, &workload_root};
+
+	// Final registration
+	model.use_workload_seeds(all);
+	model.set_root_workload(workload_root);
 }
 
 void run_engine_on_core1(void* param)
