@@ -7,84 +7,43 @@
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
-#include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
-#include <cstdint>
-#include <cstring>
-#include <sstream>
-#include <stdexcept>
-#include <unordered_set>
+#include "robotick/framework/model/DataConnectionSeed.h"
+#include "robotick/framework/model/WorkloadSeed.h"
 
 namespace robotick
 {
-
-	FieldPathParseError::FieldPathParseError(const std::string& msg) : std::runtime_error(msg)
+	struct DataConnectionHelpers
 	{
-	}
-
-	struct DataConnectionUtils
-	{
-		static bool is_valid_section(const std::string& s) { return (s == "inputs" || s == "outputs" || s == "config"); }
-
-		static ParsedFieldPath parse_field_path(const std::string& raw)
+		static const TypeDescriptor* get_struct_entry(const WorkloadInstanceInfo& instance, const std::string& section, size_t& out_offset)
 		{
-			std::istringstream ss(raw);
-			std::string token;
-			std::vector<std::string> tokens;
-
-			while (std::getline(ss, token, '.'))
-			{
-				if (token.empty())
-				{
-					ROBOTICK_FATAL_EXIT("Empty segment in field path: %s", raw.c_str());
-				}
-				tokens.push_back(token);
-			}
-
-			if (tokens.size() < 3 || tokens.size() > 4)
-			{
-				ROBOTICK_FATAL_EXIT("Expected format <workload>.<section>.<field> or <workload>.<section>.<field>.<subfield>: %s", raw.c_str());
-			}
-
-			if (!is_valid_section(tokens[1]))
-			{
-				ROBOTICK_FATAL_EXIT("Invalid section '%s' in path: %s", tokens[1].c_str(), raw.c_str());
-			}
-
-			const bool has_subfield = tokens.size() == 4;
-			if (has_subfield)
-			{
-				return ParsedFieldPath{FixedString64(tokens[0].c_str()), FixedString64(tokens[1].c_str()),
-					{FixedString64(tokens[2].c_str()), FixedString64(tokens[3].c_str())}};
-			}
-
-			return ParsedFieldPath{FixedString64(tokens[0].c_str()), FixedString64(tokens[1].c_str()), {FixedString64(tokens[2].c_str())}};
-		}
-
-		static const StructRegistryEntry* get_struct_entry(const WorkloadInstanceInfo& instance, const std::string& section, size_t& out_offset)
-		{
-			const auto* type = instance.type;
+			const TypeDescriptor* type = instance.type;
 			if (!type)
 			{
-				ROBOTICK_FATAL_EXIT("Missing type info for workload: %s", instance.unique_name.c_str());
+				ROBOTICK_FATAL_EXIT("Missing type info for workload: %s", instance.seed->unique_name.c_str());
 			}
 
-			const StructRegistryEntry* result = nullptr;
+			const WorkloadDescriptor* workload_desc = type->get_workload_desc();
+			if (!workload_desc)
+			{
+				ROBOTICK_FATAL_EXIT("Missing workload_desc info for workload: %s", instance.seed->unique_name.c_str());
+			}
 
-			if (section == "inputs" && type->input_struct != nullptr)
+			const TypeDescriptor* result = nullptr;
+
+			if (section == "inputs" && workload_desc->inputs_desc != nullptr)
 			{
-				out_offset = type->input_struct->offset_within_workload;
-				result = type->input_struct;
+				out_offset = workload_desc->inputs_offset;
+				result = workload_desc->inputs_desc;
 			}
-			else if (section == "outputs" && type->output_struct != nullptr)
+			else if (section == "outputs" && workload_desc->outputs_desc != nullptr)
 			{
-				out_offset = type->output_struct->offset_within_workload;
-				result = type->output_struct;
+				out_offset = workload_desc->outputs_offset;
+				result = workload_desc->outputs_desc;
 			}
-			else if (section == "config" && type->config_struct != nullptr)
+			else if (section == "config" && workload_desc->config_desc != nullptr)
 			{
-				out_offset = type->config_struct->offset_within_workload;
-				result = type->config_struct;
+				out_offset = workload_desc->config_offset;
+				result = workload_desc->config_desc;
 			}
 			else
 			{
@@ -95,167 +54,230 @@ namespace robotick
 			return result;
 		}
 
-		static const FieldInfo* find_field(const StructRegistryEntry* struct_entry, const std::string& field_name)
+		static const FieldDescriptor* find_field(const TypeDescriptor* struct_entry, const char* field_name)
 		{
 			if (!struct_entry)
 			{
 				return nullptr;
 			}
 
-			const auto& it_found = struct_entry->field_from_name.find(field_name);
-			if (it_found == struct_entry->field_from_name.end())
+			const StructDescriptor* struct_desc = struct_entry->get_struct_desc();
+			if (!struct_desc)
 			{
 				return nullptr;
 			}
 
-			const FieldInfo* found_field = it_found->second;
+			const FieldDescriptor* found_field = struct_desc->find_field(field_name);
 			return found_field;
 		}
 
-		static const BlackboardFieldInfo* resolve_blackboard_field_ptr(WorkloadsBuffer& workloads_buffer, const WorkloadInstanceInfo& inst,
-			const StructRegistryEntry& struct_info, const FieldInfo& blackboard_field, const std::string& blackboard_subfield_name)
+		static const FieldDescriptor* resolve_blackboard_field_ptr(WorkloadsBuffer& workloads_buffer,
+			const WorkloadInstanceInfo& inst,
+			const TypeDescriptor& struct_info,
+			const size_t struct_offset,
+			const FieldDescriptor& blackboard_field,
+			const char* blackboard_subfield_name)
 		{
-			if (blackboard_field.type != GET_TYPE_ID(Blackboard))
+			if (blackboard_field.type_id != GET_TYPE_ID(Blackboard))
 			{
 				return nullptr;
 			}
 
-			const Blackboard& blackboard = blackboard_field.get_data<Blackboard>(workloads_buffer, inst, struct_info);
-			return blackboard.get_field_info(blackboard_subfield_name);
+			ROBOTICK_ASSERT(struct_info.get_struct_desc() != nullptr);
+
+			const Blackboard& blackboard = blackboard_field.get_data<Blackboard>(workloads_buffer, inst, struct_info, struct_offset);
+			const StructDescriptor& blackboard_struct_desc = blackboard.get_struct_descriptor();
+
+			const FieldDescriptor* found_field = blackboard_struct_desc.find_field(blackboard_subfield_name);
+			return found_field;
 		}
 	};
 
-	std::vector<DataConnectionInfo> DataConnectionsFactory::create(
-		WorkloadsBuffer& workloads_buffer, const std::vector<DataConnectionSeed_v1>& seeds, const std::vector<WorkloadInstanceInfo>& instances)
+	namespace
 	{
-		std::vector<DataConnectionInfo> results;
-		std::unordered_set<std::string> seen_destinations;
-
-		std::unordered_map<std::string_view, const WorkloadInstanceInfo*> idx;
-		for (const auto& inst : instances)
-			idx.emplace(inst.unique_name.c_str(), &inst);
-
-		for (const auto& seed : seeds)
+		struct ResolvedField
 		{
-			ParsedFieldPath src = DataConnectionUtils::parse_field_path(seed.source_field_path);
-			ParsedFieldPath dst = DataConnectionUtils::parse_field_path(seed.dest_field_path);
+			const WorkloadInstanceInfo* workload;
+			const void* ptr;
+			TypeId type;
+			size_t size;
+		};
 
-			const auto src_it = idx.find(src.workload_name.c_str());
-			const auto dst_it = idx.find(dst.workload_name.c_str());
-			const WorkloadInstanceInfo* src_inst = src_it != idx.end() ? src_it->second : nullptr;
-			const WorkloadInstanceInfo* dst_inst = dst_it != idx.end() ? dst_it->second : nullptr;
-
-			if (!src_inst)
+		inline FixedString64 extract_next_token(const char*& path_cursor)
+		{
+			FixedString64 token;
+			size_t i = 0;
+			while (*path_cursor && *path_cursor != '.')
 			{
-				ROBOTICK_FATAL_EXIT("Unknown source workload: %s", src.workload_name.c_str());
-			}
-
-			if (!dst_inst)
-			{
-				ROBOTICK_FATAL_EXIT("Unknown destination workload: %s", dst.workload_name.c_str());
-			}
-
-			// Lookup struct + field for source
-			size_t src_struct_offset = OFFSET_UNBOUND;
-			const StructRegistryEntry* src_struct = DataConnectionUtils::get_struct_entry(*src_inst, src.section_name.c_str(), src_struct_offset);
-			const FieldInfo* src_field = DataConnectionUtils::find_field(src_struct, src.field_path[0].c_str());
-			if (!src_field)
-			{
-				ROBOTICK_FATAL_EXIT("Source field not found: %s", seed.source_field_path.c_str());
-			}
-
-			ROBOTICK_ASSERT(src_struct_offset != OFFSET_UNBOUND && "Src struct offset should have definitely been set by now");
-
-			const uint8_t* src_ptr = src_field->get_data_ptr(workloads_buffer, *src_inst, *src_struct);
-			TypeId src_type = src_field->type;
-			size_t src_size = src_field->size;
-
-			if (src.field_path.size() == 2)
-			{
-				const BlackboardFieldInfo* src_blackboard_field = DataConnectionUtils::resolve_blackboard_field_ptr(
-					workloads_buffer, *src_inst, *src_struct, *src_field, src.field_path[1].c_str());
-
-				if (!src_blackboard_field)
+				if (i >= token.capacity() - 1)
 				{
-					ROBOTICK_FATAL_EXIT("Source subfield not found: %s", seed.source_field_path.c_str());
+					ROBOTICK_WARNING("Token too long in path (max %zu): %s", token.capacity() - 1, path_cursor);
+					return {};
 				}
-
-				ROBOTICK_ASSERT(workloads_buffer.contains_object(src_ptr, src_size) && "Blackboard should be within supplied workloads-buffer");
-
-				const Blackboard* blackboard = static_cast<const Blackboard*>((void*)src_ptr);
-				const size_t blackboard_datablock_offset = blackboard->get_datablock_offset();
-
-				ROBOTICK_ASSERT(blackboard_datablock_offset != OFFSET_UNBOUND && "Blackboard data-block offset should have been set by now");
-
-				src_ptr = src_ptr + blackboard_datablock_offset + src_blackboard_field->offset_from_datablock;
-				src_type = src_blackboard_field->type;
-				src_size = src_blackboard_field->size;
+				token.data[i++] = *path_cursor++;
 			}
-
-			ROBOTICK_ASSERT(workloads_buffer.contains_object(src_ptr, src_size) && "Source Field pointer should be within supplied workloads-buffer");
-
-			// Lookup struct + field for dest
-			size_t dst_struct_offset = OFFSET_UNBOUND;
-			const StructRegistryEntry* dst_struct = DataConnectionUtils::get_struct_entry(*dst_inst, dst.section_name.c_str(), dst_struct_offset);
-			const FieldInfo* dst_field = DataConnectionUtils::find_field(dst_struct, dst.field_path[0].c_str());
-			if (!dst_field || dst_struct_offset == OFFSET_UNBOUND)
-			{
-				ROBOTICK_FATAL_EXIT("Destination field not found: %s", seed.dest_field_path.c_str());
-			}
-
-			ROBOTICK_ASSERT(dst_struct_offset != OFFSET_UNBOUND && "Dest struct offset should have definitely been set by now");
-
-			uint8_t* dst_ptr = dst_field->get_data_ptr(workloads_buffer, *dst_inst, *dst_struct);
-			TypeId dst_type = dst_field->type;
-			size_t dst_size = dst_field->size;
-
-			if (dst.field_path.size() == 2)
-			{
-				const BlackboardFieldInfo* dst_blackboard_field = DataConnectionUtils::resolve_blackboard_field_ptr(
-					workloads_buffer, *dst_inst, *dst_struct, *dst_field, dst.field_path[1].c_str());
-
-				if (!dst_blackboard_field)
-				{
-					ROBOTICK_FATAL_EXIT("Dest subfield not found: %s", seed.dest_field_path.c_str());
-				}
-
-				auto* blackboard = reinterpret_cast<Blackboard*>(dst_ptr);
-				dst_ptr = dst_ptr + blackboard->get_datablock_offset() + dst_blackboard_field->offset_from_datablock;
-				dst_type = dst_blackboard_field->type;
-				dst_size = dst_blackboard_field->size;
-			}
-
-			ROBOTICK_ASSERT(
-				workloads_buffer.contains_object(dst_ptr, dst_size) && "Destination Field pointer should be within supplied workloads-buffer");
-
-			// Validate type match
-			if (src_type != dst_type)
-			{
-				ROBOTICK_FATAL_EXIT("Type mismatch between source and dest: %s vs. %s", seed.source_field_path.c_str(), seed.dest_field_path.c_str());
-			}
-
-			// Validate size match
-			if (src_size != dst_size)
-			{
-				ROBOTICK_FATAL_EXIT(
-					"Size mismatch (%zu vs %zu) between %s and %s", src_size, dst_size, seed.source_field_path.c_str(), seed.dest_field_path.c_str());
-			}
-
-			std::string dst_key = std::string(dst.workload_name.c_str()) + "." + dst.section_name.c_str() + "." + dst.field_path[0].c_str();
-			if (dst.field_path.size() == 2)
-			{
-				dst_key = dst_key + "." + dst.field_path[1].c_str();
-			}
-
-			if (!seen_destinations.insert(dst_key).second)
-			{
-				ROBOTICK_FATAL_EXIT("Duplicate destination field: %s", dst_key.c_str());
-			}
-
-			results.push_back(DataConnectionInfo{seed, src_ptr, dst_ptr, src_inst, dst_inst, src_size, src_type});
+			token.data[i] = '\0';
+			if (*path_cursor == '.')
+				++path_cursor; // skip dot
+			return token;
 		}
 
-		return results;
+		ResolvedField resolve_field_ptr(const char* path, const Map<const char*, WorkloadInstanceInfo*>& instances, WorkloadsBuffer& workloads_buffer)
+		{
+			const char* path_cursor = path;
+
+			// Step 1: workload
+			const FixedString64 workload_token = extract_next_token(path_cursor);
+			WorkloadInstanceInfo* const* found_workload_ptr = instances.find(workload_token.c_str());
+			const WorkloadInstanceInfo* workload = found_workload_ptr ? *found_workload_ptr : nullptr;
+			if (!workload)
+				ROBOTICK_FATAL_EXIT("Unknown workload: %s", workload_token.c_str());
+
+			// Step 2: section (config, inputs, outputs)
+			const FixedString64 section_token = extract_next_token(path_cursor);
+			size_t struct_offset = OFFSET_UNBOUND;
+			const TypeDescriptor* struct_type = DataConnectionHelpers::get_struct_entry(*workload, section_token.c_str(), struct_offset);
+			if (!struct_type)
+				ROBOTICK_FATAL_EXIT("Unknown section '%s' in path: %s", section_token.c_str(), path);
+
+			// Step 3: field
+			const FixedString64 field_token = extract_next_token(path_cursor);
+			const FieldDescriptor* field = DataConnectionHelpers::find_field(struct_type, field_token.c_str());
+			if (!field)
+				ROBOTICK_FATAL_EXIT("Field '%s' not found in path: %s", field_token.c_str(), path);
+
+			const uint8_t* ptr = (uint8_t*)field->get_data_ptr(workloads_buffer, *workload, *struct_type, struct_offset);
+			TypeId type = field->type_id;
+			size_t size = field->find_type_descriptor()->size;
+
+			// Step 4: optional subfield (only if Blackboard)
+			if (*path_cursor != '\0') // There’s still more of the path
+			{
+				const FixedString64 subfield_token = extract_next_token(path_cursor);
+
+				const FieldDescriptor* blackboard_field = DataConnectionHelpers::resolve_blackboard_field_ptr(
+					workloads_buffer, *workload, *struct_type, struct_offset, *field, subfield_token.c_str());
+
+				if (!blackboard_field)
+					ROBOTICK_FATAL_EXIT("Blackboard subfield '%s' not found in path: %s", subfield_token.c_str(), path);
+
+				const Blackboard* blackboard = static_cast<const Blackboard*>((const void*)ptr);
+				ptr = ptr + blackboard->get_datablock_offset() + blackboard_field->offset_within_container;
+				type = blackboard_field->type_id;
+				size = blackboard_field->find_type_descriptor()->size;
+			}
+
+			if (*path_cursor != '\0')
+				ROBOTICK_FATAL_EXIT("Too many path components in: %s", path);
+
+			ROBOTICK_ASSERT(workloads_buffer.contains_object(ptr, size) && "Resolved field must be within workloads_buffer");
+
+			return ResolvedField{workload, ptr, type, size};
+		}
+	} // namespace
+
+	static bool has_connection_to_field(const HeapVector<DataConnectionInfo>& query_connections, const void* query_dest_ptr)
+	{
+		for (const DataConnectionInfo& query_connection : query_connections)
+		{
+			if (query_connection.dest_ptr == query_dest_ptr)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	void DataConnectionUtils::create(HeapVector<DataConnectionInfo>& out_connections,
+		WorkloadsBuffer& workloads_buffer,
+		const ArrayView<const DataConnectionSeed*>& seeds,
+		const Map<const char*, WorkloadInstanceInfo*>& instances)
+	{
+		size_t connection_index = 0;
+		out_connections.initialize(seeds.size());
+
+		for (const DataConnectionSeed* seed_ptr : seeds)
+		{
+			ROBOTICK_ASSERT(seed_ptr);
+			const auto& seed = *seed_ptr;
+
+			const ResolvedField src = resolve_field_ptr(seed.source_field_path.c_str(), instances, workloads_buffer);
+			const ResolvedField dst = resolve_field_ptr(seed.dest_field_path.c_str(), instances, workloads_buffer);
+
+			if (src.type != dst.type)
+				ROBOTICK_FATAL_EXIT("Type mismatch: %s vs %s", seed.source_field_path.c_str(), seed.dest_field_path.c_str());
+
+			if (src.size != dst.size)
+				ROBOTICK_FATAL_EXIT("Size mismatch: %s vs %s", seed.source_field_path.c_str(), seed.dest_field_path.c_str());
+
+			if (has_connection_to_field(out_connections, dst.ptr))
+				ROBOTICK_FATAL_EXIT("Duplicate connection to field: %s", seed.dest_field_path.c_str());
+
+			out_connections[connection_index] =
+				DataConnectionInfo{&seed, src.ptr, const_cast<void*>(dst.ptr), src.workload, dst.workload, src.size, src.type};
+
+			connection_index++;
+		}
+	}
+
+	std::tuple<void*, size_t, const FieldDescriptor*> DataConnectionUtils::find_field_info(const Engine& engine, const std::string& path)
+	{
+		const WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
+		const Map<const char*, WorkloadInstanceInfo*>& instances = engine.get_all_instance_info_map();
+		const char* path_cursor = path.c_str();
+
+		// workload.section.field[.blackboard_field]
+		const FixedString64 workload_token = extract_next_token(path_cursor);
+		auto* workload_info_ptr = instances.find(workload_token.c_str());
+		if (!workload_info_ptr)
+		{
+			ROBOTICK_WARNING("Unknown workload in field path: %s", workload_token.c_str());
+			return {nullptr, 0, nullptr};
+		}
+		const WorkloadInstanceInfo* workload_info = *workload_info_ptr;
+
+		const FixedString64 section_token = extract_next_token(path_cursor);
+		size_t struct_offset = OFFSET_UNBOUND;
+		const TypeDescriptor* struct_type = DataConnectionHelpers::get_struct_entry(*workload_info, section_token.c_str(), struct_offset);
+		if (!struct_type)
+		{
+			ROBOTICK_WARNING("Invalid section '%s' in field path: %s", section_token.c_str(), path.c_str());
+			return {nullptr, 0, nullptr};
+		}
+
+		const FixedString64 field_token = extract_next_token(path_cursor);
+		const FieldDescriptor* field = DataConnectionHelpers::find_field(struct_type, field_token.c_str());
+		if (!field)
+		{
+			ROBOTICK_WARNING("Field '%s' not found in path: %s", field_token.c_str(), path.c_str());
+			return {nullptr, 0, nullptr};
+		}
+
+		void* base_ptr = field->get_data_ptr(const_cast<WorkloadsBuffer&>(workloads_buffer), *workload_info, *struct_type, struct_offset);
+		size_t size = field->find_type_descriptor() ? field->find_type_descriptor()->size : 0;
+
+		// optional blackboard.subfield
+		if (*path_cursor != '\0')
+		{
+			const FixedString64 subfield_token = extract_next_token(path_cursor);
+
+			const FieldDescriptor* subfield = DataConnectionHelpers::resolve_blackboard_field_ptr(
+				const_cast<WorkloadsBuffer&>(workloads_buffer), *workload_info, *struct_type, struct_offset, *field, subfield_token.c_str());
+
+			if (!subfield)
+			{
+				ROBOTICK_WARNING("Blackboard subfield '%s' not found in path: %s", subfield_token.c_str(), path.c_str());
+				return {nullptr, 0, nullptr};
+			}
+
+			const Blackboard* blackboard = static_cast<const Blackboard*>((const void*)base_ptr);
+			base_ptr = (uint8_t*)base_ptr + blackboard->get_datablock_offset() + subfield->offset_within_container;
+			size = subfield->find_type_descriptor() ? subfield->find_type_descriptor()->size : 0;
+			field = subfield;
+		}
+
+		return {base_ptr, size, field};
 	}
 
 } // namespace robotick

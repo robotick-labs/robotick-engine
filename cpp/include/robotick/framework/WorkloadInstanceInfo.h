@@ -3,23 +3,23 @@
 
 #pragma once
 
+#include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/utils/Constants.h"
 
-#include <atomic>
 #include <cstdint>
-#include <string>
-#include <vector>
 
 namespace robotick
 {
 	class Engine;
-	struct WorkloadRegistryEntry;
+	struct TypeDescriptor;
+	struct WorkloadSeed;
 	struct WorkloadsBuffer;
+	struct WorkloadDescriptor;
 
 	struct WorkloadInstanceStats
 	{
-		double last_tick_duration{0.0};
-		double last_time_delta{0.0};
+		uint32_t last_tick_duration_ns{0}; // (uint32_t can store up to 4.29s of nanoseconds - should be fine for these deltas)
+		uint32_t last_time_delta_ns{0};
 	};
 
 	struct WorkloadInstanceInfo
@@ -28,11 +28,12 @@ namespace robotick
 		uint8_t* get_ptr(WorkloadsBuffer& workloads_buffer) const;
 
 		// constant once created:
+		const WorkloadSeed* seed = nullptr;
+		const TypeDescriptor* type = nullptr;
+		const WorkloadDescriptor* workload_descriptor = nullptr;
 		size_t offset_in_workloads_buffer = OFFSET_UNBOUND;
-		const WorkloadRegistryEntry* type = nullptr;
-		std::string unique_name;
-		double tick_rate_hz = 0.0;
-		std::vector<const WorkloadInstanceInfo*> children;
+
+		HeapVector<const WorkloadInstanceInfo*> children;
 
 		// mutable state:
 		mutable WorkloadInstanceStats mutable_stats;

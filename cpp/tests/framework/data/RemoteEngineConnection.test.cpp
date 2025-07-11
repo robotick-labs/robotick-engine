@@ -38,9 +38,9 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 				RemoteEngineConnection receiver;
 				receiver.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Receiver);
 				receiver.set_field_binder(
-					[&](const std::string& path, RemoteEngineConnection::Field& out)
+					[&](const char* path, RemoteEngineConnection::Field& out)
 					{
-						if (path == "x")
+						if (strcmp(path, "x") == 0)
 						{
 							out.path = path;
 							out.recv_ptr = &recv_value;
@@ -110,7 +110,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 				RemoteEngineConnection receiver;
 				receiver.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Receiver);
 				receiver.set_field_binder(
-					[&](const std::string&, RemoteEngineConnection::Field& out)
+					[&](const char*, RemoteEngineConnection::Field& out)
 					{
 						out.recv_ptr = receive_buffer.data();
 						out.size = receive_buffer.size();
@@ -171,7 +171,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 				RemoteEngineConnection rx;
 				rx.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Receiver);
 				rx.set_field_binder(
-					[&](auto const&, RemoteEngineConnection::Field& f)
+					[&](const char*, RemoteEngineConnection::Field& f)
 					{
 						f.path = "x";
 						f.recv_ptr = &recv_value;
@@ -257,7 +257,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 				RemoteEngineConnection rx;
 				rx.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Receiver);
 				rx.set_field_binder(
-					[&](auto const&, RemoteEngineConnection::Field& f)
+					[&](const char*, RemoteEngineConnection::Field& f)
 					{
 						f.recv_ptr = &recv_value;
 						f.size = sizeof(int);

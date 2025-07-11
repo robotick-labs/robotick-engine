@@ -23,11 +23,11 @@ namespace robotick
 		bool enable_demo = false;
 	};
 
-	ROBOTICK_BEGIN_FIELDS(ConsoleTelemetryConfig)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_pretty_print)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_unicode)
-	ROBOTICK_FIELD(ConsoleTelemetryConfig, bool, enable_demo)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(ConsoleTelemetryConfig)
+	ROBOTICK_STRUCT_FIELD(ConsoleTelemetryConfig, bool, enable_pretty_print)
+	ROBOTICK_STRUCT_FIELD(ConsoleTelemetryConfig, bool, enable_unicode)
+	ROBOTICK_STRUCT_FIELD(ConsoleTelemetryConfig, bool, enable_demo)
+	ROBOTICK_REGISTER_STRUCT_END(ConsoleTelemetryConfig)
 
 	class ConsoleTelemetryCollector
 	{
@@ -97,7 +97,7 @@ namespace robotick
 		void populate_row(ConsoleTelemetryRow& row, size_t depth, const WorkloadInstanceInfo& info)
 		{
 			row.type = depth_prefix(depth, info.type->name.c_str());
-			row.name = info.unique_name;
+			row.name = info.seed->unique_name.c_str();
 
 			std::vector<std::string> config_entries;
 			std::vector<std::string> input_entries;
@@ -105,7 +105,9 @@ namespace robotick
 
 			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set and checked by now");
 
-			WorkloadFieldsIterator::for_each_field_in_workload(*engine, info, &mirror_buffer,
+			WorkloadFieldsIterator::for_each_field_in_workload(*engine,
+				info,
+				&mirror_buffer,
 				[&](const WorkloadFieldView& view)
 				{
 					std::ostringstream entry;
@@ -118,41 +120,41 @@ namespace robotick
 
 					if (view.subfield_info)
 					{
-						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.subfield_info->size));
+						const TypeDescriptor* field_type_desc = view.subfield_info->find_type_descriptor();
+						ROBOTICK_ASSERT(field_type_desc);
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, field_type_desc->size));
 
-						const TypeId& type = view.subfield_info->type;
-						if (type == GET_TYPE_ID(int))
-							entry << *static_cast<const int*>(view.field_ptr);
-						else if (type == GET_TYPE_ID(double))
-							entry << *static_cast<const double*>(view.field_ptr);
-						else if (type == GET_TYPE_ID(FixedString64))
-							entry << "\"" << static_cast<const FixedString64*>(view.field_ptr)->c_str() << "\"";
-						else if (type == GET_TYPE_ID(FixedString128))
-							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
+						FixedString256 field_as_string;
+						if (field_type_desc->to_string(view.field_ptr, field_as_string.data, field_as_string.capacity()))
+						{
+							entry << field_as_string.c_str();
+						}
 						else
+						{
 							entry << "<?>";
+						}
 					}
 					else
 					{
-						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, view.field_info->size));
+						const TypeDescriptor* field_type_desc = view.field_info->find_type_descriptor();
+						ROBOTICK_ASSERT(field_type_desc);
+						ROBOTICK_ASSERT(mirror_buffer.contains_object(view.field_ptr, field_type_desc->size));
 
 						// fallback for top-level (non-blackboard) fields
-						const TypeId& type = view.field_info->type;
-						if (type == GET_TYPE_ID(int))
-							entry << *static_cast<const int*>(view.field_ptr);
-						else if (type == GET_TYPE_ID(double))
-							entry << *static_cast<const double*>(view.field_ptr);
-						else if (type == GET_TYPE_ID(FixedString64))
-							entry << "\"" << static_cast<const FixedString64*>(view.field_ptr)->c_str() << "\"";
-						else if (type == GET_TYPE_ID(FixedString128))
-							entry << "\"" << static_cast<const FixedString128*>(view.field_ptr)->c_str() << "\"";
+						FixedString256 field_as_string;
+						if (field_type_desc->to_string(view.field_ptr, field_as_string.data, field_as_string.capacity()))
+						{
+							entry << field_as_string.c_str();
+						}
 						else
+						{
 							entry << "<?>";
+						}
 					}
 
-					if (view.struct_info == view.workload_info->type->config_struct)
+					if (view.struct_info == view.workload_info->workload_descriptor->config_desc)
 						config_entries.push_back(entry.str());
-					else if (view.struct_info == view.workload_info->type->input_struct)
+					else if (view.struct_info == view.workload_info->workload_descriptor->inputs_desc)
 						input_entries.push_back(entry.str());
 					else
 						output_entries.push_back(entry.str());
@@ -162,9 +164,11 @@ namespace robotick
 			row.inputs = input_entries.empty() ? "-" : join(input_entries, "\n");
 			row.outputs = output_entries.empty() ? "-" : join(output_entries, "\n");
 
-			row.tick_duration_ms = info.mutable_stats.last_tick_duration * 1000.0;
-			row.tick_delta_ms = info.mutable_stats.last_time_delta * 1000.0;
-			row.goal_interval_ms = info.tick_rate_hz > 0.0 ? 1000.0 / info.tick_rate_hz : -1.0;
+			static constexpr double s_milliseconds_per_nanosecond = 1e-6;
+
+			row.tick_duration_ms = s_milliseconds_per_nanosecond * (double)info.mutable_stats.last_tick_duration_ns;
+			row.tick_delta_ms = s_milliseconds_per_nanosecond * (double)info.mutable_stats.last_time_delta_ns;
+			row.goal_interval_ms = info.seed->tick_rate_hz > 0.0 ? 1000.0 / info.seed->tick_rate_hz : -1.0;
 		}
 
 		static std::string depth_prefix(size_t depth, const std::string& name)
@@ -222,8 +226,14 @@ namespace robotick
 				input_oss << "input_" << i << "=" << val_dist(gen);
 				output_oss << "output_" << i << "=" << val_dist(gen);
 
-				rows.push_back(ConsoleTelemetryRow{"DummyType" + std::to_string(i), "Workload" + std::to_string(i), config_oss.str(), input_oss.str(),
-					output_oss.str(), tick_ms, goal_ms, percent});
+				rows.push_back(ConsoleTelemetryRow{"DummyType" + std::to_string(i),
+					"Workload" + std::to_string(i),
+					config_oss.str(),
+					input_oss.str(),
+					output_oss.str(),
+					tick_ms,
+					goal_ms,
+					percent});
 			}
 
 			return rows;
@@ -255,6 +265,6 @@ namespace robotick
 		}
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(ConsoleTelemetryWorkload, ConsoleTelemetryConfig);
+	ROBOTICK_REGISTER_WORKLOAD(ConsoleTelemetryWorkload, ConsoleTelemetryConfig);
 
 } // namespace robotick

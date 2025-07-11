@@ -11,7 +11,7 @@ namespace robotick
 {
 	// --- sqrt dispatch helper ---
 
-	namespace internal
+	namespace internal::Vec2
 	{
 		template <typename T> struct SqrtFn;
 
@@ -23,7 +23,7 @@ namespace robotick
 		{
 			static inline double apply(double v) { return sqrt(v); }
 		};
-	} // namespace internal
+	} // namespace internal::Vec2
 
 	// --- Templated base class ---
 
@@ -46,7 +46,7 @@ namespace robotick
 		TDerived operator*(TReal scalar) const { return TDerived(x * scalar, y * scalar); }
 		TDerived operator/(TReal scalar) const
 		{
-			ROBOTICK_ASSERT_MSG((fabsf((float)scalar) > kFloatEpsilon), "Divide by zero requested!");
+			ROBOTICK_ASSERT_MSG((fabs(scalar) > static_cast<TReal>(kFloatEpsilon)), "Divide by zero requested!");
 			return TDerived(x / scalar, y / scalar);
 		}
 
@@ -70,7 +70,7 @@ namespace robotick
 		}
 		TDerived& operator/=(TReal scalar)
 		{
-			ROBOTICK_ASSERT_MSG((fabsf((float)scalar) > kFloatEpsilon), "Divide by zero requested (in-place)!");
+			ROBOTICK_ASSERT_MSG((fabs(scalar) > static_cast<TReal>(kFloatEpsilon)), "Divide by zero requested (in-place)!");
 			x /= scalar;
 			y /= scalar;
 			return static_cast<TDerived&>(*this);
@@ -80,7 +80,7 @@ namespace robotick
 
 		TReal length_squared() const { return x * x + y * y; }
 
-		TReal length() const { return internal::SqrtFn<TReal>::apply(length_squared()); }
+		TReal length() const { return internal::Vec2::SqrtFn<TReal>::apply(length_squared()); }
 	};
 
 	// --- Final types (can be forward-declared) ---

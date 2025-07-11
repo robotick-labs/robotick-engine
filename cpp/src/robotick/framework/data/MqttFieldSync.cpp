@@ -10,13 +10,19 @@ namespace robotick
 {
 	// Constructor for tests: only publisher lambda
 	MqttFieldSync::MqttFieldSync(const std::string& root_ns, PublisherFn publisher)
-		: root(root_ns), publisher(std::move(publisher)), mqtt_ptr(nullptr), engine_ptr(nullptr)
+		: root(root_ns)
+		, publisher(std::move(publisher))
+		, mqtt_ptr(nullptr)
+		, engine_ptr(nullptr)
 	{
 	}
 
 	// Constructor for real use: Engine + root namespace + IMqttClient
 	MqttFieldSync::MqttFieldSync(Engine& engine, const std::string& root_ns, IMqttClient& mqtt_client)
-		: root(root_ns), publisher(nullptr), mqtt_ptr(&mqtt_client), engine_ptr(&engine)
+		: root(root_ns)
+		, publisher(nullptr)
+		, mqtt_ptr(&mqtt_client)
+		, engine_ptr(&engine)
 	{
 		try
 		{
@@ -86,106 +92,47 @@ namespace robotick
 		if (!engine_ptr)
 			return;
 
-		WorkloadsBuffer& buffer = engine_ptr->get_workloads_buffer();
 		const std::string prefix = root + "/control/";
 
 		for (const auto& [topic, json_value] : updated_topics)
 		{
+			// Skip unrelated topics
 			if (topic.find(prefix) != 0)
 				continue;
 
-			std::string suffix = topic.substr(prefix.size());
-			// Split "W/inputs/field[/subfield]" into tokens
-			std::vector<std::string> tokens;
-			size_t start = 0, end;
-			while ((end = suffix.find('/', start)) != std::string::npos)
+			// Convert MQTT topic to dot-delimited field path
+			std::string path = topic.substr(prefix.size());
+			std::replace(path.begin(), path.end(), '/', '.');
+
+			// Try to resolve the field
+			auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*engine_ptr, path.c_str());
+
+			if (ptr == nullptr)
 			{
-				tokens.push_back(suffix.substr(start, end - start));
-				start = end + 1;
-			}
-			tokens.push_back(suffix.substr(start));
-
-			if (tokens.size() < 3 || tokens.size() > 4)
-				continue;
-
-			const std::string& wname = tokens[0];
-			const std::string& sname = tokens[1];
-			const std::string& fname = tokens[2];
-			const std::string sfield = (tokens.size() == 4 ? tokens[3] : "");
-
-			// Find the workload instance
-			const WorkloadInstanceInfo* winfo = engine_ptr->find_instance_info(wname.c_str());
-			if (!winfo)
-			{
-				ROBOTICK_WARNING("MqttFieldSync - unknown workload %s", topic.c_str());
+				ROBOTICK_WARNING("MqttFieldSync::apply_control_updates() - unable to resolve field path: %s", path.c_str());
 				continue;
 			}
 
-			// Determine which struct (config/inputs/outputs)
-			const StructRegistryEntry* sinfo = nullptr;
-			if (sname == "config")
-				sinfo = winfo->type->config_struct;
-			else if (sname == "inputs")
-				sinfo = winfo->type->input_struct;
-			else if (sname == "outputs")
-				sinfo = winfo->type->output_struct;
-
-			if (!sinfo)
+			if (field_desc == nullptr)
 			{
-				ROBOTICK_WARNING("MqttFieldSync - unknown struct %s", topic.c_str());
+				ROBOTICK_WARNING("MqttFieldSync::apply_control_updates() - resolved pointer but missing field descriptor for: %s", path.c_str());
 				continue;
 			}
 
-			// Find the FieldInfo
-			const FieldInfo* finfo = sinfo->find_field(fname.c_str());
-			if (!finfo)
+			const TypeDescriptor* type_desc = field_desc->find_type_descriptor();
+			if (type_desc == nullptr)
 			{
-				ROBOTICK_WARNING("MqttFieldSync - unknown field %s", topic.c_str());
+				ROBOTICK_WARNING("MqttFieldSync::apply_control_updates() - field '%s' has no registered type descriptor", path.c_str());
 				continue;
 			}
 
-			// Get pointer to that field
-			void* ptr = finfo->get_data_ptr(buffer, *winfo, *sinfo);
-			if (!ptr)
+			// Parse and assign value
+			const std::string value_str = json_value.dump();
+			if (!type_desc->from_string(value_str.c_str(), ptr))
 			{
-				ROBOTICK_WARNING("MqttFieldSync - data ptr missing %s", topic.c_str());
+				ROBOTICK_WARNING(
+					"MqttFieldSync::apply_control_updates() - failed to parse value '%s' for field '%s'", value_str.c_str(), path.c_str());
 				continue;
-			}
-
-			// Handle Blackboard subfields if needed
-			TypeId type = finfo->type;
-			if (type == GET_TYPE_ID(Blackboard))
-			{
-				Blackboard& bb = *static_cast<Blackboard*>(ptr);
-				const BlackboardFieldInfo* sbinfo = bb.get_field_info(sfield);
-				if (!sbinfo)
-				{
-					ROBOTICK_WARNING("MqttFieldSync - unknown subfield %s", topic.c_str());
-					continue;
-				}
-				ptr = sbinfo->get_data_ptr(bb);
-				type = sbinfo->type;
-			}
-
-			// Apply the JSON value to that pointer
-			try
-			{
-				if (type == GET_TYPE_ID(int))
-					*reinterpret_cast<int*>(ptr) = json_value.get<int>();
-				else if (type == GET_TYPE_ID(double))
-					*reinterpret_cast<double*>(ptr) = json_value.get<double>();
-				else if (type == GET_TYPE_ID(FixedString64))
-					*reinterpret_cast<FixedString64*>(ptr) = FixedString64(json_value.get<std::string>().c_str());
-				else if (type == GET_TYPE_ID(FixedString128))
-					*reinterpret_cast<FixedString128*>(ptr) = FixedString128(json_value.get<std::string>().c_str());
-				else
-				{
-					ROBOTICK_WARNING("MqttFieldSync - unsupported type %s", topic.c_str());
-				}
-			}
-			catch (...)
-			{
-				ROBOTICK_WARNING("MqttFieldSync - apply failed %s", topic.c_str());
 			}
 		}
 
@@ -206,19 +153,44 @@ namespace robotick
 		// WorkloadFieldsIterator currently requires non-const buffer
 		WorkloadsBuffer& non_const_buf = const_cast<WorkloadsBuffer&>(buffer);
 
-		WorkloadFieldsIterator::for_each_workload_field(engine, &non_const_buf,
+		WorkloadFieldsIterator::for_each_workload_field(engine,
+			&non_const_buf,
 			[&](const WorkloadFieldView& view)
 			{
 				if (!view.workload_info || !view.struct_info || !view.field_info)
 					return;
 
+				const WorkloadDescriptor* workload_desc = view.workload_info->type->get_workload_desc();
+				if (!workload_desc)
+					return;
+
 				// Build path: "W/struct/field[/subfield]"
-				std::string path = view.workload_info->unique_name + "/" + view.struct_info->local_name + "/" + view.field_info->name;
-				TypeId type = view.field_info->type;
+				bool is_struct_read_only = true;
+				std::string struct_name;
+				if (view.struct_info == workload_desc->config_desc)
+				{
+					struct_name = "config";
+				}
+				else if (view.struct_info == workload_desc->inputs_desc)
+				{
+					struct_name = "inputs";
+					is_struct_read_only = false;
+				}
+				else if (view.struct_info == workload_desc->outputs_desc)
+				{
+					struct_name = "outputs";
+				}
+				else
+				{
+					return;
+				}
+
+				std::string path = std::string(view.workload_info->seed->unique_name) + "/" + struct_name + "/" + std::string(view.field_info->name);
+				TypeId type = view.field_info->type_id;
 				if (view.subfield_info)
 				{
 					path += "/" + std::string(view.subfield_info->name.c_str());
-					type = view.subfield_info->type;
+					type = view.subfield_info->type_id;
 				}
 
 				// Serialize to JSON
@@ -243,7 +215,7 @@ namespace robotick
 				// If requested, also publish "<root>/control/<path>" for writable fields
 				const std::string control_topic = root + "/control/" + path;
 
-				if (publish_control && !view.struct_info->is_read_only())
+				if (publish_control && !is_struct_read_only)
 				{
 					last_published[control_topic] = value;
 					try

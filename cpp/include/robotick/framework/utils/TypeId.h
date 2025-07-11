@@ -23,8 +23,7 @@ namespace robotick
 		constexpr explicit TypeId(const char* type_name)
 			: value(fnv1a_32(type_name))
 #ifdef ROBOTICK_DEBUG_TYPEID_NAMES
-			  ,
-			  name(type_name)
+			, name(type_name)
 #endif
 		{
 		}
@@ -35,6 +34,15 @@ namespace robotick
 
 		static constexpr TypeId invalid() { return TypeId{"<invalid>"}; }
 		constexpr bool is_valid() const { return value != 0; }
+
+		const char* get_debug_name() const
+		{
+#ifdef ROBOTICK_DEBUG_TYPEID_NAMES
+			return name;
+#else
+			return "<debug name not available>";
+#endif
+		}
 
 		uint32_t value = 0;
 

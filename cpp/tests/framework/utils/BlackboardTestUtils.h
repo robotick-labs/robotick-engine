@@ -12,28 +12,24 @@ namespace robotick
 
 	struct BlackboardTestUtils
 	{
-		static std::pair<WorkloadsBuffer, Blackboard*> make_buffer_and_embedded_blackboard(const std::vector<BlackboardFieldInfo>& schema)
+		static std::pair<WorkloadsBuffer, Blackboard*> make_buffer_and_embedded_blackboard(const HeapVector<FieldDescriptor>& fields)
 		{
 			// create a temp-blackboard on the stack to find out how much data-block space the scheme needs
-			Blackboard temp(schema);
-			size_t total_size = sizeof(Blackboard) + temp.get_info()->total_datablock_size;
+			Blackboard temp_blackboard;
+			temp_blackboard.initialize_fields(fields);
+
+			const size_t total_size = sizeof(Blackboard) + temp_blackboard.get_info().total_datablock_size;
 
 			// create a sufficiently large WorkloadsBuffer for actual Blackboard and its data
 			WorkloadsBuffer buffer(total_size);
 
 			// create the blackboard:
-			auto* blackboard_ptr = buffer.as<Blackboard>(0);
-			new (blackboard_ptr) Blackboard(schema);
+			Blackboard* blackboard_ptr = buffer.as<Blackboard>(0);
+			new (blackboard_ptr) Blackboard();
+			blackboard_ptr->initialize_fields(fields);
 			blackboard_ptr->bind(sizeof(Blackboard));
 			return {std::move(buffer), blackboard_ptr};
 		}
-
-		static const BlackboardInfo& get_info(Blackboard& blackboard) { return *blackboard.get_info(); }
-
-		static const BlackboardFieldInfo* get_field_info(const Blackboard& blackboard, const std::string& key)
-		{
-			return blackboard.get_field_info(key);
-		};
 	};
 
 } // namespace robotick

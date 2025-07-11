@@ -6,6 +6,7 @@
 #include "robotick/api_base.h"
 
 #include "robotick/framework/common/ArrayView.h"
+#include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/common/StringView.h"
 #include "robotick/framework/utils/Constants.h"
 #include "robotick/framework/utils/TypeId.h"
@@ -18,6 +19,8 @@ namespace robotick
 	struct TypeDescriptor;
 
 	class Engine;
+	class WorkloadsBuffer;
+
 	struct DataConnectionInfo;
 	struct TickInfo;
 	struct WorkloadInstanceInfo;
@@ -26,14 +29,49 @@ namespace robotick
 	{
 		StringView name;
 		TypeId type_id;
-		size_t offset = OFFSET_UNBOUND; // from start of host-struct
+		size_t offset_within_container = OFFSET_UNBOUND;
 
 		const TypeDescriptor* find_type_descriptor() const;
+
+		void* get_data_ptr(void* container_ptr) const;
+
+		void* get_data_ptr(WorkloadsBuffer& workloads_buffer,
+			const WorkloadInstanceInfo& instance,
+			const TypeDescriptor& struct_type,
+			const size_t struct_offset) const;
+
+		template <typename T> inline T& get_data(void* container_ptr) const
+		{
+			void* ptr = get_data_ptr(container_ptr);
+			if (!ptr)
+			{
+				ROBOTICK_FATAL_EXIT("FieldDescriptor::get_data<T>() null pointer access for field '%s'", name.c_str());
+			}
+
+			return *static_cast<T*>(ptr);
+		}
+
+		template <typename T>
+		inline T& get_data(WorkloadsBuffer& workloads_buffer,
+			const WorkloadInstanceInfo& instance,
+			const TypeDescriptor& struct_type,
+			const size_t struct_offset) const
+		{
+			void* ptr = get_data_ptr(workloads_buffer, instance, struct_type, struct_offset);
+			if (!ptr)
+			{
+				ROBOTICK_FATAL_EXIT("FieldDescriptor::get_data<T>() null pointer access for field '%s'", name.c_str());
+			}
+
+			return *static_cast<T*>(ptr);
+		}
 	};
 
 	struct StructDescriptor
 	{
 		ArrayView<FieldDescriptor> fields;
+
+		const FieldDescriptor* find_field(const char* field_name) const;
 	};
 
 	struct DynamicStructDescriptor
@@ -49,15 +87,15 @@ namespace robotick
 		const TypeDescriptor* inputs_desc = nullptr;
 		const TypeDescriptor* outputs_desc = nullptr;
 
-		size_t config_offset = SIZE_MAX; // from start of host-workload
-		size_t input_offset = SIZE_MAX;	 // ditto
-		size_t output_offset = SIZE_MAX; // ditto
+		size_t config_offset = OFFSET_UNBOUND;	// from start of host-workload
+		size_t inputs_offset = OFFSET_UNBOUND;	// ditto
+		size_t outputs_offset = OFFSET_UNBOUND; // ditto
 
 		// function pointers
 		void (*construct_fn)(void*) = nullptr;
 		void (*destruct_fn)(void*) = nullptr;
 
-		void (*set_children_fn)(void*, const std::vector<const WorkloadInstanceInfo*>&, std::vector<DataConnectionInfo*>&) = nullptr;
+		void (*set_children_fn)(void*, const HeapVector<const WorkloadInstanceInfo*>&, HeapVector<DataConnectionInfo>&) = nullptr;
 		void (*set_engine_fn)(void*, const Engine&) = nullptr;
 		void (*pre_load_fn)(void*) = nullptr;
 		void (*load_fn)(void*) = nullptr;
@@ -67,6 +105,14 @@ namespace robotick
 		void (*stop_fn)(void*) = nullptr;
 	};
 
+	enum class TypeCategory
+	{
+		Primitive,
+		Struct,
+		DynamicStruct,
+		Workload
+	};
+
 	struct TypeDescriptor
 	{
 		StringView name;  // e.g. "int"
@@ -74,13 +120,7 @@ namespace robotick
 		size_t size;	  // Size in bytes
 		size_t alignment; // Alignment in bytes
 
-		enum class TypeCategory
-		{
-			Primitive,
-			Struct,
-			DynamicStruct,
-			Workload
-		} type_category;
+		TypeCategory type_category;
 
 		union TypeCategoryDesc
 		{
@@ -98,6 +138,19 @@ namespace robotick
 		// Parses string and stores result in out_data.
 		bool (*from_string)(const char* str, void* out_data);
 
+		// --- misc helpers: ---
+		const WorkloadDescriptor* get_workload_desc() const
+		{
+			return (type_category == TypeCategory::Workload ? type_category_desc.workload_desc : nullptr);
+		}
+
+		const StructDescriptor* get_struct_desc() const { return (type_category == TypeCategory::Struct ? type_category_desc.struct_desc : nullptr); }
+
+		const DynamicStructDescriptor* get_dynamic_struct_desc() const
+		{
+			return (type_category == TypeCategory::DynamicStruct ? type_category_desc.dynamic_struct_desc : nullptr);
+		}
+
 		// --- templated string helpers: ---
 
 		template <typename TData, typename TString> inline bool to_string_typed(const TData& value, TString& output) const
@@ -110,5 +163,7 @@ namespace robotick
 			return from_string(input.c_str(), &out_value);
 		}
 	};
+
+	extern const TypeDescriptor s_type_desc_void;
 
 } // namespace robotick

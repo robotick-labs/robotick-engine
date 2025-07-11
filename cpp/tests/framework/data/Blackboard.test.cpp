@@ -17,26 +17,34 @@ namespace robotick
 	{
 		SECTION("Blackboard basic construction and memory layout", "[blackboard]")
 		{
-			std::vector<BlackboardFieldInfo> schema = {
-				{"age", TypeId(GET_TYPE_ID(int))}, {"score", TypeId(GET_TYPE_ID(double))}, {"name", TypeId(GET_TYPE_ID(FixedString64))}};
+			HeapVector<FieldDescriptor> blackboard_fields;
+			blackboard_fields.initialize(3);
+			blackboard_fields[0] = FieldDescriptor{"age", GET_TYPE_ID(int)};
+			blackboard_fields[1] = FieldDescriptor{"score", GET_TYPE_ID(double)};
+			blackboard_fields[2] = FieldDescriptor{"name", GET_TYPE_ID(FixedString64)};
 
-			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
+			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
 
-			REQUIRE(BlackboardTestUtils::get_info(*blackboard).schema.size() == 3);
-			REQUIRE(BlackboardTestUtils::get_info(*blackboard).total_datablock_size >= sizeof(int) + sizeof(double) + sizeof(FixedString64));
+			const auto& info = blackboard->get_info();
 
-			REQUIRE(BlackboardTestUtils::get_info(*blackboard).has_field("age"));
-			REQUIRE(BlackboardTestUtils::get_info(*blackboard).has_field("score"));
-			REQUIRE(BlackboardTestUtils::get_info(*blackboard).has_field("name"));
-			REQUIRE_FALSE(BlackboardTestUtils::get_info(*blackboard).has_field("missing"));
+			REQUIRE(info.struct_descriptor.fields.size() == 3);
+			REQUIRE(info.total_datablock_size >= sizeof(int) + sizeof(double) + sizeof(FixedString64));
+
+			REQUIRE(info.has_field("age"));
+			REQUIRE(info.has_field("score"));
+			REQUIRE(info.has_field("name"));
+			REQUIRE_FALSE(info.has_field("missing"));
 		}
 
 		SECTION("Blackboard binds to WorkloadsBuffer and performs typed access", "[blackboard][buffer]")
 		{
-			std::vector<BlackboardFieldInfo> schema = {
-				{"age", TypeId(GET_TYPE_ID(int))}, {"score", TypeId(GET_TYPE_ID(double))}, {"name", TypeId(GET_TYPE_ID(FixedString64))}};
+			HeapVector<FieldDescriptor> blackboard_fields;
+			blackboard_fields.initialize(3);
+			blackboard_fields[0] = FieldDescriptor{"age", GET_TYPE_ID(int)};
+			blackboard_fields[1] = FieldDescriptor{"score", GET_TYPE_ID(double)};
+			blackboard_fields[2] = FieldDescriptor{"name", GET_TYPE_ID(FixedString64)};
 
-			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
+			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
 
 			SECTION("Set and get int")
 			{
@@ -58,34 +66,41 @@ namespace robotick
 			}
 		}
 
-		SECTION("Blackboard throws on missing keys or unbound source", "[blackboard][errors]")
+		SECTION("Blackboard error conditions for missing keys and unbound access", "[blackboard][errors]")
 		{
-			std::vector<BlackboardFieldInfo> schema = {{"alpha", TypeId(GET_TYPE_ID(int))}};
+			HeapVector<FieldDescriptor> blackboard_fields;
+			blackboard_fields.initialize(1);
+			blackboard_fields[0] = FieldDescriptor{"alpha", GET_TYPE_ID(int)};
 
 			SECTION("Throws on unbound field offset")
 			{
-				Blackboard temp(schema);
-				WorkloadsBuffer buffer(sizeof(Blackboard) + BlackboardTestUtils::get_info(temp).total_datablock_size);
+				Blackboard temp;
+				temp.initialize_fields(blackboard_fields);
+				WorkloadsBuffer buffer(sizeof(Blackboard) + temp.get_info().total_datablock_size);
+				Blackboard* blackboard_ptr = buffer.as<Blackboard>(0);
+				new (blackboard_ptr) Blackboard(); // Constructed but not bound
+				blackboard_ptr->initialize_fields(blackboard_fields);
+				// intentionally don't call blackboard_ptr->bind();
 
-				auto* blackboard_ptr = buffer.as<Blackboard>(0);
-				new (blackboard_ptr) Blackboard(schema); // not bound
 				ROBOTICK_REQUIRE_ERROR_MSG(blackboard_ptr->get<int>("alpha"), ("Blackboard"));
 			}
 
 			SECTION("Throws on missing field")
 			{
-				auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
-
+				auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
 				ROBOTICK_REQUIRE_ERROR_MSG(blackboard->get<int>("nonexistent"), ("Blackboard"));
 			}
 		}
 
-		SECTION("Blackboard alignment and offset consistency", "[blackboard][layout]")
+		SECTION("Blackboard field offset and alignment correctness", "[blackboard][layout]")
 		{
-			std::vector<BlackboardFieldInfo> schema = {
-				{"a", TypeId(GET_TYPE_ID(int))}, {"b", TypeId(GET_TYPE_ID(double))}, {"c", TypeId(GET_TYPE_ID(int))}};
+			HeapVector<FieldDescriptor> blackboard_fields;
+			blackboard_fields.initialize(3);
+			blackboard_fields[0] = FieldDescriptor{"a", GET_TYPE_ID(int)};
+			blackboard_fields[1] = FieldDescriptor{"b", GET_TYPE_ID(double)};
+			blackboard_fields[2] = FieldDescriptor{"c", GET_TYPE_ID(int)};
 
-			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(schema);
+			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
 
 			blackboard->set<int>("a", 1);
 			blackboard->set<double>("b", 3.14);

@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/platform/EntryPoint.h"
 #include "robotick/platform/NetworkManager.h"
 #include "robotick/platform/Threading.h"
@@ -33,14 +31,37 @@ namespace robotick
 
 } // namespace robotick
 
-void populate_model(robotick::Model_v1& model)
+void populate_model(robotick::Model& model)
 {
-	std::vector<robotick::WorkloadHandle_v1> children = {model.add("BaseXWorkload", "basex"), model.add("ConsoleTelemetryWorkload", "console"),
-		model.add("FaceDisplayWorkload", "face_display"), model.add("SteeringMixerWorkload", "steering"),
-		model.add("TimingDiagnosticsWorkload", "timing")};
+	const float tick_rate_hz = 100.0f;
 
-	auto root = model.add("SequencedGroupWorkload", "root", children, 100.0);
-	model.set_root(root);
+	// Static workload seeds
+	static const robotick::WorkloadSeed workload_basex{robotick::TypeId("BaseXWorkload"), robotick::StringView("basex"), tick_rate_hz};
+
+	static const robotick::WorkloadSeed workload_console{robotick::TypeId("ConsoleTelemetryWorkload"), robotick::StringView("console"), tick_rate_hz};
+
+	static const robotick::WorkloadSeed workload_face_display{
+		robotick::TypeId("FaceDisplayWorkload"), robotick::StringView("face_display"), tick_rate_hz};
+
+	static const robotick::WorkloadSeed workload_steering{robotick::TypeId("SteeringMixerWorkload"), robotick::StringView("steering"), tick_rate_hz};
+
+	static const robotick::WorkloadSeed workload_timing{robotick::TypeId("TimingDiagnosticsWorkload"), robotick::StringView("timing"), tick_rate_hz};
+
+	// Static child list
+	static const robotick::WorkloadSeed* group_children[] = {
+		&workload_basex, &workload_console, &workload_face_display, &workload_steering, &workload_timing};
+
+	// Root group
+	static const robotick::WorkloadSeed workload_root{
+		robotick::TypeId("SequencedGroupWorkload"), robotick::StringView("root"), tick_rate_hz, group_children};
+
+	// All workloads
+	static const robotick::WorkloadSeed* all[] = {
+		&workload_basex, &workload_console, &workload_face_display, &workload_steering, &workload_timing, &workload_root};
+
+	// Final registration
+	model.use_workload_seeds(all);
+	model.set_root_workload(workload_root);
 }
 
 void run_engine_on_core1(void* param)
@@ -49,7 +70,7 @@ void run_engine_on_core1(void* param)
 
 	auto* engine = static_cast<robotick::Engine*>(param);
 
-	robotick::Model_v1 model;
+	robotick::Model model;
 	populate_model(model);
 
 	ROBOTICK_INFO("esp32-testbed - Loading Robotick model...");

@@ -43,6 +43,12 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 	static const float s_tick_100hz(100.f);
 	static const float s_tick_200hz(200.f);
 
+	SECTION("Rejects unknown workload type")
+	{
+		Model model;
+		REQUIRE_THROWS(model.add("UnknownType", "fail").set_tick_rate_hz(s_tick_100hz));
+	}
+
 	SECTION("Throws if child tick rate faster than parent")
 	{
 		Model model;
@@ -69,11 +75,11 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 		REQUIRE(((seeds[0] == &one && seeds[1] == &two) || (seeds[1] == &one && seeds[0] == &two)));
 
 		REQUIRE(one.type_id == TypeId("DummyModelWorkload"));
-		REQUIRE(one.name == "One");
+		REQUIRE(one.unique_name == "One");
 		REQUIRE(one.tick_rate_hz == s_tick_100hz);
 
 		REQUIRE(two.type_id == TypeId("DummyModelWorkload"));
-		REQUIRE(two.name == "Two");
+		REQUIRE(two.unique_name == "Two");
 		REQUIRE(two.tick_rate_hz == s_tick_200hz);
 	}
 
@@ -221,21 +227,21 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 		for (const WorkloadSeed* seed : workload_seeds)
 		{
 			CHECK(seed != nullptr);
-			if (strcmp(seed->name.c_str(), "A") == 0)
+			if (strcmp(seed->unique_name.c_str(), "A") == 0)
 			{
 				found_a = seed;
 				CHECK(seed->type_id == TypeId("DummyModelWorkload"));
 				CHECK(seed->tick_rate_hz == s_tick_100hz);
 				CHECK(seed->children.size() == 0);
 			}
-			else if (strcmp(seed->name.c_str(), "B") == 0)
+			else if (strcmp(seed->unique_name.c_str(), "B") == 0)
 			{
 				found_b = seed;
 				CHECK(seed->type_id == TypeId("DummyModelWorkload"));
 				CHECK(seed->tick_rate_hz == s_tick_100hz);
 				CHECK(seed->children.size() == 0);
 			}
-			else if (strcmp(seed->name.c_str(), "Group") == 0)
+			else if (strcmp(seed->unique_name.c_str(), "Group") == 0)
 			{
 				found_group = seed;
 				CHECK(seed->type_id == TypeId("DummyModelWorkload"));

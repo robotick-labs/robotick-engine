@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/registry-v2/TypeDescriptor.h"
-#include "robotick/framework/registry-v2/TypeRegistry.h"
+#include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/registry/TypeRegistry.h"
 #include <catch2/catch_all.hpp>
 #include <cstring>
 #include <set>
@@ -73,7 +73,7 @@ namespace robotick::test
 				REQUIRE(desc != nullptr);
 				CHECK(desc->id == entry.id);
 				CHECK(desc->size == entry.size);
-				CHECK(desc->type_category == TypeDescriptor::TypeCategory::Primitive);
+				CHECK(desc->type_category == TypeCategory::Primitive);
 			}
 		}
 

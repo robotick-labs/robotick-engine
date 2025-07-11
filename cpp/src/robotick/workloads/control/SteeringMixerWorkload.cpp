@@ -18,12 +18,12 @@ namespace robotick
 		double power_scale_right = 1.0;
 	};
 
-	ROBOTICK_BEGIN_FIELDS(SteeringMixerTransformerConfig)
-	ROBOTICK_FIELD(SteeringMixerTransformerConfig, double, max_speed_differential)
-	ROBOTICK_FIELD(SteeringMixerTransformerConfig, double, power_scale_both)
-	ROBOTICK_FIELD(SteeringMixerTransformerConfig, double, power_scale_left)
-	ROBOTICK_FIELD(SteeringMixerTransformerConfig, double, power_scale_right)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(SteeringMixerTransformerConfig)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerConfig, double, max_speed_differential)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerConfig, double, power_scale_both)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerConfig, double, power_scale_left)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerConfig, double, power_scale_right)
+	ROBOTICK_REGISTER_STRUCT_END(SteeringMixerTransformerConfig)
 
 	struct SteeringMixerTransformerInputs
 	{
@@ -31,10 +31,10 @@ namespace robotick
 		double turn_rate = 0.0;
 	};
 
-	ROBOTICK_BEGIN_FIELDS(SteeringMixerTransformerInputs)
-	ROBOTICK_FIELD(SteeringMixerTransformerInputs, double, speed)
-	ROBOTICK_FIELD(SteeringMixerTransformerInputs, double, turn_rate)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(SteeringMixerTransformerInputs)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerInputs, double, speed)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerInputs, double, turn_rate)
+	ROBOTICK_REGISTER_STRUCT_END(SteeringMixerTransformerInputs)
 
 	struct SteeringMixerTransformerOutputs
 	{
@@ -42,10 +42,10 @@ namespace robotick
 		double right_motor = 0.0;
 	};
 
-	ROBOTICK_BEGIN_FIELDS(SteeringMixerTransformerOutputs)
-	ROBOTICK_FIELD(SteeringMixerTransformerOutputs, double, left_motor)
-	ROBOTICK_FIELD(SteeringMixerTransformerOutputs, double, right_motor)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(SteeringMixerTransformerOutputs)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerOutputs, double, left_motor)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerOutputs, double, right_motor)
+	ROBOTICK_REGISTER_STRUCT_END(SteeringMixerTransformerOutputs)
 
 	// === Workload ===
 
@@ -77,6 +77,6 @@ namespace robotick
 
 	// === Auto-registration ===
 
-	ROBOTICK_DEFINE_WORKLOAD(SteeringMixerWorkload, SteeringMixerTransformerConfig, SteeringMixerTransformerInputs, SteeringMixerTransformerOutputs)
+	ROBOTICK_REGISTER_WORKLOAD(SteeringMixerWorkload, SteeringMixerTransformerConfig, SteeringMixerTransformerInputs, SteeringMixerTransformerOutputs)
 
 } // namespace robotick

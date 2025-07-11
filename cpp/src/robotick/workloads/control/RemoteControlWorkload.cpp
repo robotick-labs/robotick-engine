@@ -16,10 +16,10 @@ namespace robotick
 		int port = 7080;
 		FixedString128 web_root_folder = "engine-data/remote_control_interface_web";
 	};
-	ROBOTICK_BEGIN_FIELDS(RemoteControlConfig)
-	ROBOTICK_FIELD(RemoteControlConfig, int, port)
-	ROBOTICK_FIELD(RemoteControlConfig, FixedString128, web_root_folder)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(RemoteControlConfig)
+	ROBOTICK_STRUCT_FIELD(RemoteControlConfig, int, port)
+	ROBOTICK_STRUCT_FIELD(RemoteControlConfig, FixedString128, web_root_folder)
+	ROBOTICK_REGISTER_STRUCT_END(RemoteControlConfig)
 
 	struct RemoteControlInputs
 	{
@@ -35,17 +35,17 @@ namespace robotick
 		double scale_right_x = 1.0;
 		double scale_right_y = 1.0;
 	};
-	ROBOTICK_BEGIN_FIELDS(RemoteControlInputs)
-	ROBOTICK_FIELD(RemoteControlInputs, bool, use_web_inputs)
-	ROBOTICK_FIELD(RemoteControlInputs, double, left_x)
-	ROBOTICK_FIELD(RemoteControlInputs, double, left_y)
-	ROBOTICK_FIELD(RemoteControlInputs, double, right_x)
-	ROBOTICK_FIELD(RemoteControlInputs, double, right_y)
-	ROBOTICK_FIELD(RemoteControlInputs, double, scale_left_x)
-	ROBOTICK_FIELD(RemoteControlInputs, double, scale_left_y)
-	ROBOTICK_FIELD(RemoteControlInputs, double, scale_right_x)
-	ROBOTICK_FIELD(RemoteControlInputs, double, scale_right_y)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(RemoteControlInputs)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, bool, use_web_inputs)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, left_x)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, left_y)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, right_x)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, right_y)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, scale_left_x)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, scale_left_y)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, scale_right_x)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, scale_right_y)
+	ROBOTICK_REGISTER_STRUCT_END(RemoteControlInputs)
 
 	struct RemoteControlOutputs
 	{
@@ -54,12 +54,12 @@ namespace robotick
 		double right_x = 0;
 		double right_y = 0;
 	};
-	ROBOTICK_BEGIN_FIELDS(RemoteControlOutputs)
-	ROBOTICK_FIELD(RemoteControlOutputs, double, left_x)
-	ROBOTICK_FIELD(RemoteControlOutputs, double, left_y)
-	ROBOTICK_FIELD(RemoteControlOutputs, double, right_x)
-	ROBOTICK_FIELD(RemoteControlOutputs, double, right_y)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(RemoteControlOutputs)
+	ROBOTICK_STRUCT_FIELD(RemoteControlOutputs, double, left_x)
+	ROBOTICK_STRUCT_FIELD(RemoteControlOutputs, double, left_y)
+	ROBOTICK_STRUCT_FIELD(RemoteControlOutputs, double, right_x)
+	ROBOTICK_STRUCT_FIELD(RemoteControlOutputs, double, right_y)
+	ROBOTICK_REGISTER_STRUCT_END(RemoteControlOutputs)
 
 	struct RemoteControlState
 	{
@@ -78,7 +78,8 @@ namespace robotick
 		void setup()
 		{
 #if defined(ROBOTICK_PLATFORM_DESKTOP)
-			state->server.start(config.port, config.web_root_folder.c_str(),
+			state->server.start(config.port,
+				config.web_root_folder.c_str(),
 				[&](const WebRequest& request, WebResponse& response)
 				{
 					if (request.method == "POST" && request.uri == "/api/joystick_input")
@@ -150,6 +151,6 @@ namespace robotick
 		}
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(RemoteControlWorkload, RemoteControlConfig, RemoteControlInputs, RemoteControlOutputs)
+	ROBOTICK_REGISTER_WORKLOAD(RemoteControlWorkload, RemoteControlConfig, RemoteControlInputs, RemoteControlOutputs)
 
 } // namespace robotick

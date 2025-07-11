@@ -16,15 +16,15 @@ namespace robotick
 	{
 		int log_rate_hz = 1;
 	};
-	ROBOTICK_BEGIN_FIELDS(TimingDiagnosticsConfig)
-	ROBOTICK_FIELD(TimingDiagnosticsConfig, int, log_rate_hz)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(TimingDiagnosticsConfig)
+	ROBOTICK_STRUCT_FIELD(TimingDiagnosticsConfig, int, log_rate_hz)
+	ROBOTICK_REGISTER_STRUCT_END(TimingDiagnosticsConfig)
 
 	struct TimingDiagnosticsInputs
 	{
 	};
-	ROBOTICK_BEGIN_FIELDS(TimingDiagnosticsInputs)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(TimingDiagnosticsInputs)
+	ROBOTICK_REGISTER_STRUCT_END(TimingDiagnosticsInputs)
 
 	struct TimingDiagnosticsOutputs
 	{
@@ -32,11 +32,11 @@ namespace robotick
 		double avg_tick_rate = 0.0;
 		double tick_stddev = 0.0;
 	};
-	ROBOTICK_BEGIN_FIELDS(TimingDiagnosticsOutputs)
-	ROBOTICK_FIELD(TimingDiagnosticsOutputs, double, last_tick_rate)
-	ROBOTICK_FIELD(TimingDiagnosticsOutputs, double, avg_tick_rate)
-	ROBOTICK_FIELD(TimingDiagnosticsOutputs, double, tick_stddev)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(TimingDiagnosticsOutputs)
+	ROBOTICK_STRUCT_FIELD(TimingDiagnosticsOutputs, double, last_tick_rate)
+	ROBOTICK_STRUCT_FIELD(TimingDiagnosticsOutputs, double, avg_tick_rate)
+	ROBOTICK_STRUCT_FIELD(TimingDiagnosticsOutputs, double, tick_stddev)
+	ROBOTICK_REGISTER_STRUCT_END(TimingDiagnosticsOutputs)
 
 	// === Internal state (not registered) ===
 
@@ -107,5 +107,5 @@ namespace robotick
 
 	// === Auto-registration ===
 
-	ROBOTICK_DEFINE_WORKLOAD(TimingDiagnosticsWorkload, TimingDiagnosticsConfig, TimingDiagnosticsInputs, TimingDiagnosticsOutputs)
+	ROBOTICK_REGISTER_WORKLOAD(TimingDiagnosticsWorkload, TimingDiagnosticsConfig, TimingDiagnosticsInputs, TimingDiagnosticsOutputs)
 } // namespace robotick

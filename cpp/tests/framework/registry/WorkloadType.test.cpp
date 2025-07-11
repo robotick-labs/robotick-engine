@@ -5,9 +5,9 @@
 #include "robotick/api.h"
 
 #include "robotick/framework/common/HeapVector.h"
-#include "robotick/framework/data/Blackboard_v2.h"
+#include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/math/Vec3.h"
-#include "robotick/framework/registry-v2/TypeMacros.h"
+#include "robotick/framework/registry/TypeMacros.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <catch2/catch_all.hpp>
@@ -32,14 +32,14 @@ namespace robotick::test
 			int output_value_1 = 0;
 			int output_value_2 = 0;
 			Vec3 output_vec3;
-			Blackboard_v2 output_blackboard;
+			Blackboard output_blackboard;
 		};
 
 		ROBOTICK_REGISTER_STRUCT_BEGIN(RegistryTestOutputs)
 		ROBOTICK_STRUCT_FIELD(RegistryTestOutputs, int, output_value_1)
 		ROBOTICK_STRUCT_FIELD(RegistryTestOutputs, int, output_value_2)
 		ROBOTICK_STRUCT_FIELD(RegistryTestOutputs, Vec3, output_vec3)
-		ROBOTICK_STRUCT_FIELD(RegistryTestOutputs, Blackboard_v2, output_blackboard)
+		ROBOTICK_STRUCT_FIELD(RegistryTestOutputs, Blackboard, output_blackboard)
 		ROBOTICK_REGISTER_STRUCT_END(RegistryTestOutputs)
 
 		struct RegistryTestState
@@ -64,9 +64,7 @@ namespace robotick::test
 				state->blackboard_fields[0] = FieldDescriptor{"counter", GET_TYPE_ID(int)};
 				state->blackboard_fields[1] = FieldDescriptor{"target_position", GET_TYPE_ID(Vec3)};
 
-				const ArrayView<FieldDescriptor> fields_view(state->blackboard_fields.data(), state->blackboard_fields.size());
-
-				outputs.output_blackboard.initialize_fields(fields_view);
+				outputs.output_blackboard.initialize_fields(state->blackboard_fields);
 			}
 
 			void tick(const TickInfo&) { outputs.output_value_1 = inputs.input_value + 1; }
@@ -81,7 +79,7 @@ namespace robotick::test
 		{
 			const TypeDescriptor* workload_type = TypeRegistry::get().find_by_name("RegistryTestWorkload");
 			REQUIRE(workload_type != nullptr);
-			CHECK(workload_type->type_category == TypeDescriptor::TypeCategory::Workload);
+			CHECK(workload_type->type_category == TypeCategory::Workload);
 		}
 
 		SECTION("'RegistryTestWorkload' has correct metadata")
@@ -97,15 +95,15 @@ namespace robotick::test
 			REQUIRE(desc != nullptr);
 			CHECK(desc->start_fn == nullptr);
 			CHECK(desc->tick_fn != nullptr);
-			CHECK(desc->input_offset != SIZE_MAX);
-			CHECK(desc->output_offset != SIZE_MAX);
+			CHECK(desc->inputs_offset != SIZE_MAX);
+			CHECK(desc->outputs_offset != SIZE_MAX);
 		}
 
 		SECTION("Can find 'RegistryTestInputs' struct in the registry with correct metadata")
 		{
 			const TypeDescriptor* td = TypeRegistry::get().find_by_name("RegistryTestInputs");
 			REQUIRE(td != nullptr);
-			CHECK(td->type_category == TypeDescriptor::TypeCategory::Struct);
+			CHECK(td->type_category == TypeCategory::Struct);
 			CHECK(td->id == GET_TYPE_ID(RegistryTestInputs));
 			CHECK(td->size == sizeof(RegistryTestInputs));
 
@@ -122,7 +120,7 @@ namespace robotick::test
 		{
 			const TypeDescriptor* td = TypeRegistry::get().find_by_name("RegistryTestOutputs");
 			REQUIRE(td != nullptr);
-			CHECK(td->type_category == TypeDescriptor::TypeCategory::Struct);
+			CHECK(td->type_category == TypeCategory::Struct);
 			CHECK(td->id == GET_TYPE_ID(RegistryTestOutputs));
 			CHECK(td->size == sizeof(RegistryTestOutputs));
 
@@ -139,7 +137,7 @@ namespace robotick::test
 			CHECK(sd->fields[2].type_id == GET_TYPE_ID(Vec3));
 			CHECK(sd->fields[2].find_type_descriptor()->id == sd->fields[2].type_id);
 			CHECK(sd->fields[3].name == "output_blackboard");
-			CHECK(sd->fields[3].type_id == GET_TYPE_ID(Blackboard_v2));
+			CHECK(sd->fields[3].type_id == GET_TYPE_ID(Blackboard));
 			CHECK(sd->fields[3].find_type_descriptor()->id == sd->fields[3].type_id);
 		}
 
@@ -148,12 +146,12 @@ namespace robotick::test
 			RegistryTestWorkload test_workload;
 			test_workload.setup();
 
-			Blackboard_v2& blackboard = test_workload.outputs.output_blackboard;
+			Blackboard& blackboard = test_workload.outputs.output_blackboard;
 
 			// Lookup the type descriptor from the registry
-			const TypeDescriptor* blackboard_type = TypeRegistry::get().find_by_name("Blackboard_v2");
+			const TypeDescriptor* blackboard_type = TypeRegistry::get().find_by_name("Blackboard");
 			REQUIRE(blackboard_type != nullptr);
-			CHECK(blackboard_type->type_category == TypeDescriptor::TypeCategory::DynamicStruct);
+			CHECK(blackboard_type->type_category == TypeCategory::DynamicStruct);
 
 			// Get the dynamic resolver and call it with our Blackboard
 			const DynamicStructDescriptor* dyn_desc = blackboard_type->type_category_desc.dynamic_struct_desc;

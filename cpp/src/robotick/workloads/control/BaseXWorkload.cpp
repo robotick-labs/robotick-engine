@@ -16,9 +16,9 @@ namespace robotick
 	{
 		double max_motor_speed = 1.0;
 	};
-	ROBOTICK_BEGIN_FIELDS(BaseXConfig)
-	ROBOTICK_FIELD(BaseXConfig, double, max_motor_speed)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(BaseXConfig)
+	ROBOTICK_STRUCT_FIELD(BaseXConfig, double, max_motor_speed)
+	ROBOTICK_REGISTER_STRUCT_END(BaseXConfig)
 
 	struct BaseXInputs
 	{
@@ -27,12 +27,12 @@ namespace robotick
 		double motor3_speed = 0.0;
 		double motor4_speed = 0.0;
 	};
-	ROBOTICK_BEGIN_FIELDS(BaseXInputs)
-	ROBOTICK_FIELD(BaseXInputs, double, motor1_speed)
-	ROBOTICK_FIELD(BaseXInputs, double, motor2_speed)
-	ROBOTICK_FIELD(BaseXInputs, double, motor3_speed)
-	ROBOTICK_FIELD(BaseXInputs, double, motor4_speed)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(BaseXInputs)
+	ROBOTICK_STRUCT_FIELD(BaseXInputs, double, motor1_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXInputs, double, motor2_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXInputs, double, motor3_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXInputs, double, motor4_speed)
+	ROBOTICK_REGISTER_STRUCT_END(BaseXInputs)
 
 	struct BaseXOutputs
 	{
@@ -41,12 +41,12 @@ namespace robotick
 		double motor3_speed = 0.0;
 		double motor4_speed = 0.0;
 	};
-	ROBOTICK_BEGIN_FIELDS(BaseXOutputs)
-	ROBOTICK_FIELD(BaseXOutputs, double, motor1_speed)
-	ROBOTICK_FIELD(BaseXOutputs, double, motor2_speed)
-	ROBOTICK_FIELD(BaseXOutputs, double, motor3_speed)
-	ROBOTICK_FIELD(BaseXOutputs, double, motor4_speed)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(BaseXOutputs)
+	ROBOTICK_STRUCT_FIELD(BaseXOutputs, double, motor1_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXOutputs, double, motor2_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXOutputs, double, motor3_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXOutputs, double, motor4_speed)
+	ROBOTICK_REGISTER_STRUCT_END(BaseXOutputs)
 
 	struct BaseXWorkload
 	{
@@ -94,6 +94,6 @@ namespace robotick
 		}
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(BaseXWorkload, BaseXConfig, BaseXInputs, BaseXOutputs)
+	ROBOTICK_REGISTER_WORKLOAD(BaseXWorkload, BaseXConfig, BaseXInputs, BaseXOutputs)
 
 } // namespace robotick

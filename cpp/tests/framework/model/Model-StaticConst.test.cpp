@@ -42,9 +42,9 @@ namespace
 
 	void populate_model_static_const(Model& model)
 	{
-		static const ConfigEntry config_entries[] = {{"entry_float", "2.0f"}, {"entry_bool", "false"}};
+		static const FieldConfigEntry config_entries[] = {{"entry_float", "2.0f"}, {"entry_bool", "false"}};
 
-		static const ConfigEntry input_entries[] = {{"entry_int", "10"}, {"entry_string", "there"}};
+		static const FieldConfigEntry input_entries[] = {{"entry_int", "10"}, {"entry_string", "there"}};
 
 		// Declare workloads A and B
 		static const WorkloadSeed workload_a{
@@ -91,6 +91,109 @@ namespace
 
 TEST_CASE("Unit/Framework/Model-StaticConst")
 {
+	SECTION("Rejects unknown workload type")
+	{
+		// Declare workload with unknown type
+		static const WorkloadSeed workload_unknown{
+			TypeId("UnknownType"), // deliberately unknown type
+			StringView("fail"),	   // workload name
+			s_tick_100hz,		   // tick rate
+			{},					   // no children
+			{},					   // no config
+			{}					   // no inputs
+		};
+
+		// Updated all workload pointers to include it
+		static const WorkloadSeed* all[] = {&workload_unknown};
+
+		Model model;
+		ROBOTICK_REQUIRE_ERROR_MSG(model.use_workload_seeds(all), "Unable to find workload type");
+	}
+
+	SECTION("Throws if child tick rate faster than parent")
+	{
+		static const WorkloadSeed child{TypeId("DummyStaticModelWorkload"), "A", s_tick_200hz, {}, {}, {}};
+
+		static const WorkloadSeed* children[] = {&child};
+
+		static const WorkloadSeed parent{TypeId("DummyStaticModelWorkload"), "Parent", s_tick_100hz, children, {}, {}};
+
+		static const WorkloadSeed* all[] = {&child, &parent};
+
+		Model model;
+		model.use_workload_seeds(all);
+
+		const bool auto_finalize = false;
+		model.set_root_workload(parent, auto_finalize);
+
+		ROBOTICK_REQUIRE_ERROR_MSG(model.finalize(), "faster tick rate");
+	}
+
+	SECTION("Duplicate data connection throws")
+	{
+		static const WorkloadSeed a{TypeId("DummyStaticModelWorkload"), "A", s_tick_100hz, {}, {}, {}};
+		static const WorkloadSeed b{TypeId("DummyStaticModelWorkload"), "B", s_tick_100hz, {}, {}, {}};
+
+		static const WorkloadSeed* all[] = {&a, &b};
+
+		static const DataConnectionSeed dc1{"A.outputs.x", "B.inputs.x"};
+		static const DataConnectionSeed dc2{"A.outputs.y", "B.inputs.x"};
+		static const DataConnectionSeed* connections[] = {&dc1, &dc2};
+
+		Model model;
+		model.use_workload_seeds(all);
+		model.use_data_connection_seeds(connections);
+
+		const bool auto_finalize = false;
+		model.set_root_workload(a, auto_finalize);
+
+		ROBOTICK_REQUIRE_ERROR_MSG(model.finalize(), "already has an incoming connection");
+	}
+
+	SECTION("Duplicate inputs throw with clear error")
+	{
+		static const WorkloadSeed a{TypeId("DummyStaticModelWorkload"), "A", s_tick_100hz, {}, {}, {}};
+		static const WorkloadSeed b{TypeId("DummyStaticModelWorkload"), "B", s_tick_100hz, {}, {}, {}};
+		static const WorkloadSeed c{TypeId("DummyStaticModelWorkload"), "C", s_tick_100hz, {}, {}, {}};
+
+		static const WorkloadSeed* all[] = {&a, &b, &c};
+
+		static const DataConnectionSeed dc1{"A.output", "C.input"};
+		static const DataConnectionSeed dc2{"B.output", "C.input"};
+		static const DataConnectionSeed* dcs[] = {&dc1, &dc2};
+
+		Model model;
+		model.use_workload_seeds(all);
+		model.use_data_connection_seeds(dcs);
+
+		const bool auto_finalize = false;
+		model.set_root_workload(c, auto_finalize);
+
+		ROBOTICK_REQUIRE_ERROR_MSG(model.finalize(), "already has an incoming connection");
+	}
+
+	SECTION("Allows connecting input between valid workloads")
+	{
+		static const WorkloadSeed a{TypeId("DummyStaticModelWorkload"), "A", s_tick_100hz, {}, {}, {}};
+		static const WorkloadSeed b{TypeId("DummyStaticModelWorkload"), "B", s_tick_100hz, {}, {}, {}};
+		static const WorkloadSeed* children[] = {&a, &b};
+		static const WorkloadSeed group{TypeId("DummyStaticModelWorkload"), "Group", s_tick_100hz, children, {}, {}};
+
+		static const WorkloadSeed* all[] = {&a, &b, &group};
+
+		static const DataConnectionSeed dc{"A.output", "B.input"};
+		static const DataConnectionSeed* dcs[] = {&dc};
+
+		Model model;
+		model.use_workload_seeds(all);
+		model.use_data_connection_seeds(dcs);
+
+		const bool auto_finalize = false;
+		model.set_root_workload(group, auto_finalize);
+
+		REQUIRE_NOTHROW(model.finalize());
+	}
+
 	SECTION("Seeds are preserved for engine use")
 	{
 		Model model;
@@ -106,11 +209,11 @@ TEST_CASE("Unit/Framework/Model-StaticConst")
 
 		for (auto* seed : seeds)
 		{
-			if (seed->name == "A")
+			if (seed->unique_name == "A")
 				found_a = seed;
-			if (seed->name == "B")
+			if (seed->unique_name == "B")
 				found_b = seed;
-			if (seed->name == "Group")
+			if (seed->unique_name == "Group")
 				found_group = seed;
 		}
 

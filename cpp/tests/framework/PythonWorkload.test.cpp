@@ -2,19 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/api.h"
-#include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
-
-#include "utils/EngineInspector.h"
 
 #include <catch2/catch_all.hpp>
 
 using namespace robotick;
-using namespace robotick::test;
 
 #ifndef ROBOTICK_ENABLE_PYTHON
 #error "ROBOTICK_ENABLE_PYTHON must be defined (expected value: 1)"
@@ -26,73 +19,66 @@ using namespace robotick::test;
 
 TEST_CASE("Unit/Workloads/PythonWorkload")
 {
-	SECTION("Metadata is registered correctly")
-	{
-		const auto* cfg = FieldRegistry::get().get_struct("PythonConfig");
-		const auto* in = FieldRegistry::get().get_struct("PythonInputs");
-		const auto* out = FieldRegistry::get().get_struct("PythonOutputs");
-
-		REQUIRE(cfg != nullptr);
-		REQUIRE(in != nullptr);
-		REQUIRE(out != nullptr);
-
-		REQUIRE(cfg->fields.size() == 3);
-		REQUIRE(in->fields.size() == 1);
-		REQUIRE(out->fields.size() == 1);
-	}
-
 	SECTION("Python tick executes")
 	{
-		Model_v1 model;
-		const auto handle = model.add(
-			"PythonWorkload", "test2", 1.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
-		model.set_root(handle);
+		Model model;
+		const WorkloadSeed& python_workload =
+			model.add("PythonWorkload", "test2")
+				.set_tick_rate_hz(1.0f)
+				.set_config({{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
+		model.set_root_workload(python_workload);
 
 		Engine engine;
 		engine.load(model);
-		const auto& info = EngineInspector::get_instance_info(engine, handle.index);
+		const auto& info = *engine.find_instance_info(python_workload.unique_name);
 		auto* inst_ptr = info.get_ptr(engine);
 
 		REQUIRE(inst_ptr);
 		REQUIRE(info.type != nullptr);
-		REQUIRE(info.type->tick_fn != nullptr);
+		REQUIRE(info.type->get_workload_desc() != nullptr);
+		REQUIRE(info.type->get_workload_desc()->tick_fn != nullptr);
 
-		REQUIRE_NOTHROW(info.type->tick_fn(inst_ptr, TICK_INFO_FIRST_10MS_100HZ));
+		REQUIRE_NOTHROW(info.type->get_workload_desc()->tick_fn(inst_ptr, TICK_INFO_FIRST_10MS_100HZ));
 	}
 
 	SECTION("Output reflects Python computation")
 	{
-		Model_v1 model;
-		const auto handle = model.add("PythonWorkload", "py", 1.0,
-			{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}, {"example_in", "21.0"}});
-		model.set_root(handle);
+		Model model;
+		const WorkloadSeed& root =
+			model.add("PythonWorkload", "py")
+				.set_tick_rate_hz(1.0f)
+				.set_config(
+					{{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}, {"example_in", "21.0"}});
+		model.set_root_workload(root);
 
 		Engine engine;
 		engine.load(model);
 
-		const auto& info = EngineInspector::get_instance_info(engine, handle.index);
+		const auto& info = *engine.find_instance_info(root.unique_name);
 		auto* inst_ptr = info.get_ptr(engine);
 		REQUIRE(inst_ptr != nullptr);
 		REQUIRE(info.type != nullptr);
-		REQUIRE(info.type->tick_fn != nullptr);
+		REQUIRE(info.type->get_workload_desc()->tick_fn != nullptr);
 
 		// Execute tick
-		info.type->tick_fn(inst_ptr, TICK_INFO_FIRST_10MS_100HZ);
+		info.type->get_workload_desc()->tick_fn(inst_ptr, TICK_INFO_FIRST_10MS_100HZ);
 
 		// === Find the output blackboard ===
-		const auto* output_struct = info.type->output_struct;
-		REQUIRE(output_struct != nullptr);
+		const auto* outputs_desc = info.type->get_workload_desc()->outputs_desc;
+		const size_t outputs_offset = info.type->get_workload_desc()->outputs_offset;
+		REQUIRE(outputs_desc != nullptr);
+		REQUIRE(outputs_offset != OFFSET_UNBOUND);
 
-		const void* output_base = static_cast<const uint8_t*>(inst_ptr) + output_struct->offset_within_workload;
+		const void* output_base = static_cast<const uint8_t*>(inst_ptr) + outputs_offset;
 
 		const robotick::Blackboard* output_blackboard = nullptr;
-		for (const auto& field : output_struct->fields)
+		for (const auto& field : outputs_desc->get_struct_desc()->fields)
 		{
 			if (field.name == "blackboard")
 			{
-				ROBOTICK_ASSERT(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+				ROBOTICK_ASSERT(field.offset_within_container != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
 
-				const void* field_ptr = static_cast<const uint8_t*>(output_base) + field.offset_within_struct;
+				const void* field_ptr = static_cast<const uint8_t*>(output_base) + field.offset_within_container;
 				output_blackboard = static_cast<const robotick::Blackboard*>(field_ptr);
 				break;
 			}
@@ -113,27 +99,29 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 
 	SECTION("start/stop hooks are optional and safe")
 	{
-		Model_v1 model;
-		const auto handle = model.add(
-			"PythonWorkload", "test", 10.0, {{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
-		model.set_root(handle);
+		Model model;
+		const WorkloadSeed& root =
+			model.add("PythonWorkload", "test")
+				.set_tick_rate_hz(10.0f)
+				.set_config({{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
+		model.set_root_workload(root);
 
 		Engine engine;
 		engine.load(model);
 
-		const auto& info = EngineInspector::get_instance_info(engine, handle.index);
+		const auto& info = *engine.find_instance_info(root.unique_name);
 		auto* inst_ptr = info.get_ptr(engine);
 
 		REQUIRE(inst_ptr != nullptr);
 		REQUIRE(info.type != nullptr);
 
-		if (info.type->start_fn)
+		if (info.type->get_workload_desc()->start_fn)
 		{
-			REQUIRE_NOTHROW(info.type->start_fn(inst_ptr, 10.0));
+			REQUIRE_NOTHROW(info.type->get_workload_desc()->start_fn(inst_ptr, 10.0));
 		}
-		if (info.type->stop_fn)
+		if (info.type->get_workload_desc()->stop_fn)
 		{
-			REQUIRE_NOTHROW(info.type->stop_fn(inst_ptr));
+			REQUIRE_NOTHROW(info.type->get_workload_desc()->stop_fn(inst_ptr));
 		}
 	}
 }

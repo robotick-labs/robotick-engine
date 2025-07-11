@@ -54,11 +54,19 @@ target_include_directories(robotick-engine PUBLIC
 
 target_compile_options(robotick-engine PRIVATE -fno-exceptions)
 
+message("Determining platform...")
+
 if(ROBOTICK_PLATFORM_UBUNTU)
-    add_compile_definitions(ROBOTICK_PLATFORM_UBUNTU)
-    add_compile_definitions(ROBOTICK_PLATFORM_DESKTOP)
+    message("✅ ROBOTICK_PLATFORM_UBUNTU - defining ROBOTICK_PLATFORM_UBUNTU and ROBOTICK_PLATFORM_DESKTOP")
+    target_compile_definitions(robotick-engine PUBLIC
+        ROBOTICK_PLATFORM_UBUNTU
+        ROBOTICK_PLATFORM_DESKTOP
+    )
 elseif(ROBOTICK_PLATFORM_ESP32)
-    add_compile_definitions(ROBOTICK_PLATFORM_ESP32)
+    message("✅ ROBOTICK_PLATFORM_ESP32 - defining ROBOTICK_PLATFORM_ESP32")
+    target_compile_definitions(robotick-engine PUBLIC
+        ROBOTICK_PLATFORM_ESP32
+    )
 endif()
 
 # =========================

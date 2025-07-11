@@ -21,7 +21,10 @@ namespace robotick
 		constexpr StringView() = default;
 
 		/** @brief Construct from a null-terminated C string */
-		constexpr StringView(const char* str) : data(str) {}
+		constexpr StringView(const char* str)
+			: data(str)
+		{
+		}
 
 		/** @brief Assign from a null-terminated C string */
 		StringView& operator=(const char* str)
@@ -61,6 +64,9 @@ namespace robotick
 
 		/** @brief Get the raw character pointer */
 		const char* c_str() const { return data; }
+
+		/** @brief Implicit conversion to const char* */
+		operator const char*() const { return data; }
 
 		/** @brief True if the string is null or starts with '\0' */
 		bool empty() const { return data == nullptr || data[0] == '\0'; }

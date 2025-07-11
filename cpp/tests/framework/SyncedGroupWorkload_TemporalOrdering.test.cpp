@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/platform/Threading.h"
-#include "utils/EngineInspector.h"
 
 #include <catch2/catch_all.hpp>
 #include <chrono>
@@ -19,24 +16,24 @@ namespace robotick::test
 		{
 			int output = 0;
 		};
-		ROBOTICK_BEGIN_FIELDS(SenderOut)
-		ROBOTICK_FIELD(SenderOut, int, output)
-		ROBOTICK_END_FIELDS()
+		ROBOTICK_REGISTER_STRUCT_BEGIN(SenderOut)
+		ROBOTICK_STRUCT_FIELD(SenderOut, int, output)
+		ROBOTICK_REGISTER_STRUCT_END(SenderOut)
 
 		struct ReceiverIn
 		{
 			int input = 0;
 		};
-		ROBOTICK_BEGIN_FIELDS(ReceiverIn)
-		ROBOTICK_FIELD(ReceiverIn, int, input)
-		ROBOTICK_END_FIELDS()
+		ROBOTICK_REGISTER_STRUCT_BEGIN(ReceiverIn)
+		ROBOTICK_STRUCT_FIELD(ReceiverIn, int, input)
+		ROBOTICK_REGISTER_STRUCT_END(ReceiverIn)
 
 		struct SenderWorkload
 		{
 			SenderOut outputs;
 			void tick(const TickInfo&) { outputs.output++; }
 		};
-		ROBOTICK_DEFINE_WORKLOAD(SenderWorkload, void, void, SenderOut)
+		ROBOTICK_REGISTER_WORKLOAD(SenderWorkload, void, void, SenderOut)
 
 		struct ReceiverWorkload
 		{
@@ -44,22 +41,22 @@ namespace robotick::test
 			std::vector<int> received;
 			void tick(const TickInfo&) { received.push_back(inputs.input); }
 		};
-		ROBOTICK_DEFINE_WORKLOAD(ReceiverWorkload, void, ReceiverIn)
+		ROBOTICK_REGISTER_WORKLOAD(ReceiverWorkload, void, ReceiverIn)
 	} // namespace
 
 	TEST_CASE("Unit/Framework/Data/Connection/SyncedGroupWorklaod")
 	{
 		SECTION("Data connections are propagated correctly")
 		{
-			Model_v1 model;
-			const double tick_rate = 100.0;
+			Model model;
+			const float tick_rate = 100.0f;
 
-			auto sender = model.add("SenderWorkload", "sender", tick_rate);
-			auto receiver = model.add("ReceiverWorkload", "receiver", tick_rate);
-			auto group = model.add("SyncedGroupWorkload", "group", {sender, receiver}, tick_rate);
+			const WorkloadSeed& sender = model.add("SenderWorkload", "sender").set_tick_rate_hz(tick_rate);
+			const WorkloadSeed& receiver = model.add("ReceiverWorkload", "receiver").set_tick_rate_hz(tick_rate);
+			const WorkloadSeed& group_seed = model.add("SyncedGroupWorkload", "group").set_children({&sender, &receiver}).set_tick_rate_hz(tick_rate);
 
 			model.connect("sender.outputs.output", "receiver.inputs.input");
-			model.set_root(group);
+			model.set_root_workload(group_seed);
 
 			Engine engine;
 			engine.load(model);
@@ -76,7 +73,7 @@ namespace robotick::test
 			stop_after_next_tick_flag.set(true);
 			runner.join();
 
-			const auto& receiver_info = EngineInspector::get_instance_info(engine, receiver.index);
+			const auto& receiver_info = *engine.find_instance_info(receiver.unique_name);
 			auto* receiver_workload = static_cast<ReceiverWorkload*>((void*)receiver_info.get_ptr(engine));
 
 			REQUIRE(receiver_workload->received.size() > 10);

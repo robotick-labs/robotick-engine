@@ -26,7 +26,7 @@ namespace robotick
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 		// dynamic modifiers and accessor(s):
 		WorkloadSeed& add();
-		WorkloadSeed& add(const char* type_name, const char* name);
+		WorkloadSeed& add(const char* type_name, const char* unique_name);
 		void connect(const char* source_field_path, const char* dest_field_path);
 		void add_remote_model(const Model& remote_model, const char* model_name, const char* comms_channel);
 

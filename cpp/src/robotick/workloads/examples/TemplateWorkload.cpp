@@ -20,12 +20,12 @@ namespace robotick
 		// ^- you would tend to only use a Blackboard on a scripting Workload where you don't know your fields in advance - more indirection means
 		// they are a bit slower to use
 	};
-	ROBOTICK_BEGIN_FIELDS(TemplateConfig)
-	ROBOTICK_FIELD(TemplateConfig, double, gain)
-	ROBOTICK_FIELD(TemplateConfig, int, threshold)
-	ROBOTICK_FIELD(TemplateConfig, FixedString32, label)
-	ROBOTICK_FIELD(TemplateConfig, Blackboard, blackboard)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(TemplateConfig)
+	ROBOTICK_STRUCT_FIELD(TemplateConfig, double, gain)
+	ROBOTICK_STRUCT_FIELD(TemplateConfig, int, threshold)
+	ROBOTICK_STRUCT_FIELD(TemplateConfig, FixedString32, label)
+	ROBOTICK_STRUCT_FIELD(TemplateConfig, Blackboard, blackboard)
+	ROBOTICK_REGISTER_STRUCT_END(TemplateConfig)
 
 	struct TemplateInputs
 	{
@@ -34,12 +34,12 @@ namespace robotick
 		FixedString16 sensor_label;
 		Blackboard blackboard; // (see note on TemplateConfig::blackboard)
 	};
-	ROBOTICK_BEGIN_FIELDS(TemplateInputs)
-	ROBOTICK_FIELD(TemplateInputs, double, angle)
-	ROBOTICK_FIELD(TemplateInputs, int, sensor_value)
-	ROBOTICK_FIELD(TemplateInputs, FixedString16, sensor_label)
-	ROBOTICK_FIELD(TemplateInputs, Blackboard, blackboard)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(TemplateInputs)
+	ROBOTICK_STRUCT_FIELD(TemplateInputs, double, angle)
+	ROBOTICK_STRUCT_FIELD(TemplateInputs, int, sensor_value)
+	ROBOTICK_STRUCT_FIELD(TemplateInputs, FixedString16, sensor_label)
+	ROBOTICK_STRUCT_FIELD(TemplateInputs, Blackboard, blackboard)
+	ROBOTICK_REGISTER_STRUCT_END(TemplateInputs)
 
 	struct TemplateOutputs
 	{
@@ -56,19 +56,26 @@ namespace robotick
 		bool has_called_tick = false;
 		bool has_called_stop = false;
 	};
-	ROBOTICK_BEGIN_FIELDS(TemplateOutputs)
-	ROBOTICK_FIELD(TemplateOutputs, double, command)
-	ROBOTICK_FIELD(TemplateOutputs, FixedString64, status)
-	ROBOTICK_FIELD(TemplateOutputs, Blackboard, blackboard)
-	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_set_children)
-	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_set_engine)
-	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_pre_load)
-	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_load)
-	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_setup)
-	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_start)
-	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_tick)
-	ROBOTICK_FIELD(TemplateOutputs, bool, has_called_stop)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(TemplateOutputs)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, double, command)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, FixedString64, status)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, Blackboard, blackboard)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, bool, has_called_set_children)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, bool, has_called_set_engine)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, bool, has_called_pre_load)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, bool, has_called_load)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, bool, has_called_setup)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, bool, has_called_start)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, bool, has_called_tick)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, bool, has_called_stop)
+	ROBOTICK_REGISTER_STRUCT_END(TemplateOutputs)
+
+	struct TemplateState
+	{
+		HeapVector<FieldDescriptor> blackboard_fields_config;
+		HeapVector<FieldDescriptor> blackboard_fields_input;
+		HeapVector<FieldDescriptor> blackboard_fields_output;
+	};
 
 	//------------------------------------------------------------------------------
 	// TemplateWorkload: demonstrates full function pointer coverage
@@ -80,7 +87,9 @@ namespace robotick
 		TemplateInputs inputs;
 		TemplateOutputs outputs;
 
-		void set_children(const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& connections)
+		State<TemplateState> state;
+
+		void set_children(const HeapVector<const WorkloadInstanceInfo*>& children, HeapVector<DataConnectionInfo>& connections)
 		{
 			// Handle child linkage (if applicable - typically only used for compositional workloads
 			// e.g. AsyncPairWorkload, SyncedGroupWorkloads, SequencedGroupWorkload)
@@ -103,12 +112,19 @@ namespace robotick
 			// Called before blackboards or memory allocated...
 
 			// ... meaning it is the correct place to set the schema for each of our blackboards, for example:
-			config.blackboard = Blackboard({BlackboardFieldInfo("my_config_double", GET_TYPE_ID(double))});
 
-			inputs.blackboard = Blackboard(
-				{BlackboardFieldInfo("my_config_int", GET_TYPE_ID(int)), BlackboardFieldInfo("my_config_string", GET_TYPE_ID(FixedString64))});
+			state->blackboard_fields_config.initialize(1);
+			state->blackboard_fields_config[0] = FieldDescriptor{"my_config_double", GET_TYPE_ID(double)};
+			config.blackboard.initialize_fields(state->blackboard_fields_config);
 
-			outputs.blackboard = Blackboard({BlackboardFieldInfo("my_config_string", GET_TYPE_ID(FixedString64))});
+			state->blackboard_fields_input.initialize(1);
+			state->blackboard_fields_input[0] = FieldDescriptor{"my_config_int", GET_TYPE_ID(int)};
+			state->blackboard_fields_input[1] = FieldDescriptor{"my_config_string", GET_TYPE_ID(FixedString64)};
+			config.blackboard.initialize_fields(state->blackboard_fields_input);
+
+			state->blackboard_fields_output.initialize(1);
+			state->blackboard_fields_output[0] = FieldDescriptor{"my_config_string", GET_TYPE_ID(FixedString64)};
+			config.blackboard.initialize_fields(state->blackboard_fields_output);
 
 			outputs.has_called_pre_load = true; // (for unit-testing of this template - not for illustrating suggested usage!)
 		}
@@ -153,6 +169,6 @@ namespace robotick
 
 	// === Auto-registration ===
 
-	ROBOTICK_DEFINE_WORKLOAD(TemplateWorkload, TemplateConfig, TemplateInputs, TemplateOutputs)
+	ROBOTICK_REGISTER_WORKLOAD(TemplateWorkload, TemplateConfig, TemplateInputs, TemplateOutputs)
 
 } // namespace robotick

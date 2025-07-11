@@ -15,9 +15,9 @@ namespace robotick
 		float rest_heart_rate = 60.0f;
 	};
 
-	ROBOTICK_BEGIN_FIELDS(HeartbeatConfig)
-	ROBOTICK_FIELD(HeartbeatConfig, float, rest_heart_rate)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(HeartbeatConfig)
+	ROBOTICK_STRUCT_FIELD(HeartbeatConfig, float, rest_heart_rate)
+	ROBOTICK_REGISTER_STRUCT_END(HeartbeatConfig)
 
 	struct HeartbeatInputs
 	{
@@ -32,25 +32,25 @@ namespace robotick
 
 		float heart_rate_scale = 1.0f;
 	};
-	ROBOTICK_BEGIN_FIELDS(HeartbeatInputs)
-	ROBOTICK_FIELD(HeartbeatInputs, FixedString8, bar1_label)
-	ROBOTICK_FIELD(HeartbeatInputs, float, bar1_fraction)
-	ROBOTICK_FIELD(HeartbeatInputs, FixedString8, bar2_label)
-	ROBOTICK_FIELD(HeartbeatInputs, float, bar2_fraction)
-	ROBOTICK_FIELD(HeartbeatInputs, FixedString8, bar3_label)
-	ROBOTICK_FIELD(HeartbeatInputs, float, bar3_fraction)
-	ROBOTICK_FIELD(HeartbeatInputs, FixedString8, bar4_label)
-	ROBOTICK_FIELD(HeartbeatInputs, float, bar4_fraction)
-	ROBOTICK_FIELD(HeartbeatInputs, float, heart_rate_scale)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(HeartbeatInputs)
+	ROBOTICK_STRUCT_FIELD(HeartbeatInputs, FixedString8, bar1_label)
+	ROBOTICK_STRUCT_FIELD(HeartbeatInputs, float, bar1_fraction)
+	ROBOTICK_STRUCT_FIELD(HeartbeatInputs, FixedString8, bar2_label)
+	ROBOTICK_STRUCT_FIELD(HeartbeatInputs, float, bar2_fraction)
+	ROBOTICK_STRUCT_FIELD(HeartbeatInputs, FixedString8, bar3_label)
+	ROBOTICK_STRUCT_FIELD(HeartbeatInputs, float, bar3_fraction)
+	ROBOTICK_STRUCT_FIELD(HeartbeatInputs, FixedString8, bar4_label)
+	ROBOTICK_STRUCT_FIELD(HeartbeatInputs, float, bar4_fraction)
+	ROBOTICK_STRUCT_FIELD(HeartbeatInputs, float, heart_rate_scale)
+	ROBOTICK_REGISTER_STRUCT_END(HeartbeatInputs)
 
 	struct HeartbeatOutputs
 	{
 		float activation_amount = 1.0f;
 	};
-	ROBOTICK_BEGIN_FIELDS(HeartbeatOutputs)
-	ROBOTICK_FIELD(HeartbeatOutputs, float, activation_amount)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(HeartbeatOutputs)
+	ROBOTICK_STRUCT_FIELD(HeartbeatOutputs, float, activation_amount)
+	ROBOTICK_REGISTER_STRUCT_END(HeartbeatOutputs)
 
 	struct HeartbeatDisplayWorkload
 	{
@@ -197,8 +197,10 @@ namespace robotick
 				uint16_t color;
 			};
 
-			StatBar bars[] = {{in.bar1_label.c_str(), in.bar1_fraction, GREEN}, {in.bar2_label.c_str(), in.bar2_fraction, YELLOW},
-				{in.bar3_label.c_str(), in.bar3_fraction, BLUE}, {in.bar4_label.c_str(), in.bar4_fraction, ORANGE}};
+			StatBar bars[] = {{in.bar1_label.c_str(), in.bar1_fraction, GREEN},
+				{in.bar2_label.c_str(), in.bar2_fraction, YELLOW},
+				{in.bar3_label.c_str(), in.bar3_fraction, BLUE},
+				{in.bar4_label.c_str(), in.bar4_fraction, ORANGE}};
 
 			const int N = sizeof(bars) / sizeof(bars[0]);
 			if (N == 0)
@@ -279,6 +281,6 @@ namespace robotick
 #endif // #if defined(ROBOTICK_PLATFORM_ESP32)
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(HeartbeatDisplayWorkload, HeartbeatConfig, HeartbeatInputs, HeartbeatOutputs)
+	ROBOTICK_REGISTER_WORKLOAD(HeartbeatDisplayWorkload, HeartbeatConfig, HeartbeatInputs, HeartbeatOutputs)
 
 } // namespace robotick

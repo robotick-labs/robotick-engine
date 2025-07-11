@@ -3,12 +3,9 @@
 
 #include "robotick/framework/data/MqttFieldSync.h"
 #include "../utils/BlackboardTestUtils.h"
-#include "../utils/EngineInspector.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model_v1.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 
@@ -27,29 +24,38 @@ namespace robotick::test
 			int value = 7;
 			FixedString64 text = "abc";
 			Blackboard blackboard;
-
-			TestInputs()
-				: blackboard({BlackboardFieldInfo("flag", TypeId(GET_TYPE_ID(int))), BlackboardFieldInfo("ratio", TypeId(GET_TYPE_ID(double)))})
-			{
-			}
-
-			void load()
-			{
-				blackboard.set("flag", 1);
-				blackboard.set("ratio", 0.5);
-			}
 		};
-		ROBOTICK_BEGIN_FIELDS(TestInputs)
-		ROBOTICK_FIELD(TestInputs, int, value)
-		ROBOTICK_FIELD(TestInputs, FixedString64, text)
-		ROBOTICK_FIELD(TestInputs, Blackboard, blackboard)
-		ROBOTICK_END_FIELDS()
+		ROBOTICK_REGISTER_STRUCT_BEGIN(TestInputs)
+		ROBOTICK_STRUCT_FIELD(TestInputs, int, value)
+		ROBOTICK_STRUCT_FIELD(TestInputs, FixedString64, text)
+		ROBOTICK_STRUCT_FIELD(TestInputs, Blackboard, blackboard)
+		ROBOTICK_REGISTER_STRUCT_END(TestInputs)
+
+		struct TestState
+		{
+			HeapVector<FieldDescriptor> fields;
+		};
 
 		struct TestWorkload
 		{
 			TestInputs inputs;
+			State<TestState> state;
+
+			void pre_load()
+			{
+				state->fields.initialize(2);
+				state->fields[0] = FieldDescriptor{"flag", GET_TYPE_ID(int)};
+				state->fields[1] = FieldDescriptor{"ratio", GET_TYPE_ID(double)};
+				inputs.blackboard.initialize_fields(state->fields);
+			}
+
+			void load()
+			{
+				inputs.blackboard.set("flag", 1);
+				inputs.blackboard.set("ratio", 0.5);
+			}
 		};
-		ROBOTICK_DEFINE_WORKLOAD(TestWorkload, void, TestInputs, void)
+		ROBOTICK_REGISTER_WORKLOAD(TestWorkload, void, TestInputs, void)
 
 		struct DummyMqttClient : public IMqttClient
 		{
@@ -72,22 +78,22 @@ namespace robotick::test
 	{
 		SECTION("MqttFieldSync can publish state and control fields")
 		{
-			Model_v1 model;
-			auto test_workload_seed_handle = model.add("TestWorkload", "W1", 1.0);
-			model.set_root(test_workload_seed_handle);
+			Model model;
+			const WorkloadSeed& test_workload_seed = model.add("TestWorkload", "W1").set_tick_rate_hz(1.0f);
+			model.set_root_workload(test_workload_seed);
 
 			Engine engine;
 			engine.load(model);
 
 			// initialize our input fields & blackboard-fields:
-			const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed_handle.index);
+			const auto& info = *engine.find_instance_info(test_workload_seed.unique_name);
 			auto* test_workload_ptr = static_cast<TestWorkload*>((void*)info.get_ptr(engine));
 			test_workload_ptr->inputs.value = 42;
 			test_workload_ptr->inputs.blackboard.set("flag", 2);
 			test_workload_ptr->inputs.blackboard.set("ratio", 3.14);
 
 			WorkloadsBuffer mirror_buf;
-			mirror_buf.create_mirror_from(EngineInspector::get_workloads_buffer(engine));
+			mirror_buf.create_mirror_from(engine.get_workloads_buffer());
 
 			DummyMqttClient dummy_client;
 			std::string root_topic_name = "robotick";
@@ -115,16 +121,15 @@ namespace robotick::test
 
 		SECTION("MqttFieldSync can apply control updates")
 		{
-			Model_v1 model;
-			auto test_workload_seed_handle = model.add("TestWorkload", "W2", 1.0);
-			model.set_root(test_workload_seed_handle);
+			Model model;
+			const WorkloadSeed& test_workload_seed = model.add("TestWorkload", "W2").set_tick_rate_hz(1.0f);
+			model.set_root_workload(test_workload_seed);
 
 			Engine engine;
 			engine.load(model);
 
-			const auto& info = EngineInspector::get_instance_info(engine, test_workload_seed_handle.index);
+			const auto& info = *engine.find_instance_info(test_workload_seed.unique_name);
 			auto* test_workload_ptr = static_cast<TestWorkload*>((void*)info.get_ptr(engine));
-			test_workload_ptr->inputs.load();
 
 			DummyMqttClient dummy_client;
 			std::string root_topic_name = "robotick";

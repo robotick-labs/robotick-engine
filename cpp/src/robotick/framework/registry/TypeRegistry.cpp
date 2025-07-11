@@ -1,10 +1,10 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/registry-v2/TypeRegistry.h"
+#include "robotick/framework/registry/TypeRegistry.h"
 
 #include "robotick/api_base.h"
-#include "robotick/framework/registry-v2/TypeDescriptor.h"
+#include "robotick/framework/registry/TypeDescriptor.h"
 
 namespace robotick
 {
@@ -23,9 +23,11 @@ namespace robotick
 			ROBOTICK_FATAL_EXIT("TypeRegistry::register_type() - cannot have multiple types with same id '%u' (names new vs existing: '%s'|'%s' )",
 				(unsigned int)type.id.value,
 #ifdef ROBOTICK_DEBUG_TYPEID_NAMES
-				type.id.name, (*existing_type)->id.name);
+				type.id.name,
+				(*existing_type)->id.name);
 #else
-				type.name.c_str(), (*existing_type)->name.c_str());
+				type.name.c_str(),
+				(*existing_type)->name.c_str());
 #endif // #ifdef ROBOTICK_DEBUG_TYPEID_NAMES
 		}
 

@@ -20,14 +20,14 @@ namespace robotick
 	struct MqttClientConfig
 	{
 		FixedString64 broker_url = "mqtt://localhost";
-		int broker_mqtt_port = 1883;
+		uint16_t broker_mqtt_port = 1883;
 		FixedString64 root_topic_namespace = "robotick";
 	};
-	ROBOTICK_BEGIN_FIELDS(MqttClientConfig)
-	ROBOTICK_FIELD(MqttClientConfig, FixedString64, broker_url)
-	ROBOTICK_FIELD(MqttClientConfig, int, broker_mqtt_port)
-	ROBOTICK_FIELD(MqttClientConfig, FixedString64, root_topic_namespace)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(MqttClientConfig)
+	ROBOTICK_STRUCT_FIELD(MqttClientConfig, FixedString64, broker_url)
+	ROBOTICK_STRUCT_FIELD(MqttClientConfig, uint16_t, broker_mqtt_port)
+	ROBOTICK_STRUCT_FIELD(MqttClientConfig, FixedString64, root_topic_namespace)
+	ROBOTICK_REGISTER_STRUCT_END(MqttClientConfig)
 
 	//----------------------------------------------------------------------
 	// Internal State
@@ -92,6 +92,6 @@ namespace robotick
 		}
 	};
 
-	ROBOTICK_DEFINE_WORKLOAD(MqttClientWorkload, MqttClientConfig)
+	ROBOTICK_REGISTER_WORKLOAD(MqttClientWorkload, MqttClientConfig)
 
 } // namespace robotick

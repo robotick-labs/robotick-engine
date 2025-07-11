@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/registry-v2/TypeDescriptor.h"
-#include "robotick/framework/registry-v2/TypeMacros.h"
-#include "robotick/framework/registry-v2/TypeRegistry.h"
+#include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/registry/TypeMacros.h"
+#include "robotick/framework/registry/TypeRegistry.h"
 
 #include <cstdio>
 #include <ctype.h>
@@ -35,6 +35,62 @@ namespace robotick
 	}
 
 	ROBOTICK_REGISTER_PRIMITIVE(int, int_to_string, int_from_string);
+
+	// register uint8_t: =====
+
+	static bool uint8_t_to_string(const void* data, char* out, size_t size)
+	{
+		return print_value(out, size, "%hhu", *reinterpret_cast<const uint8_t*>(data));
+	}
+
+	static bool uint8_t_from_string(const char* str, void* out)
+	{
+		return scan_value(str, "%hhu", reinterpret_cast<uint8_t*>(out));
+	}
+
+	ROBOTICK_REGISTER_PRIMITIVE(uint8_t, uint8_t_to_string, uint8_t_from_string);
+
+	// register uint16_t: =====
+
+	static bool uint16_t_to_string(const void* data, char* out, size_t size)
+	{
+		return print_value(out, size, "%hu", *reinterpret_cast<const uint16_t*>(data));
+	}
+
+	static bool uint16_t_from_string(const char* str, void* out)
+	{
+		return scan_value(str, "%hu", reinterpret_cast<uint16_t*>(out));
+	}
+
+	ROBOTICK_REGISTER_PRIMITIVE(uint16_t, uint16_t_to_string, uint16_t_from_string);
+
+	// register uint32_t: =====
+
+	static bool uint32_t_to_string(const void* data, char* out, size_t size)
+	{
+		return print_value(out, size, "%u", *reinterpret_cast<const uint32_t*>(data));
+	}
+
+	static bool uint32_t_from_string(const char* str, void* out)
+	{
+		return scan_value(str, "%u", reinterpret_cast<uint32_t*>(out));
+	}
+
+	ROBOTICK_REGISTER_PRIMITIVE(uint32_t, uint32_t_to_string, uint32_t_from_string);
+
+	// register uint64_t: =====
+
+	static bool uint64_t_to_string(const void* data, char* out, size_t size)
+	{
+		return print_value(out, size, "%llu", *reinterpret_cast<const uint64_t*>(data));
+	}
+
+	static bool uint64_t_from_string(const char* str, void* out)
+	{
+		return scan_value(str, "%llu", reinterpret_cast<uint64_t*>(out));
+	}
+
+	ROBOTICK_REGISTER_PRIMITIVE(uint64_t, uint64_t_to_string, uint64_t_from_string);
 
 	// register float: =====
 
@@ -141,8 +197,7 @@ namespace robotick
 	template <size_t N> static constexpr TypeDescriptor make_fixed_string_desc(const char* name)
 	{
 		using FS = FixedString<N>;
-		return {name, TypeId(name), sizeof(FS), alignof(FS), TypeDescriptor::TypeCategory::Primitive, {}, &fixed_string_to_string<N>,
-			&fixed_string_from_string<N>};
+		return {name, TypeId(name), sizeof(FS), alignof(FS), TypeCategory::Primitive, {}, &fixed_string_to_string<N>, &fixed_string_from_string<N>};
 	}
 
 #define REGISTER_FIXED_STRING(N)                                                                                                                     \

@@ -97,7 +97,8 @@ SyncedGroup (1kHz)
 | Overrun handling              | Logged per-child                  | Interrupt must return fast (no overrun logs)|
 | Tick sync                     | True sync                         | Sync possible but looser (main may lag)     |
 
-### Thread Model_v1 (MCU: ISR + main loop)
+### Thread Model (MCU: ISR + main loop)
+
 ```
 Timer ISR Thread →
                 ┌ Tick SensorUpdate ┐   ┌ Tick SensorUpdate ┐
