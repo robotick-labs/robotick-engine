@@ -45,7 +45,7 @@ namespace robotick
 			void* ptr = get_data_ptr(container_ptr);
 			if (!ptr)
 			{
-				ROBOTICK_FATAL_EXIT("FieldDescriptor::get_data<T>() null-pointer access for field '%s'", name.c_str());
+				ROBOTICK_FATAL_EXIT("FieldDescriptor::get_data<T>() null pointer access for field '%s'", name.c_str());
 			}
 
 			return *static_cast<T*>(ptr);
@@ -60,7 +60,7 @@ namespace robotick
 			void* ptr = get_data_ptr(workloads_buffer, instance, struct_type, struct_offset);
 			if (!ptr)
 			{
-				ROBOTICK_FATAL_EXIT("FieldDescriptor::get_data<T>() null-pointer access for field '%s'", name.c_str());
+				ROBOTICK_FATAL_EXIT("FieldDescriptor::get_data<T>() null pointer access for field '%s'", name.c_str());
 			}
 
 			return *static_cast<T*>(ptr);

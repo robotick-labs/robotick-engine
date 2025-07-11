@@ -33,31 +33,30 @@ namespace robotick
 
 void populate_model(robotick::Model& model)
 {
-	using namespace robotick;
-
 	const float tick_rate_hz = 100.0f;
 
-	using namespace robotick;
-
 	// Static workload seeds
-	static const WorkloadSeed workload_basex{TypeId("BaseXWorkload"), StringView("basex"), tick_rate_hz};
+	static const robotick::WorkloadSeed workload_basex{robotick::TypeId("BaseXWorkload"), robotick::StringView("basex"), tick_rate_hz};
 
-	static const WorkloadSeed workload_console{TypeId("ConsoleTelemetryWorkload"), StringView("console"), tick_rate_hz};
+	static const robotick::WorkloadSeed workload_console{robotick::TypeId("ConsoleTelemetryWorkload"), robotick::StringView("console"), tick_rate_hz};
 
-	static const WorkloadSeed workload_face_display{TypeId("FaceDisplayWorkload"), StringView("face_display"), tick_rate_hz};
+	static const robotick::WorkloadSeed workload_face_display{
+		robotick::TypeId("FaceDisplayWorkload"), robotick::StringView("face_display"), tick_rate_hz};
 
-	static const WorkloadSeed workload_steering{TypeId("SteeringMixerWorkload"), StringView("steering"), tick_rate_hz};
+	static const robotick::WorkloadSeed workload_steering{robotick::TypeId("SteeringMixerWorkload"), robotick::StringView("steering"), tick_rate_hz};
 
-	static const WorkloadSeed workload_timing{TypeId("TimingDiagnosticsWorkload"), StringView("timing"), tick_rate_hz};
+	static const robotick::WorkloadSeed workload_timing{robotick::TypeId("TimingDiagnosticsWorkload"), robotick::StringView("timing"), tick_rate_hz};
 
 	// Static child list
-	static const WorkloadSeed* group_children[] = {&workload_basex, &workload_console, &workload_face_display, &workload_steering, &workload_timing};
+	static const robotick::WorkloadSeed* group_children[] = {
+		&workload_basex, &workload_console, &workload_face_display, &workload_steering, &workload_timing};
 
 	// Root group
-	static const WorkloadSeed workload_root{TypeId("SequencedGroupWorkload"), StringView("root"), tick_rate_hz, group_children};
+	static const robotick::WorkloadSeed workload_root{
+		robotick::TypeId("SequencedGroupWorkload"), robotick::StringView("root"), tick_rate_hz, group_children};
 
 	// All workloads
-	static const WorkloadSeed* all[] = {
+	static const robotick::WorkloadSeed* all[] = {
 		&workload_basex, &workload_console, &workload_face_display, &workload_steering, &workload_timing, &workload_root};
 
 	// Final registration

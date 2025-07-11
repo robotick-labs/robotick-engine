@@ -58,8 +58,14 @@ namespace robotick
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##TypeName(s_type_desc_##TypeName);
 
+#define ROBOTICK_SUPPRESS_UNUSED_WARNING_START                                                                                                       \
+	_Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wunused-variable\"") _Pragma("GCC diagnostic ignored \"-Wattributes\"")
+
+#define ROBOTICK_SUPPRESS_UNUSED_WARNING_END _Pragma("GCC diagnostic pop")
+
 /// @brief Macros to register Workloads:
 #define ROBOTICK_REGISTER_WORKLOAD_BASE(WorkloadTypeName, ConfigTypePtr, InputTypePtr, OutputTypePtr)                                                \
+	ROBOTICK_SUPPRESS_UNUSED_WARNING_START                                                                                                           \
 	static const ::robotick::WorkloadDescriptor s_workload_desc_##WorkloadTypeName =                                                                 \
 		::robotick::registry::make_workload_descriptor<WorkloadTypeName>(ConfigTypePtr, InputTypePtr, OutputTypePtr);                                \
 	static const ::robotick::TypeDescriptor s_type_desc_##WorkloadTypeName = {#WorkloadTypeName,                                                     \
@@ -71,7 +77,8 @@ namespace robotick
 		nullptr,                                                                                                                                     \
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##WorkloadTypeName(s_type_desc_##WorkloadTypeName);                                         \
-	volatile bool g_##WorkloadTypeName##_NoDeadStrip = false;
+	volatile bool g_##WorkloadTypeName##_NoDeadStrip = false;                                                                                        \
+	ROBOTICK_SUPPRESS_UNUSED_WARNING_END
 
 #define ROBOTICK_REGISTER_WORKLOAD_1(Type) ROBOTICK_REGISTER_WORKLOAD_BASE(Type, nullptr, nullptr, nullptr)
 #define ROBOTICK_REGISTER_WORKLOAD_2(Type, Config) ROBOTICK_REGISTER_WORKLOAD_BASE(Type, &s_type_desc_##Config, nullptr, nullptr)
