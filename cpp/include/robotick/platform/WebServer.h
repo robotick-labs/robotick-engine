@@ -2,6 +2,8 @@
 
 #if defined(ROBOTICK_PLATFORM_DESKTOP)
 
+#include "robotick/framework/common/FixedVector.h"
+
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -20,7 +22,7 @@ namespace robotick
 
 	struct WebResponse
 	{
-		std::string body;
+		FixedVector256k body;
 		std::string content_type = "text/plain"; // Default
 		int status_code = 404;					 // Default: NotFound (intuituve - meaning it's not been handled)
 	};
@@ -84,4 +86,3 @@ namespace robotick
 } // namespace robotick
 
 #endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)
-

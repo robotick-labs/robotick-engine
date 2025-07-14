@@ -264,6 +264,13 @@ window.onload = () => {
     });
 
     sendFullState();
+
+    // Live camera stream refresh
+    const cameraImg = document.getElementById("camera-stream");
+    setInterval(() => {
+        cameraImg.src = `/api/jpeg_data?t=${Date.now()}`; // bust cache
+    }, 66); // 15 FPS
+
 };
 
 function sendFullState() {

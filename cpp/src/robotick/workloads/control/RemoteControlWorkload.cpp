@@ -33,6 +33,8 @@ namespace robotick
 		double scale_left_y = 1.0;
 		double scale_right_x = 1.0;
 		double scale_right_y = 1.0;
+
+		FixedVector128k jpeg_data;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(RemoteControlInputs)
 	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, bool, use_web_inputs)
@@ -44,6 +46,7 @@ namespace robotick
 	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, scale_left_y)
 	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, scale_right_x)
 	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, scale_right_y)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, FixedVector128k, jpeg_data)
 	ROBOTICK_REGISTER_STRUCT_END(RemoteControlInputs)
 
 	struct RemoteControlOutputs
@@ -87,7 +90,7 @@ namespace robotick
 						if (json_opt.is_discarded())
 						{
 							response.status_code = 400;
-							response.body = "Invalid JSON format.";
+							response.body.set_from_string("Invalid JSON format.");
 							return;
 						}
 
@@ -117,6 +120,12 @@ namespace robotick
 						try_set_vec2("scale_left", w.scale_left_x, w.scale_left_y);
 						try_set_vec2("scale_right", w.scale_right_x, w.scale_right_y);
 
+						response.status_code = 200;
+					}
+					else if (request.method == "GET" && request.uri == "/api/jpeg_data")
+					{
+						response.body.set(inputs.jpeg_data.data(), inputs.jpeg_data.size());
+						response.content_type = "img/jpg";
 						response.status_code = 200;
 					}
 				});

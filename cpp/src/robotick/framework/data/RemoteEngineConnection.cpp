@@ -236,9 +236,6 @@ namespace robotick
 	{
 		ROBOTICK_ASSERT_MSG(mode == Mode::Receiver, "RemoteEngineConnection::tick_disconnected_receiver() should only be called in Mode::Receiver");
 
-		ROBOTICK_INFO(
-			"RemoteEngineConnection::tick_disconnected_receiver() [Receiver] Attempting to accept connection on local port %d", config.port);
-
 		if (socket_fd < 0)
 		{
 			socket_fd = create_tcp_socket();

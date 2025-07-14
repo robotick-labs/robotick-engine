@@ -65,3 +65,23 @@ body {
 .slider-group label {
     margin-right: 5px;
 }
+
+.camera-container {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90vw;
+    max-width: 600px;
+    max-height: 40vh;
+    overflow: hidden;
+    border-radius: 8px;
+    background: black;
+}
+
+#camera-stream {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+}

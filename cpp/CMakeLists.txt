@@ -57,6 +57,7 @@ target_compile_options(robotick-engine PRIVATE -fno-exceptions)
 message("Determining platform...")
 
 if(ROBOTICK_PLATFORM_UBUNTU)
+    set(ROBOTICK_PLATFORM_DESKTOP ON)
     message("✅ ROBOTICK_PLATFORM_UBUNTU - defining ROBOTICK_PLATFORM_UBUNTU and ROBOTICK_PLATFORM_DESKTOP")
     target_compile_definitions(robotick-engine PUBLIC
         ROBOTICK_PLATFORM_UBUNTU
@@ -94,6 +95,7 @@ if(ROBOTICK_ENABLE_PYTHON)
         ${CMAKE_CURRENT_LIST_DIR}/src/robotick/workloads/telemetry/MqttClientWorkload.cpp
         ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/MqttClient.cpp
         ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/posix/WebServer.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/posix/Camera.cpp
     )
 
     foreach(source_file IN LISTS EXCEPTION_ENABLED_SOURCES)
@@ -147,6 +149,25 @@ if (ROBOTICK_BUILD_TESTS)
     )
 else()
     message(STATUS "❌ ROBOTICK_BUILD_TESTS - OFF")
+endif()
+
+# =========================
+# ✅ Prebuilt OpenCV (Desktop Only)
+# =========================
+
+if(ROBOTICK_PLATFORM_DESKTOP)
+    find_package(OpenCV REQUIRED)
+
+    if(NOT OpenCV_FOUND)
+        message(FATAL_ERROR "❌ OpenCV not found — install with: sudo apt install libopencv-dev")
+    else()
+        message(STATUS "✅ OpenCV found — version: ${OpenCV_VERSION}")
+    endif()
+
+    target_include_directories(robotick-engine PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_link_libraries(robotick-engine PRIVATE ${OpenCV_LIBS})
+else()
+    message(STATUS "❌ OpenCV is not enabled on this platform")
 endif()
 
 # =========================

@@ -130,7 +130,7 @@ namespace robotick
 						}
 						else
 						{
-							entry << "<?>";
+							entry << "<" << field_type_desc->name << ">";
 						}
 					}
 					else
@@ -147,7 +147,7 @@ namespace robotick
 						}
 						else
 						{
-							entry << "<?>";
+							entry << "<" << field_type_desc->name << ">";
 						}
 					}
 

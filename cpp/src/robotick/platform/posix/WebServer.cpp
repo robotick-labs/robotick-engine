@@ -9,7 +9,9 @@
 
 namespace robotick
 {
-	WebServer::WebServer() : ctx(nullptr), running(false)
+	WebServer::WebServer()
+		: ctx(nullptr)
+		, running(false)
 	{
 	}
 
@@ -63,7 +65,7 @@ namespace robotick
 		catch (const std::exception& e)
 		{
 			ROBOTICK_WARNING("[WebServer] Exception in fallback handler for %s: %s", std::string(request.uri).c_str(), e.what());
-			response.body = "[WebServer] Handler error";
+			response.body.set_from_string("[WebServer] Handler error");
 			response.status_code = 500; // Internal Server Error
 		}
 
@@ -72,7 +74,8 @@ namespace robotick
 			"Content-Type: %s\r\n"
 			"Content-Length: %zu\r\n"
 			"\r\n",
-			response.content_type.c_str(), response.body.size());
+			response.content_type.c_str(),
+			response.body.size());
 		mg_write(conn, response.body.data(), response.body.size());
 
 		return response.status_code;
