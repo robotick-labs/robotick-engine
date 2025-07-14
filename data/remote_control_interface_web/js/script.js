@@ -185,6 +185,44 @@ function handleTouchEnd(e) {
     }
 }
 
+function setupVideoFeed() {
+    const cameraImg = document.getElementById("camera-stream");
+    let lastFrameBlobUrl = null;
+
+    function refreshCameraFrame() {
+        const loaderImg = new Image();
+        loaderImg.onload = () => {
+            // Swap only after successful load
+            cameraImg.src = loaderImg.src;
+
+            // Revoke the previous blob URL to avoid leaks
+            if (lastFrameBlobUrl) URL.revokeObjectURL(lastFrameBlobUrl);
+            lastFrameBlobUrl = loaderImg.src;
+        };
+
+        loaderImg.onerror = () => {
+            // Ignore errors, keep old image
+            console.warn("Camera frame failed to load");
+        };
+
+        // Fetch image as a blob
+        fetch(`/api/jpeg_data?t=${Date.now()}`)
+            .then(response => {
+                if (!response.ok) throw new Error("HTTP error");
+                return response.blob();
+            })
+            .then(blob => {
+                const blobUrl = URL.createObjectURL(blob);
+                loaderImg.src = blobUrl;
+            })
+            .catch(err => {
+                console.warn("Camera fetch failed:", err);
+            });
+    }
+
+    setInterval(refreshCameraFrame, 66); // ~15 FPS
+}
+
 document.addEventListener('touchstart', handleTouchStart);
 document.addEventListener('touchmove', handleTouchMove);
 document.addEventListener('touchend', handleTouchEnd);
@@ -265,12 +303,7 @@ window.onload = () => {
 
     sendFullState();
 
-    // Live camera stream refresh
-    const cameraImg = document.getElementById("camera-stream");
-    setInterval(() => {
-        cameraImg.src = `/api/jpeg_data?t=${Date.now()}`; // bust cache
-    }, 66); // 15 FPS
-
+    setupVideoFeed();
 };
 
 function sendFullState() {
