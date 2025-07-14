@@ -48,11 +48,17 @@ namespace robotick
 		if (source_field_path[0] == '|')
 			ROBOTICK_FATAL_EXIT("Source field paths cannot be remote: %s", source_field_path);
 
+		if (strstr(source_field_path, "outputs") == nullptr)
+			ROBOTICK_FATAL_EXIT("Only 'outputs' fields can be data connection sources: %s", source_field_path);
+
 		if (dest_field_path[0] == '|')
 		{
 			connect_remote(source_field_path, dest_field_path);
 			return;
 		}
+
+		if (strstr(dest_field_path, "inputs") == nullptr)
+			ROBOTICK_FATAL_EXIT("Only 'inputs' fields can be data connection destinations: %s", dest_field_path);
 
 		for (const DataConnectionSeed& existing : data_connection_seeds_storage)
 		{
@@ -255,17 +261,44 @@ namespace robotick
 		}
 #endif
 
-		// Ensure unique input destinations
+		// Validate any data-connections:
 		for (size_t i = 0; i < data_connection_seeds.size(); ++i)
 		{
-			const char* dest_i = data_connection_seeds[i]->dest_field_path.c_str();
+			const DataConnectionSeed* conn = data_connection_seeds[i];
+			const char* source = conn->source_field_path.c_str();
+			const char* dest = conn->dest_field_path.c_str();
 
+			// --- Validate source field path ---
+			if (!strstr(source, ".outputs."))
+			{
+				ROBOTICK_FATAL_EXIT("Data connection error: source field path '%s' must use the 'outputs' structure.", source);
+			}
+
+			// Ensure valid source path format (at least 3 tokens: workload.outputs.field)
+			if (std::count(source, source + strlen(source), '.') < 2)
+			{
+				ROBOTICK_FATAL_EXIT("Data connection error: malformed source field path '%s'. Expected format: workload.outputs.field", source);
+			}
+
+			// --- Validate destination field path ---
+			if (!strstr(dest, ".inputs."))
+			{
+				ROBOTICK_FATAL_EXIT("Data connection error: destination field path '%s' must use the 'inputs' structure.", dest);
+			}
+
+			// Ensure valid destination path format (at least 3 tokens: workload.inputs.field)
+			if (std::count(dest, dest + strlen(dest), '.') < 2)
+			{
+				ROBOTICK_FATAL_EXIT("Data connection error: malformed destination field path '%s'. Expected format: workload.inputs.field", dest);
+			}
+
+			// --- Check for duplicates ---
 			for (size_t j = i + 1; j < data_connection_seeds.size(); ++j)
 			{
 				const char* dest_j = data_connection_seeds[j]->dest_field_path.c_str();
-				if (strcmp(dest_i, dest_j) == 0)
+				if (strcmp(dest, dest_j) == 0)
 				{
-					ROBOTICK_FATAL_EXIT("Data connection error: destination field '%s' already has an incoming connection.", dest_i);
+					ROBOTICK_FATAL_EXIT("Data connection error: destination field '%s' already has an incoming connection.", dest);
 				}
 			}
 		}
