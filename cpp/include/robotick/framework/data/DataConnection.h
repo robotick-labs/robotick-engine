@@ -55,7 +55,6 @@ namespace robotick
 		void do_data_copy() const noexcept
 		{
 			ROBOTICK_ASSERT(source_ptr != nullptr && dest_ptr != nullptr && size > 0);
-			static_assert(std::is_trivially_copyable_v<std::byte>, "do_data_copy() assumes trivially-copyable payloads");
 			ROBOTICK_ASSERT(source_ptr != dest_ptr && "Source and destination pointers are the same - this should have been caught in fixup");
 
 			// If aliasing is possible, use std::memmove instead.

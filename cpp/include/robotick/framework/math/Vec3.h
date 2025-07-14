@@ -43,6 +43,8 @@ namespace robotick
 		{
 		}
 
+		bool operator==(const TDerived& rhs) const { return x == rhs.x && y == rhs.y && z == rhs.z; }
+
 		TDerived operator+(const TDerived& rhs) const { return TDerived(x + rhs.x, y + rhs.y, z + rhs.z); }
 		TDerived operator-(const TDerived& rhs) const { return TDerived(x - rhs.x, y - rhs.y, z - rhs.z); }
 		TDerived operator*(TReal scalar) const { return TDerived(x * scalar, y * scalar, z * scalar); }

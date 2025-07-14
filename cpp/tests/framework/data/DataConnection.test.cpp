@@ -18,12 +18,14 @@ namespace robotick::test
 		{
 			int x = 0;
 			double y = 0.0;
+			Vec3 out_vec3;
 			Blackboard out_blackboard;
 		};
 		ROBOTICK_REGISTER_STRUCT_BEGIN(DummyAOutput)
 		ROBOTICK_STRUCT_FIELD(DummyAOutput, Blackboard, out_blackboard)
 		ROBOTICK_STRUCT_FIELD(DummyAOutput, int, x)
 		ROBOTICK_STRUCT_FIELD(DummyAOutput, double, y)
+		ROBOTICK_STRUCT_FIELD(DummyAOutput, Vec3, out_vec3)
 		ROBOTICK_REGISTER_STRUCT_END(DummyAOutput)
 
 		struct DummyBInput
@@ -31,11 +33,13 @@ namespace robotick::test
 			Blackboard in_blackboard;
 			double y = 0.0;
 			int x = 0;
+			Vec3 in_vec3;
 		};
 		ROBOTICK_REGISTER_STRUCT_BEGIN(DummyBInput)
 		ROBOTICK_STRUCT_FIELD(DummyBInput, Blackboard, in_blackboard)
 		ROBOTICK_STRUCT_FIELD(DummyBInput, double, y)
 		ROBOTICK_STRUCT_FIELD(DummyBInput, int, x)
+		ROBOTICK_STRUCT_FIELD(DummyBInput, Vec3, in_vec3)
 		ROBOTICK_REGISTER_STRUCT_END(DummyBInput)
 
 		struct DummyState
@@ -331,7 +335,7 @@ namespace robotick::test
 			SUCCEED("Will be added once Blackboard field path support is implemented");
 		}
 
-		SECTION("Unidirectional copy")
+		SECTION("Unidirectional copy (primitive-int)")
 		{
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
@@ -360,6 +364,78 @@ namespace robotick::test
 
 			REQUIRE(b->inputs.x == 123);
 			REQUIRE(a->outputs.x == 123); // Confirm unmodified
+		}
+
+		SECTION("Unidirectional copy (whole vec3)")
+		{
+			Model model;
+			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			model.set_root_workload(root);
+
+			Engine engine;
+			engine.load(model);
+
+			auto* a = engine.find_instance<DummyA>(seed_a.unique_name);
+			auto* b = engine.find_instance<DummyB>(seed_b.unique_name);
+
+			a->outputs.out_vec3 = Vec3(1, 2, 3);
+			b->inputs.in_vec3 = Vec3(9, 9, 9); // Should get overwritten
+
+			static const DataConnectionSeed conn_1("A.outputs.out_vec3", "B.inputs.in_vec3");
+			static const DataConnectionSeed* connections[] = {&conn_1};
+			ArrayView<const DataConnectionSeed*> seeds(connections);
+
+			HeapVector<DataConnectionInfo> resolved;
+			DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, engine.get_all_instance_info_map());
+
+			REQUIRE(resolved.size() == 1);
+			resolved[0].do_data_copy();
+
+			REQUIRE(b->inputs.in_vec3 == Vec3(1, 2, 3));
+			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
+		}
+
+		SECTION("Unidirectional copy (per-element vec3)")
+		{
+			Model model;
+			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
+			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			model.set_root_workload(root);
+
+			Engine engine;
+			engine.load(model);
+
+			auto* a = engine.find_instance<DummyA>(seed_a.unique_name);
+			auto* b = engine.find_instance<DummyB>(seed_b.unique_name);
+
+			a->outputs.out_vec3 = Vec3(1, 2, 3);
+			b->inputs.in_vec3 = Vec3(9, 9, 9); // Should get overwritten
+
+			static const DataConnectionSeed conn_X("A.outputs.out_vec3.x", "B.inputs.in_vec3.x");
+			static const DataConnectionSeed conn_Y("A.outputs.out_vec3.y", "B.inputs.in_vec3.y");
+			static const DataConnectionSeed conn_Z("A.outputs.out_vec3.z", "B.inputs.in_vec3.z");
+			static const DataConnectionSeed* connections[] = {&conn_X, &conn_Y, &conn_Z};
+			ArrayView<const DataConnectionSeed*> seeds(connections);
+
+			HeapVector<DataConnectionInfo> resolved;
+			DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, engine.get_all_instance_info_map());
+
+			REQUIRE(resolved.size() == 3);
+
+			resolved[0].do_data_copy();
+			REQUIRE(b->inputs.in_vec3 == Vec3(1, 9, 9));
+			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
+
+			resolved[1].do_data_copy();
+			REQUIRE(b->inputs.in_vec3 == Vec3(1, 2, 9));
+			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
+
+			resolved[2].do_data_copy();
+			REQUIRE(b->inputs.in_vec3 == Vec3(1, 2, 3));
+			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
 		}
 
 		SECTION("Throws for blackboard subfield not found")
