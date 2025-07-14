@@ -5,7 +5,6 @@
 
 #include "robotick/api_base.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
-#include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/DataConnectionSeed.h"
 #include "robotick/framework/model/WorkloadSeed.h"
@@ -70,27 +69,6 @@ namespace robotick
 			const FieldDescriptor* found_field = struct_desc->find_field(field_name);
 			return found_field;
 		}
-
-		static const FieldDescriptor* resolve_blackboard_field_ptr(WorkloadsBuffer& workloads_buffer,
-			const WorkloadInstanceInfo& inst,
-			const TypeDescriptor& struct_info,
-			const size_t struct_offset,
-			const FieldDescriptor& blackboard_field,
-			const char* blackboard_subfield_name)
-		{
-			if (blackboard_field.type_id != GET_TYPE_ID(Blackboard))
-			{
-				return nullptr;
-			}
-
-			ROBOTICK_ASSERT(struct_info.get_struct_desc() != nullptr);
-
-			const Blackboard& blackboard = blackboard_field.get_data<Blackboard>(workloads_buffer, inst, struct_info, struct_offset);
-			const StructDescriptor& blackboard_struct_desc = blackboard.get_struct_descriptor();
-
-			const FieldDescriptor* found_field = blackboard_struct_desc.find_field(blackboard_subfield_name);
-			return found_field;
-		}
 	};
 
 	namespace
@@ -148,23 +126,42 @@ namespace robotick
 
 			const uint8_t* ptr = (uint8_t*)field->get_data_ptr(workloads_buffer, *workload, *struct_type, struct_offset);
 			TypeId type = field->type_id;
-			size_t size = field->find_type_descriptor()->size;
+			const TypeDescriptor* field_type_desc = field->find_type_descriptor();
+			if (!field_type_desc)
+				ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has unknown type", field_token.c_str(), path);
+			size_t size = field_type_desc->size;
 
-			// Step 4: optional subfield (only if Blackboard)
+			// Step 4: optional subfield
 			if (*path_cursor != '\0') // There’s still more of the path
 			{
 				const FixedString64 subfield_token = extract_next_token(path_cursor);
 
-				const FieldDescriptor* blackboard_field = DataConnectionHelpers::resolve_blackboard_field_ptr(
-					workloads_buffer, *workload, *struct_type, struct_offset, *field, subfield_token.c_str());
+				const StructDescriptor* struct_desc = field_type_desc->get_struct_desc();
+				if (!struct_desc)
+				{
+					if (const DynamicStructDescriptor* dynamic_struct_desc = field_type_desc->get_dynamic_struct_desc())
+					{
+						struct_desc = dynamic_struct_desc->get_struct_descriptor(ptr);
+					}
+				}
 
-				if (!blackboard_field)
-					ROBOTICK_FATAL_EXIT("Blackboard subfield '%s' not found in path: %s", subfield_token.c_str(), path);
+				if (struct_desc)
+				{
+					const FieldDescriptor* sub_field = struct_desc->find_field(subfield_token.c_str());
+					if (!sub_field)
+						ROBOTICK_FATAL_EXIT("Subfield '%s' not found in path: %s", subfield_token.c_str(), path);
 
-				const Blackboard* blackboard = static_cast<const Blackboard*>((const void*)ptr);
-				ptr = ptr + blackboard->get_datablock_offset() + blackboard_field->offset_within_container;
-				type = blackboard_field->type_id;
-				size = blackboard_field->find_type_descriptor()->size;
+					ptr = (uint8_t*)sub_field->get_data_ptr((void*)ptr);
+					type = sub_field->type_id;
+					const TypeDescriptor* sub_field_type_desc = sub_field->find_type_descriptor();
+					if (!sub_field_type_desc)
+						ROBOTICK_FATAL_EXIT("Subfield '%s' in path '%s' has unknown type", subfield_token.c_str(), path);
+					size = sub_field_type_desc->size;
+				}
+				else
+				{
+					ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has no sub-field", field_token.c_str(), path);
+				}
 			}
 
 			if (*path_cursor != '\0')
@@ -221,11 +218,11 @@ namespace robotick
 		}
 	}
 
-	std::tuple<void*, size_t, const FieldDescriptor*> DataConnectionUtils::find_field_info(const Engine& engine, const std::string& path)
+	std::tuple<void*, size_t, const FieldDescriptor*> DataConnectionUtils::find_field_info(const Engine& engine, const char* path)
 	{
 		const WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
 		const Map<const char*, WorkloadInstanceInfo*>& instances = engine.get_all_instance_info_map();
-		const char* path_cursor = path.c_str();
+		const char* path_cursor = path;
 
 		// workload.section.field[.blackboard_field]
 		const FixedString64 workload_token = extract_next_token(path_cursor);
@@ -242,7 +239,7 @@ namespace robotick
 		const TypeDescriptor* struct_type = DataConnectionHelpers::get_struct_entry(*workload_info, section_token.c_str(), struct_offset);
 		if (!struct_type)
 		{
-			ROBOTICK_WARNING("Invalid section '%s' in field path: %s", section_token.c_str(), path.c_str());
+			ROBOTICK_WARNING("Invalid section '%s' in field path: %s", section_token.c_str(), path);
 			return {nullptr, 0, nullptr};
 		}
 
@@ -250,31 +247,49 @@ namespace robotick
 		const FieldDescriptor* field = DataConnectionHelpers::find_field(struct_type, field_token.c_str());
 		if (!field)
 		{
-			ROBOTICK_WARNING("Field '%s' not found in path: %s", field_token.c_str(), path.c_str());
+			ROBOTICK_WARNING("Field '%s' not found in path: %s", field_token.c_str(), path);
 			return {nullptr, 0, nullptr};
 		}
 
-		void* base_ptr = field->get_data_ptr(const_cast<WorkloadsBuffer&>(workloads_buffer), *workload_info, *struct_type, struct_offset);
-		size_t size = field->find_type_descriptor() ? field->find_type_descriptor()->size : 0;
+		const TypeDescriptor* field_type_desc = field->find_type_descriptor();
+		if (!field_type_desc)
+			ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has unknown type", field_token.c_str(), path);
 
-		// optional blackboard.subfield
+		void* base_ptr = field->get_data_ptr(const_cast<WorkloadsBuffer&>(workloads_buffer), *workload_info, *struct_type, struct_offset);
+		size_t size = field_type_desc->size;
+
+		// optional field.subfield
 		if (*path_cursor != '\0')
 		{
 			const FixedString64 subfield_token = extract_next_token(path_cursor);
 
-			const FieldDescriptor* subfield = DataConnectionHelpers::resolve_blackboard_field_ptr(
-				const_cast<WorkloadsBuffer&>(workloads_buffer), *workload_info, *struct_type, struct_offset, *field, subfield_token.c_str());
-
-			if (!subfield)
+			const StructDescriptor* struct_desc = field_type_desc->get_struct_desc();
+			if (!struct_desc)
 			{
-				ROBOTICK_WARNING("Blackboard subfield '%s' not found in path: %s", subfield_token.c_str(), path.c_str());
-				return {nullptr, 0, nullptr};
+				if (const DynamicStructDescriptor* dynamic_struct_desc = field_type_desc->get_dynamic_struct_desc())
+				{
+					struct_desc = dynamic_struct_desc->get_struct_descriptor(base_ptr);
+				}
 			}
 
-			const Blackboard* blackboard = static_cast<const Blackboard*>((const void*)base_ptr);
-			base_ptr = (uint8_t*)base_ptr + blackboard->get_datablock_offset() + subfield->offset_within_container;
-			size = subfield->find_type_descriptor() ? subfield->find_type_descriptor()->size : 0;
-			field = subfield;
+			if (struct_desc)
+			{
+				const FieldDescriptor* sub_field = struct_desc->find_field(subfield_token.c_str());
+				if (!sub_field)
+					ROBOTICK_FATAL_EXIT("Subfield '%s' not found in path: %s", subfield_token.c_str(), path);
+
+				base_ptr = (uint8_t*)sub_field->get_data_ptr(base_ptr);
+				const TypeDescriptor* sub_field_type_desc = sub_field->find_type_descriptor();
+				if (!sub_field_type_desc)
+					ROBOTICK_FATAL_EXIT("Subfield '%s' in path '%s' has unknown type", subfield_token.c_str(), path);
+
+				size = sub_field_type_desc->size;
+				field = sub_field;
+			}
+			else
+			{
+				ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has no sub-field", field_token.c_str(), path);
+			}
 		}
 
 		return {base_ptr, size, field};

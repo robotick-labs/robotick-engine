@@ -82,7 +82,7 @@ namespace robotick
 				blackboard_ptr->initialize_fields(blackboard_fields);
 				// intentionally don't call blackboard_ptr->bind();
 
-				ROBOTICK_REQUIRE_ERROR_MSG(blackboard_ptr->get<int>("alpha"), ("Blackboard"));
+				ROBOTICK_REQUIRE_ERROR_MSG(blackboard_ptr->get<int>("alpha"), ("has not yet been bound"));
 			}
 
 			SECTION("Throws on missing field")

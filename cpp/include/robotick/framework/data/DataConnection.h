@@ -109,7 +109,7 @@ namespace robotick
 		}
 
 		/// @brief Given a dot-separated field path (e.g. "MyWorkload.outputs.x"), returns the raw pointer, size in bytes, and field-descriptor
-		static std::tuple<void*, size_t, const FieldDescriptor*> find_field_info(const Engine& engine, const std::string& path);
+		static std::tuple<void*, size_t, const FieldDescriptor*> find_field_info(const Engine& engine, const char* path);
 	};
 
 } // namespace robotick
