@@ -163,11 +163,11 @@ namespace robotick
 			row.inputs = input_entries.empty() ? "-" : join(input_entries, "\n");
 			row.outputs = output_entries.empty() ? "-" : join(output_entries, "\n");
 
-			static constexpr double s_milliseconds_per_nanosecond = 1e-6;
+			static constexpr float s_milliseconds_per_nanosecond = 1e-6f;
 
-			row.tick_duration_ms = s_milliseconds_per_nanosecond * (double)info.mutable_stats.last_tick_duration_ns;
-			row.tick_delta_ms = s_milliseconds_per_nanosecond * (double)info.mutable_stats.last_time_delta_ns;
-			row.goal_interval_ms = info.seed->tick_rate_hz > 0.0 ? 1000.0 / info.seed->tick_rate_hz : -1.0;
+			row.tick_duration_ms = s_milliseconds_per_nanosecond * (float)info.mutable_stats.last_tick_duration_ns;
+			row.tick_delta_ms = s_milliseconds_per_nanosecond * (float)info.mutable_stats.last_time_delta_ns;
+			row.goal_interval_ms = info.seed->tick_rate_hz > 0.0 ? 1000.0f / info.seed->tick_rate_hz : -1.0;
 		}
 
 		static std::string depth_prefix(size_t depth, const std::string& name)
@@ -208,15 +208,15 @@ namespace robotick
 
 			static std::random_device rd;
 			static std::mt19937 gen(rd());
-			static std::uniform_real_distribution<> tick_dist(0.1, 5.0);
-			static std::uniform_real_distribution<> goal_dist(1.0, 5.0);
-			static std::uniform_real_distribution<> val_dist(0.0, 100.0);
+			static std::uniform_real_distribution<> tick_dist(0.1f, 5.0f);
+			static std::uniform_real_distribution<> goal_dist(1.0f, 5.0f);
+			static std::uniform_real_distribution<> val_dist(0.0f, 100.0f);
 
 			for (int i = 0; i < 3; ++i)
 			{
-				double tick_ms = tick_dist(gen);
-				double goal_ms = goal_dist(gen);
-				double percent = (tick_ms / goal_ms) * 100.0;
+				float tick_ms = tick_dist(gen);
+				float goal_ms = goal_dist(gen);
+				float percent = (tick_ms / goal_ms) * 100.0f;
 
 				std::ostringstream config_oss;
 				std::ostringstream input_oss;

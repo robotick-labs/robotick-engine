@@ -126,11 +126,11 @@ namespace robotick
 				}
 			}
 
-			auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_time).count();
+			const auto elapsed = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::steady_clock::now() - start_time).count();
 
 			if (elapsed > tick_info.delta_time)
 			{
-				std::printf("[Sequenced] Overrun: tick took %.3fms (budget %.3fms)\n", elapsed * 1000.0, tick_info.delta_time * 1000.0);
+				std::printf("[Sequenced] Overrun: tick took %.3fms (budget %.3fms)\n", elapsed * 1000.0f, tick_info.delta_time * 1000.0f);
 			}
 		}
 	};
@@ -156,7 +156,7 @@ namespace robotick
 			impl->set_children(children, pending_connections);
 		}
 
-		void start(double) { /* placeholder for consistency with SequencedGroup*/ }
+		void start(float) { /* placeholder for consistency with SequencedGroup*/ }
 
 		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
 

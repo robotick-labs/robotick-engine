@@ -20,7 +20,7 @@ namespace
 	struct CountingWorkload
 	{
 		std::atomic<int> tick_count{0};
-		double last_dt{0};
+		float last_dt{0};
 
 		void tick(const TickInfo& tick_info)
 		{
@@ -76,7 +76,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		{
 			info.type->get_workload_desc()->tick_fn(group_ptr, tick_info);
 
-			std::this_thread::sleep_for(std::chrono::duration<double>(tick_info.delta_time));
+			std::this_thread::sleep_for(std::chrono::duration<float>(tick_info.delta_time));
 
 			// Confirm each child has exactly i + 1 ticks after this iteration
 			CHECK(wa->tick_count == i + 1);
@@ -91,7 +91,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		using namespace std::chrono;
 
 		const TickInfo tick_info = TICK_INFO_FIRST_10MS_100HZ;
-		const double tick_rate_hz = 1.0 / tick_info.delta_time;
+		const float tick_rate_hz = 1.0f / tick_info.delta_time;
 		constexpr int num_ticks = 5;
 
 		Model model;
@@ -134,7 +134,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		using namespace std::chrono;
 
 		const TickInfo tick_info = TICK_INFO_FIRST_10MS_100HZ;
-		const double tick_rate_hz = 1.0 / tick_info.delta_time;
+		const float tick_rate_hz = 1.0f / tick_info.delta_time;
 
 		Model model;
 		const WorkloadSeed& h = model.add("CountingWorkload", "ticky").set_tick_rate_hz(tick_rate_hz);
@@ -157,7 +157,7 @@ TEST_CASE("Unit/Workloads/SyncedGroupWorkload")
 		group_info.type->get_workload_desc()->tick_fn(group_ptr, tick_info);
 
 		std::this_thread::sleep_for(40ms);
-		const double first_dt = counting->last_dt;
+		const float first_dt = counting->last_dt;
 
 		group_info.type->get_workload_desc()->tick_fn(group_ptr, tick_info);
 

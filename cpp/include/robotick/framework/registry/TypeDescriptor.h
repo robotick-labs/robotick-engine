@@ -102,7 +102,7 @@ namespace robotick
 		void (*pre_load_fn)(void*) = nullptr;
 		void (*load_fn)(void*) = nullptr;
 		void (*setup_fn)(void*) = nullptr;
-		void (*start_fn)(void*, double) = nullptr;
+		void (*start_fn)(void*, float) = nullptr;
 		void (*tick_fn)(void*, const TickInfo&) = nullptr;
 		void (*stop_fn)(void*) = nullptr;
 	};

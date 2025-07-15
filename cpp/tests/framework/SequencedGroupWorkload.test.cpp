@@ -57,7 +57,7 @@ TEST_CASE("Unit/Workloads/SequencedGroupWorkload")
 
 		const WorkloadDescriptor* workload_desc = group_info.type->get_workload_desc();
 
-		REQUIRE_NOTHROW(workload_desc->start_fn(group_ptr, 50.0));
+		REQUIRE_NOTHROW(workload_desc->start_fn(group_ptr, 50.0f));
 		REQUIRE_NOTHROW(workload_desc->tick_fn(group_ptr, TICK_INFO_FIRST_10MS_100HZ));
 		REQUIRE_NOTHROW(workload_desc->stop_fn(group_ptr));
 

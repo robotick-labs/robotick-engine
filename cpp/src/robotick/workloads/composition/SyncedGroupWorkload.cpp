@@ -86,7 +86,7 @@ namespace robotick
 			}
 		}
 
-		void start(double)
+		void start(float)
 		{
 			running = true;
 
@@ -161,7 +161,7 @@ namespace robotick
 			auto last_tick_time = child_start_time;
 			auto next_tick_time = child_start_time;
 
-			const auto tick_interval_sec = std::chrono::duration<double>(1.0 / child.seed->tick_rate_hz);
+			const auto tick_interval_sec = std::chrono::duration<float>(1.0f / child.seed->tick_rate_hz);
 			const auto tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(tick_interval_sec);
 
 			std::string thread_name(child.seed->unique_name.c_str(), 15);
@@ -236,7 +236,7 @@ namespace robotick
 		{
 			impl->set_children(children, pending_connections);
 		}
-		void start(double tick_rate_hz) { impl->start(tick_rate_hz); }
+		void start(float tick_rate_hz) { impl->start(tick_rate_hz); }
 		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
 		void stop() { impl->stop(); }
 	};
