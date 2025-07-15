@@ -16,24 +16,32 @@
 
 namespace robotick
 {
-	class Model;
 	struct WorkloadSeed;
 
 	struct RemoteModelSeed
 	{
-		friend class Model;
-
-		StringView model_name = nullptr;
-
 		enum class Mode
 		{
 			IP,
 			UART,
 			Local
-		} comms_mode = Mode::Local;
+		};
 
-		StringView comms_channel = nullptr; // e.g. "/dev/ttyUSB0", "192.168.1.42", etc.
-		const Model* model = nullptr;
+		RemoteModelSeed() = default;
+
+		RemoteModelSeed(
+			const StringView& model_name, const Mode comms_mode, const StringView& comms_channel, const ArrayView<const DataConnectionSeed*>& seeds)
+			: model_name(model_name)
+			, comms_mode(comms_mode)
+			, comms_channel(comms_channel)
+			, remote_data_connection_seeds(seeds)
+		{
+		}
+
+		StringView model_name;
+
+		Mode comms_mode = Mode::Local;
+		StringView comms_channel; // e.g. "/dev/ttyUSB0", "192.168.1.42", etc.
 
 		ArrayView<const DataConnectionSeed*> remote_data_connection_seeds;
 
@@ -62,6 +70,21 @@ namespace robotick
 			}
 
 			remote_data_connection_seeds.use(baked_remote_data_connections.data(), baked_remote_data_connections.size());
+		}
+
+		void connect(const char* source_field_path_local, const char* dest_field_path_remote)
+		{
+			for (const auto& s : remote_data_connection_seeds_storage)
+			{
+				if (s.dest_field_path == dest_field_path_remote)
+					ROBOTICK_FATAL_EXIT("Remote destination field in model '%s' already has an incoming remote-connection: %s",
+						model_name.c_str(),
+						dest_field_path_remote);
+			}
+
+			DataConnectionSeed& data_connection_seed = remote_data_connection_seeds_storage.push_back();
+			data_connection_seed.set_source_field_path(source_field_path_local);
+			data_connection_seed.set_dest_field_path(dest_field_path_remote);
 		}
 
 	  protected:

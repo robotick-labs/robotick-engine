@@ -128,7 +128,7 @@ namespace robotick
 			TypeId type = field->type_id;
 			const TypeDescriptor* field_type_desc = field->find_type_descriptor();
 			if (!field_type_desc)
-				ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has unknown type", field_token.c_str(), path);
+				ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has unknown type '%s'", field_token.c_str(), path, type.get_debug_name());
 			size_t size = field_type_desc->size;
 
 			// Step 4: optional subfield

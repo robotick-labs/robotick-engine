@@ -135,13 +135,13 @@ namespace robotick
 
 		void stop() { state->server.stop(); }
 
-		static double apply_dead_zone(double value, double dead_zone)
+		static float apply_dead_zone(float value, float dead_zone)
 		{
 			if (std::abs(value) < dead_zone)
 				return 0.0;
 			else
 			{
-				const double sign = (value > 0.0) ? 1.0 : -1.0;
+				const float sign = (value > 0.0) ? 1.0 : -1.0;
 				return ((std::abs(value) - dead_zone) / (1.0 - dead_zone)) * sign;
 			}
 		}

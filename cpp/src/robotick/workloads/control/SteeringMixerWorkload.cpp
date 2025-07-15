@@ -10,62 +10,62 @@ namespace robotick
 
 	// === Field registrations ===
 
-	struct SteeringMixerTransformerConfig
+	struct SteeringMixerConfig
 	{
-		double max_speed_differential = 0.4;
-		double power_scale_both = 1.0;
-		double power_scale_left = 1.0;
-		double power_scale_right = 1.0;
+		float max_speed_differential = 0.4f;
+		float power_scale_both = 1.0f;
+		float power_scale_left = 1.0f;
+		float power_scale_right = 1.0f;
 	};
 
-	ROBOTICK_REGISTER_STRUCT_BEGIN(SteeringMixerTransformerConfig)
-	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerConfig, double, max_speed_differential)
-	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerConfig, double, power_scale_both)
-	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerConfig, double, power_scale_left)
-	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerConfig, double, power_scale_right)
-	ROBOTICK_REGISTER_STRUCT_END(SteeringMixerTransformerConfig)
+	ROBOTICK_REGISTER_STRUCT_BEGIN(SteeringMixerConfig)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerConfig, float, max_speed_differential)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerConfig, float, power_scale_both)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerConfig, float, power_scale_left)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerConfig, float, power_scale_right)
+	ROBOTICK_REGISTER_STRUCT_END(SteeringMixerConfig)
 
-	struct SteeringMixerTransformerInputs
+	struct SteeringMixerInputs
 	{
-		double speed = 0.0;
-		double turn_rate = 0.0;
+		float speed = 0.0f;
+		float turn_rate = 0.0f;
 	};
 
-	ROBOTICK_REGISTER_STRUCT_BEGIN(SteeringMixerTransformerInputs)
-	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerInputs, double, speed)
-	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerInputs, double, turn_rate)
-	ROBOTICK_REGISTER_STRUCT_END(SteeringMixerTransformerInputs)
+	ROBOTICK_REGISTER_STRUCT_BEGIN(SteeringMixerInputs)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerInputs, float, speed)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerInputs, float, turn_rate)
+	ROBOTICK_REGISTER_STRUCT_END(SteeringMixerInputs)
 
-	struct SteeringMixerTransformerOutputs
+	struct SteeringMixerOutputs
 	{
-		double left_motor = 0.0;
-		double right_motor = 0.0;
+		float left_motor = 0.0f;
+		float right_motor = 0.0f;
 	};
 
-	ROBOTICK_REGISTER_STRUCT_BEGIN(SteeringMixerTransformerOutputs)
-	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerOutputs, double, left_motor)
-	ROBOTICK_STRUCT_FIELD(SteeringMixerTransformerOutputs, double, right_motor)
-	ROBOTICK_REGISTER_STRUCT_END(SteeringMixerTransformerOutputs)
+	ROBOTICK_REGISTER_STRUCT_BEGIN(SteeringMixerOutputs)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerOutputs, float, left_motor)
+	ROBOTICK_STRUCT_FIELD(SteeringMixerOutputs, float, right_motor)
+	ROBOTICK_REGISTER_STRUCT_END(SteeringMixerOutputs)
 
 	// === Workload ===
 
 	struct SteeringMixerWorkload
 	{
-		SteeringMixerTransformerInputs inputs;
-		SteeringMixerTransformerOutputs outputs;
-		SteeringMixerTransformerConfig config;
+		SteeringMixerInputs inputs;
+		SteeringMixerOutputs outputs;
+		SteeringMixerConfig config;
 
 		void tick(const TickInfo&)
 		{
-			const double speed = inputs.speed;
-			const double turn = inputs.turn_rate;
+			const float speed = inputs.speed;
+			const float turn = inputs.turn_rate;
 
-			double left = speed + turn * config.max_speed_differential;
-			double right = speed - turn * config.max_speed_differential;
+			float left = speed + turn * config.max_speed_differential;
+			float right = speed - turn * config.max_speed_differential;
 
 			// Clamp to [-1, 1]
-			left = std::max(-1.0, std::min(1.0, left));
-			right = std::max(-1.0, std::min(1.0, right));
+			left = std::max(-1.0f, std::min(1.0f, left));
+			right = std::max(-1.0f, std::min(1.0f, right));
 
 			left *= config.power_scale_both * config.power_scale_left;
 			right *= config.power_scale_both * config.power_scale_right;
@@ -77,6 +77,6 @@ namespace robotick
 
 	// === Auto-registration ===
 
-	ROBOTICK_REGISTER_WORKLOAD(SteeringMixerWorkload, SteeringMixerTransformerConfig, SteeringMixerTransformerInputs, SteeringMixerTransformerOutputs)
+	ROBOTICK_REGISTER_WORKLOAD(SteeringMixerWorkload, SteeringMixerConfig, SteeringMixerInputs, SteeringMixerOutputs)
 
 } // namespace robotick

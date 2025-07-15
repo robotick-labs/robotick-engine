@@ -52,10 +52,7 @@ namespace robotick
 			ROBOTICK_FATAL_EXIT("Only 'outputs' fields can be data connection sources: %s", source_field_path);
 
 		if (dest_field_path[0] == '|')
-		{
-			connect_remote(source_field_path, dest_field_path);
-			return;
-		}
+			ROBOTICK_FATAL_EXIT("Remote destination field paths should be specified via the remote-model: %s", dest_field_path);
 
 		if (strstr(dest_field_path, "inputs") == nullptr)
 			ROBOTICK_FATAL_EXIT("Only 'inputs' fields can be data connection destinations: %s", dest_field_path);
@@ -73,62 +70,13 @@ namespace robotick
 		data_connection_seed.set_dest_field_path(dest_field_path);
 	}
 
-	void Model::connect_remote(const char* source_field_path, const char* dest_field_path)
+	RemoteModelSeed& Model::add_remote_model(const char* model_name, const char* comms_channel)
 	{
-		const char* pipe1 = strchr(dest_field_path + 1, '|');
-		if (!pipe1)
-			ROBOTICK_FATAL_EXIT("Invalid remote field format: %s", dest_field_path);
-
-		FixedString64 model_id(dest_field_path + 1, pipe1 - dest_field_path - 1);
-		const char* remote_field_path = pipe1 + 1;
-
-		RemoteModelSeed* found_remote_model = nullptr;
-		for (RemoteModelSeed& rm : remote_models_storage)
-		{
-			if (rm.model_name == model_id)
-			{
-				found_remote_model = &rm;
-				break;
-			}
-		}
-
-		if (!found_remote_model)
-			ROBOTICK_FATAL_EXIT("Unknown remote model ID: %s", model_id.c_str());
-
-		if (!found_remote_model->model)
-			ROBOTICK_FATAL_EXIT("No model set on remote model ID: %s", model_id.c_str());
-
-		for (const auto& s : found_remote_model->remote_data_connection_seeds_storage)
-		{
-			if (s.dest_field_path == remote_field_path)
-				ROBOTICK_FATAL_EXIT(
-					"Remote destination field already has an incoming remote-connection: |%s|%s", model_id.c_str(), remote_field_path);
-		}
-
-		for (const auto& s : found_remote_model->model->get_data_connection_seeds())
-		{
-			if (strcmp(s->dest_field_path.c_str(), remote_field_path) == 0)
-				ROBOTICK_FATAL_EXIT("Remote destination field already has an incoming local-connection: |%s|%s", model_id.c_str(), remote_field_path);
-		}
-
-		DataConnectionSeed& data_connection_seed = found_remote_model->remote_data_connection_seeds_storage.push_back();
-		data_connection_seed.set_source_field_path(source_field_path);
-		data_connection_seed.set_dest_field_path(remote_field_path);
-	}
-
-	void Model::add_remote_model(const Model& remote_model, const char* model_name, const char* comms_channel)
-	{
-		if (!remote_model.root_workload)
-			ROBOTICK_FATAL_EXIT("add_remote_model: remote_model must have root_workload and been finalised");
-
 		if (!model_name || !*model_name)
 			ROBOTICK_FATAL_EXIT("add_remote_model: model_name must not be empty");
 
 		if (!comms_channel || !*comms_channel)
 			ROBOTICK_FATAL_EXIT("add_remote_model: comms_channel must not be empty");
-
-		if (remote_model.get_workload_seeds().size() == 0)
-			ROBOTICK_FATAL_EXIT("add_remote_model: remote_model must contain at least one workload");
 
 		for (const auto& rm : remote_models_storage)
 		{
@@ -147,8 +95,6 @@ namespace robotick
 		seed.set_model_name(model_name);
 		seed.set_comms_channel(address);
 
-		seed.model = &remote_model;
-
 		if (mode == "ip")
 		{
 			seed.comms_mode = RemoteModelSeed::Mode::IP;
@@ -157,6 +103,8 @@ namespace robotick
 		{
 			ROBOTICK_FATAL_EXIT("add_remote_model: unsupported comms_channel mode: '%s'", mode.c_str());
 		}
+
+		return seed;
 	}
 	void Model::bake_dynamic_workloads()
 	{
@@ -234,6 +182,19 @@ namespace robotick
 #endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 		data_connection_seeds = ArrayView<const DataConnectionSeed*>(in_connections, num_connections);
+	}
+
+	void Model::use_remote_models(const RemoteModelSeed** in_remote_model_seeds, size_t num_remote_model_seeds)
+	{
+#ifdef ROBOTICK_ENABLE_MODEL_HEAP
+		if (remote_models_storage.size() > 0)
+		{
+			ROBOTICK_FATAL_EXIT(
+				"Model::use_remote_models() (non-dynamic models) called after Model::add_remote_model() (dynamic models) has been called");
+		}
+#endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
+
+		remote_models = ArrayView<const RemoteModelSeed*>(in_remote_model_seeds, num_remote_model_seeds);
 	}
 
 	void Model::set_root_workload(const WorkloadSeed& root, bool auto_finalize)

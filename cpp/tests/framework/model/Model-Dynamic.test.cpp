@@ -141,19 +141,13 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 
 	SECTION("Connect to remote model")
 	{
-		// create spine remote-model:
-		Model spine;
-		const WorkloadSeed& steering = spine.add("DummyModelWorkload", "Steering").set_tick_rate_hz(s_tick_100hz);
-
-		const bool auto_finalise_and_validate = true;
-		spine.set_root_workload(steering, auto_finalise_and_validate);
-
 		// create brain local-model:
 		Model brain;
 		const WorkloadSeed& controller = brain.add("DummyModelWorkload", "Controller").set_tick_rate_hz(s_tick_100hz);
-		brain.add_remote_model(spine, "spine", "ip:127.0.0.1");
-		brain.connect("Controller.outputs.turn", "|spine|Steering.inputs.turn_rate");
 
+		brain.add_remote_model("spine", "ip:127.0.0.1").connect("Controller.outputs.turn", "Steering.inputs.turn_rate");
+
+		const bool auto_finalise_and_validate = true;
 		brain.set_root_workload(controller, auto_finalise_and_validate);
 
 		const auto& remote_models = brain.get_remote_models();
@@ -164,27 +158,13 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 		REQUIRE(remote_model->remote_data_connection_seeds[0]->dest_field_path == "Steering.inputs.turn_rate");
 	}
 
-	SECTION("Invalid remote dest path format throws")
+	SECTION("Throws on remote path via model.connect()")
 	{
 		Model model;
 		model.add("DummyModelWorkload", "A").set_tick_rate_hz(s_tick_100hz);
 
-		ROBOTICK_REQUIRE_ERROR_MSG(model.connect("A.outputs.x", "|badformat"), "Invalid remote field format");
-	}
-
-	SECTION("Duplicate remote connection throws")
-	{
-		Model remote;
-		const WorkloadSeed& remote_workload = remote.add("DummyModelWorkload", "R").set_tick_rate_hz(s_tick_100hz);
-		remote.set_root_workload(remote_workload);
-
-		Model local;
-		local.add("DummyModelWorkload", "X").set_tick_rate_hz(s_tick_100hz);
-		local.add("DummyModelWorkload", "Y").set_tick_rate_hz(s_tick_100hz);
-		local.add_remote_model(remote, "spine", "ip:123.0.0.123");
-
-		local.connect("X.outputs.x", "|spine|R.inputs.a");
-		ROBOTICK_REQUIRE_ERROR_MSG(local.connect("Y.outputs.y", "|spine|R.inputs.a"), "already has an incoming remote-connection");
+		ROBOTICK_REQUIRE_ERROR_MSG(
+			model.connect("A.outputs.x", "|badformat"), "Remote destination field paths should be specified via the remote-model");
 	}
 
 	SECTION("Allows connecting input between valid workloads")
