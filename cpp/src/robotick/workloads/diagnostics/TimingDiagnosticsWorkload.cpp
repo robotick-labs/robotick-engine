@@ -80,12 +80,12 @@ namespace robotick
 			internal_state.sum_dt += actual_dt;
 			internal_state.sum_dt2 += actual_dt * actual_dt;
 
-			const float tick_period = 1.0f / config.log_rate_hz;
+			const float tick_period = 1.0f / (float)config.log_rate_hz;
 
 			if (internal_state.sum_dt >= tick_period)
 			{
-				float mean_dt = internal_state.sum_dt / internal_state.count;
-				float mean_dt2 = internal_state.sum_dt2 / internal_state.count;
+				float mean_dt = internal_state.sum_dt / (float)internal_state.count;
+				float mean_dt2 = internal_state.sum_dt2 / (float)internal_state.count;
 				const float variance = std::max(0.0f, mean_dt2 - mean_dt * mean_dt);
 				const float stddev = std::sqrt(variance);
 
