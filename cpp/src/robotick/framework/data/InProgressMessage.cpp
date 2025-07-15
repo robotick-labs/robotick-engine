@@ -120,7 +120,7 @@ namespace robotick
 
 			static_assert(sizeof(MAGIC) == sizeof(header.magic));
 
-			if (std::memcmp(header.magic, MAGIC, sizeof(MAGIC)) != 0 || header.version != VERSION)
+			if (memcmp(header.magic, MAGIC, sizeof(MAGIC)) != 0 || header.version != VERSION)
 			{
 				ROBOTICK_WARNING("InProgressMessage::tick(): Invalid header magic or version");
 				return Result::ConnectionLost;

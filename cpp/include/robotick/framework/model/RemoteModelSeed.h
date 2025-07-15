@@ -20,6 +20,8 @@ namespace robotick
 
 	struct RemoteModelSeed
 	{
+		friend class Model;
+
 		enum class Mode
 		{
 			IP,
@@ -58,21 +60,7 @@ namespace robotick
 			comms_channel = comms_channel_storage.c_str();
 		}
 
-		void bake_dynamic_remote_connections()
-		{
-			baked_remote_data_connections.initialize(remote_data_connection_seeds_storage.size());
-
-			size_t index = 0;
-			for (auto& seed : remote_data_connection_seeds_storage)
-			{
-				baked_remote_data_connections[index] = &seed;
-				++index;
-			}
-
-			remote_data_connection_seeds.use(baked_remote_data_connections.data(), baked_remote_data_connections.size());
-		}
-
-		void connect(const char* source_field_path_local, const char* dest_field_path_remote)
+		RemoteModelSeed& connect(const char* source_field_path_local, const char* dest_field_path_remote)
 		{
 			for (const auto& s : remote_data_connection_seeds_storage)
 			{
@@ -85,6 +73,23 @@ namespace robotick
 			DataConnectionSeed& data_connection_seed = remote_data_connection_seeds_storage.push_back();
 			data_connection_seed.set_source_field_path(source_field_path_local);
 			data_connection_seed.set_dest_field_path(dest_field_path_remote);
+
+			return *this;
+		}
+
+	  protected:
+		void bake_dynamic_remote_connections()
+		{
+			baked_remote_data_connections.initialize(remote_data_connection_seeds_storage.size());
+
+			size_t index = 0;
+			for (auto& seed : remote_data_connection_seeds_storage)
+			{
+				baked_remote_data_connections[index] = &seed;
+				++index;
+			}
+
+			remote_data_connection_seeds.use(baked_remote_data_connections.data(), baked_remote_data_connections.size());
 		}
 
 	  protected:

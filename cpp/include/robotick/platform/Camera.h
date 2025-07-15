@@ -8,6 +8,8 @@ namespace robotick
 	class Camera
 	{
 	  public:
+		struct Impl;
+
 		// Constructor (default)
 		Camera();
 
@@ -24,7 +26,6 @@ namespace robotick
 		void print_available_cameras();
 
 	  private:
-		struct Impl;
 		Impl* impl = nullptr;
 	};
 
