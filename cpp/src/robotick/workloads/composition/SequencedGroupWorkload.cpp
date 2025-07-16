@@ -128,7 +128,8 @@ namespace robotick
 
 			const auto elapsed = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::steady_clock::now() - start_time).count();
 
-			if (elapsed > tick_info.delta_time)
+			const float overrun_fraction_allowed = 1.02f;
+			if (elapsed > (tick_info.delta_time * overrun_fraction_allowed))
 			{
 				std::printf("[Sequenced] Overrun: tick took %.3fms (budget %.3fms)\n", elapsed * 1000.0f, tick_info.delta_time * 1000.0f);
 			}

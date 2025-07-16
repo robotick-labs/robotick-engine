@@ -41,7 +41,7 @@ namespace robotick
 		return impl->video_capture.isOpened();
 	}
 
-	bool Camera::read_frame(const uint8_t*& out_data_ptr, size_t& out_size)
+	bool Camera::read_frame(uint8_t* dst_buffer, const size_t dst_capacity, size_t& out_size_used)
 	{
 		cv::Mat frame;
 		const bool camera_ready = impl->video_capture.isOpened() && impl->video_capture.read(frame);
@@ -82,9 +82,14 @@ namespace robotick
 		impl->jpeg_buffer.clear();
 		cv::imencode(".jpg", frame, impl->jpeg_buffer);
 
-		out_data_ptr = impl->jpeg_buffer.data();
-		out_size = impl->jpeg_buffer.size();
-		return true;
+		if (impl->jpeg_buffer.size() <= dst_capacity)
+		{
+			memcpy(dst_buffer, impl->jpeg_buffer.data(), impl->jpeg_buffer.size());
+			out_size_used = impl->jpeg_buffer.size();
+			return true;
+		}
+
+		return false;
 	}
 
 	void Camera::print_available_cameras()

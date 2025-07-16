@@ -14,8 +14,6 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define ROBOTICK_REMOTE_ENGINE_LOG_PACKETS 0
-
 namespace robotick
 {
 

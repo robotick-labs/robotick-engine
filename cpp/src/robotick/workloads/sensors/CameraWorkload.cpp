@@ -63,21 +63,10 @@ namespace robotick
 		{
 			(void)tick_info;
 
-			const uint8_t* data = nullptr;
-			size_t size = 0;
-			if (state->camera.read_frame(data, size))
+			size_t size_used = 0;
+			if (state->camera.read_frame(outputs.jpeg_data.data(), outputs.jpeg_data.capacity(), size_used))
 			{
-				if (size > outputs.jpeg_data.capacity())
-				{
-					ROBOTICK_WARNING("CameraWorkload - camera-data size (%zu bytes) is too large for jpeg_data buffer (%zu bytes)",
-						size,
-						outputs.jpeg_data.capacity());
-				}
-				else
-				{
-					outputs.jpeg_data.set_size(size);
-					memcpy(outputs.jpeg_data.data(), data, size);
-				}
+				outputs.jpeg_data.set_size(size_used);
 			}
 		}
 	};

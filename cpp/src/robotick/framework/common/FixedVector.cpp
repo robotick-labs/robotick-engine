@@ -38,4 +38,9 @@ namespace robotick
 	ROBOTICK_REGISTER_PRIMITIVE(FixedVector128k, fixed_vector_to_string<FixedVector128k>, fixed_vector_from_string);
 	ROBOTICK_REGISTER_PRIMITIVE(FixedVector256k, fixed_vector_to_string<FixedVector256k>, fixed_vector_from_string);
 
+	extern "C" void robotick_force_register_fixed_vector_types()
+	{
+		// This function exists solely to force this TU to be retained
+	}
+
 } // namespace robotick

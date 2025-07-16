@@ -20,7 +20,7 @@ namespace robotick
 		bool setup(const int camera_index);
 
 		// On success, fills data_ptr/size with JPEG frame data
-		bool read_frame(const uint8_t*& out_data_ptr, size_t& out_size);
+		bool read_frame(uint8_t* dst_buffer, const size_t dst_capacity, size_t& out_size_used);
 
 		// Print available camera IDs (friendly or index-based)
 		void print_available_cameras();

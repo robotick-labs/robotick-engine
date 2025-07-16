@@ -156,7 +156,7 @@ namespace robotick
 
 	  private:
 		T data_buffer[Capacity]{}; ///< Underlying storage.
-		size_t count = 0;		   ///< Current number of elements.
+		uint32_t count = 0;		   ///< Current number of elements.
 	};
 
 	using FixedVector1k = FixedVector<uint8_t, 1 * 1024>;
