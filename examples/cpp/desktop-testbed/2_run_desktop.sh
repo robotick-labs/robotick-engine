@@ -1,2 +1,2 @@
 #!/bin/bash
-./build/desktop-testbed-ubuntu-x64-debug/desktop-testbed
+./build/desktop-testbed-linux-debug/desktop-testbed

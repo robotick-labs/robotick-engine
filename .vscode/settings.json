@@ -1,16 +1,16 @@
 {
     "cmake.useCMakePresets": "always",
-    "cmake.configurePreset": "ubuntu-x64-debug",
-    "cmake.buildPreset": "ubuntu-x64-debug",
+    "cmake.configurePreset": "linux-debug",
+    "cmake.buildPreset": "linux-debug",
     "cmake.sourceDirectory": "${workspaceFolder}",
     "cmake.buildDirectory": "${workspaceFolder}/build",
     "cmake.testExplorer.enableOutput": true,
     "cmake.testExplorer.useCTest": true,
-    "cmake.testExplorer.extraCTestArgs": "--test-dir ${workspaceFolder}/build/ubuntu-x64-debug/cpp/tests",
+    "cmake.testExplorer.extraCTestArgs": "--test-dir ${workspaceFolder}/build/linux-debug/cpp/tests",
     "testMate.cpp.testFramework": "catch2",
     "testMate.cpp.enableTestDiscovery": true,
     "testMate.cpp.debug.config.template": "Debug Robotick Tests (No Leak Check)",
-    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/ubuntu-x64-debug/compile_commands.json",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/linux-debug/compile_commands.json",
     "C_Cpp.codeAnalysis.clangTidy.enabled": true,
     "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
         "modernize-use-trailing-return-type"

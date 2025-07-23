@@ -6,24 +6,24 @@
     },
     "configurePresets": [
         {
-            "name": "desktop-testbed-ubuntu-x64-base",
+            "name": "desktop-testbed-linux-base",
             "hidden": true,
             "generator": "Ninja",
-            "description": "Base preset for desktop-testbed on Ubuntu x64",
+            "description": "Base preset for desktop-testbed on native Linux (x64 or ARM64)",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "/usr/bin/gcc",
                 "CMAKE_CXX_COMPILER": "/usr/bin/g++",
-                "ROBOTICK_PLATFORM_UBUNTU": "ON",
+                "ROBOTICK_PLATFORM_LINUX": "ON",
                 "ROBOTICK_ENABLE_PYTHON": "ON",
-                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/../../../cmake/toolchain-ubuntu-x64.cmake",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/../../../cmake/toolchain-linux-native.cmake",
                 "WORKLOAD_PRESET": "ubuntu-workloads-all",
                 "ROBOTICK_PROJECT_ROOT": "${sourceDir}"
             }
         },
         {
-            "name": "desktop-testbed-ubuntu-x64-debug",
-            "inherits": "desktop-testbed-ubuntu-x64-base",
+            "name": "desktop-testbed-linux-debug",
+            "inherits": "desktop-testbed-linux-base",
             "description": "Debug build for desktop-testbed",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
@@ -32,8 +32,8 @@
             }
         },
         {
-            "name": "desktop-testbed-ubuntu-x64-development",
-            "inherits": "desktop-testbed-ubuntu-x64-base",
+            "name": "desktop-testbed-linux-development",
+            "inherits": "desktop-testbed-linux-base",
             "description": "Dev build with debug symbols for desktop-testbed",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo",
@@ -42,8 +42,8 @@
             }
         },
         {
-            "name": "desktop-testbed-ubuntu-x64-release",
-            "inherits": "desktop-testbed-ubuntu-x64-base",
+            "name": "desktop-testbed-linux-release",
+            "inherits": "desktop-testbed-linux-base",
             "description": "Stripped and optimized release build for desktop-testbed",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
@@ -55,16 +55,16 @@
     ],
     "buildPresets": [
         {
-            "name": "desktop-testbed-ubuntu-x64-debug",
-            "configurePreset": "desktop-testbed-ubuntu-x64-debug"
+            "name": "desktop-testbed-linux-debug",
+            "configurePreset": "desktop-testbed-linux-debug"
         },
         {
-            "name": "desktop-testbed-ubuntu-x64-development",
-            "configurePreset": "desktop-testbed-ubuntu-x64-development"
+            "name": "desktop-testbed-linux-development",
+            "configurePreset": "desktop-testbed-linux-development"
         },
         {
-            "name": "desktop-testbed-ubuntu-x64-release",
-            "configurePreset": "desktop-testbed-ubuntu-x64-release"
+            "name": "desktop-testbed-linux-release",
+            "configurePreset": "desktop-testbed-linux-release"
         }
     ]
 }

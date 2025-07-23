@@ -1,4 +1,4 @@
-name: CI - Build & Test (ubuntu-x64.dev)
+name: CI - Build & Test (linux.dev)
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        preset: [ubuntu-x64-debug, ubuntu-x64-development, ubuntu-x64-release]
+        preset: [linux-debug, linux-development, linux-release]
 
     steps:
       - name: Checkout repository
@@ -25,7 +25,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.docker-cache
-          key: docker-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('docker/Docker.ubuntu-x64.dev') }}
+          key: docker-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('docker/Docker.ubuntu.dev') }}
           restore-keys: |
             docker-${{ runner.os }}-
 
@@ -39,7 +39,7 @@ jobs:
       - name: Build Docker image (robotick-ci)
         run: |
           docker build -t robotick-ci \
-            -f docker/Docker.ubuntu-x64.dev \
+            -f docker/Docker.ubuntu.dev \
             .
 
       - name: Save Docker image to cache
@@ -60,7 +60,7 @@ jobs:
             "
 
       - name: Run CTest in Docker (Debug Only)
-        if: matrix.preset == 'ubuntu-x64-debug'
+        if: matrix.preset == 'linux-debug'
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
@@ -68,5 +68,5 @@ jobs:
             robotick-ci \
             bash -c "
               set -e
-              ctest --test-dir build/ubuntu-x64-debug/cpp/tests --output-on-failure --timeout 10
+              ctest --test-dir build/linux-debug/cpp/tests --output-on-failure --timeout 10
             "
