@@ -72,7 +72,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 					Thread::sleep_ms(5);
 				RemoteEngineConnection sender;
 				sender.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Sender);
-				sender.register_field({.path = "x", .send_ptr = &send_value, .size = sizeof(int), .type_hash = 0});
+				sender.register_field({"x", &send_value, nullptr, sizeof(int), 0});
+
 				while (!sender.is_ready())
 				{
 					sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
@@ -139,7 +140,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 					Thread::sleep_ms(5);
 				RemoteEngineConnection sender;
 				sender.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Sender);
-				sender.register_field({.path = "blob", .send_ptr = send_buffer.data(), .size = send_buffer.size(), .type_hash = 0});
+				sender.register_field({"blob", send_buffer.data(), nullptr, send_buffer.size(), 0});
 				while (!sender.is_ready())
 				{
 					sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
@@ -207,7 +208,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 
 				RemoteEngineConnection tx;
 				tx.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Sender);
-				tx.register_field({.path = "x", .send_ptr = &send_value, .size = sizeof(int), .type_hash = 0});
+				tx.register_field({"x", &send_value, nullptr, sizeof(int), 0});
 				while (!tx.is_ready())
 				{
 					tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
@@ -292,7 +293,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 					Thread::sleep_ms(5);
 				RemoteEngineConnection tx;
 				tx.configure({"127.0.0.1", port}, RemoteEngineConnection::Mode::Sender);
-				tx.register_field({.path = "x", .send_ptr = &send_value, .size = sizeof(int), .type_hash = 0});
+				tx.register_field({"x", &send_value, nullptr, sizeof(int), 0});
 				while (!tx.is_ready())
 				{
 					tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);

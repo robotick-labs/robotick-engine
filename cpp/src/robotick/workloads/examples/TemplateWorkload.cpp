@@ -13,7 +13,7 @@ namespace robotick
 
 	struct TemplateConfig
 	{
-		double gain;
+		float gain;
 		int threshold;
 		FixedString32 label;
 		Blackboard blackboard;
@@ -21,7 +21,7 @@ namespace robotick
 		// they are a bit slower to use
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(TemplateConfig)
-	ROBOTICK_STRUCT_FIELD(TemplateConfig, double, gain)
+	ROBOTICK_STRUCT_FIELD(TemplateConfig, float, gain)
 	ROBOTICK_STRUCT_FIELD(TemplateConfig, int, threshold)
 	ROBOTICK_STRUCT_FIELD(TemplateConfig, FixedString32, label)
 	ROBOTICK_STRUCT_FIELD(TemplateConfig, Blackboard, blackboard)
@@ -29,13 +29,13 @@ namespace robotick
 
 	struct TemplateInputs
 	{
-		double angle;
+		float angle;
 		int sensor_value;
 		FixedString16 sensor_label;
 		Blackboard blackboard; // (see note on TemplateConfig::blackboard)
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(TemplateInputs)
-	ROBOTICK_STRUCT_FIELD(TemplateInputs, double, angle)
+	ROBOTICK_STRUCT_FIELD(TemplateInputs, float, angle)
 	ROBOTICK_STRUCT_FIELD(TemplateInputs, int, sensor_value)
 	ROBOTICK_STRUCT_FIELD(TemplateInputs, FixedString16, sensor_label)
 	ROBOTICK_STRUCT_FIELD(TemplateInputs, Blackboard, blackboard)
@@ -43,7 +43,7 @@ namespace robotick
 
 	struct TemplateOutputs
 	{
-		double command;
+		float command;
 		FixedString64 status;
 		Blackboard blackboard; // (see note on TemplateConfig::blackboard)
 
@@ -57,7 +57,7 @@ namespace robotick
 		bool has_called_stop = false;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(TemplateOutputs)
-	ROBOTICK_STRUCT_FIELD(TemplateOutputs, double, command)
+	ROBOTICK_STRUCT_FIELD(TemplateOutputs, float, command)
 	ROBOTICK_STRUCT_FIELD(TemplateOutputs, FixedString64, status)
 	ROBOTICK_STRUCT_FIELD(TemplateOutputs, Blackboard, blackboard)
 	ROBOTICK_STRUCT_FIELD(TemplateOutputs, bool, has_called_set_children)
@@ -114,7 +114,7 @@ namespace robotick
 			// ... meaning it is the correct place to set the schema for each of our blackboards, for example:
 
 			state->blackboard_fields_config.initialize(1);
-			state->blackboard_fields_config[0] = FieldDescriptor{"my_config_double", GET_TYPE_ID(double)};
+			state->blackboard_fields_config[0] = FieldDescriptor{"my_config_float", GET_TYPE_ID(float)};
 			config.blackboard.initialize_fields(state->blackboard_fields_config);
 
 			state->blackboard_fields_input.initialize(1);
@@ -143,12 +143,12 @@ namespace robotick
 			outputs.has_called_setup = true; // (for unit-testing of this template - not for illustrating suggested usage!)
 		}
 
-		void start(double time_now)
+		void start(float tick_rate_hz)
 		{
 			// Called once when ticking begins
 
 			outputs.has_called_start = true; // (for unit-testing of this template - not for illustrating suggested usage!)
-			(void)time_now;					 // (just to stop compiler warning is about unused args)
+			(void)tick_rate_hz;				 // (just to stop compiler warning is about unused args)
 		}
 
 		void tick(const TickInfo& tick_info)

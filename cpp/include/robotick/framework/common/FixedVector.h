@@ -5,8 +5,10 @@
 
 #pragma once
 
-#include <cassert>
+#include "robotick/api_base.h"
+
 #include <cstddef>
+#include <cstdint>
 
 namespace robotick
 {
@@ -19,6 +21,16 @@ namespace robotick
 	template <typename T, size_t Capacity> class FixedVector
 	{
 	  public:
+		/**
+		 * @brief Sets the current size of the vector. Use with care.
+		 *        Caller must ensure the corresponding elements are initialized.
+		 */
+		void set_size(size_t new_size)
+		{
+			ROBOTICK_ASSERT_MSG((new_size <= capacity()), "FixedVector::set_size() exceeds capacity");
+			count = new_size;
+		}
+
 		/**
 		 * @brief Returns the number of elements currently stored.
 		 */
@@ -46,7 +58,7 @@ namespace robotick
 		{
 			for (size_t i = count; i < Capacity; ++i)
 			{
-				data[i] = T{};
+				data_buffer[i] = T{};
 			}
 
 			count = Capacity;
@@ -59,8 +71,39 @@ namespace robotick
 		 */
 		void add(const T& value)
 		{
-			assert(count < Capacity && "FixedVector overflow");
-			data[count++] = value;
+			ROBOTICK_ASSERT(count < Capacity && "FixedVector overflow");
+			data_buffer[count++] = value;
+		}
+
+		/**
+		 * @brief Set the buffer contents from a raw memory block
+		 *
+		 * @param src Pointer to source data
+		 * @param len Number of bytes to copy
+		 */
+		void set(const void* src, size_t len)
+		{
+			ROBOTICK_ASSERT(src != nullptr);
+			ROBOTICK_ASSERT(len <= capacity());
+			memcpy(data_buffer, src, len);
+			count = len;
+		}
+
+		/**
+		 * @brief Set the buffer-contents and size to the specified string
+		 * (string-length plus null-terminator)
+		 *
+		 * @param value The string-value to set
+		 */
+		void set_from_string(const char* value)
+		{
+			ROBOTICK_ASSERT(value != nullptr);
+
+			const size_t len = strlen(value) + 1; // include null terminator
+			ROBOTICK_ASSERT(len <= capacity());
+
+			memcpy(data_buffer, value, len);
+			count = len;
 		}
 
 		/**
@@ -68,8 +111,8 @@ namespace robotick
 		 */
 		T& operator[](size_t index)
 		{
-			assert(index < count);
-			return data[index];
+			ROBOTICK_ASSERT(index < count);
+			return data_buffer[index];
 		}
 
 		/**
@@ -77,38 +120,53 @@ namespace robotick
 		 */
 		const T& operator[](size_t index) const
 		{
-			assert(index < count);
-			return data[index];
+			ROBOTICK_ASSERT(index < count);
+			return data_buffer[index];
 		}
 
 		/**
 		 * @brief Returns a pointer to the first element.
 		 */
-		T* begin() { return data; }
+		T* begin() { return data_buffer; }
 
 		/**
 		 * @brief Returns a pointer past the last element.
 		 */
-		T* end() { return data + count; }
+		T* end() { return data_buffer + count; }
 
 		/**
 		 * @brief Returns a const pointer to the first element.
 		 */
-		const T* begin() const { return data; }
+		const T* begin() const { return data_buffer; }
 
 		/**
 		 * @brief Returns a const pointer past the last element.
 		 */
-		const T* end() const { return data + count; }
+		const T* end() const { return data_buffer + count; }
 
 		/**
 		 * @brief Clears all elements in the vector.
 		 */
 		void clear() { count = 0; }
 
+		/**
+		 * @brief Returns pointer to start of our data-buffer
+		 */
+		T* data() { return &data_buffer[0]; };
+
 	  private:
-		T data[Capacity]{}; ///< Underlying storage.
-		size_t count = 0;	///< Current number of elements.
+		T data_buffer[Capacity]{}; ///< Underlying storage.
+		uint32_t count = 0;		   ///< Current number of elements.
 	};
+
+	using FixedVector1k = FixedVector<uint8_t, 1 * 1024>;
+	using FixedVector2k = FixedVector<uint8_t, 2 * 1024>;
+	using FixedVector4k = FixedVector<uint8_t, 4 * 1024>;
+	using FixedVector8k = FixedVector<uint8_t, 8 * 1024>;
+	using FixedVector16k = FixedVector<uint8_t, 16 * 1024>;
+	using FixedVector32k = FixedVector<uint8_t, 32 * 1024>;
+	using FixedVector64k = FixedVector<uint8_t, 64 * 1024>;
+	using FixedVector128k = FixedVector<uint8_t, 128 * 1024>;
+	using FixedVector256k = FixedVector<uint8_t, 256 * 1024>;
 
 } // namespace robotick

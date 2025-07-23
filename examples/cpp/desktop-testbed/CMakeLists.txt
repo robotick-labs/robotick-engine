@@ -19,8 +19,16 @@ message(STATUS "🔗 Will symlink engine data from: ${ENGINE_DATA_SOURCE_DIR}")
 message(STATUS "🔗            into binary path: ${ENGINE_DATA_DEST_DIR}")
 
 if(NOT EXISTS "${ENGINE_DATA_DEST_DIR}")
-    file(CREATE_LINK "${ENGINE_DATA_SOURCE_DIR}" "${ENGINE_DATA_DEST_DIR}" SYMBOLIC)
-    message(STATUS "✅ Created symlink: ${ENGINE_DATA_DEST_DIR} → ${ENGINE_DATA_SOURCE_DIR}")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E create_symlink "${ENGINE_DATA_SOURCE_DIR}" "${ENGINE_DATA_DEST_DIR}"
+        RESULT_VARIABLE SYMLINK_RESULT
+    )
+    if(SYMLINK_RESULT EQUAL 0)
+        message(STATUS "✅ Created symlink for engine data: ${ENGINE_DATA_SOURCE_DIR} -> ${ENGINE_DATA_DEST_DIR}")
+    else()
+        message(WARNING "❌ Failed to create symlink: ${ENGINE_DATA_SOURCE_DIR} -> ${ENGINE_DATA_DEST_DIR}")
+    endif()
 else()
-    message(STATUS "♻️  Symlink or directory already exists: ${ENGINE_DATA_DEST_DIR}")
+    message(STATUS "ℹ️  Symlink already exists: ${ENGINE_DATA_DEST_DIR}")
 endif()
+

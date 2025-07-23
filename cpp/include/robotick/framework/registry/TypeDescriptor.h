@@ -78,6 +78,8 @@ namespace robotick
 	{
 		/// @brief Takes a void* to an instance (e.g. a blackboard), returns a StructDescriptor view of available fields
 		const StructDescriptor* (*resolve_fn)(const void* instance);
+
+		const StructDescriptor* get_struct_descriptor(const void* instance) const { return resolve_fn(instance); }
 	};
 
 	struct WorkloadDescriptor
@@ -100,7 +102,7 @@ namespace robotick
 		void (*pre_load_fn)(void*) = nullptr;
 		void (*load_fn)(void*) = nullptr;
 		void (*setup_fn)(void*) = nullptr;
-		void (*start_fn)(void*, double) = nullptr;
+		void (*start_fn)(void*, float) = nullptr;
 		void (*tick_fn)(void*, const TickInfo&) = nullptr;
 		void (*stop_fn)(void*) = nullptr;
 	};
@@ -113,6 +115,14 @@ namespace robotick
 		Workload
 	};
 
+	// Converts data to string form, writing to buffer. Null-terminated.
+	// Returns true if successful.
+	using ToStringFn = bool (*)(const void* data, char* out_buffer, size_t buffer_size);
+
+	// Parses string and stores result in out_data.
+	// Returns true if successful.
+	using FromStringFn = bool (*)(const char* str, void* out_data);
+
 	struct TypeDescriptor
 	{
 		StringView name;  // e.g. "int"
@@ -124,6 +134,7 @@ namespace robotick
 
 		union TypeCategoryDesc
 		{
+			const void* any_desc; // allows construction from brace-init list pre-C++20
 			const StructDescriptor* struct_desc;
 			const WorkloadDescriptor* workload_desc;
 			const DynamicStructDescriptor* dynamic_struct_desc;
@@ -133,10 +144,10 @@ namespace robotick
 
 		// Converts data to string form, writing to buffer. Null-terminated.
 		// Returns true if successful.
-		bool (*to_string)(const void* data, char* out_buffer, size_t buffer_size);
+		ToStringFn to_string = nullptr;
 
 		// Parses string and stores result in out_data.
-		bool (*from_string)(const char* str, void* out_data);
+		FromStringFn from_string = nullptr;
 
 		// --- misc helpers: ---
 		const WorkloadDescriptor* get_workload_desc() const

@@ -45,14 +45,25 @@ namespace robotick
 				if (!base_ptr)
 					continue;
 
-				if (field_desc.type_id == GET_TYPE_ID(Blackboard))
+				const TypeDescriptor* field_type_desc = field_desc.find_type_descriptor();
+				if (!field_type_desc)
+					continue;
+
+				const StructDescriptor* struct_desc = field_type_desc->get_struct_desc();
+				if (!struct_desc)
 				{
-					Blackboard& blackboard = *static_cast<Blackboard*>(base_ptr);
-					const StructDescriptor& blackboard_struct_desc = blackboard.get_struct_descriptor();
-					for (const FieldDescriptor& blackboard_field : blackboard_struct_desc.fields)
+					if (const DynamicStructDescriptor* dynamic_struct_desc = field_type_desc->get_dynamic_struct_desc())
 					{
-						void* blackboard_field_data_ptr = blackboard.get_field_data(blackboard_field);
-						WorkloadFieldView view{&instance, struct_type, &field_desc, &blackboard_field, blackboard_field_data_ptr};
+						struct_desc = dynamic_struct_desc->get_struct_descriptor(base_ptr);
+					}
+				}
+
+				if (struct_desc)
+				{
+					for (const FieldDescriptor& sub_field : struct_desc->fields)
+					{
+						void* sub_field_data_ptr = sub_field.get_data_ptr(base_ptr);
+						WorkloadFieldView view{&instance, struct_type, &field_desc, &sub_field, sub_field_data_ptr};
 						callback(view);
 					}
 				}

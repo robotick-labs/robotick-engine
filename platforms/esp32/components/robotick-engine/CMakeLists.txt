@@ -9,7 +9,9 @@ set(ROBOTICK_ENGINE_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
 include(${ROBOTICK_ENGINE_SOURCE_DIR}/cmake/RobotickWorkloadFilter.cmake)
 
 set(srcs ${CORE_SOURCES})
-set(include_dirs ${CMAKE_CURRENT_LIST_DIR}/include)
+set(include_dirs
+    ${CMAKE_CURRENT_LIST_DIR}/include
+)
 
 message(STATUS "🧐 Included sources:")
 foreach(file ${srcs})
@@ -21,5 +23,7 @@ idf_component_register(
     INCLUDE_DIRS ${include_dirs}
     REQUIRES json esp_timer M5GFX M5Unified esp_wifi
 )
+
+
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC ROBOTICK_PLATFORM_ESP32)

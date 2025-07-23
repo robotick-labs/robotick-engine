@@ -17,6 +17,8 @@ namespace robotick
 
 /// @brief Macro to register Primitives:
 #define ROBOTICK_REGISTER_PRIMITIVE(TypeName, ToStringFn, FromStringFn)                                                                              \
+	static_assert(                                                                                                                                   \
+		std::is_standard_layout<TypeName>::value, #TypeName " is not standard layout. Only standard layout types can be registered as primitives."); \
 	static_assert(std::is_trivially_copyable<TypeName>::value,                                                                                       \
 		#TypeName " is not trivially copyable. Only trivially copyable items can be registered as primitive types.");                                \
 	static constexpr ::robotick::TypeDescriptor s_type_desc_##TypeName = {                                                                           \
@@ -31,6 +33,8 @@ namespace robotick
 #define ROBOTICK_REGISTER_STRUCT_END(StructType)                                                                                                     \
 	}                                                                                                                                                \
 	;                                                                                                                                                \
+	static_assert(std::is_standard_layout<StructType>::value,                                                                                        \
+		#StructType " is not standard layout. Only standard layout structs can be registered as field types.");                                      \
 	static_assert(std::is_trivially_copyable<StructType>::value,                                                                                     \
 		#StructType " is not trivially copyable. Only trivially copyable structs can be registered as field types.");                                \
 	static constexpr ::robotick::StructDescriptor s_struct_desc_##StructType = {::robotick::ArrayView<::robotick::FieldDescriptor>{                  \
@@ -47,13 +51,17 @@ namespace robotick
 
 /// @brief Macro to register Dynamic Structs :
 #define ROBOTICK_REGISTER_DYNAMIC_STRUCT(TypeName, ResolveFn)                                                                                        \
+	static_assert(std::is_standard_layout<TypeName>::value,                                                                                          \
+		#TypeName " is not standard layout. Only standard layout types can be registered as dynamic structs.");                                      \
+	static_assert(std::is_trivially_copyable<TypeName>::value,                                                                                       \
+		#TypeName " is not trivially copyable. Only trivially copyable types can be registered as dynamic structs.");                                \
 	static const ::robotick::DynamicStructDescriptor s_dynamic_struct_desc_##TypeName = {ResolveFn};                                                 \
 	static const ::robotick::TypeDescriptor s_type_desc_##TypeName = {#TypeName,                                                                     \
 		GET_TYPE_ID(TypeName),                                                                                                                       \
 		sizeof(TypeName),                                                                                                                            \
 		alignof(TypeName),                                                                                                                           \
 		::robotick::TypeCategory::DynamicStruct,                                                                                                     \
-		{.dynamic_struct_desc = &s_dynamic_struct_desc_##TypeName},                                                                                  \
+		{&s_dynamic_struct_desc_##TypeName},                                                                                                         \
 		nullptr,                                                                                                                                     \
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##TypeName(s_type_desc_##TypeName);
@@ -66,6 +74,8 @@ namespace robotick
 /// @brief Macros to register Workloads:
 #define ROBOTICK_REGISTER_WORKLOAD_BASE(WorkloadTypeName, ConfigTypePtr, InputTypePtr, OutputTypePtr)                                                \
 	ROBOTICK_SUPPRESS_UNUSED_WARNING_START                                                                                                           \
+	static_assert(                                                                                                                                   \
+		std::is_standard_layout<WorkloadTypeName>::value, #WorkloadTypeName " is not standard layout. All workloads must be standard layout.");      \
 	static const ::robotick::WorkloadDescriptor s_workload_desc_##WorkloadTypeName =                                                                 \
 		::robotick::registry::make_workload_descriptor<WorkloadTypeName>(ConfigTypePtr, InputTypePtr, OutputTypePtr);                                \
 	static const ::robotick::TypeDescriptor s_type_desc_##WorkloadTypeName = {#WorkloadTypeName,                                                     \
@@ -73,7 +83,7 @@ namespace robotick
 		sizeof(WorkloadTypeName),                                                                                                                    \
 		alignof(WorkloadTypeName),                                                                                                                   \
 		::robotick::TypeCategory::Workload,                                                                                                          \
-		{.workload_desc = &s_workload_desc_##WorkloadTypeName},                                                                                      \
+		{&s_workload_desc_##WorkloadTypeName},                                                                                                       \
 		nullptr,                                                                                                                                     \
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##WorkloadTypeName(s_type_desc_##WorkloadTypeName);                                         \

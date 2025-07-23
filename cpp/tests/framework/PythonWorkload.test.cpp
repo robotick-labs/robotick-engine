@@ -117,7 +117,7 @@ TEST_CASE("Unit/Workloads/PythonWorkload")
 
 		if (info.type->get_workload_desc()->start_fn)
 		{
-			REQUIRE_NOTHROW(info.type->get_workload_desc()->start_fn(inst_ptr, 10.0));
+			REQUIRE_NOTHROW(info.type->get_workload_desc()->start_fn(inst_ptr, 10.0f));
 		}
 		if (info.type->get_workload_desc()->stop_fn)
 		{

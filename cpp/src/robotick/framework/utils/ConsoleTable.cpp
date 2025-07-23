@@ -65,8 +65,12 @@ namespace robotick
 		}
 	} // namespace
 
-	void print_console_table(const std::string& title, const std::vector<std::string>& headers, const std::vector<size_t>& widths,
-		const std::vector<ConsoleTableRow>& rows, bool pretty_print, bool enable_unicode)
+	void print_console_table(const std::string& title,
+		const std::vector<std::string>& headers,
+		const std::vector<size_t>& widths,
+		const std::vector<ConsoleTableRow>& rows,
+		bool pretty_print,
+		bool enable_unicode)
 	{
 		constexpr const char* GREEN = "\033[32m";
 		constexpr const char* YELLOW = "\033[33m";
@@ -144,7 +148,7 @@ namespace robotick
 					if (pretty_print && headers[col].find('%') != std::string::npos)
 					{
 						// extract numeric prefix
-						double val = 0.0;
+						float val = 0.0f;
 						if (!cell.empty())
 						{
 							const char* str = cell.data();
@@ -156,7 +160,7 @@ namespace robotick
 							{
 								// Failed to parse — keep val = 0.0
 								// Optional: log a warning here
-								ROBOTICK_WARNING("Invalid double in cell: \"%.*s\"", static_cast<int>(cell.size()), cell.c_str());
+								ROBOTICK_WARNING("Invalid float in cell: \"%.*s\"", static_cast<int>(cell.size()), cell.c_str());
 							}
 						}
 

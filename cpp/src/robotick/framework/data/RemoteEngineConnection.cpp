@@ -14,8 +14,6 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define ROBOTICK_REMOTE_ENGINE_LOG_PACKETS 0
-
 namespace robotick
 {
 
@@ -235,9 +233,6 @@ namespace robotick
 	void RemoteEngineConnection::tick_disconnected_receiver()
 	{
 		ROBOTICK_ASSERT_MSG(mode == Mode::Receiver, "RemoteEngineConnection::tick_disconnected_receiver() should only be called in Mode::Receiver");
-
-		ROBOTICK_INFO(
-			"RemoteEngineConnection::tick_disconnected_receiver() [Receiver] Attempting to accept connection on local port %d", config.port);
 
 		if (socket_fd < 0)
 		{

@@ -89,8 +89,8 @@ This macro declares field metadata for a given struct.
 
 ```cpp
 struct HelloInputs {
-    double a;
-    double b;
+    float a;
+    float b;
 };
 
 ROBOTICK_DEFINE_FIELDS(HelloInputs, a, b)

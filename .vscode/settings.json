@@ -13,7 +13,9 @@
     "C_Cpp.default.compileCommands": "${workspaceFolder}/build/linux-debug/compile_commands.json",
     "C_Cpp.codeAnalysis.clangTidy.enabled": true,
     "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
-        "modernize-use-trailing-return-type"
+        "modernize-use-trailing-return-type",
+        "readability-uppercase-literal-suffix",
+        "readability-math-missing-parentheses"
     ],
     "terminal.integrated.defaultProfile.linux": "bash",
     "editor.formatOnSave": true,
@@ -127,6 +129,7 @@
         "xtr1common": "cpp",
         "xtree": "cpp",
         "xutility": "cpp",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "cfenv": "cpp"
     }
 }

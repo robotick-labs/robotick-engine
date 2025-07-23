@@ -34,38 +34,44 @@ namespace robotick
 		return (value + alignment - 1) & ~(alignment - 1);
 	}
 
-	void Blackboard::compute_total_datablock_size()
+	static size_t compute_and_apply_layout(FieldDescriptor* fields, const size_t field_count, const size_t start_offset, const bool write_offsets)
 	{
-		info.total_datablock_size = 0;
+		size_t current_offset = start_offset;
 
-		for (FieldDescriptor& field : info.struct_descriptor.fields)
+		for (size_t i = 0; i < field_count; ++i)
 		{
-			const TypeDescriptor* field_type_desc = field.find_type_descriptor();
-			ROBOTICK_ASSERT_MSG(field_type_desc != nullptr, "Fields should always have a known type once registered");
+			FieldDescriptor& field = fields[i];
+			const TypeDescriptor* type = field.find_type_descriptor();
+			ROBOTICK_ASSERT_MSG(type != nullptr, "Field has no type descriptor");
 
-			size_t align = field_type_desc->alignment;
-			size_t size = field_type_desc->size;
+			current_offset = align_up(current_offset, type->alignment);
 
-			// Align current offset
-			info.total_datablock_size = align_up(info.total_datablock_size, align);
+			if (write_offsets)
+			{
+				field.offset_within_container = current_offset;
+			}
 
-			// Assign offset to the field for future access
-			field.offset_within_container = info.total_datablock_size;
-
-			// Increment total size
-			info.total_datablock_size += size;
+			current_offset += type->size;
 		}
+
+		return current_offset;
 	}
 
-	void* Blackboard::get_field_data(const FieldDescriptor& field_desc) const
+	void Blackboard::compute_total_datablock_size()
 	{
-		const size_t datablock_offset = get_datablock_offset();
-		ROBOTICK_ASSERT_MSG(datablock_offset != OFFSET_UNBOUND, "Blackboard data-block has not been bound");
+		const size_t start_offset = 0;
+		const bool write_offsets = false;
 
-		uint8_t* datablock_ptr = (uint8_t*)this + datablock_offset;
+		info.total_datablock_size =
+			compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
+	}
 
-		void* field_data = field_desc.get_data_ptr(datablock_ptr);
-		return field_data;
+	void Blackboard::bind(const size_t datablock_offset)
+	{
+		const size_t start_offset = datablock_offset;
+		const bool write_offsets = true;
+
+		compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
 	}
 
 	const FieldDescriptor* Blackboard::find_field(const char* field_name) const
@@ -78,7 +84,7 @@ namespace robotick
 		found_field = find_field(field_name);
 		if (found_field)
 		{
-			void* field_data = get_field_data(*found_field);
+			void* field_data = found_field->get_data_ptr((void*)this);
 			return field_data;
 		}
 

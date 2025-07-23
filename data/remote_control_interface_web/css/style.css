@@ -36,6 +36,7 @@ body {
     color: white;
     font-family: sans-serif;
     text-align: center;
+    width: 100vw;
 }
 
 .toggle-button {
@@ -64,4 +65,36 @@ body {
 
 .slider-group label {
     margin-right: 5px;
+}
+
+.camera-container {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90vw;
+    max-width: 600px;
+    max-height: 40vh;
+    overflow: hidden;
+    border-radius: 8px;
+    background: black;
+}
+
+#camera-stream {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+}
+
+@media screen and (max-height: 480px) and (orientation: landscape) {
+    .camera-container {
+
+        width: 25vw;
+        max-width: 300px;
+    }
+
+    .controls {
+        bottom: 10px;
+    }
 }

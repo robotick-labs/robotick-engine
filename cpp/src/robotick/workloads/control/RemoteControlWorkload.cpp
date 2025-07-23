@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/api.h"
-#include "robotick/framework/data/Blackboard.h"
 #include "robotick/platform/WebServer.h"
 
 #if defined(ROBOTICK_PLATFORM_DESKTOP)
@@ -25,40 +24,31 @@ namespace robotick
 	{
 		bool use_web_inputs = true;
 
-		double left_x = 0;
-		double left_y = 0;
-		double right_x = 0;
-		double right_y = 0;
+		Vec2f left;
+		Vec2f right;
 
-		double scale_left_x = 1.0;
-		double scale_left_y = 1.0;
-		double scale_right_x = 1.0;
-		double scale_right_y = 1.0;
+		Vec2f scale_left{1.0f, 1.0f};
+		Vec2f scale_right{1.0f, 1.0f};
+
+		FixedVector128k jpeg_data;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(RemoteControlInputs)
 	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, bool, use_web_inputs)
-	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, left_x)
-	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, left_y)
-	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, right_x)
-	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, right_y)
-	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, scale_left_x)
-	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, scale_left_y)
-	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, scale_right_x)
-	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, double, scale_right_y)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, Vec2f, left)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, Vec2f, right)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, Vec2f, scale_left)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, Vec2f, scale_right)
+	ROBOTICK_STRUCT_FIELD(RemoteControlInputs, FixedVector128k, jpeg_data)
 	ROBOTICK_REGISTER_STRUCT_END(RemoteControlInputs)
 
 	struct RemoteControlOutputs
 	{
-		double left_x = 0;
-		double left_y = 0;
-		double right_x = 0;
-		double right_y = 0;
+		Vec2f left;
+		Vec2f right;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(RemoteControlOutputs)
-	ROBOTICK_STRUCT_FIELD(RemoteControlOutputs, double, left_x)
-	ROBOTICK_STRUCT_FIELD(RemoteControlOutputs, double, left_y)
-	ROBOTICK_STRUCT_FIELD(RemoteControlOutputs, double, right_x)
-	ROBOTICK_STRUCT_FIELD(RemoteControlOutputs, double, right_y)
+	ROBOTICK_STRUCT_FIELD(RemoteControlOutputs, Vec2f, left)
+	ROBOTICK_STRUCT_FIELD(RemoteControlOutputs, Vec2f, right)
 	ROBOTICK_REGISTER_STRUCT_END(RemoteControlOutputs)
 
 	struct RemoteControlState
@@ -88,7 +78,7 @@ namespace robotick
 						if (json_opt.is_discarded())
 						{
 							response.status_code = 400;
-							response.body = "Invalid JSON format.";
+							response.body.set_from_string("Invalid JSON format.");
 							return;
 						}
 
@@ -99,7 +89,7 @@ namespace robotick
 						if (json.contains("use_web_inputs") && json["use_web_inputs"].is_boolean())
 							w.use_web_inputs = json["use_web_inputs"].get<bool>();
 
-						auto try_set_vec2 = [&](const std::string& name, double& x, double& y)
+						auto try_set_vec2_from_json = [&](const std::string& name, Vec2f& out_vec2)
 						{
 							if (!json.contains(name))
 								return;
@@ -107,17 +97,23 @@ namespace robotick
 							if (obj.is_object())
 							{
 								if (obj.contains("x") && obj["x"].is_number())
-									x = obj["x"].get<double>();
+									out_vec2.x = obj["x"].get<float>();
 								if (obj.contains("y") && obj["y"].is_number())
-									y = obj["y"].get<double>();
+									out_vec2.y = obj["y"].get<float>();
 							}
 						};
 
-						try_set_vec2("left", w.left_x, w.left_y);
-						try_set_vec2("right", w.right_x, w.right_y);
-						try_set_vec2("scale_left", w.scale_left_x, w.scale_left_y);
-						try_set_vec2("scale_right", w.scale_right_x, w.scale_right_y);
+						try_set_vec2_from_json("left", w.left);
+						try_set_vec2_from_json("right", w.right);
+						try_set_vec2_from_json("scale_left", w.scale_left);
+						try_set_vec2_from_json("scale_right", w.scale_right);
 
+						response.status_code = 200;
+					}
+					else if (request.method == "GET" && request.uri == "/api/jpeg_data")
+					{
+						response.body.set(inputs.jpeg_data.data(), inputs.jpeg_data.size());
+						response.content_type = "image/jpeg";
 						response.status_code = 200;
 					}
 				});
@@ -131,21 +127,24 @@ namespace robotick
 
 			const RemoteControlInputs& inputs_ref = use_web_inputs ? state->web_inputs : inputs;
 
-			outputs.left_x = inputs_ref.left_x * inputs_ref.scale_left_x;
-			outputs.left_y = inputs_ref.left_y * inputs_ref.scale_left_y;
-			outputs.right_x = inputs_ref.right_x * inputs_ref.scale_right_x;
-			outputs.right_y = inputs_ref.right_y * inputs_ref.scale_right_y;
+			outputs.left.x = inputs_ref.left.x * inputs_ref.scale_left.x;
+			outputs.left.y = inputs_ref.left.y * inputs_ref.scale_left.y;
+			outputs.right.x = inputs_ref.right.x * inputs_ref.scale_right.x;
+			outputs.right.y = inputs_ref.right.y * inputs_ref.scale_right.y;
 		}
 
-		void stop() { state->server.stop(); }
+		void stop()
+		{
+			state->server.stop();
+		}
 
-		static double apply_dead_zone(double value, double dead_zone)
+		static float apply_dead_zone(float value, float dead_zone)
 		{
 			if (std::abs(value) < dead_zone)
 				return 0.0;
 			else
 			{
-				const double sign = (value > 0.0) ? 1.0 : -1.0;
+				const float sign = (value > 0.0) ? 1.0 : -1.0;
 				return ((std::abs(value) - dead_zone) / (1.0 - dead_zone)) * sign;
 			}
 		}

@@ -98,7 +98,7 @@ namespace robotick::test
 				CHECK(desc->from_string(buffer, parsed));
 
 				// compare raw bytes
-				CHECK(std::memcmp(parsed, entry.sample_value, desc->size) == 0);
+				CHECK(memcmp(parsed, entry.sample_value, desc->size) == 0);
 			}
 		}
 	}

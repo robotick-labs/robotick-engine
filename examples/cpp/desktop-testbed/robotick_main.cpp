@@ -17,51 +17,39 @@ void signal_handler()
 
 void populate_model_hello_world(robotick::Model& model)
 {
-	using namespace robotick;
+	const robotick::WorkloadSeed& console = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(5.0f);
 
-	const WorkloadSeed& console = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(5.0f);
+	const robotick::WorkloadSeed& test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
 
-	const WorkloadSeed& test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
-
-	const WorkloadSeed& test_state_2 =
+	const robotick::WorkloadSeed& test_state_2 =
 		model.add("PythonWorkload", "test_state_2")
 			.set_tick_rate_hz(1.0f)
 			.set_config({{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
 
-	const WorkloadSeed& root =
+	const robotick::WorkloadSeed& root =
 		model.add("SyncedGroupWorkload", "root_group").set_children({&console, &test_state_1, &test_state_2}).set_tick_rate_hz(1000.0f);
-
-	model.set_root_workload(root);
-}
-
-void populate_model_hello_mqtt(robotick::Model& model)
-{
-	using namespace robotick;
-
-	const WorkloadSeed& remote_control = model.add("RemoteControlWorkload", "remote_control").set_tick_rate_hz(30.0f);
-
-	const WorkloadSeed& mqtt_client =
-		model.add("MqttClientWorkload", "mqtt_client").set_tick_rate_hz(30.0f).set_config({{"broker_url", "mqtt://192.168.5.14"}});
-
-	const WorkloadSeed& console_telem = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(5.0f);
-
-	const WorkloadSeed& root =
-		model.add("SyncedGroupWorkload", "root_group").set_children({&console_telem, &remote_control, &mqtt_client}).set_tick_rate_hz(30.0f);
 
 	model.set_root_workload(root);
 }
 
 void populate_model_hello_rc(robotick::Model& model)
 {
-	using namespace robotick;
+	const float tick_rate_hz_main = 30.0f;	 //  slightly slower than the 30Hz at which the camera updates, so as to not need to wait for reads
+	const float tick_rate_hz_console = 5.0f; //  no real benefit of debug-telemetry being faster than this
 
-	const WorkloadSeed& remote_control = model.add("RemoteControlWorkload", "remote_control").set_tick_rate_hz(30.0f);
-	const WorkloadSeed& face = model.add("FaceDisplayWorkload", "face").set_tick_rate_hz(30.0f);
+	const robotick::WorkloadSeed& remote_control = model.add("RemoteControlWorkload", "remote_control").set_tick_rate_hz(tick_rate_hz_main);
 
-	const WorkloadSeed& console_telem = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(5.0f);
+	const robotick::WorkloadSeed& face = model.add("FaceDisplayWorkload", "face").set_tick_rate_hz(tick_rate_hz_main);
 
-	const WorkloadSeed& root =
-		model.add("SyncedGroupWorkload", "root_group").set_children({&console_telem, &remote_control, &face}).set_tick_rate_hz(30.0f);
+	const robotick::WorkloadSeed& camera = model.add("CameraWorkload", "camera").set_tick_rate_hz(tick_rate_hz_main);
+
+	const robotick::WorkloadSeed& console_telem = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(tick_rate_hz_console);
+
+	const robotick::WorkloadSeed& root = model.add("SyncedGroupWorkload", "root_group")
+											 .set_children({&console_telem, &remote_control, &face, &camera})
+											 .set_tick_rate_hz(tick_rate_hz_main);
+
+	model.connect("camera.outputs.jpeg_data", "remote_control.inputs.jpeg_data");
 
 	model.set_root_workload(root);
 }

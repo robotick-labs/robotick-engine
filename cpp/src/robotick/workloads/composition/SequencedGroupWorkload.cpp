@@ -26,6 +26,8 @@ namespace robotick
 		const Engine* engine = nullptr;
 		HeapVector<ChildWorkloadInfo> children;
 
+		float delta_time_budget = 0.0f;
+
 		void set_engine(const Engine& engine_in) { engine = &engine_in; }
 
 		ChildWorkloadInfo* find_child_workload(const WorkloadInstanceInfo& query_child)
@@ -96,6 +98,8 @@ namespace robotick
 			}
 		}
 
+		void start(float tick_rate_hz) { delta_time_budget = tick_rate_hz > 0.0f ? 1.0f / tick_rate_hz : 0.0f; }
+
 		void tick(const TickInfo& tick_info)
 		{
 			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set by now");
@@ -126,11 +130,12 @@ namespace robotick
 				}
 			}
 
-			auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_time).count();
+			const auto elapsed = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::steady_clock::now() - start_time).count();
 
-			if (elapsed > tick_info.delta_time)
+			const float overrun_fraction_allowed = 1.02f;
+			if (elapsed > (delta_time_budget * overrun_fraction_allowed))
 			{
-				std::printf("[Sequenced] Overrun: tick took %.3fms (budget %.3fms)\n", elapsed * 1000.0, tick_info.delta_time * 1000.0);
+				std::printf("[Sequenced] Overrun: tick took %.3fms (budget %.3fms)\n", elapsed * 1000.0f, delta_time_budget * 1000.0f);
 			}
 		}
 	};
@@ -156,11 +161,13 @@ namespace robotick
 			impl->set_children(children, pending_connections);
 		}
 
-		void start(double) { /* placeholder for consistency with SequencedGroup*/ }
+		void start(float tick_rate_hz) { impl->start(tick_rate_hz); }
 
 		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
 
-		void stop() { /* placeholder for consistency with SequencedGroup*/ }
+		void stop()
+		{ /* placeholder for consistency with SequencedGroup*/
+		}
 	};
 
 	ROBOTICK_REGISTER_WORKLOAD(SequencedGroupWorkload)

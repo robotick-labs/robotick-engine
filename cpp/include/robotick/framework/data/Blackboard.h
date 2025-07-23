@@ -18,7 +18,6 @@ namespace robotick
 	{
 		StructDescriptor struct_descriptor;
 
-		size_t datablock_offset_from_blackboard = OFFSET_UNBOUND;
 		size_t total_datablock_size = 0;
 
 		bool has_field(const char* field_name) const { return find_field(field_name) != nullptr; }
@@ -38,8 +37,6 @@ namespace robotick
 
 		const FieldDescriptor* find_field(const char* field_name) const;
 		void* find_field_data(const char* field_name, const FieldDescriptor*& found_field) const;
-
-		void* get_field_data(const FieldDescriptor& field_desc) const;
 
 		bool has(const char* field_name) const;
 		bool set(const char* field_name, void* value, const size_t size);
@@ -66,9 +63,7 @@ namespace robotick
 		static const StructDescriptor* resolve_descriptor(const void* instance);
 
 	  public: // non-API accessors - used for setup and lower-level querying of Blackboard
-		void bind(size_t datablock_offset) { info.datablock_offset_from_blackboard = datablock_offset; };
-
-		size_t get_datablock_offset() const { return info.datablock_offset_from_blackboard; };
+		void bind(const size_t datablock_offset);
 
 		const StructDescriptor& get_struct_descriptor() const { return info.struct_descriptor; };
 		const BlackboardInfo& get_info() const { return info; };

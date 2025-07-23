@@ -65,8 +65,8 @@ namespace robotick::test
 			Engine engine;
 			engine.load(model);
 
-			double tick_rate = engine.get_root_instance_info()->seed->tick_rate_hz;
-			REQUIRE(tick_rate == Catch::Approx(123.0));
+			float tick_rate = engine.get_root_instance_info()->seed->tick_rate_hz;
+			REQUIRE(tick_rate == Catch::Approx(123.0f));
 		}
 
 		SECTION("DummyWorkload config is loaded via load()")

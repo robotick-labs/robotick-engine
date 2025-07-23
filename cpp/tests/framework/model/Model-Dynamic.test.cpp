@@ -30,12 +30,23 @@ namespace
 	ROBOTICK_STRUCT_FIELD(DummyModelInputs, FixedString32, entry_string)
 	ROBOTICK_REGISTER_STRUCT_END(DummyModelInputs)
 
+	struct DummyModelOutputs
+	{
+		int entry_int_1 = 0;
+		int entry_int_2 = 0;
+	};
+	ROBOTICK_REGISTER_STRUCT_BEGIN(DummyModelOutputs)
+	ROBOTICK_STRUCT_FIELD(DummyModelOutputs, int, entry_int_1)
+	ROBOTICK_STRUCT_FIELD(DummyModelOutputs, int, entry_int_2)
+	ROBOTICK_REGISTER_STRUCT_END(DummyModelOutputs)
+
 	struct DummyModelWorkload
 	{
 		DummyModelConfig config;
 		DummyModelInputs inputs;
+		DummyModelOutputs outputs;
 	};
-	ROBOTICK_REGISTER_WORKLOAD(DummyModelWorkload, DummyModelConfig, DummyModelInputs)
+	ROBOTICK_REGISTER_WORKLOAD(DummyModelWorkload, DummyModelConfig, DummyModelInputs, DummyModelOutputs)
 } // namespace
 
 TEST_CASE("Unit/Framework/Model-Dynamic")
@@ -130,19 +141,13 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 
 	SECTION("Connect to remote model")
 	{
-		// create spine remote-model:
-		Model spine;
-		const WorkloadSeed& steering = spine.add("DummyModelWorkload", "Steering").set_tick_rate_hz(s_tick_100hz);
-
-		const bool auto_finalise_and_validate = true;
-		spine.set_root_workload(steering, auto_finalise_and_validate);
-
 		// create brain local-model:
 		Model brain;
 		const WorkloadSeed& controller = brain.add("DummyModelWorkload", "Controller").set_tick_rate_hz(s_tick_100hz);
-		brain.add_remote_model(spine, "spine", "ip:127.0.0.1");
-		brain.connect("Controller.outputs.turn", "|spine|Steering.inputs.turn_rate");
 
+		brain.add_remote_model("spine", "ip:127.0.0.1").connect("Controller.outputs.turn", "Steering.inputs.turn_rate");
+
+		const bool auto_finalise_and_validate = true;
 		brain.set_root_workload(controller, auto_finalise_and_validate);
 
 		const auto& remote_models = brain.get_remote_models();
@@ -153,27 +158,13 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 		REQUIRE(remote_model->remote_data_connection_seeds[0]->dest_field_path == "Steering.inputs.turn_rate");
 	}
 
-	SECTION("Invalid remote dest path format throws")
+	SECTION("Throws on remote path via model.connect()")
 	{
 		Model model;
 		model.add("DummyModelWorkload", "A").set_tick_rate_hz(s_tick_100hz);
 
-		ROBOTICK_REQUIRE_ERROR_MSG(model.connect("A.outputs.x", "|badformat"), "Invalid remote field format");
-	}
-
-	SECTION("Duplicate remote connection throws")
-	{
-		Model remote;
-		const WorkloadSeed& remote_workload = remote.add("DummyModelWorkload", "R").set_tick_rate_hz(s_tick_100hz);
-		remote.set_root_workload(remote_workload);
-
-		Model local;
-		local.add("DummyModelWorkload", "X").set_tick_rate_hz(s_tick_100hz);
-		local.add("DummyModelWorkload", "Y").set_tick_rate_hz(s_tick_100hz);
-		local.add_remote_model(remote, "spine", "ip:123.0.0.123");
-
-		local.connect("X.outputs.x", "|spine|R.inputs.a");
-		ROBOTICK_REQUIRE_ERROR_MSG(local.connect("Y.outputs.y", "|spine|R.inputs.a"), "already has an incoming remote-connection");
+		ROBOTICK_REQUIRE_ERROR_MSG(
+			model.connect("A.outputs.x", "|badformat"), "Remote destination field paths should be specified via the remote-model");
 	}
 
 	SECTION("Allows connecting input between valid workloads")
@@ -183,12 +174,37 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 		const WorkloadSeed& a = model.add("DummyModelWorkload", "A").set_tick_rate_hz(s_tick_100hz);
 		const WorkloadSeed& b = model.add("DummyModelWorkload", "B").set_tick_rate_hz(s_tick_100hz);
 
-		model.connect("A.output", "B.input");
+		model.connect("A.outputs.entry_int_1", "B.inputs.entry_int");
 
 		const WorkloadSeed& group = model.add("DummyModelWorkload", "Group").set_children({&a, &b}).set_tick_rate_hz(s_tick_100hz);
 		model.set_root_workload(group, false);
 
 		REQUIRE_NOTHROW(model.finalize());
+	}
+
+	SECTION("Throws when connecting to non-input destination")
+	{
+		Model model;
+		model.add("DummyModelWorkload", "A").set_tick_rate_hz(s_tick_100hz);
+		model.add("DummyModelWorkload", "B").set_tick_rate_hz(s_tick_100hz);
+
+		ROBOTICK_REQUIRE_ERROR_MSG(
+			model.connect("A.outputs.entry_int_1", "B.config.entry_float"), "Only 'inputs' fields can be data connection destinations");
+
+		ROBOTICK_REQUIRE_ERROR_MSG(
+			model.connect("A.outputs.entry_int_1", "B.outputs.entry_int"), "Only 'inputs' fields can be data connection destinations");
+	}
+
+	SECTION("Throws when connecting from non-output source")
+	{
+		Model model;
+		model.add("DummyModelWorkload", "A").set_tick_rate_hz(s_tick_100hz);
+		model.add("DummyModelWorkload", "B").set_tick_rate_hz(s_tick_100hz);
+
+		ROBOTICK_REQUIRE_ERROR_MSG(
+			model.connect("A.config.entry_float", "B.inputs.entry_int"), "Only 'outputs' fields can be data connection sources");
+
+		ROBOTICK_REQUIRE_ERROR_MSG(model.connect("A.inputs.entry_int", "B.inputs.entry_int"), "Only 'outputs' fields can be data connection sources");
 	}
 
 	SECTION("Duplicate inputs throw with clear error")
@@ -199,8 +215,8 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 		model.add("DummyModelWorkload", "B").set_tick_rate_hz(s_tick_100hz);
 		model.add("DummyModelWorkload", "C").set_tick_rate_hz(s_tick_100hz);
 
-		model.connect("A.output", "C.input");
-		ROBOTICK_REQUIRE_ERROR_MSG(model.connect("B.output", "C.input"), ("already has an incoming connection"));
+		model.connect("A.outputs.entry_int_1", "C.inputs.entry_int");
+		ROBOTICK_REQUIRE_ERROR_MSG(model.connect("B.outputs.entry_int_2", "C.inputs.entry_int"), ("already has an incoming connection"));
 	}
 
 	SECTION("Seeds are preserved for engine use")
@@ -211,7 +227,7 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 			model.add("DummyModelWorkload", "A").set_tick_rate_hz(s_tick_100hz).set_config({{"entry_float", "2.0f"}, {"entry_bool", "false"}});
 		const WorkloadSeed& b =
 			model.add("DummyModelWorkload", "B").set_tick_rate_hz(s_tick_100hz).set_inputs({{"entry_int", "10"}, {"entry_string", "there"}});
-		model.connect("A.output", "B.input");
+		model.connect("A.outputs.entry_int_1", "B.inputs.entry_int");
 
 		const WorkloadSeed& group = model.add("DummyModelWorkload", "Group").set_children({&a, &b}).set_tick_rate_hz(s_tick_100hz);
 		model.set_root_workload(group);
@@ -265,8 +281,8 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 		const auto& data_connection_seeds = model.get_data_connection_seeds();
 		REQUIRE(data_connection_seeds.size() == 1);
 		const auto* conn = data_connection_seeds[0];
-		CHECK(conn->source_field_path == "A.output");
-		CHECK(conn->dest_field_path == "B.input");
+		CHECK(conn->source_field_path == "A.outputs.entry_int_1");
+		CHECK(conn->dest_field_path == "B.inputs.entry_int");
 
 		// Validate config entries on A
 		REQUIRE(found_a->config.size() == 2);

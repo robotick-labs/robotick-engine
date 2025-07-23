@@ -29,7 +29,8 @@ namespace
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, body.size());
 		curl_easy_setopt(
-			curl, CURLOPT_WRITEFUNCTION,
+			curl,
+			CURLOPT_WRITEFUNCTION,
 			+[](char* ptr, size_t size, size_t nmemb, void* userdata) -> size_t
 			{
 				auto& out = *reinterpret_cast<std::string*>(userdata);
@@ -53,7 +54,8 @@ namespace
 		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2);
 		curl_easy_setopt(
-			curl, CURLOPT_WRITEFUNCTION,
+			curl,
+			CURLOPT_WRITEFUNCTION,
 			+[](char* ptr, size_t size, size_t nmemb, void* userdata) -> size_t
 			{
 				auto& out = *reinterpret_cast<std::string*>(userdata);
@@ -87,14 +89,16 @@ TEST_CASE("Unit/Platform/WebServer/WebServer serves static file and fallback han
 	std::string last_body;
 
 	WebServer server;
-	server.start(8089, "data/remote_control_interface_web",
+	server.start(8089,
+		"data/remote_control_interface_web",
 		[&](const WebRequest& request, WebResponse& response)
 		{
 			fallback_called = true;
 			last_method = request.method;
 			last_body = request.body;
 
-			response.body = std::string("Custom: ") + std::string(request.uri);
+			std::string body_string = std::string("Custom: ") + std::string(request.uri);
+			response.body.set_from_string(body_string.c_str());
 			response.content_type = "text/plain";
 		});
 

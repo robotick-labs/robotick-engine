@@ -58,7 +58,7 @@ namespace robotick
 		HeartbeatInputs inputs;
 		HeartbeatOutputs outputs;
 
-		double start_time_sec = 0.0;
+		float start_time_sec = 0.0f;
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
 
@@ -67,12 +67,12 @@ namespace robotick
 			M5.begin();
 			M5.Lcd.setRotation(1);
 
-			start_time_sec = (double)esp_timer_get_time() / 1e6;
+			start_time_sec = (float)esp_timer_get_time() / 1e6;
 		}
 
 		void tick(const TickInfo& tick_info)
 		{
-			const float alive_time_sec = static_cast<float>(tick_info.time_now_ns * 1e-9); // avoids any double/float
+			const float alive_time_sec = static_cast<float>(tick_info.time_now_ns * 1e-9); // avoids any float/float
 
 			const float bpm = config.rest_heart_rate * inputs.heart_rate_scale;
 			const float beat_duration = 60.0f / bpm;

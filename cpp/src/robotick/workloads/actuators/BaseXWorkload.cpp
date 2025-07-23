@@ -14,38 +14,38 @@ namespace robotick
 
 	struct BaseXConfig
 	{
-		double max_motor_speed = 1.0;
+		float max_motor_speed = 1.0f;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(BaseXConfig)
-	ROBOTICK_STRUCT_FIELD(BaseXConfig, double, max_motor_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXConfig, float, max_motor_speed)
 	ROBOTICK_REGISTER_STRUCT_END(BaseXConfig)
 
 	struct BaseXInputs
 	{
-		double motor1_speed = 0.0;
-		double motor2_speed = 0.0;
-		double motor3_speed = 0.0;
-		double motor4_speed = 0.0;
+		float motor1_speed = 0.0f;
+		float motor2_speed = 0.0f;
+		float motor3_speed = 0.0f;
+		float motor4_speed = 0.0f;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(BaseXInputs)
-	ROBOTICK_STRUCT_FIELD(BaseXInputs, double, motor1_speed)
-	ROBOTICK_STRUCT_FIELD(BaseXInputs, double, motor2_speed)
-	ROBOTICK_STRUCT_FIELD(BaseXInputs, double, motor3_speed)
-	ROBOTICK_STRUCT_FIELD(BaseXInputs, double, motor4_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXInputs, float, motor1_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXInputs, float, motor2_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXInputs, float, motor3_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXInputs, float, motor4_speed)
 	ROBOTICK_REGISTER_STRUCT_END(BaseXInputs)
 
 	struct BaseXOutputs
 	{
-		double motor1_speed = 0.0;
-		double motor2_speed = 0.0;
-		double motor3_speed = 0.0;
-		double motor4_speed = 0.0;
+		float motor1_speed = 0.0f;
+		float motor2_speed = 0.0f;
+		float motor3_speed = 0.0f;
+		float motor4_speed = 0.0f;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(BaseXOutputs)
-	ROBOTICK_STRUCT_FIELD(BaseXOutputs, double, motor1_speed)
-	ROBOTICK_STRUCT_FIELD(BaseXOutputs, double, motor2_speed)
-	ROBOTICK_STRUCT_FIELD(BaseXOutputs, double, motor3_speed)
-	ROBOTICK_STRUCT_FIELD(BaseXOutputs, double, motor4_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXOutputs, float, motor1_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXOutputs, float, motor2_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXOutputs, float, motor3_speed)
+	ROBOTICK_STRUCT_FIELD(BaseXOutputs, float, motor4_speed)
 	ROBOTICK_REGISTER_STRUCT_END(BaseXOutputs)
 
 	struct BaseXWorkload
@@ -56,10 +56,10 @@ namespace robotick
 
 		~BaseXWorkload()
 		{
-			set_motor_speed(0, 0.0, outputs.motor1_speed);
-			set_motor_speed(1, 0.0, outputs.motor2_speed);
-			set_motor_speed(2, 0.0, outputs.motor3_speed);
-			set_motor_speed(3, 0.0, outputs.motor4_speed);
+			set_motor_speed(0, 0.0f, outputs.motor1_speed);
+			set_motor_speed(1, 0.0f, outputs.motor2_speed);
+			set_motor_speed(2, 0.0f, outputs.motor3_speed);
+			set_motor_speed(3, 0.0f, outputs.motor4_speed);
 		}
 
 		void tick(const TickInfo&)
@@ -74,12 +74,12 @@ namespace robotick
 			// 	outputs.motor3_speed, outputs.motor4_speed);
 		}
 
-		void set_motor_speed(uint8_t index, double input_speed, double& output_ref)
+		void set_motor_speed(uint8_t index, float input_speed, float& output_ref)
 		{
 			if (index > 3)
 				return;
 
-			double clamped = std::max(-config.max_motor_speed, std::min(config.max_motor_speed, input_speed));
+			float clamped = std::max(-config.max_motor_speed, std::min(config.max_motor_speed, input_speed));
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
 			int8_t duty = static_cast<int8_t>(clamped * 127.0);

@@ -215,4 +215,9 @@ namespace robotick
 
 #undef REGISTER_FIXED_STRING
 
+	extern "C" void robotick_force_register_primitives()
+	{
+		// This function exists solely to force this TU to be retained
+	}
+
 } // namespace robotick

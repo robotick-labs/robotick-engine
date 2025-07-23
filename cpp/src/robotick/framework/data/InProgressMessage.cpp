@@ -12,7 +12,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define ROBOTICK_REMOTE_ENGINE_LOG_PACKETS 1
+#define ROBOTICK_REMOTE_ENGINE_LOG_PACKETS 0
 
 namespace robotick
 {
@@ -120,7 +120,7 @@ namespace robotick
 
 			static_assert(sizeof(MAGIC) == sizeof(header.magic));
 
-			if (std::memcmp(header.magic, MAGIC, sizeof(MAGIC)) != 0 || header.version != VERSION)
+			if (memcmp(header.magic, MAGIC, sizeof(MAGIC)) != 0 || header.version != VERSION)
 			{
 				ROBOTICK_WARNING("InProgressMessage::tick(): Invalid header magic or version");
 				return Result::ConnectionLost;

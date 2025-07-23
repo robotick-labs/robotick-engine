@@ -28,7 +28,7 @@ namespace robotick
 		WorkloadSeed& add();
 		WorkloadSeed& add(const char* type_name, const char* unique_name);
 		void connect(const char* source_field_path, const char* dest_field_path);
-		void add_remote_model(const Model& remote_model, const char* model_name, const char* comms_channel);
+		RemoteModelSeed& add_remote_model(const char* model_name, const char* comms_channel);
 
 		const List<WorkloadSeed>& get_workload_seeds_storage() const { return workload_seeds_storage; }
 
@@ -42,6 +42,12 @@ namespace robotick
 			use_data_connection_seeds(in_connections, N);
 		}
 		void use_data_connection_seeds(const DataConnectionSeed** in_connections, size_t num_connections);
+
+		template <size_t N> void use_remote_models(const RemoteModelSeed* (&in_remote_model_seeds)[N])
+		{
+			use_remote_models(in_remote_model_seeds, N);
+		}
+		void use_remote_models(const RemoteModelSeed** in_remote_model_seeds, size_t num_remote_model_seeds);
 
 		void set_root_workload(const WorkloadSeed& root_workload, bool auto_finalize_and_validate = true);
 
@@ -57,8 +63,6 @@ namespace robotick
 
 	  protected:
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
-		void connect_remote(const char* source_field_path, const char* dest_field_path);
-
 		void bake_dynamic_workloads();
 		void bake_dynamic_data_connections();
 		void bake_dynamic_remote_models();

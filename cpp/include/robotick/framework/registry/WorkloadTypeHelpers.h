@@ -58,7 +58,7 @@ namespace robotick::registry
 	template <typename T, typename = void> struct has_start : std::false_type
 	{
 	};
-	template <typename T> struct has_start<T, std::void_t<decltype(std::declval<T>().start(std::declval<double>()))>> : std::true_type
+	template <typename T> struct has_start<T, std::void_t<decltype(std::declval<T>().start(std::declval<float>()))>> : std::true_type
 	{
 	};
 
@@ -168,7 +168,7 @@ namespace robotick::registry
 		static_cast<T*>(self)->setup();
 	}
 
-	template <typename T> static void start_fn(void* self, double t)
+	template <typename T> static void start_fn(void* self, float t)
 	{
 		static_cast<T*>(self)->start(t);
 	}

@@ -30,12 +30,23 @@ namespace
 	ROBOTICK_STRUCT_FIELD(DummyStaticModelInputs, FixedString32, entry_string)
 	ROBOTICK_REGISTER_STRUCT_END(DummyStaticModelInputs)
 
+	struct DummyStaticModelOutputs
+	{
+		int entry_int_1 = 0;
+		int entry_int_2 = 0;
+	};
+	ROBOTICK_REGISTER_STRUCT_BEGIN(DummyStaticModelOutputs)
+	ROBOTICK_STRUCT_FIELD(DummyStaticModelOutputs, int, entry_int_1)
+	ROBOTICK_STRUCT_FIELD(DummyStaticModelOutputs, int, entry_int_2)
+	ROBOTICK_REGISTER_STRUCT_END(DummyStaticModelOutputs)
+
 	struct DummyStaticModelWorkload
 	{
 		DummyStaticModelConfig config;
 		DummyStaticModelInputs inputs;
+		DummyStaticModelOutputs outputs;
 	};
-	ROBOTICK_REGISTER_WORKLOAD(DummyStaticModelWorkload, DummyStaticModelConfig, DummyStaticModelInputs)
+	ROBOTICK_REGISTER_WORKLOAD(DummyStaticModelWorkload, DummyStaticModelConfig, DummyStaticModelInputs, DummyStaticModelOutputs)
 
 	static const float s_tick_100hz(100.f);
 	static const float s_tick_200hz(200.f);
@@ -75,7 +86,7 @@ namespace
 		static const WorkloadSeed* all[] = {&workload_a, &workload_b, &workload_group};
 
 		// All Data Connections
-		static const DataConnectionSeed data_connection_1("A.output", "B.input");
+		static const DataConnectionSeed data_connection_1("A.outputs.entry_int_1", "B.inputs.entry_int");
 
 		static const DataConnectionSeed* data_connections[] = {&data_connection_1};
 
@@ -136,8 +147,8 @@ TEST_CASE("Unit/Framework/Model-StaticConst")
 
 		static const WorkloadSeed* all[] = {&a, &b};
 
-		static const DataConnectionSeed dc1{"A.outputs.x", "B.inputs.x"};
-		static const DataConnectionSeed dc2{"A.outputs.y", "B.inputs.x"};
+		static const DataConnectionSeed dc1{"A.outputs.entry_int_1", "B.inputs.entry_int"};
+		static const DataConnectionSeed dc2{"A.outputs.entry_int_2", "B.inputs.entry_int"};
 		static const DataConnectionSeed* connections[] = {&dc1, &dc2};
 
 		Model model;
@@ -146,28 +157,6 @@ TEST_CASE("Unit/Framework/Model-StaticConst")
 
 		const bool auto_finalize = false;
 		model.set_root_workload(a, auto_finalize);
-
-		ROBOTICK_REQUIRE_ERROR_MSG(model.finalize(), "already has an incoming connection");
-	}
-
-	SECTION("Duplicate inputs throw with clear error")
-	{
-		static const WorkloadSeed a{TypeId("DummyStaticModelWorkload"), "A", s_tick_100hz, {}, {}, {}};
-		static const WorkloadSeed b{TypeId("DummyStaticModelWorkload"), "B", s_tick_100hz, {}, {}, {}};
-		static const WorkloadSeed c{TypeId("DummyStaticModelWorkload"), "C", s_tick_100hz, {}, {}, {}};
-
-		static const WorkloadSeed* all[] = {&a, &b, &c};
-
-		static const DataConnectionSeed dc1{"A.output", "C.input"};
-		static const DataConnectionSeed dc2{"B.output", "C.input"};
-		static const DataConnectionSeed* dcs[] = {&dc1, &dc2};
-
-		Model model;
-		model.use_workload_seeds(all);
-		model.use_data_connection_seeds(dcs);
-
-		const bool auto_finalize = false;
-		model.set_root_workload(c, auto_finalize);
 
 		ROBOTICK_REQUIRE_ERROR_MSG(model.finalize(), "already has an incoming connection");
 	}
@@ -181,7 +170,7 @@ TEST_CASE("Unit/Framework/Model-StaticConst")
 
 		static const WorkloadSeed* all[] = {&a, &b, &group};
 
-		static const DataConnectionSeed dc{"A.output", "B.input"};
+		static const DataConnectionSeed dc{"A.outputs.entry_int_1", "B.inputs.entry_int"};
 		static const DataConnectionSeed* dcs[] = {&dc};
 
 		Model model;
@@ -192,6 +181,50 @@ TEST_CASE("Unit/Framework/Model-StaticConst")
 		model.set_root_workload(group, auto_finalize);
 
 		REQUIRE_NOTHROW(model.finalize());
+	}
+
+	SECTION("Throws when static destination field is not to inputs")
+	{
+		static const WorkloadSeed a{TypeId("DummyStaticModelWorkload"), "A", s_tick_100hz, {}, {}, {}};
+		static const WorkloadSeed b{TypeId("DummyStaticModelWorkload"), "B", s_tick_100hz, {}, {}, {}};
+
+		static const WorkloadSeed* all[] = {&a, &b};
+
+		static const DataConnectionSeed bad_dst_1{"A.outputs.entry_int", "B.config.entry_float"};
+		static const DataConnectionSeed bad_dst_2{"A.outputs.entry_int", "B.outputs.entry_int"};
+
+		static const DataConnectionSeed* dcs[] = {&bad_dst_1, &bad_dst_2};
+
+		Model model;
+		model.use_workload_seeds(all);
+		model.use_data_connection_seeds(dcs);
+
+		const bool auto_finalize = false;
+		model.set_root_workload(b, auto_finalize);
+
+		ROBOTICK_REQUIRE_ERROR_MSG(model.finalize(), "must use the 'inputs' structure");
+	}
+
+	SECTION("Throws when static source field is not from outputs")
+	{
+		static const WorkloadSeed a{TypeId("DummyStaticModelWorkload"), "A", s_tick_100hz, {}, {}, {}};
+		static const WorkloadSeed b{TypeId("DummyStaticModelWorkload"), "B", s_tick_100hz, {}, {}, {}};
+
+		static const WorkloadSeed* all[] = {&a, &b};
+
+		static const DataConnectionSeed bad_src_1{"A.config.entry_float", "B.inputs.entry_int"};
+		static const DataConnectionSeed bad_src_2{"A.inputs.entry_int", "B.inputs.entry_int"};
+
+		static const DataConnectionSeed* dcs[] = {&bad_src_1, &bad_src_2};
+
+		Model model;
+		model.use_workload_seeds(all);
+		model.use_data_connection_seeds(dcs);
+
+		const bool auto_finalize = false;
+		model.set_root_workload(a, auto_finalize);
+
+		ROBOTICK_REQUIRE_ERROR_MSG(model.finalize(), "must use the 'outputs' structure");
 	}
 
 	SECTION("Seeds are preserved for engine use")
@@ -229,8 +262,8 @@ TEST_CASE("Unit/Framework/Model-StaticConst")
 		const auto& data_connection_seeds = model.get_data_connection_seeds();
 		REQUIRE(data_connection_seeds.size() == 1);
 		const auto* conn = data_connection_seeds[0];
-		CHECK(conn->source_field_path == "A.output");
-		CHECK(conn->dest_field_path == "B.input");
+		CHECK(conn->source_field_path == "A.outputs.entry_int_1");
+		CHECK(conn->dest_field_path == "B.inputs.entry_int");
 
 		// Validate config entries on A
 		REQUIRE(found_a->config.size() == 2);

@@ -79,7 +79,7 @@ namespace robotick
 			state->field_sync = std::move(field_sync);
 		}
 
-		void start(double)
+		void start(float)
 		{
 			// Subscribe and initial sync
 			state->field_sync->subscribe_and_sync_startup();

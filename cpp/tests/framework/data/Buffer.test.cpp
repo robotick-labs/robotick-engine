@@ -38,7 +38,7 @@ TEST_CASE("Unit/Framework/Data/Buffer")
 		clone.create_mirror_from(original);
 
 		REQUIRE(clone.get_size() == 64);
-		REQUIRE(std::memcmp(clone.raw_ptr(), original.raw_ptr(), 64) == 0);
+		REQUIRE(memcmp(clone.raw_ptr(), original.raw_ptr(), 64) == 0);
 
 		original.raw_ptr()[0] = 0xCD;
 		REQUIRE(clone.raw_ptr()[0] == static_cast<uint8_t>(0xAB));
@@ -51,7 +51,7 @@ TEST_CASE("Unit/Framework/Data/Buffer")
 		std::memset(b.raw_ptr(), 0x66, 16);
 
 		a.update_mirror_from(b);
-		REQUIRE(std::memcmp(a.raw_ptr(), b.raw_ptr(), 16) == 0);
+		REQUIRE(memcmp(a.raw_ptr(), b.raw_ptr(), 16) == 0);
 
 		RawBuffer c(32);
 		ROBOTICK_REQUIRE_ERROR_MSG(a.update_mirror_from(c), ("size mismatch"));

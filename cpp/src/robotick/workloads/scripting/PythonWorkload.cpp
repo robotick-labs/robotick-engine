@@ -106,6 +106,8 @@ namespace robotick
 				// Set type_id based on known strings
 				if (type_str == "int")
 					field_desc.type_id = TypeId(GET_TYPE_ID(int));
+				else if (type_str == "float")
+					field_desc.type_id = TypeId(GET_TYPE_ID(float));
 				else if (type_str == "double")
 					field_desc.type_id = TypeId(GET_TYPE_ID(double));
 				else if (type_str == "fixedstring64")
@@ -188,6 +190,8 @@ namespace robotick
 
 				if (type == GET_TYPE_ID(int))
 					py_cfg[key] = config.blackboard.get<int>(key);
+				else if (type == GET_TYPE_ID(float))
+					py_cfg[key] = config.blackboard.get<float>(key);
 				else if (type == GET_TYPE_ID(double))
 					py_cfg[key] = config.blackboard.get<double>(key);
 				else if (type == GET_TYPE_ID(FixedString64))
@@ -230,6 +234,8 @@ namespace robotick
 
 				if (type == GET_TYPE_ID(int))
 					py_in[key] = inputs.blackboard.get<int>(key);
+				else if (type == GET_TYPE_ID(float))
+					py_in[key] = inputs.blackboard.get<float>(key);
 				else if (type == GET_TYPE_ID(double))
 					py_in[key] = inputs.blackboard.get<double>(key);
 				else if (type == GET_TYPE_ID(FixedString64))
@@ -263,6 +269,8 @@ namespace robotick
 
 				if (found_field->type_id == GET_TYPE_ID(int))
 					outputs.blackboard.set<int>(key, val.cast<int>());
+				else if (found_field->type_id == GET_TYPE_ID(float))
+					outputs.blackboard.set<float>(key, val.cast<float>());
 				else if (found_field->type_id == GET_TYPE_ID(double))
 					outputs.blackboard.set<double>(key, val.cast<double>());
 				else if (found_field->type_id == GET_TYPE_ID(FixedString64))

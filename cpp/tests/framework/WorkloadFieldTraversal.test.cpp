@@ -44,7 +44,7 @@ namespace robotick::test
 		ROBOTICK_REGISTER_WORKLOAD(SimpleWorkload, void, SimpleInputs, SimpleOutputs)
 	} // namespace
 
-	TEST_CASE("Unit/Framework/FieldWalker")
+	TEST_CASE("Unit/Framework/WorkloadFieldsIterator")
 	{
 		SECTION("Field pointers match expected values and buffers")
 		{

@@ -14,20 +14,20 @@ namespace robotick
 
 	struct HelloConfig
 	{
-		double multiplier = 1.0;
+		float multiplier = 1.0;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(HelloConfig)
-	ROBOTICK_STRUCT_FIELD(HelloConfig, double, multiplier)
+	ROBOTICK_STRUCT_FIELD(HelloConfig, float, multiplier)
 	ROBOTICK_REGISTER_STRUCT_END(HelloConfig)
 
 	struct HelloInputs
 	{
-		double a = 0.0;
-		double b = 0.0;
+		float a = 0.0;
+		float b = 0.0;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(HelloInputs)
-	ROBOTICK_STRUCT_FIELD(HelloInputs, double, a)
-	ROBOTICK_STRUCT_FIELD(HelloInputs, double, b)
+	ROBOTICK_STRUCT_FIELD(HelloInputs, float, a)
+	ROBOTICK_STRUCT_FIELD(HelloInputs, float, b)
 	ROBOTICK_REGISTER_STRUCT_END(HelloInputs)
 
 	enum class HelloStatus
@@ -38,13 +38,13 @@ namespace robotick
 
 	struct HelloOutputs
 	{
-		double sum = 0.0;
+		float sum = 0.0;
 		FixedString32 message = "Waiting...";
 		HelloStatus status = HelloStatus::NORMAL;
 	};
 
 	ROBOTICK_REGISTER_STRUCT_BEGIN(HelloOutputs)
-	ROBOTICK_STRUCT_FIELD(HelloOutputs, double, sum)
+	ROBOTICK_STRUCT_FIELD(HelloOutputs, float, sum)
 	ROBOTICK_STRUCT_FIELD(HelloOutputs, FixedString32, message)
 	ROBOTICK_STRUCT_FIELD(HelloOutputs, int, status)
 	ROBOTICK_REGISTER_STRUCT_END(HelloOutputs)
