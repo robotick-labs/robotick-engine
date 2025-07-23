@@ -1,4 +1,4 @@
 #!/bin/bash
 clear
-cmake --preset desktop-testbed-ubuntu-x64-debug
-cmake --build --preset desktop-testbed-ubuntu-x64-debug
+cmake --preset desktop-testbed-linux-debug
+cmake --build --preset desktop-testbed-linux-debug

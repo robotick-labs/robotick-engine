@@ -6,25 +6,25 @@
     },
     "configurePresets": [
         {
-            "name": "ubuntu-x64-base",
+            "name": "linux-base",
             "hidden": true,
             "generator": "Ninja",
-            "description": "Base preset for Ubuntu x64 CI builds (common compiler & generator settings)",
+            "description": "Base preset for Linux CI builds (common compiler & generator settings)",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "/usr/bin/gcc",
                 "CMAKE_CXX_COMPILER": "/usr/bin/g++",
-                "ROBOTICK_PLATFORM_UBUNTU": "ON",
+                "ROBOTICK_PLATFORM_LINUX": "ON",
                 "ROBOTICK_ENABLE_PYTHON": "ON",
-                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-ubuntu-x64.cmake",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-linux-native.cmake",
                 "WORKLOAD_PRESET": "ubuntu-workloads-all",
                 "ROBOTICK_PROJECT_ROOT": "${sourceDir}"
             }
         },
         {
-            "name": "ubuntu-x64-debug",
-            "inherits": "ubuntu-x64-base",
-            "description": "Ubuntu Debug build (no optimizations, full asserts)",
+            "name": "linux-debug",
+            "inherits": "linux-base",
+            "description": "Linux Debug build (no optimizations, full asserts)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
@@ -33,9 +33,9 @@
             }
         },
         {
-            "name": "ubuntu-x64-development",
-            "inherits": "ubuntu-x64-base",
-            "description": "Ubuntu Development build (optimized with probes)",
+            "name": "linux-development",
+            "inherits": "linux-base",
+            "description": "Linux Development build (optimized with probes)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo",
                 "CMAKE_CXX_FLAGS_DEBUG": "-g -O1 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEV -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD",
@@ -43,9 +43,9 @@
             }
         },
         {
-            "name": "ubuntu-x64-release",
-            "inherits": "ubuntu-x64-base",
-            "description": "Ubuntu Release build (stripped, fastest)",
+            "name": "linux-release",
+            "inherits": "linux-base",
+            "description": "Linux Release build (stripped, fastest)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_CXX_FLAGS_DEBUG": "-DNDEBUG -DROBOTICK_RELEASE -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD",
@@ -74,16 +74,16 @@
     ],
     "buildPresets": [
         {
-            "name": "ubuntu-x64-debug",
-            "configurePreset": "ubuntu-x64-debug"
+            "name": "linux-debug",
+            "configurePreset": "linux-debug"
         },
         {
-            "name": "ubuntu-x64-development",
-            "configurePreset": "ubuntu-x64-development"
+            "name": "linux-development",
+            "configurePreset": "linux-development"
         },
         {
-            "name": "ubuntu-x64-release",
-            "configurePreset": "ubuntu-x64-release"
+            "name": "linux-release",
+            "configurePreset": "linux-release"
         },
         {
             "name": "esp32s3-debug",

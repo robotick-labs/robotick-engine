@@ -5,14 +5,14 @@
             "name": "Example: C++ - robotick_main",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/ubuntu-x64-debug/robotick_main",
+            "program": "${workspaceFolder}/build/linux-debug/robotick_main",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
                 {
                     "name": "LD_LIBRARY_PATH",
-                    "value": "${workspaceFolder}/build/ubuntu-x64-debug"
+                    "value": "${workspaceFolder}/build/linux-debug"
                 },
                 {
                     "name": "ROBOTICK_ENABLE_BACKTRACE",
@@ -33,7 +33,7 @@
                 "engineLogging": true
             },
             "preLaunchTask": "Build Example: C++ - robotick_main",
-            "additionalSOLibSearchPath": "${workspaceFolder}/build/ubuntu-x64-debug",
+            "additionalSOLibSearchPath": "${workspaceFolder}/build/linux-debug",
             "sourceFileMap": {
                 "/workspace": "${workspaceFolder}"
             },
@@ -44,14 +44,14 @@
             "name": "Debug robotick_tests",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/ubuntu-x64-debug/cpp/tests/robotick_tests",
+            "program": "${workspaceFolder}/build/linux-debug/cpp/tests/robotick_tests",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
                 {
                     "name": "LD_LIBRARY_PATH",
-                    "value": "${workspaceFolder}/build/ubuntu-x64-debug"
+                    "value": "${workspaceFolder}/build/linux-debug"
                 },
                 {
                     "name": "ROBOTICK_ENABLE_BACKTRACE",
@@ -72,7 +72,7 @@
                 "engineLogging": true
             },
             "preLaunchTask": "Build robotick_tests",
-            "additionalSOLibSearchPath": "${workspaceFolder}/build/ubuntu-x64-debug",
+            "additionalSOLibSearchPath": "${workspaceFolder}/build/linux-debug",
             "sourceFileMap": {
                 "/workspace": "${workspaceFolder}"
             },

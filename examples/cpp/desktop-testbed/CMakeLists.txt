@@ -11,7 +11,7 @@ add_executable(desktop-testbed robotick_main.cpp)
 
 target_link_libraries(desktop-testbed PRIVATE robotick-engine)
 
-# Optional: symlink engine runtime data for testing
+# symlink engine runtime data for testing
 set(ENGINE_DATA_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../data")
 set(ENGINE_DATA_DEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/engine-data")
 
