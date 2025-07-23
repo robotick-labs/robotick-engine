@@ -95,7 +95,7 @@ if(ROBOTICK_ENABLE_PYTHON)
         ${CMAKE_CURRENT_LIST_DIR}/src/robotick/workloads/telemetry/MqttClientWorkload.cpp
         ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/MqttClient.cpp
         ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/WebServer_desktop.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/posix/Camera.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/Camera_desktop.cpp
     )
 
     foreach(source_file IN LISTS EXCEPTION_ENABLED_SOURCES)

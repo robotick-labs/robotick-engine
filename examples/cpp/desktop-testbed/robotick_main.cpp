@@ -39,29 +39,17 @@ void populate_model_hello_rc(robotick::Model& model)
 
 	const robotick::WorkloadSeed& remote_control = model.add("RemoteControlWorkload", "remote_control").set_tick_rate_hz(tick_rate_hz_main);
 
+	const robotick::WorkloadSeed& face = model.add("FaceDisplayWorkload", "face").set_tick_rate_hz(tick_rate_hz_main);
+
 	const robotick::WorkloadSeed& camera = model.add("CameraWorkload", "camera").set_tick_rate_hz(tick_rate_hz_main);
 
 	const robotick::WorkloadSeed& console_telem = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(tick_rate_hz_console);
 
-	const robotick::WorkloadSeed& root =
-		model.add("SyncedGroupWorkload", "root_group").set_children({&console_telem, &remote_control, &camera}).set_tick_rate_hz(tick_rate_hz_main);
+	const robotick::WorkloadSeed& root = model.add("SyncedGroupWorkload", "root_group")
+											 .set_children({&console_telem, &remote_control, &face, &camera})
+											 .set_tick_rate_hz(tick_rate_hz_main);
 
 	model.connect("camera.outputs.jpeg_data", "remote_control.inputs.jpeg_data");
-
-	model.set_root_workload(root);
-}
-
-void populate_model_hello_rc(robotick::Model& model)
-{
-	using namespace robotick;
-
-	const WorkloadSeed& remote_control = model.add("RemoteControlWorkload", "remote_control").set_tick_rate_hz(30.0f);
-	const WorkloadSeed& face = model.add("FaceDisplayWorkload", "face").set_tick_rate_hz(30.0f);
-
-	const WorkloadSeed& console_telem = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(5.0f);
-
-	const WorkloadSeed& root =
-		model.add("SyncedGroupWorkload", "root_group").set_children({&console_telem, &remote_control, &face}).set_tick_rate_hz(30.0f);
 
 	model.set_root_workload(root);
 }
