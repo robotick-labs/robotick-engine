@@ -28,5 +28,5 @@ docker run -it \
   -v "$SSH_AUTH_SOCK:/ssh-agent" \
   -e SSH_AUTH_SOCK=/ssh-agent \
   --name robotick-dev \
-  robotick-dev:ubuntu-x64 \
+  robotick-dev:linux \
   bash

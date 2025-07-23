@@ -5,7 +5,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-if(ROBOTICK_PLATFORM_UBUNTU)
+if(ROBOTICK_PLATFORM_LINUX)
     project(robotick-engine)
 endif()
 
@@ -56,10 +56,10 @@ target_compile_options(robotick-engine PRIVATE -fno-exceptions)
 
 message("Determining platform...")
 
-if(ROBOTICK_PLATFORM_UBUNTU)
-    message("✅ ROBOTICK_PLATFORM_UBUNTU - defining ROBOTICK_PLATFORM_UBUNTU and ROBOTICK_PLATFORM_DESKTOP")
+if(ROBOTICK_PLATFORM_LINUX)
+    message("✅ ROBOTICK_PLATFORM_LINUX - defining ROBOTICK_PLATFORM_LINUX and ROBOTICK_PLATFORM_DESKTOP")
     target_compile_definitions(robotick-engine PUBLIC
-        ROBOTICK_PLATFORM_UBUNTU
+        ROBOTICK_PLATFORM_LINUX
         ROBOTICK_PLATFORM_DESKTOP
     )
 elseif(ROBOTICK_PLATFORM_ESP32)
@@ -93,7 +93,7 @@ if(ROBOTICK_ENABLE_PYTHON)
         ${CMAKE_CURRENT_LIST_DIR}/src/robotick/framework/data/MqttFieldSync.cpp
         ${CMAKE_CURRENT_LIST_DIR}/src/robotick/workloads/telemetry/MqttClientWorkload.cpp
         ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/MqttClient.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/posix/WebServer.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/src/robotick/platform/WebServer_desktop.cpp
     )
 
     foreach(source_file IN LISTS EXCEPTION_ENABLED_SOURCES)
@@ -109,10 +109,12 @@ endif()
 
 target_link_libraries(robotick-engine PUBLIC nlohmann_json::nlohmann_json)
 
-if(ROBOTICK_PLATFORM_UBUNTU)
+if(ROBOTICK_PLATFORM_LINUX)
+    find_package(SDL2 REQUIRED)
     find_package(PahoMqttCpp REQUIRED)
     target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3)
     target_link_libraries(robotick-engine PRIVATE civetweb)
+    target_link_libraries(robotick-engine PRIVATE SDL2::SDL2)
 endif()
 
 # =========================
