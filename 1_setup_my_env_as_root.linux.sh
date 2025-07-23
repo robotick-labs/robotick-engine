@@ -19,6 +19,7 @@ apt-get update && apt-get install -y \
   gdb \
   libssl-dev \
   libcurl4-openssl-dev \
+  libsdl2-dev \
   && apt-get clean
 
 echo "📦 Installing Paho MQTT C library..."
