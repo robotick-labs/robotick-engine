@@ -16,7 +16,7 @@ namespace robotick
 		// Destructor (default)
 		~Camera();
 
-		// Call with null or empty string to trigger fallback listing behavior
+		// Call with zero to obtain default camera (if present)
 		bool setup(const int camera_index);
 
 		// On success, fills data_ptr/size with JPEG frame data

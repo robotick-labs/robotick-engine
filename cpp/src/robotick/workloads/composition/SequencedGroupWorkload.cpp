@@ -98,7 +98,7 @@ namespace robotick
 			}
 		}
 
-		void start(float tick_rate_hz) { delta_time_budget = tick_rate_hz > 0.0f ? 1.0f / delta_time_budget : 0.0f; }
+		void start(float tick_rate_hz) { delta_time_budget = tick_rate_hz > 0.0f ? 1.0f / tick_rate_hz : 0.0f; }
 
 		void tick(const TickInfo& tick_info)
 		{
@@ -165,7 +165,9 @@ namespace robotick
 
 		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
 
-		void stop() { /* placeholder for consistency with SequencedGroup*/ }
+		void stop()
+		{ /* placeholder for consistency with SequencedGroup*/
+		}
 	};
 
 	ROBOTICK_REGISTER_WORKLOAD(SequencedGroupWorkload)

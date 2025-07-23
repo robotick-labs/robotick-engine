@@ -113,7 +113,7 @@ namespace robotick
 					else if (request.method == "GET" && request.uri == "/api/jpeg_data")
 					{
 						response.body.set(inputs.jpeg_data.data(), inputs.jpeg_data.size());
-						response.content_type = "img/jpg";
+						response.content_type = "image/jpeg";
 						response.status_code = 200;
 					}
 				});
@@ -133,7 +133,10 @@ namespace robotick
 			outputs.right.y = inputs_ref.right.y * inputs_ref.scale_right.y;
 		}
 
-		void stop() { state->server.stop(); }
+		void stop()
+		{
+			state->server.stop();
+		}
 
 		static float apply_dead_zone(float value, float dead_zone)
 		{

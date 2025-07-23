@@ -19,7 +19,7 @@ namespace robotick
 		const size_t used_kb = vec->size() / 1024;
 
 		// Format string into out_buffer
-		const int written = snprintf(out_buffer, buffer_size, "<FixedVector%zuk(%zukB)>", capacity_kb, used_kb);
+		const int written = snprintf(out_buffer, buffer_size, "<FixedVector%zuk(%zuk)>", capacity_kb, used_kb);
 		return written > 0 && static_cast<size_t>(written) < buffer_size;
 	}
 
