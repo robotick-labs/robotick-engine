@@ -48,13 +48,13 @@ namespace robotick
 		if (source_field_path[0] == '|')
 			ROBOTICK_FATAL_EXIT("Source field paths cannot be remote: %s", source_field_path);
 
-		if (strstr(source_field_path, "outputs") == nullptr)
+		if (strstr(source_field_path, ".outputs.") == nullptr)
 			ROBOTICK_FATAL_EXIT("Only 'outputs' fields can be data connection sources: %s", source_field_path);
 
 		if (dest_field_path[0] == '|')
 			ROBOTICK_FATAL_EXIT("Remote destination field paths should be specified via the remote-model: %s", dest_field_path);
 
-		if (strstr(dest_field_path, "inputs") == nullptr)
+		if (strstr(dest_field_path, ".inputs.") == nullptr)
 			ROBOTICK_FATAL_EXIT("Only 'inputs' fields can be data connection destinations: %s", dest_field_path);
 
 		for (const DataConnectionSeed& existing : data_connection_seeds_storage)

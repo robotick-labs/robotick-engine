@@ -25,7 +25,8 @@ namespace robotick
 
 	static bool fixed_vector_from_string(const char*, void*)
 	{
-		return false; // not supported
+		// Deserialization from string is intentionally not supported, since its string variant is just a debug-string (see above)
+		return false;
 	}
 
 	ROBOTICK_REGISTER_PRIMITIVE(FixedVector1k, fixed_vector_to_string<FixedVector1k>, fixed_vector_from_string);

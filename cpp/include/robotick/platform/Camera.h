@@ -16,6 +16,12 @@ namespace robotick
 		// Destructor (default)
 		~Camera();
 
+		// Non-copyable. Moving allowed.
+		Camera(const Camera&) = delete;
+		Camera& operator=(const Camera&) = delete;
+		Camera(Camera&&) noexcept;
+		Camera& operator=(Camera&&) noexcept;
+
 		// Call with zero to obtain default camera (if present)
 		bool setup(const int camera_index);
 
