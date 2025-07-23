@@ -1,7 +1,9 @@
 #if defined(ROBOTICK_PLATFORM_ESP32)
 
-#include "robotick/platform/Camera.h"
+#if defined(ENABLE_ESP32_CAMERA_CODE)
+
 #include "robotick/api.h"
+#include "robotick/platform/Camera.h"
 
 #include "esp_camera.h"
 #include "esp_heap_caps.h"
@@ -164,4 +166,47 @@ namespace robotick
 
 } // namespace robotick
 
+#else // #if defined(ENABLE_ESP32_CAMERA_CODE)
+
+#include "robotick/api.h"
+#include "robotick/platform/Camera.h"
+
+namespace robotick
+{
+	struct Camera::Impl
+	{
+	};
+
+	Camera::Camera()
+	{
+		impl = new Impl();
+	}
+
+	Camera::~Camera()
+	{
+		delete impl;
+	}
+
+	bool Camera::setup(const int camera_index)
+	{
+		(void)camera_index;
+		return true;
+	}
+
+	bool Camera::read_frame(uint8_t* dst_buffer, const size_t dst_capacity, size_t& out_size_used)
+	{
+		(void)dst_buffer;
+		(void)dst_capacity;
+		out_size_used = 0;
+		return false;
+	}
+
+	void Camera::print_available_cameras()
+	{
+		ROBOTICK_INFO("Camera stubs active (ESP32)");
+	}
+
+} // namespace robotick
+
+#endif // #if defined(ENABLE_ESP32_CAMERA_CODE)
 #endif // ROBOTICK_PLATFORM_ESP32
