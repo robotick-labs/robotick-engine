@@ -1,35 +1,120 @@
 #if defined(ROBOTICK_PLATFORM_DESKTOP)
 
-#include "robotick/platform/Camera.h"
 #include "robotick/api.h"
+#include "robotick/platform/Camera.h"
+#include <atomic>
+#include <cstring>
+#include <mutex>
 #include <opencv2/opencv.hpp>
+#include <thread>
 #include <vector>
 
 namespace robotick
 {
-	struct Camera::Impl
+
+	/// @brief Continuously captures JPEG frames from a camera in a background thread.
+	///
+	/// Frames are read from OpenCV's VideoCapture, encoded to JPEG, and made available via get_latest_frame().
+	/// This allows the main engine loop to query for the most recent frame without blocking.
+
+	class AsyncCameraCapture
 	{
+	  public:
+		/// @brief Constructs the capture object. Call setup() to begin streaming.
+		AsyncCameraCapture() = default;
+
+		/// @brief Destructor — automatically stops the capture thread.
+		~AsyncCameraCapture() { stop(); }
+
+		/// @brief Sets up the camera and starts the background capture thread.
+		/// @param camera_index Index of the camera to open.
+		/// @return true if the camera was opened successfully, false otherwise.
+		bool setup(int camera_index = 0)
+		{
+			video_capture.open(camera_index, cv::CAP_V4L2);
+			if (!video_capture.isOpened())
+				return false;
+
+			video_capture.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+			video_capture.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+			video_capture.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+
+			for (int i = 0; i < 5; ++i)
+				video_capture.grab();
+
+			running = true;
+			thread = std::thread(
+				[this]()
+				{
+					cv::Mat frame;
+					while (running)
+					{
+						if (video_capture.read(frame))
+						{
+							std::vector<uchar> temp;
+							cv::imencode(".jpg", frame, temp);
+							std::lock_guard<std::mutex> lock(mutex);
+							jpeg_data = std::move(temp);
+							std::this_thread::sleep_for(std::chrono::milliseconds(1));
+						}
+						else
+						{
+							// wait half a second before retrying
+							std::this_thread::sleep_for(std::chrono::milliseconds(500));
+						}
+					}
+				});
+
+			return true;
+		}
+
+		/// @brief Retrieves the most recently captured JPEG frame, if available.
+		/// @param dst_buffer Destination buffer to copy JPEG bytes into.
+		/// @param dst_capacity Capacity of the destination buffer in bytes.
+		/// @param out_size_used Number of bytes written to the destination.
+		/// @return true if a valid frame was returned, false otherwise.
+		bool get_latest_frame(uint8_t* dst_buffer, size_t dst_capacity, size_t& out_size_used)
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			if (jpeg_data.empty() || jpeg_data.size() > dst_capacity)
+				return false;
+
+			memcpy(dst_buffer, jpeg_data.data(), jpeg_data.size());
+			out_size_used = jpeg_data.size();
+			return true;
+		}
+
+	  private:
+		/// @brief Stops the capture thread if running.
+		void stop()
+		{
+			if (running.exchange(false) && thread.joinable())
+				thread.join();
+		}
+
+		std::atomic<bool> running = false;
+		std::thread thread;
 		cv::VideoCapture video_capture;
-		std::vector<uchar> jpeg_buffer;
-		cv::Mat fallback_image;
+		std::vector<uchar> jpeg_data;
+		std::mutex mutex;
 	};
 
-	static void init_fallback_image(cv::Mat& fallback_image)
+	struct Camera::Impl
 	{
-		fallback_image = cv::Mat(480, 640, CV_8UC3, cv::Scalar(255, 255, 255)); // White
-		cv::putText(fallback_image, "Robotick|No Camera", cv::Point(20, 240), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 128), 2);
-	}
+		AsyncCameraCapture async_capture;
+	};
 
+	/// @brief Captures frames from a camera using OpenCV and exposes a simple blocking read interface.
+	///
+	/// This class uses an internal AsyncCameraCapture instance to decouple frame acquisition from engine tick rate.
 	Camera::Camera()
 	{
 		impl = new Camera::Impl();
-
-		init_fallback_image(impl->fallback_image);
 	}
 
 	Camera::~Camera()
 	{
-		// nothing to do yet
+		delete impl;
 	}
 
 	bool Camera::setup(const int camera_index)
@@ -37,57 +122,16 @@ namespace robotick
 		if (camera_index < 0)
 			return false;
 
-		impl->video_capture.open(camera_index);
-		return impl->video_capture.isOpened();
+		if (!impl->async_capture.setup(camera_index))
+			return false;
+
+		return true;
 	}
 
 	bool Camera::read_frame(uint8_t* dst_buffer, const size_t dst_capacity, size_t& out_size_used)
 	{
-		cv::Mat frame;
-		const bool camera_ready = impl->video_capture.isOpened() && impl->video_capture.read(frame);
-
-		if (!camera_ready)
-		{
-			static bool warned = false;
-			if (!warned)
-			{
-				ROBOTICK_WARNING("No camera available — using fallback test image.");
-				warned = true;
-			}
-			frame = impl->fallback_image.clone(); // ensure mutability for cropping
-		}
-
-		// ✅ Always perform the crop+resize logic
-		const float input_aspect = static_cast<float>(frame.cols) / frame.rows;
-		const float target_aspect = 4.0f / 3.0f;
-
-		int crop_x = 0, crop_y = 0, crop_w = frame.cols, crop_h = frame.rows;
-
-		if (input_aspect > target_aspect)
-		{
-			crop_w = static_cast<int>(frame.rows * target_aspect);
-			crop_x = (frame.cols - crop_w) / 2;
-		}
-		else if (input_aspect < target_aspect)
-		{
-			crop_h = static_cast<int>(frame.cols / target_aspect);
-			crop_y = (frame.rows - crop_h) / 2;
-		}
-
-		cv::Rect crop_rect(crop_x, crop_y, crop_w, crop_h);
-		cv::Mat cropped = frame(crop_rect);
-		cv::resize(cropped, frame, cv::Size(640, 480));
-
-		// ✅ Encode to JPEG
-		impl->jpeg_buffer.clear();
-		cv::imencode(".jpg", frame, impl->jpeg_buffer);
-
-		if (impl->jpeg_buffer.size() <= dst_capacity)
-		{
-			memcpy(dst_buffer, impl->jpeg_buffer.data(), impl->jpeg_buffer.size());
-			out_size_used = impl->jpeg_buffer.size();
+		if (impl->async_capture.get_latest_frame(dst_buffer, dst_capacity, out_size_used))
 			return true;
-		}
 
 		return false;
 	}
@@ -107,4 +151,4 @@ namespace robotick
 	}
 } // namespace robotick
 
-#endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)
+#endif // ROBOTICK_PLATFORM_DESKTOP

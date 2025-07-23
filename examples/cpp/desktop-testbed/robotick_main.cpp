@@ -34,7 +34,7 @@ void populate_model_hello_world(robotick::Model& model)
 
 void populate_model_hello_rc(robotick::Model& model)
 {
-	const float tick_rate_hz_main = 25.0f;	 //  slightly slower than the 30Hz at which the camera updates, so as to not need to wait for reads
+	const float tick_rate_hz_main = 30.0f;	 //  slightly slower than the 30Hz at which the camera updates, so as to not need to wait for reads
 	const float tick_rate_hz_console = 5.0f; //  no real benefit of debug-telemetry being faster than this
 
 	const robotick::WorkloadSeed& remote_control = model.add("RemoteControlWorkload", "remote_control").set_tick_rate_hz(tick_rate_hz_main);
