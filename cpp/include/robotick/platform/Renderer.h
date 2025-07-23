@@ -15,10 +15,13 @@ namespace robotick
 	class Renderer
 	{
 	  public:
+		~Renderer() { cleanup(); }
+
 		// Lifecycle
 		void init();
 		void clear();
 		void present();
+		void cleanup();
 
 		// Viewport
 		void set_viewport(float w, float h)

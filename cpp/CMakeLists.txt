@@ -115,6 +115,10 @@ if(ROBOTICK_PLATFORM_LINUX)
     target_link_libraries(robotick-engine PUBLIC PahoMqttCpp::paho-mqttpp3)
     target_link_libraries(robotick-engine PRIVATE civetweb)
     target_link_libraries(robotick-engine PRIVATE SDL2::SDL2)
+    target_link_libraries(robotick-engine PRIVATE ${SDL2_GFX_LIBRARIES})
+    target_include_directories(robotick-engine PRIVATE ${SDL2_GFX_INCLUDE_DIRS})
+    target_include_directories(robotick-engine PRIVATE /usr/include/SDL2)
+    target_link_libraries(robotick-engine PRIVATE SDL2_gfx)
 endif()
 
 # =========================

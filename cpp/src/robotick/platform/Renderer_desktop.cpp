@@ -3,7 +3,9 @@
 
 #include "robotick/api.h"
 #include "robotick/platform/Renderer.h"
+
 #include <SDL2/SDL.h>
+#include <SDL2/SDL2_gfxPrimitives.h>
 
 namespace robotick
 {
@@ -40,6 +42,23 @@ namespace robotick
 		SDL_RenderPresent(renderer);
 	}
 
+	void Renderer::cleanup()
+	{
+		if (renderer)
+		{
+			SDL_DestroyRenderer(renderer);
+			renderer = nullptr;
+		}
+
+		if (window)
+		{
+			SDL_DestroyWindow(window);
+			window = nullptr;
+		}
+
+		SDL_Quit();
+	}
+
 	void Renderer::clear()
 	{
 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
@@ -60,14 +79,7 @@ namespace robotick
 		const int rx_px = to_px_w(rx);
 		const int ry_px = to_px_h(ry);
 
-		for (int y = -ry_px; y <= ry_px; ++y)
-		{
-			for (int x = -rx_px; x <= rx_px; ++x)
-			{
-				if ((x * x * ry_px * ry_px + y * y * rx_px * rx_px) <= (rx_px * rx_px * ry_px * ry_px))
-					SDL_RenderDrawPoint(renderer, cx_px + x, cy_px + y);
-			}
-		}
+		filledEllipseRGBA(renderer, cx_px, cy_px, rx_px, ry_px, color.r, color.g, color.b, color.a);
 	}
 } // namespace robotick
 

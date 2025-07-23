@@ -63,8 +63,8 @@ namespace robotick
 			}
 
 			// update our animations
-			const float time_time_now_sec = tick_info.time_now;
-			update_blinks(time_time_now_sec);
+			const float time_now_sec = tick_info.time_now;
+			update_blinks(time_now_sec);
 
 			// draw & present our face
 			s.renderer.clear();

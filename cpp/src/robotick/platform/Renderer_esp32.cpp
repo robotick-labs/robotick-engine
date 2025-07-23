@@ -28,6 +28,15 @@ namespace robotick
 		canvas->pushSprite(0, 0);
 	}
 
+	void Renderer::cleanup()
+	{
+		if (canvas)
+		{
+			delete canvas;
+			canvas = nullptr;
+		}
+	}
+
 	void Renderer::draw_ellipse_filled(const float cx, const float cy, const float rx, const float ry, const Color& color)
 	{
 		uint32_t c = canvas->color565(color.r, color.g, color.b);
