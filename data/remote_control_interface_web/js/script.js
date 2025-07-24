@@ -221,8 +221,8 @@ function setupVideoFeed() {
     }
 
     const videoRefreshRateHz = 15;
-    const videoRefreshInternalMs = 1000 / videoRefreshRateHz; 
-    setInterval(refreshCameraFrame, videoRefreshInternalMs); // at ~15 FPS
+    const videoRefreshIntervalMs = 1000 / videoRefreshRateHz; 
+    setInterval(refreshCameraFrame, videoRefreshIntervalMs); // at ~15 FPS
 }
 
 document.addEventListener('touchstart', handleTouchStart);
