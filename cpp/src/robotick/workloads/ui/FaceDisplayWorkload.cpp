@@ -53,6 +53,7 @@ namespace robotick
 			// init the renderer if not already done so:
 			if (!s.has_init_renderer)
 			{
+				s.renderer.set_viewport(320, 240);
 				s.renderer.init();
 				s.has_init_renderer = true;
 			}
@@ -109,9 +110,9 @@ namespace robotick
 		{
 			auto& blink = state->eye_blink_progress;
 			const int center_y = 120;
-			const int eye_w = 30;
-			const int eye_h = 55;
-			const int eye_spacing = 160;
+			const int eye_w = 35;
+			const int eye_h = 65;
+			const int eye_spacing = 200;
 
 			for (int i = 0; i < 2; ++i)
 			{
