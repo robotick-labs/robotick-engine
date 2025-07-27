@@ -117,7 +117,7 @@ namespace robotick
 					},
 					ctx,
 					thread_name,
-					2);
+					-1);
 			}
 		}
 

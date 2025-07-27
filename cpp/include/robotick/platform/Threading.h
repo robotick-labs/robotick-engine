@@ -26,7 +26,7 @@ namespace robotick
 		using EntryPoint = void (*)(void*);
 
 		Thread() = default;
-		Thread(EntryPoint fn, void* arg, const std::string& name = "", int core = -1, int stack_size = 4096, int priority = 1);
+		Thread(EntryPoint fn, void* arg, const std::string& name = "", int core = -1, int stack_size = 8192, int priority = 1);
 		~Thread();
 
 		Thread(const Thread&) = delete;
@@ -58,7 +58,10 @@ namespace robotick
 	class AtomicFlag
 	{
 	  public:
-		explicit AtomicFlag(bool initial = false) : flag(initial) {}
+		explicit AtomicFlag(bool initial = false)
+			: flag(initial)
+		{
+		}
 
 		void set(bool value = true) { flag.store(value); }
 		bool is_set() const { return flag.load(); }

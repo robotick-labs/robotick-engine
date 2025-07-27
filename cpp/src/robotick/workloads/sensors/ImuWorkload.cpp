@@ -68,7 +68,6 @@ namespace robotick
 #if defined(ROBOTICK_PLATFORM_ESP32)
 		void setup()
 		{
-			M5.begin();
 			state->imu = &M5.Imu;
 			m5::IMU_Class* imu = state->imu;
 

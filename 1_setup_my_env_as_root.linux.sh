@@ -21,6 +21,7 @@ apt-get update && apt-get install -y \
   libcurl4-openssl-dev \
   libsdl2-dev \
   libsdl2-gfx-dev \
+  libsdl2-ttf-dev \
   libopencv-dev \
   && apt-get clean
 

@@ -125,8 +125,7 @@ namespace robotick
 			// Tight spin, yield periodically to prevent WDT issues
 			if (++spin_counter % watchdog_yield_interval == 0)
 			{
-				taskYIELD();		  // Allow IDLE tasks to run
-				// esp_task_wdt_reset(); // Pet the watchdog manually
+				taskYIELD(); // Allow IDLE tasks to run
 			}
 		}
 	}

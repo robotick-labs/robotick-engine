@@ -6,6 +6,7 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL2_gfxPrimitives.h>
+#include <SDL2/SDL_ttf.h>
 
 namespace robotick
 {
@@ -40,6 +41,8 @@ namespace robotick
 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 		SDL_RenderClear(renderer);
 		SDL_RenderPresent(renderer);
+
+		update_scale();
 	}
 
 	void Renderer::cleanup()
@@ -59,9 +62,9 @@ namespace robotick
 		SDL_Quit();
 	}
 
-	void Renderer::clear()
+	void Renderer::clear(const Color& color)
 	{
-		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+		SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
 		SDL_RenderClear(renderer);
 	}
 
@@ -70,17 +73,91 @@ namespace robotick
 		SDL_RenderPresent(renderer);
 	}
 
-	void Renderer::draw_ellipse_filled(const float cx, const float cy, const float rx, const float ry, const Color& color)
+	void Renderer::draw_ellipse_filled(const Vec2& center, const float rx, const float ry, const Color& color)
 	{
 		SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
 
-		const int cx_px = to_px_x(cx);
-		const int cy_px = to_px_y(cy);
+		const int cx_px = to_px_x(center.x);
+		const int cy_px = to_px_y(center.y);
 		const int rx_px = to_px_w(rx);
 		const int ry_px = to_px_h(ry);
 
 		filledEllipseRGBA(renderer, cx_px, cy_px, rx_px, ry_px, color.r, color.g, color.b, color.a);
 	}
+
+	void Renderer::draw_text(const char* text, const Vec2& pos, const float size, const TextAlign align, const Color& color)
+	{
+		if (!text || !*text || !renderer)
+			return;
+
+		static TTF_Font* font = nullptr;
+
+		if (!font)
+		{
+			TTF_Init();
+			font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", static_cast<int>(size * scale));
+			if (!font)
+			{
+				ROBOTICK_FATAL_EXIT("Failed to load font: %s", TTF_GetError());
+				return;
+			}
+		}
+
+		SDL_Color sdl_color = {color.r, color.g, color.b, color.a};
+		SDL_Surface* surface = TTF_RenderUTF8_Blended(font, text, sdl_color);
+		if (!surface)
+			return;
+
+		SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+		if (!texture)
+		{
+			SDL_FreeSurface(surface);
+			return;
+		}
+
+		SDL_Rect dst;
+		dst.w = surface->w;
+		dst.h = surface->h;
+
+		// Viewport-aware position
+		const int px = to_px_x(pos.x);
+		const int py = to_px_y(pos.y);
+
+		switch (align)
+		{
+		case TextAlign::TopLeft:
+			dst.x = px;
+			dst.y = py;
+			break;
+
+		case TextAlign::Center:
+			dst.x = px - dst.w / 2;
+			dst.y = py - dst.h / 2;
+			break;
+
+		default:
+			dst.x = px;
+			dst.y = py;
+			break;
+		}
+
+		SDL_RenderCopy(renderer, texture, nullptr, &dst);
+		SDL_DestroyTexture(texture);
+		SDL_FreeSurface(surface);
+	}
+
+	void Renderer::draw_triangle_filled(const Vec2& p0, const Vec2& p1, const Vec2& p2, const Color& color)
+	{
+		const int x0 = to_px_x(p0.x);
+		const int y0 = to_px_y(p0.y);
+		const int x1 = to_px_x(p1.x);
+		const int y1 = to_px_y(p1.y);
+		const int x2 = to_px_x(p2.x);
+		const int y2 = to_px_y(p2.y);
+
+		filledTrigonRGBA(renderer, x0, y0, x1, y1, x2, y2, color.r, color.g, color.b, color.a);
+	}
+
 } // namespace robotick
 
 #endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)

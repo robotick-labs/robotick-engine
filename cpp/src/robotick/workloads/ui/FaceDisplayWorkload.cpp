@@ -44,12 +44,7 @@ namespace robotick
 		FaceDisplayOutputs outputs;
 		State<FaceDisplayState> state;
 
-		void setup()
-		{
-			ROBOTICK_INFO("Face: setup()");
-
-			schedule_blink_pair(0.0f);
-		}
+		void setup() { schedule_blink_pair(0.0f); }
 
 		void tick(const TickInfo& tick_info)
 		{
@@ -67,7 +62,7 @@ namespace robotick
 			update_blinks(time_now_sec);
 
 			// draw & present our face
-			s.renderer.clear();
+			s.renderer.clear(Colors::White);
 			draw_face(s.renderer);
 			s.renderer.present();
 		}
@@ -128,8 +123,8 @@ namespace robotick
 
 		void draw_eye(Renderer& r, const int cx, const int cy, const int rx, const int ry)
 		{
-			r.draw_ellipse_filled(cx, cy, rx, ry, {0, 0, 0, 255});
-			r.draw_ellipse_filled(cx + rx / 4, cy - ry / 3, rx / 3, ry / 4, {255, 255, 255, 255});
+			r.draw_ellipse_filled(Vec2(cx, cy), rx, ry, {0, 0, 0, 255});
+			r.draw_ellipse_filled(Vec2(cx + rx / 4, cy - ry / 3), rx / 3, ry / 4, {255, 255, 255, 255});
 		}
 	};
 
