@@ -135,8 +135,48 @@ namespace robotick
 			const float overrun_fraction_allowed = 1.02f;
 			if (elapsed > (delta_time_budget * overrun_fraction_allowed))
 			{
-				std::printf("[Sequenced] Overrun: tick took %.3fms (budget %.3fms)\n", elapsed * 1000.0f, delta_time_budget * 1000.0f);
+				print_overrun_debug_message(elapsed, delta_time_budget, children);
 			}
+		}
+
+		static void print_overrun_debug_message(float elapsed_seconds, float delta_time_budget, const HeapVector<ChildWorkloadInfo>& children)
+		{
+			struct Entry
+			{
+				const char* name;
+				uint32_t duration_ns;
+			};
+			Entry top1 = {nullptr, 0}, top2 = {nullptr, 0};
+			uint32_t other_ns = 0;
+
+			for (const auto& child : children)
+			{
+				const auto ns = child.workload_info->mutable_stats.last_tick_duration_ns;
+				const char* name = child.workload_info->seed->unique_name.c_str(); // More helpful than workload type
+
+				if (ns > top1.duration_ns)
+				{
+					top2 = top1;
+					top1 = {name, ns};
+				}
+				else if (ns > top2.duration_ns)
+				{
+					top2 = {name, ns};
+				}
+				else
+				{
+					other_ns += ns;
+				}
+			}
+
+			ROBOTICK_WARNING("[Sequenced] Overrun: tick took %.3fms (budget %.3fms) [%s=%.2fms, %s=%.2fms, other=%.2fms]\n",
+				elapsed_seconds * 1000.0f,
+				delta_time_budget * 1000.0f,
+				top1.name ? top1.name : "N/A",
+				top1.duration_ns / 1e6f,
+				top2.name ? top2.name : "N/A",
+				top2.duration_ns / 1e6f,
+				other_ns / 1e6f);
 		}
 	};
 
@@ -165,9 +205,7 @@ namespace robotick
 
 		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
 
-		void stop()
-		{ /* placeholder for consistency with SequencedGroup*/
-		}
+		void stop() { /* placeholder for consistency with SequencedGroup*/ }
 	};
 
 	ROBOTICK_REGISTER_WORKLOAD(SequencedGroupWorkload)
