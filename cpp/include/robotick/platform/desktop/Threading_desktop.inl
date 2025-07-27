@@ -21,7 +21,10 @@ namespace robotick
 			  [fn, arg, name, core]()
 			  {
 				  Thread::set_name(name);
-				  Thread::set_affinity(core);
+				  if (core >= 0)
+				  {
+					  Thread::set_affinity(core);
+				  }
 				  Thread::set_priority_high();
 				  fn(arg);
 			  })
