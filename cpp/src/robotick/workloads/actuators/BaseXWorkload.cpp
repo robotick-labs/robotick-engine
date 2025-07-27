@@ -72,6 +72,10 @@ namespace robotick
 		void set_motor_speeds()
 		{
 #if defined(ROBOTICK_PLATFORM_ESP32)
+
+			inputs.motor1_speed = 0.0f;
+			inputs.motor2_speed = 0.0f;
+
 			// Create duty values
 			uint8_t duties[4] = {
 				static_cast<uint8_t>(std::clamp(inputs.motor1_speed, -config.max_motor_speed, config.max_motor_speed) * 127.0f),
@@ -80,18 +84,10 @@ namespace robotick
 				static_cast<uint8_t>(std::clamp(inputs.motor4_speed, -config.max_motor_speed, config.max_motor_speed) * 127.0f),
 			};
 
-			constexpr int I2C_PORT = 0; // default used by M5
-			auto start = std::chrono::steady_clock::now();
+			constexpr uint32_t BASEX_I2C_FREQ = 400000;
 
 			// Begin I2C transaction manually
-			m5gfx::i2c::beginTransaction(I2C_PORT, BASEX_I2C_ADDR, 400000, false);
-			m5gfx::i2c::writeBytes(I2C_PORT, &BASEX_PWM_DUTY_ADDR, 1); // Register address
-			m5gfx::i2c::writeBytes(I2C_PORT, duties, 4);			   // 4 bytes: motors 0–3
-			m5gfx::i2c::endTransaction(I2C_PORT);
-
-			auto end = std::chrono::steady_clock::now();
-			float dur_ms = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / 1e6f;
-			ROBOTICK_INFO("BaseXWorkload::set_motor_speeds() [raw] I2C batch took %.3fms", dur_ms);
+			m5::In_I2C.writeRegister(BASEX_I2C_ADDR, BASEX_PWM_DUTY_ADDR, duties, sizeof(duties), BASEX_I2C_FREQ);
 #endif
 
 			outputs.motor1_speed = inputs.motor1_speed;
