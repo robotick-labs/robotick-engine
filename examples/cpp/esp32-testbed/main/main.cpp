@@ -27,6 +27,7 @@ namespace robotick
 		ROBOTICK_KEEP_WORKLOAD(ConsoleTelemetryWorkload)
 		ROBOTICK_KEEP_WORKLOAD(FaceDisplayWorkload)
 		ROBOTICK_KEEP_WORKLOAD(HeartbeatDisplayWorkload)
+		ROBOTICK_KEEP_WORKLOAD(ImuWorkload)
 		ROBOTICK_KEEP_WORKLOAD(SequencedGroupWorkload)
 		ROBOTICK_KEEP_WORKLOAD(SyncedGroupWorkload)
 		ROBOTICK_KEEP_WORKLOAD(SteeringMixerWorkload)
@@ -49,16 +50,17 @@ void populate_model(robotick::Model& model)
 		robotick::TypeId("SequencedGroupWorkload"), robotick::StringView("control_sequence"), tick_rate_hz_main, control_children};
 
 	// Other workloads:
+	static const robotick::WorkloadSeed imu{robotick::TypeId("ImuWorkload"), robotick::StringView("imu"), tick_rate_hz_main};
 	static const robotick::WorkloadSeed heart_display{
 		robotick::TypeId("HeartbeatDisplayWorkload"), robotick::StringView("heart_display"), tick_rate_hz_main};
 	static const robotick::WorkloadSeed console{robotick::TypeId("ConsoleTelemetryWorkload"), robotick::StringView("console"), tick_rate_hz_telem};
 
 	// Root group
-	static const robotick::WorkloadSeed* root_children[] = {&basex, &console, &heart_display, &steering};
+	static const robotick::WorkloadSeed* root_children[] = {&basex, &console, &heart_display, &imu, &steering};
 	static const robotick::WorkloadSeed root{robotick::TypeId("SyncedGroupWorkload"), robotick::StringView("root"), tick_rate_hz_main, root_children};
 
 	// All workloads
-	static const robotick::WorkloadSeed* all[] = {&basex, &steering, &control_group, &console, &heart_display, &root};
+	static const robotick::WorkloadSeed* all[] = {&basex, &steering, &control_group, &console, &heart_display, &imu, &root};
 
 	// Final registration
 	model.use_workload_seeds(all);
