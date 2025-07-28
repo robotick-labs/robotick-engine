@@ -76,6 +76,7 @@ namespace robotick
 				}
 			}
 			bucket.entries.push_back({key, value});
+			size_++;
 		}
 
 		Value* find(const Key& key)
@@ -104,7 +105,12 @@ namespace robotick
 			return nullptr;
 		}
 
+		bool contains(const Key& key) const { return find(key) != nullptr; }
+
+		size_t size() const { return size_; }
+
 	  private:
 		FixedVector<Bucket, NumBuckets> buckets;
+		size_t size_ = 0;
 	};
 } // namespace robotick

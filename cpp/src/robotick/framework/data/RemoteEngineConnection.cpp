@@ -14,6 +14,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#if defined(ROBOTICK_PLATFORM_ESP32)
+#include "esp_netif.h"
+#endif
+
 namespace robotick
 {
 
@@ -21,8 +25,25 @@ namespace robotick
 	{
 		constexpr float RECONNECT_ATTEMPT_INTERVAL_SEC = 1.0f;
 
+		bool is_network_stack_ready()
+		{
+#if defined(ROBOTICK_PLATFORM_ESP32)
+			esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+			return netif && esp_netif_is_netif_up(netif);
+#else
+			// Assume true on platforms like desktop
+			return true;
+#endif
+		}
+
 		int create_tcp_socket()
 		{
+			if (!is_network_stack_ready())
+			{
+				ROBOTICK_WARNING("Network stack not ready — skipping socket creation");
+				return -1;
+			}
+
 			int fd = socket(AF_INET, SOCK_STREAM, 0);
 			if (fd < 0)
 			{

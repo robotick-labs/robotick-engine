@@ -84,15 +84,26 @@ namespace robotick
 
 		if (!pretty_print)
 		{
-			for (auto& h : headers)
-				oss << h << "\t";
+			// Header row
+			for (size_t i = 0; i < headers.size(); ++i)
+				oss << std::setw(widths[i]) << std::left << headers[i];
 			oss << "\n";
-			for (auto& row : rows)
+
+			// Data rows with separating lines
+			for (const auto& row : rows)
 			{
-				for (auto& col : row.columns)
-					oss << col << "\t";
+				// Separator before each workload-row
+				if (row.columns.size() > 0 && row.columns[0].length())
+				{
+					for (size_t i = 0; i < headers.size(); ++i)
+						oss << std::string(widths[i], '-') << (i + 1 < headers.size() ? "" : "\n");
+				}
+
+				for (size_t i = 0; i < row.columns.size(); ++i)
+					oss << std::setw(widths[i]) << std::left << row.columns[i];
 				oss << "\n";
 			}
+
 			std::cout << oss.str() << std::flush;
 			return;
 		}

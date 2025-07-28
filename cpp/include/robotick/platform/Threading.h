@@ -26,7 +26,7 @@ namespace robotick
 		using EntryPoint = void (*)(void*);
 
 		Thread() = default;
-		Thread(EntryPoint fn, void* arg, const std::string& name = "", int core = -1, int stack_size = 8192, int priority = 1);
+		Thread(EntryPoint fn, void* arg, const std::string& name = "", int core = -1, int stack_size = 12288, int priority = 1);
 		~Thread();
 
 		Thread(const Thread&) = delete;

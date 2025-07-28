@@ -17,8 +17,13 @@ namespace robotick
 {
 	struct ConsoleTelemetryConfig
 	{
+#if defined(ROBOTICK_PLATFORM_ESP32)
+		bool enable_pretty_print = false;
+		bool enable_unicode = false;
+#else
 		bool enable_pretty_print = true;
 		bool enable_unicode = true;
+#endif // #if defined(ROBOTICK_PLATFORM_ESP32)
 		bool enable_demo = false;
 	};
 

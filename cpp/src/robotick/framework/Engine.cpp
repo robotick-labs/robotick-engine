@@ -50,8 +50,15 @@ namespace robotick
 		delete state;
 	}
 
+	extern "C" void robotick_force_register_primitives();
+	extern "C" void robotick_force_register_fixed_vector_types();
+
 	void Engine::load(const Model& model)
 	{
+		// ensure out standard types don't get pruned by the linker:
+		robotick_force_register_primitives();
+		robotick_force_register_fixed_vector_types();
+
 		if (!model.get_root_workload())
 			ROBOTICK_FATAL_EXIT("Model has no root workload");
 
