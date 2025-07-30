@@ -47,7 +47,9 @@ namespace robotick
 
 				const TypeDescriptor* field_type_desc = field_desc.find_type_descriptor();
 				if (!field_type_desc)
+				{
 					continue;
+				}
 
 				const StructDescriptor* struct_desc = field_type_desc->get_struct_desc();
 				if (!struct_desc)

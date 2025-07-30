@@ -45,7 +45,12 @@ namespace robotick
 
 	const TypeDescriptor* FieldDescriptor::find_type_descriptor() const
 	{
-		return TypeRegistry::get().find_by_id(type_id);
+		const TypeDescriptor* field_type = TypeRegistry::get().find_by_id(type_id);
+		ROBOTICK_ASSERT_MSG(field_type != nullptr,
+			"Unable to find TypeDescriptor '%s' for field '%s' - this shouldn't be possible - perhaps they are being pruned by the linker?",
+			this->type_id.get_debug_name(),
+			this->name.c_str());
+		return field_type;
 	}
 
 	const FieldDescriptor* StructDescriptor::find_field(const char* field_name) const

@@ -11,9 +11,7 @@ const joystickState = {
     left: { x: 0.0, y: 0.0 },
     right: { x: 0.0, y: 0.0 },
     dead_zone_left: { x: 0.1, y: 0.1 },
-    dead_zone_right: { x: 0.1, y: 0.1 },
-    scale_left: { x: 1.0, y: 1.0 },
-    scale_right: { x: 1.0, y: 1.0 }
+    dead_zone_right: { x: 0.1, y: 0.1 }
 };
 
 const lastSentState = JSON.parse(JSON.stringify(joystickState));
@@ -221,8 +219,8 @@ function setupVideoFeed() {
     }
 
     const videoRefreshRateHz = 15;
-    const videoRefreshInternalMs = 1000 / videoRefreshRateHz; 
-    setInterval(refreshCameraFrame, videoRefreshInternalMs); // at ~15 FPS
+    const videoRefreshIntervalMs = 1000 / videoRefreshRateHz; 
+    setInterval(refreshCameraFrame, videoRefreshIntervalMs); // at ~15 FPS
 }
 
 document.addEventListener('touchstart', handleTouchStart);

@@ -2,7 +2,10 @@
 
 #include "robotick/api.h"
 
+#include <chrono>
+
 #if defined(ROBOTICK_PLATFORM_ESP32)
+#include "driver/i2c.h"
 #include <M5Unified.h>
 #endif // #if defined(ROBOTICK_PLATFORM_ESP32)
 
@@ -56,41 +59,38 @@ namespace robotick
 
 		~BaseXWorkload()
 		{
-			set_motor_speed(0, 0.0f, outputs.motor1_speed);
-			set_motor_speed(1, 0.0f, outputs.motor2_speed);
-			set_motor_speed(2, 0.0f, outputs.motor3_speed);
-			set_motor_speed(3, 0.0f, outputs.motor4_speed);
+			inputs.motor1_speed = 0.0f;
+			inputs.motor2_speed = 0.0f;
+			inputs.motor3_speed = 0.0f;
+			inputs.motor4_speed = 0.0f;
+
+			set_motor_speeds();
 		}
 
-		void tick(const TickInfo&)
+		void tick(const TickInfo&) { set_motor_speeds(); }
+
+		void set_motor_speeds()
 		{
-			set_motor_speed(0, inputs.motor1_speed, outputs.motor1_speed);
-			set_motor_speed(1, inputs.motor2_speed, outputs.motor2_speed);
-			set_motor_speed(2, inputs.motor3_speed, outputs.motor3_speed);
-			set_motor_speed(3, inputs.motor4_speed, outputs.motor4_speed);
-
-			// ROBOTICK_INFO("BaseXWorkload::tick() inputs:  m1=%.3f  m2=%.3f  m3=%.3f  m4=%.3f outputs: m1=%.3f  m2=%.3f  m3=%.3f  m4=%.3f",
-			// 	inputs.motor1_speed, inputs.motor2_speed, inputs.motor3_speed, inputs.motor4_speed, outputs.motor1_speed, outputs.motor2_speed,
-			// 	outputs.motor3_speed, outputs.motor4_speed);
-		}
-
-		void set_motor_speed(uint8_t index, float input_speed, float& output_ref)
-		{
-			if (index > 3)
-				return;
-
-			float clamped = std::max(-config.max_motor_speed, std::min(config.max_motor_speed, input_speed));
-
 #if defined(ROBOTICK_PLATFORM_ESP32)
-			int8_t duty = static_cast<int8_t>(clamped * 127.0);
-			uint8_t reg = BASEX_PWM_DUTY_ADDR + index;
+
+			// Create duty values
+			uint8_t duties[4] = {
+				static_cast<uint8_t>(std::clamp(inputs.motor1_speed, -config.max_motor_speed, config.max_motor_speed) * 127.0f),
+				static_cast<uint8_t>(std::clamp(inputs.motor2_speed, -config.max_motor_speed, config.max_motor_speed) * 127.0f),
+				static_cast<uint8_t>(std::clamp(inputs.motor3_speed, -config.max_motor_speed, config.max_motor_speed) * 127.0f),
+				static_cast<uint8_t>(std::clamp(inputs.motor4_speed, -config.max_motor_speed, config.max_motor_speed) * 127.0f),
+			};
 
 			constexpr uint32_t BASEX_I2C_FREQ = 400000;
 
-			m5::In_I2C.writeRegister8(BASEX_I2C_ADDR, reg, static_cast<uint8_t>(duty), BASEX_I2C_FREQ);
-#endif // #if defined(ROBOTICK_PLATFORM_ESP32)
+			// Begin I2C transaction manually
+			m5::In_I2C.writeRegister(BASEX_I2C_ADDR, BASEX_PWM_DUTY_ADDR, duties, sizeof(duties), BASEX_I2C_FREQ);
+#endif
 
-			output_ref = clamped;
+			outputs.motor1_speed = inputs.motor1_speed;
+			outputs.motor2_speed = inputs.motor2_speed;
+			outputs.motor3_speed = inputs.motor3_speed;
+			outputs.motor4_speed = inputs.motor4_speed;
 		}
 	};
 

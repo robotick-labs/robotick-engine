@@ -105,8 +105,6 @@ namespace robotick
 
 						try_set_vec2_from_json("left", w.left);
 						try_set_vec2_from_json("right", w.right);
-						try_set_vec2_from_json("scale_left", w.scale_left);
-						try_set_vec2_from_json("scale_right", w.scale_right);
 
 						response.status_code = 200;
 					}

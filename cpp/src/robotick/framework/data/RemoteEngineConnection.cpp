@@ -14,6 +14,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#if defined(ROBOTICK_PLATFORM_ESP32)
+#include "esp_netif.h"
+#endif
+
 namespace robotick
 {
 
@@ -21,8 +25,25 @@ namespace robotick
 	{
 		constexpr float RECONNECT_ATTEMPT_INTERVAL_SEC = 1.0f;
 
+		bool is_network_stack_ready()
+		{
+#if defined(ROBOTICK_PLATFORM_ESP32)
+			esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+			return netif && esp_netif_is_netif_up(netif);
+#else
+			// Assume true on platforms like desktop
+			return true;
+#endif
+		}
+
 		int create_tcp_socket()
 		{
+			if (!is_network_stack_ready())
+			{
+				ROBOTICK_WARNING_ONCE("Network stack not ready — skipping socket creation");
+				return -1;
+			}
+
 			int fd = socket(AF_INET, SOCK_STREAM, 0);
 			if (fd < 0)
 			{
@@ -502,15 +523,15 @@ namespace robotick
 		{
 			auto [payload_data, payload_size] = in_progress_message.get_payload();
 
-			size_t offset = 0;
+			size_t offset_into_payload = 0;
 			for (auto& field : fields)
 			{
-				if (offset + field.size > payload_size)
+				if (offset_into_payload + field.size > payload_size)
 				{
 					ROBOTICK_FATAL_EXIT(
 						"RemoteEngineConnection::receive_into_fields() - buffer received is too small (%zu bytes) for all expected fields (%zu)",
 						payload_size,
-						(offset + field.size));
+						(offset_into_payload + field.size));
 
 					break;
 				}
@@ -520,8 +541,14 @@ namespace robotick
 					ROBOTICK_FATAL_EXIT("Receiver field '%s' has null recv_ptr", field.path.c_str());
 				}
 
-				std::memcpy(field.recv_ptr, payload_data + offset, field.size);
-				offset += field.size;
+				std::memcpy(field.recv_ptr, payload_data + offset_into_payload, field.size);
+				offset_into_payload += field.size;
+
+				static bool s_enable_debug_info = false;
+				if (s_enable_debug_info)
+				{
+					ROBOTICK_INFO("Successfully written %zu bytes into field '%s'", field.size, field.path.c_str());
+				}
 			}
 
 			in_progress_message.vacate(); // vacate ready for next user

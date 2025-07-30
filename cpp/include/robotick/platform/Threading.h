@@ -26,7 +26,7 @@ namespace robotick
 		using EntryPoint = void (*)(void*);
 
 		Thread() = default;
-		Thread(EntryPoint fn, void* arg, const std::string& name = "", int core = -1, int stack_size = 4096, int priority = 1);
+		Thread(EntryPoint fn, void* arg, const std::string& name = "", int core = -1, int stack_size = 12288, int priority = 1);
 		~Thread();
 
 		Thread(const Thread&) = delete;
@@ -43,6 +43,7 @@ namespace robotick
 		static void sleep_ms(uint32_t ms);
 		static void hybrid_sleep_until(std::chrono::steady_clock::time_point target_time);
 
+	  protected:
 		static void set_name(const std::string& name);
 		static void set_priority_high();
 		static void set_affinity(int core);
@@ -58,7 +59,10 @@ namespace robotick
 	class AtomicFlag
 	{
 	  public:
-		explicit AtomicFlag(bool initial = false) : flag(initial) {}
+		explicit AtomicFlag(bool initial = false)
+			: flag(initial)
+		{
+		}
 
 		void set(bool value = true) { flag.store(value); }
 		bool is_set() const { return flag.load(); }

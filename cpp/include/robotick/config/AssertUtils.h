@@ -43,7 +43,10 @@ namespace robotick
 	class TestError : public std::exception
 	{
 	  public:
-		explicit TestError(const char* message) : msg(message) {}
+		explicit TestError(const char* message)
+			: msg(message)
+		{
+		}
 		const char* what() const noexcept override { return msg.c_str(); }
 
 	  private:
@@ -124,6 +127,18 @@ namespace robotick
 	{                                                                                                                                                \
 		ROBOTICK_BREAKPOINT();                                                                                                                       \
 		ROBOTICK_INTERNAL_LOG("WARN", __VA_ARGS__);                                                                                                  \
+	} while (0)
+
+#define ROBOTICK_WARNING_ONCE(...)                                                                                                                   \
+	do                                                                                                                                               \
+	{                                                                                                                                                \
+		static bool robotick_warning_logged = false;                                                                                                 \
+		if (!robotick_warning_logged)                                                                                                                \
+		{                                                                                                                                            \
+			ROBOTICK_BREAKPOINT();                                                                                                                   \
+			ROBOTICK_INTERNAL_LOG("WARN", __VA_ARGS__);                                                                                              \
+			robotick_warning_logged = true;                                                                                                          \
+		}                                                                                                                                            \
 	} while (0)
 
 #define ROBOTICK_INFO(...)                                                                                                                           \

@@ -37,6 +37,8 @@ namespace robotick
 
 	const TypeDescriptor* TypeRegistry::find_by_id(const TypeId& id)
 	{
+		ROBOTICK_ASSERT(types_by_id.size() == types.size());
+
 		const TypeDescriptor** found_type = types_by_id.find(id);
 		return found_type ? *found_type : nullptr;
 	}

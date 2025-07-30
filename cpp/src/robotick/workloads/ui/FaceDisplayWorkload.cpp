@@ -44,12 +44,7 @@ namespace robotick
 		FaceDisplayOutputs outputs;
 		State<FaceDisplayState> state;
 
-		void setup()
-		{
-			ROBOTICK_INFO("Face: setup()");
-
-			schedule_blink_pair(0.0f);
-		}
+		void setup() { schedule_blink_pair(0.0f); }
 
 		void tick(const TickInfo& tick_info)
 		{
@@ -58,6 +53,7 @@ namespace robotick
 			// init the renderer if not already done so:
 			if (!s.has_init_renderer)
 			{
+				s.renderer.set_viewport(320, 240);
 				s.renderer.init();
 				s.has_init_renderer = true;
 			}
@@ -67,7 +63,7 @@ namespace robotick
 			update_blinks(time_now_sec);
 
 			// draw & present our face
-			s.renderer.clear();
+			s.renderer.clear(Colors::White);
 			draw_face(s.renderer);
 			s.renderer.present();
 		}
@@ -114,9 +110,9 @@ namespace robotick
 		{
 			auto& blink = state->eye_blink_progress;
 			const int center_y = 120;
-			const int eye_w = 30;
-			const int eye_h = 55;
-			const int eye_spacing = 160;
+			const int eye_w = 35;
+			const int eye_h = 65;
+			const int eye_spacing = 200;
 
 			for (int i = 0; i < 2; ++i)
 			{
@@ -128,8 +124,8 @@ namespace robotick
 
 		void draw_eye(Renderer& r, const int cx, const int cy, const int rx, const int ry)
 		{
-			r.draw_ellipse_filled(cx, cy, rx, ry, {0, 0, 0, 255});
-			r.draw_ellipse_filled(cx + rx / 4, cy - ry / 3, rx / 3, ry / 4, {255, 255, 255, 255});
+			r.draw_ellipse_filled(Vec2(cx, cy), rx, ry, {0, 0, 0, 255});
+			r.draw_ellipse_filled(Vec2(cx + rx / 4, cy - ry / 3), rx / 3, ry / 4, {255, 255, 255, 255});
 		}
 	};
 

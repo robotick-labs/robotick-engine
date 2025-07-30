@@ -20,6 +20,12 @@ namespace robotick
 	{
 		uint32_t last_tick_duration_ns{0}; // (uint32_t can store up to 4.29s of nanoseconds - should be fine for these deltas)
 		uint32_t last_time_delta_ns{0};
+
+		float get_last_tick_duration_sec() const { return (float)last_tick_duration_ns * 1e-9f; }
+		float get_last_time_delta_sec() const { return (float)last_time_delta_ns * 1e-9f; }
+
+		float get_last_tick_duration_ms() const { return (float)last_tick_duration_ns * 1e-6f; }
+		float get_last_time_delta_ms() const { return (float)last_time_delta_ns * 1e-6f; }
 	};
 
 	struct WorkloadInstanceInfo

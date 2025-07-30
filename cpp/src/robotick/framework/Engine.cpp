@@ -50,8 +50,15 @@ namespace robotick
 		delete state;
 	}
 
+	extern "C" void robotick_force_register_primitives();
+	extern "C" void robotick_force_register_fixed_vector_types();
+
 	void Engine::load(const Model& model)
 	{
+		// ensure out standard types don't get pruned by the linker:
+		robotick_force_register_primitives();
+		robotick_force_register_fixed_vector_types();
+
 		if (!model.get_root_workload())
 			ROBOTICK_FATAL_EXIT("Model has no root workload");
 
@@ -236,12 +243,8 @@ namespace robotick
 				inst.workload_descriptor->setup_fn(inst.get_ptr(*this));
 		}
 
-		ROBOTICK_INFO("Setting up remote engine senders...");
 		setup_remote_engine_senders(model);
-
-		ROBOTICK_INFO("Setting up remote engines listener...");
 		setup_remote_engines_receiver();
-		ROBOTICK_INFO("Finished setting up remote engines listener");
 
 		state->root_instance = root_instance;
 	}
@@ -284,6 +287,7 @@ namespace robotick
 		auto next_tick_time = engine_start_time;
 
 		TickInfo tick_info;
+		tick_info.workload_stats = &root_info.mutable_stats;
 
 		do
 		{
@@ -335,6 +339,8 @@ namespace robotick
 
 	void Engine::setup_remote_engines_receiver()
 	{
+		ROBOTICK_INFO("Setting up remote engines receiver...");
+
 		state->remote_engines_receiver.configure(
 			RemoteEngineConnection::ConnectionConfig{"", DEFAULT_REMOTE_ENGINE_PORT}, RemoteEngineConnection::Mode::Receiver);
 
@@ -350,7 +356,8 @@ namespace robotick
 				out.path = path;
 				out.recv_ptr = ptr;
 				out.size = size;
-				out.type_hash = field_desc->type_id;
+				out.type_desc = field_desc->find_type_descriptor();
+				ROBOTICK_ASSERT(out.type_desc != nullptr);
 
 				return true;
 			});
@@ -359,6 +366,12 @@ namespace robotick
 	void Engine::setup_remote_engine_senders(const Model& model)
 	{
 		const auto& remote_model_seeds = model.get_remote_models();
+		if (remote_model_seeds.size() == 0)
+		{
+			return;
+		}
+
+		ROBOTICK_INFO("Setting up remote engine senders...");
 
 		state->remote_engine_senders.initialize(remote_model_seeds.size());
 
@@ -399,7 +412,8 @@ namespace robotick
 				remote_field.path = remote_data_connection_seed->dest_field_path.c_str();
 				remote_field.send_ptr = ptr;
 				remote_field.size = size;
-				remote_field.type_hash = field_desc->type_id;
+				remote_field.type_desc = field_desc->find_type_descriptor();
+				ROBOTICK_ASSERT(remote_field.type_desc != nullptr);
 
 				remote_engine_connection.register_field(remote_field);
 			}
