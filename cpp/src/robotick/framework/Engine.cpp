@@ -10,6 +10,7 @@
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/Model.h"
 #include "robotick/framework/utils/TypeId.h"
+#include "robotick/platform/PlatformEvents.h"
 #include "robotick/platform/Threading.h"
 
 namespace robotick
@@ -324,7 +325,7 @@ namespace robotick
 			next_tick_time += child_tick_interval;
 			Thread::hybrid_sleep_until(next_tick_time);
 
-		} while (!stop_after_next_tick_flag.is_set());
+		} while (!stop_after_next_tick_flag.is_set() && !should_exit_application());
 
 		state->is_running = false;
 
