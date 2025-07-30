@@ -544,7 +544,11 @@ namespace robotick
 				std::memcpy(field.recv_ptr, payload_data + offset_into_payload, field.size);
 				offset_into_payload += field.size;
 
-				ROBOTICK_INFO("Successfully written %zu bytes into field '%s'", field.size, field.path.c_str());
+				static bool s_enable_debug_info = false;
+				if (s_enable_debug_info)
+				{
+					ROBOTICK_INFO("Successfully written %zu bytes into field '%s'", field.size, field.path.c_str());
+				}
 			}
 
 			in_progress_message.vacate(); // vacate ready for next user

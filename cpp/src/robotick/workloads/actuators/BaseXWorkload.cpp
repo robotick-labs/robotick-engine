@@ -73,9 +73,6 @@ namespace robotick
 		{
 #if defined(ROBOTICK_PLATFORM_ESP32)
 
-			inputs.motor1_speed = 0.0f;
-			inputs.motor2_speed = 0.0f;
-
 			// Create duty values
 			uint8_t duties[4] = {
 				static_cast<uint8_t>(std::clamp(inputs.motor1_speed, -config.max_motor_speed, config.max_motor_speed) * 127.0f),
