@@ -1,15 +1,93 @@
 {
-    "version": 8,
+    "version": 4,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21
+    },
     "configurePresets": [
         {
-            "name": "debug",
-            "displayName": "Debug Build",
+            "name": "linux-base",
+            "hidden": true,
             "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build",
+            "description": "Base preset for Linux CI builds (common compiler & generator settings)",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "/usr/bin/gcc",
+                "CMAKE_CXX_COMPILER": "/usr/bin/g++",
+                "ROBOTICK_PLATFORM_LINUX": "ON",
+                "ROBOTICK_ENABLE_PYTHON": "ON",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-linux-native.cmake",
+                "WORKLOAD_PRESET": "ubuntu-workloads-all",
+                "ROBOTICK_PROJECT_ROOT": "${sourceDir}"
+            }
+        },
+        {
+            "name": "linux-debug",
+            "inherits": "linux-base",
+            "description": "Linux Debug build (no optimizations, full asserts)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEBUG -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD",
+                "ROBOTICK_BUILD_TESTS": "ON"
             }
+        },
+        {
+            "name": "linux-development",
+            "inherits": "linux-base",
+            "description": "Linux Development build (optimized with probes)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O1 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEV -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD",
+                "ROBOTICK_BUILD_CONFIG_DEVELOPMENT": "ON"
+            }
+        },
+        {
+            "name": "linux-release",
+            "inherits": "linux-base",
+            "description": "Linux Release build (stripped, fastest)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_FLAGS_DEBUG": "-DNDEBUG -DROBOTICK_RELEASE -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD",
+                "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
+                "ROBOTICK_STRIP_PROBES": "ON"
+            }
+        },
+        {
+            "name": "esp32s3-debug",
+            "displayName": "ESP32-S3 Debug (VS Code Friendly)",
+            "generator": "Ninja",
+            "description": "Debug build for ESP32-S3 using Espressif toolchain and SDK",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "ROBOTICK_PLATFORM_ESP32": "ON",
+                "ROBOTICK_BUILD_TESTS": "OFF",
+                "WORKLOAD_PRESET": "esp32-s3-workloads-all",
+                "ROBOTICK_PROJECT_ROOT": "${sourceDir}"
+            },
+            "environment": {
+                "IDF_PATH": "C:/Espressif/frameworks/esp-idf-v5.4.1",
+                "IDF_TOOLS_PATH": "C:/Espressif"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "linux-debug",
+            "configurePreset": "linux-debug"
+        },
+        {
+            "name": "linux-development",
+            "configurePreset": "linux-development"
+        },
+        {
+            "name": "linux-release",
+            "configurePreset": "linux-release"
+        },
+        {
+            "name": "esp32s3-debug",
+            "configurePreset": "esp32s3-debug"
         }
     ]
 }

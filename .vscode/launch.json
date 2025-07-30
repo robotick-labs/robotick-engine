@@ -1,34 +1,24 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        {
-            "name": "Example: Python - mujoco_balancing_robot",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/examples/mujoco_balancing_robot/main.py",
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "Example: Python - brickpi_simple_rc",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/examples/brickpi_simple_rc/main.py",
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal"
-        },
         {
             "name": "Example: C++ - robotick_main",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/robotick_main",
+            "program": "${workspaceFolder}/examples/cpp/desktop-testbed/build/desktop-testbed-linux-debug/desktop-testbed",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "environment": [],
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "${workspaceFolder}/examples/cpp/desktop-testbed/build/desktop-testbed-linux-debug"
+                },
+                {
+                    "name": "ROBOTICK_ENABLE_BACKTRACE",
+                    "value": "1"
+                }
+            ],
             "externalConsole": false,
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
@@ -38,31 +28,56 @@
                     "text": "-enable-pretty-printing",
                     "ignoreFailures": true
                 }
-            ]
+            ],
+            "logging": {
+                "engineLogging": true
+            },
+            "preLaunchTask": "Build Example: C++ - robotick_main",
+            "additionalSOLibSearchPath": "${workspaceFolder}/build/linux-debug",
+            "sourceFileMap": {
+                "${workspaceFolder}": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen"
         },
         {
-            "name": "Debug PythonWorkload Tests",
+            "name": "Debug robotick_tests",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/tests/cpp/Debug/robotick_tests.exe", // or your actual test binary
-            "args": [], // optional: pass specific test names/tags here
-            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/build/linux-debug/cpp/tests/robotick_tests",
+            "args": [],
             "stopAtEntry": false,
-            "environment": [],
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "${workspaceFolder}/build/linux-debug"
+                },
+                {
+                    "name": "ROBOTICK_ENABLE_BACKTRACE",
+                    "value": "1"
+                }
+            ],
             "externalConsole": false,
-            "MIMode": "gdb", // for Linux or WSL
-            // "MIMode": "lldb",       // for macOS
-            // "miDebuggerPath": "/usr/bin/gdb", // customize if needed
-            // For Windows with MSVC:
-            "type": "cppvsdbg", // use this instead of cppdbg
-            "preLaunchTask": "build", // optional: hook up to a CMake or build task
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing",
                     "text": "-enable-pretty-printing",
                     "ignoreFailures": true
                 }
-            ]
+            ],
+            "logging": {
+                "engineLogging": true
+            },
+            "preLaunchTask": "Build robotick_tests",
+            "additionalSOLibSearchPath": "${workspaceFolder}/build/linux-debug",
+            "sourceFileMap": {
+                "/workspace": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen"
         }
     ]
 }

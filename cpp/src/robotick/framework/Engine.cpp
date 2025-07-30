@@ -1,46 +1,38 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
 
-#include "robotick/config/PlatformDefaults.h"
-#include "robotick/framework/Model.h"
+#include "robotick/api.h"
 #include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/data/DataConnection.h"
+#include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
-#include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/registry/FieldUtils.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
-#include "robotick/framework/utils/Thread.h"
-
-#include <algorithm>
-#include <atomic>
-#include <cassert>
-#include <chrono>
-#include <cstdint>
-#include <cstring>
-#include <future>
-#include <sstream>
-#include <stdexcept>
-#include <thread>
-#include <vector>
+#include "robotick/framework/model/Model.h"
+#include "robotick/framework/utils/TypeId.h"
+#include "robotick/platform/Threading.h"
 
 namespace robotick
 {
 	struct Engine::State
 	{
-		Model m_loaded_model;
+		const Model* model = nullptr;
 		bool is_running = false;
 
 		WorkloadsBuffer workloads_buffer;
 
 		const WorkloadInstanceInfo* root_instance = nullptr;
-		std::vector<WorkloadInstanceInfo> instances;
-		std::vector<DataConnectionInfo> data_connections_all;
-		std::vector<size_t> data_connections_acquired_indices;
+		HeapVector<WorkloadInstanceInfo> instances;
+		Map<const char*, WorkloadInstanceInfo*> instances_by_unique_name;
+		HeapVector<DataConnectionInfo> data_connections_all;
+		HeapVector<DataConnectionInfo*> data_connections_acquired;
+
+		HeapVector<RemoteEngineConnection> remote_engine_senders; // one sender per remote-engine we need to send data to
+		RemoteEngineConnection remote_engines_receiver;			  // one receiver in case any engines need to send data to us
 	};
 
-	Engine::Engine() : state(std::make_unique<Engine::State>())
+	Engine::Engine()
+		: state(new Engine::State())
 	{
 	}
 
@@ -48,14 +40,389 @@ namespace robotick
 	{
 		for (auto& instance : state->instances)
 		{
-			if (instance.type->destruct)
+			if (instance.workload_descriptor->destruct_fn)
 			{
 				void* instance_ptr = instance.get_ptr(*this);
-				assert(instance_ptr != nullptr && "Workload pointer should not be null at this point");
-
-				instance.type->destruct(instance_ptr);
+				ROBOTICK_ASSERT(instance_ptr != nullptr);
+				instance.workload_descriptor->destruct_fn(instance_ptr);
 			}
 		}
+		delete state;
+	}
+
+	extern "C" void robotick_force_register_primitives();
+	extern "C" void robotick_force_register_fixed_vector_types();
+
+	void Engine::load(const Model& model)
+	{
+		// ensure out standard types don't get pruned by the linker:
+		robotick_force_register_primitives();
+		robotick_force_register_fixed_vector_types();
+
+		if (!model.get_root_workload())
+			ROBOTICK_FATAL_EXIT("Model has no root workload");
+
+		if (state->model != nullptr)
+			ROBOTICK_FATAL_EXIT("Engine has already been loaded, and cannot be reused");
+
+		state->model = &model;
+
+		// compute how big we need our workloads-buffer to be:
+		const auto& seeds = model.get_workload_seeds();
+		size_t workloads_cursor = 0;
+		std::vector<size_t> offsets;
+		for (const WorkloadSeed* seed : seeds)
+		{
+			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
+			if (!workload_type)
+				ROBOTICK_FATAL_EXIT("Unknown workload type: %s", seed->type_id.get_debug_name());
+
+			const size_t align = std::max<size_t>(workload_type->alignment, alignof(std::max_align_t));
+			workloads_cursor = (workloads_cursor + align - 1) & ~(align - 1);
+			offsets.push_back(workloads_cursor);
+			workloads_cursor += workload_type->size;
+		}
+
+		// create our workloads-buffer, workload-instances info, and construct each workload:
+		const size_t total_size = workloads_cursor;
+		state->workloads_buffer = WorkloadsBuffer(total_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
+		uint8_t* buffer_ptr = state->workloads_buffer.raw_ptr();
+		state->instances.initialize(seeds.size());
+
+		for (size_t i = 0; i < seeds.size(); ++i)
+		{
+			const auto* seed = seeds[i];
+			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
+
+			const auto* workload_desc = workload_type->get_workload_desc();
+			ROBOTICK_ASSERT(workload_desc != nullptr);
+
+			uint8_t* ptr = buffer_ptr + offsets[i];
+
+			WorkloadInstanceInfo& workload_instance_info = state->instances[i];
+			workload_instance_info.offset_in_workloads_buffer = offsets[i];
+			workload_instance_info.type = workload_type;
+			workload_instance_info.workload_descriptor = workload_desc;
+			workload_instance_info.seed = seed;
+
+			// add it to our map for quick lookup by name
+			state->instances_by_unique_name.insert(seed->unique_name.c_str(), &workload_instance_info);
+
+			if (workload_desc->construct_fn)
+				workload_desc->construct_fn(ptr);
+		}
+
+		// handle pre-load for each workload (we can multithread this in future, where platforms allow)
+		for (size_t i = 0; i < seeds.size(); ++i)
+		{
+			const auto& seed = seeds[i];
+			const auto* workload_desc = state->instances[i].workload_descriptor;
+			uint8_t* ptr = buffer_ptr + state->instances[i].offset_in_workloads_buffer;
+
+			if (workload_desc->set_engine_fn)
+				workload_desc->set_engine_fn(ptr, *this);
+
+			if (seed->config.size() > 0 && workload_desc->config_desc)
+			{
+				ROBOTICK_ASSERT(workload_desc->config_offset != OFFSET_UNBOUND);
+				DataConnectionUtils::apply_struct_field_values(ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config);
+			}
+
+			if (seed->inputs.size() > 0 && workload_desc->inputs_desc)
+			{
+				ROBOTICK_ASSERT(workload_desc->inputs_offset != OFFSET_UNBOUND);
+				DataConnectionUtils::apply_struct_field_values(ptr + workload_desc->inputs_offset, *workload_desc->inputs_desc, seed->inputs);
+			}
+
+			if (workload_desc->pre_load_fn)
+				workload_desc->pre_load_fn(ptr);
+		}
+
+		// compute our blackboard memory requirements, and bind our blackboards to that memory (they will store buffer-offsets relative to each
+		// Blackboard header):
+		size_t blackboard_size = compute_blackboard_memory_requirements(state->instances);
+		if (blackboard_size > DEFAULT_MAX_BLACKBOARDS_BYTES)
+			ROBOTICK_FATAL_EXIT("Blackboard memory (%zu) exceeds max allowed (%zu)", blackboard_size, DEFAULT_MAX_BLACKBOARDS_BYTES);
+
+		if (blackboard_size > 0)
+		{
+			size_t start = workloads_cursor;
+			workloads_cursor += blackboard_size;
+			bind_blackboards_for_instances(state->instances, start);
+		}
+
+		// handle load for each workload (we can multithread this in future, where platforms allow)
+		for (size_t i = 0; i < state->instances.size(); ++i)
+		{
+			auto& inst = state->instances[i];
+			void* ptr = inst.get_ptr(*this);
+			const auto* workload_desc = state->instances[i].workload_descriptor;
+
+			if (workload_desc->load_fn)
+				workload_desc->load_fn(ptr);
+		}
+
+		// hook-up children for each instance:
+		for (size_t i = 0; i < seeds.size(); ++i)
+		{
+			auto& inst = state->instances[i];
+			const auto* seed = seeds[i];
+
+			ROBOTICK_ASSERT(inst.seed == seed);
+
+			inst.children.initialize(seed->children.size());
+
+			size_t child_index = 0;
+			for (const auto* child_seed : seed->children)
+			{
+				ROBOTICK_ASSERT(child_seed != nullptr);
+
+				const WorkloadInstanceInfo* child_inst = find_instance_info(child_seed->unique_name.c_str());
+				ROBOTICK_ASSERT_MSG(child_inst != nullptr,
+					"Child workload-instance named '%s' not found for workload-instance '%s'",
+					child_seed->unique_name.c_str(),
+					seed->unique_name.c_str());
+
+				inst.children[child_index] = child_inst;
+				child_index++;
+			}
+		}
+
+		// create all data-connections:
+		DataConnectionUtils::create(
+			state->data_connections_all, state->workloads_buffer, model.get_data_connection_seeds(), state->instances_by_unique_name);
+
+		const WorkloadInstanceInfo* root_instance = find_instance_info(model.get_root_workload()->unique_name.c_str());
+		ROBOTICK_ASSERT(root_instance != nullptr);
+
+		// call set_children_fn - allowing each child to take ownership (responsibility for propagating) each connection
+		{
+			if (root_instance->workload_descriptor->set_children_fn)
+			{
+				uint8_t* root_ptr = root_instance->get_ptr(*this);
+				root_instance->workload_descriptor->set_children_fn(root_ptr, root_instance->children, state->data_connections_all);
+			}
+		}
+
+		// allow Engine to acquire data-connections not handled by groups within the model:
+		{
+			// count how many data-connections we need to acquire:
+			size_t num_to_acquire = 0;
+			for (DataConnectionInfo& conn : state->data_connections_all)
+			{
+				if (conn.expected_handler == DataConnectionInfo::ExpectedHandler::DelegateToParent)
+				{
+					num_to_acquire++;
+				}
+				else if (conn.expected_handler == DataConnectionInfo::ExpectedHandler::Unassigned)
+				{
+					ROBOTICK_FATAL_EXIT("Unclaimed connection: %s -> %s", conn.seed->source_field_path.c_str(), conn.seed->dest_field_path.c_str());
+				}
+			}
+
+			// allocate storage for data_connections_acquired
+			state->data_connections_acquired.initialize(num_to_acquire);
+
+			// acquire data_connections_acquired that Engine needs to propagate its self
+			size_t acquired_index = 0;
+			for (DataConnectionInfo& conn : state->data_connections_all)
+			{
+				if (conn.expected_handler == DataConnectionInfo::ExpectedHandler::DelegateToParent)
+				{
+					conn.expected_handler = DataConnectionInfo::ExpectedHandler::Engine;
+					state->data_connections_acquired[acquired_index] = &conn;
+					acquired_index++;
+				}
+			}
+		}
+
+		// call setup() on each instance that has that function
+		for (auto& inst : state->instances)
+		{
+			if (inst.workload_descriptor->setup_fn)
+				inst.workload_descriptor->setup_fn(inst.get_ptr(*this));
+		}
+
+		setup_remote_engine_senders(model);
+		setup_remote_engines_receiver();
+
+		state->root_instance = root_instance;
+	}
+
+	void Engine::run(const AtomicFlag& stop_after_next_tick_flag)
+	{
+		if (!state->root_instance)
+			ROBOTICK_FATAL_EXIT("Root workload instance-info not set");
+
+		const auto& root_info = *(state->root_instance);
+		void* root_ptr = root_info.get_ptr(*this);
+
+		if (!root_ptr)
+			ROBOTICK_FATAL_EXIT("Root workload must have valid object-pointer - check it has been correctly registered");
+
+		const float root_tick_rate_hz = root_info.seed->tick_rate_hz;
+		if (root_tick_rate_hz <= 0.0)
+			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_rate_hz>0.0 - check your model settings");
+
+		const auto root_tick_fn = root_info.workload_descriptor->tick_fn;
+		if (root_tick_fn == nullptr)
+			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_fn - check it has been correctly registered");
+
+		// Start all workloads
+		for (auto& inst : state->instances)
+		{
+			if (inst.workload_descriptor->start_fn)
+				inst.workload_descriptor->start_fn(inst.get_ptr(*this), inst.seed->tick_rate_hz);
+		}
+
+		state->is_running = true;
+
+		const auto child_tick_interval_sec = std::chrono::duration<float>(1.0f / root_tick_rate_hz);
+		const auto child_tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(child_tick_interval_sec);
+
+		const auto engine_start_time = std::chrono::steady_clock::now() - child_tick_interval;
+		// ^- subtract tick-interval so initial delta is from tick-interval
+
+		auto last_tick_time = engine_start_time;
+		auto next_tick_time = engine_start_time;
+
+		TickInfo tick_info;
+		tick_info.workload_stats = &root_info.mutable_stats;
+
+		do
+		{
+			const auto now = std::chrono::steady_clock::now();
+			const auto ns_since_start = std::chrono::duration_cast<std::chrono::nanoseconds>(now - engine_start_time).count();
+			const auto ns_since_last = std::chrono::duration_cast<std::chrono::nanoseconds>(now - last_tick_time).count();
+
+			static const float s_1_nanosecond_sec = 1e-9F;
+
+			tick_info.tick_count += 1;
+			tick_info.time_now_ns = ns_since_start;
+			tick_info.time_now = ns_since_start * s_1_nanosecond_sec;
+			tick_info.delta_time = ns_since_last * s_1_nanosecond_sec;
+
+			last_tick_time = now;
+
+			// update remote data-connections
+			tick_remote_engine_connections(tick_info);
+
+			// update local data-connections
+			for (const DataConnectionInfo* data_connection : state->data_connections_acquired)
+			{
+				data_connection->do_data_copy();
+			}
+
+			std::atomic_thread_fence(std::memory_order_release);
+
+			root_tick_fn(root_ptr, tick_info);
+
+			const auto now_post = std::chrono::steady_clock::now();
+			root_info.mutable_stats.last_tick_duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now_post - now).count();
+			root_info.mutable_stats.last_time_delta_ns = ns_since_last;
+
+			next_tick_time += child_tick_interval;
+			Thread::hybrid_sleep_until(next_tick_time);
+
+		} while (!stop_after_next_tick_flag.is_set());
+
+		state->is_running = false;
+
+		for (auto& inst : state->instances)
+		{
+			if (inst.workload_descriptor->stop_fn)
+				inst.workload_descriptor->stop_fn(inst.get_ptr(*this));
+		}
+	}
+
+	constexpr int DEFAULT_REMOTE_ENGINE_PORT = 7262;
+
+	void Engine::setup_remote_engines_receiver()
+	{
+		ROBOTICK_INFO("Setting up remote engines receiver...");
+
+		state->remote_engines_receiver.configure(
+			RemoteEngineConnection::ConnectionConfig{"", DEFAULT_REMOTE_ENGINE_PORT}, RemoteEngineConnection::Mode::Receiver);
+
+		state->remote_engines_receiver.set_field_binder(
+			[&](const char* path, RemoteEngineConnection::Field& out)
+			{
+				auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*this, path);
+				if (ptr == nullptr)
+				{
+					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engines_receiver() - unable to resolve field path: %s", path);
+				}
+
+				out.path = path;
+				out.recv_ptr = ptr;
+				out.size = size;
+				out.type_desc = field_desc->find_type_descriptor();
+				ROBOTICK_ASSERT(out.type_desc != nullptr);
+
+				return true;
+			});
+	}
+
+	void Engine::setup_remote_engine_senders(const Model& model)
+	{
+		const auto& remote_model_seeds = model.get_remote_models();
+		if (remote_model_seeds.size() == 0)
+		{
+			return;
+		}
+
+		ROBOTICK_INFO("Setting up remote engine senders...");
+
+		state->remote_engine_senders.initialize(remote_model_seeds.size());
+
+		uint32_t remote_engine_index = 0;
+
+		for (const RemoteModelSeed* remote_model_seed : remote_model_seeds)
+		{
+			ROBOTICK_ASSERT(remote_model_seed != nullptr);
+
+			if (remote_model_seed->remote_data_connection_seeds.size() == 0)
+			{
+				ROBOTICK_WARNING("Remote model '%s' has no remote data-connections - skipping adding remote_engine_sender for it",
+					remote_model_seed->model_name.c_str());
+
+				continue;
+			}
+
+			RemoteEngineConnection& remote_engine_connection = state->remote_engine_senders[remote_engine_index];
+			remote_engine_index++;
+
+			RemoteEngineConnection::ConnectionConfig config;
+			config.host = remote_model_seed->comms_channel.c_str();
+			config.port = DEFAULT_REMOTE_ENGINE_PORT;
+
+			remote_engine_connection.configure(config, RemoteEngineConnection::Mode::Sender);
+
+			for (const auto* remote_data_connection_seed : remote_model_seed->remote_data_connection_seeds)
+			{
+				const char* source_field_path = remote_data_connection_seed->source_field_path.c_str();
+
+				auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*this, source_field_path);
+				if (ptr == nullptr)
+				{
+					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engine_senders() - unable to resolve source field path: %s", source_field_path);
+				}
+
+				RemoteEngineConnection::Field remote_field;
+				remote_field.path = remote_data_connection_seed->dest_field_path.c_str();
+				remote_field.send_ptr = ptr;
+				remote_field.size = size;
+				remote_field.type_desc = field_desc->find_type_descriptor();
+				ROBOTICK_ASSERT(remote_field.type_desc != nullptr);
+
+				remote_engine_connection.register_field(remote_field);
+			}
+		}
+	}
+
+	bool Engine::is_running() const
+	{
+		return state && state->is_running;
 	}
 
 	const WorkloadInstanceInfo* Engine::get_root_instance_info() const
@@ -63,17 +430,34 @@ namespace robotick
 		return state->root_instance;
 	}
 
-	const WorkloadInstanceInfo& Engine::get_instance_info(size_t index) const
+	const WorkloadInstanceInfo* Engine::find_instance_info(const char* unique_name) const
 	{
-		return state->instances.at(index);
+		WorkloadInstanceInfo** found_instance_info = state->instances_by_unique_name.find(unique_name);
+		return found_instance_info ? *found_instance_info : nullptr;
 	}
 
-	const std::vector<WorkloadInstanceInfo>& Engine::get_all_instance_info() const
+	void* Engine::find_instance(const char* unique_name) const
+	{
+		const WorkloadInstanceInfo* found_instance_info = find_instance_info(unique_name);
+		if (found_instance_info)
+		{
+			return found_instance_info->get_ptr(*this);
+		}
+
+		return nullptr;
+	}
+
+	const HeapVector<WorkloadInstanceInfo>& Engine::get_all_instance_info() const
 	{
 		return state->instances;
 	}
 
-	const std::vector<DataConnectionInfo>& Engine::get_all_data_connections() const
+	const Map<const char*, WorkloadInstanceInfo*>& Engine::get_all_instance_info_map() const
+	{
+		return state->instances_by_unique_name;
+	}
+
+	const HeapVector<DataConnectionInfo>& Engine::get_all_data_connections() const
 	{
 		return state->data_connections_all;
 	}
@@ -83,381 +467,96 @@ namespace robotick
 		return state->workloads_buffer;
 	}
 
-	size_t Engine::compute_blackboard_memory_requirements(const std::vector<WorkloadInstanceInfo>& instances)
+	size_t Engine::compute_blackboard_memory_requirements(const HeapVector<WorkloadInstanceInfo>& instances)
 	{
-		// note - this function is not recursive, since we don't expect to have nested blackboards
-
 		size_t total = 0;
-
 		for (const auto& instance : instances)
 		{
-			const auto* type = instance.type;
-			if (!type)
+			const WorkloadDescriptor* workload_descriptor = instance.workload_descriptor;
+			if (!workload_descriptor)
 				continue;
 
 			void* instance_ptr = instance.get_ptr(*this);
-			assert(instance_ptr != nullptr && "Engine should never have null instances at this point");
+			ROBOTICK_ASSERT(instance_ptr != nullptr);
 
-			auto accumulate = [&](const StructRegistryEntry* struct_info)
+			auto accumulate = [&](const TypeDescriptor* struct_type_desc, const size_t struct_offset)
 			{
-				if (!struct_info)
-				{
+				if (!struct_type_desc)
 					return;
+
+				const StructDescriptor* struct_desc = struct_type_desc->get_struct_desc();
+				if (!struct_desc)
+				{
+					ROBOTICK_FATAL_EXIT("Workload '%s' has invalid struct descriptor of type '%s'",
+						instance.seed->unique_name.c_str(),
+						struct_type_desc->name.c_str());
 				}
 
-				const size_t struct_offset = struct_info->offset_within_workload;
-
-				const auto struct_ptr = static_cast<uint8_t*>(instance_ptr) + struct_offset;
-
-				for (const FieldInfo& field : struct_info->fields)
+				for (const FieldDescriptor& field : struct_desc->fields)
 				{
-					if (field.type == typeid(Blackboard))
+					if (field.type_id == GET_TYPE_ID(Blackboard))
 					{
-						assert(field.offset_within_struct != OFFSET_UNBOUND && "Field offset should have been correctly set by now");
+						ROBOTICK_ASSERT(field.offset_within_container != OFFSET_UNBOUND);
 
-						const auto* blackboard_raw_ptr = struct_ptr + field.offset_within_struct;
-						const auto* blackboard = reinterpret_cast<const Blackboard*>(blackboard_raw_ptr);
-
-						total += blackboard->get_info()->total_datablock_size;
+						const Blackboard& blackboard =
+							field.get_data<Blackboard>(state->workloads_buffer, instance, *struct_type_desc, struct_offset);
+						total += blackboard.get_info().total_datablock_size;
 					}
 				}
 			};
 
-			accumulate(type->config_struct);
-			accumulate(type->input_struct);
-			accumulate(type->output_struct);
+			accumulate(workload_descriptor->config_desc, workload_descriptor->config_offset);
+			accumulate(workload_descriptor->inputs_desc, workload_descriptor->inputs_offset);
+			accumulate(workload_descriptor->outputs_desc, workload_descriptor->outputs_offset);
 		}
-
 		return total;
 	}
 
 	void Engine::bind_blackboards_in_struct(
-		WorkloadInstanceInfo& workload_instance_info, const StructRegistryEntry& struct_entry, size_t& blackboard_storage_offset)
+		WorkloadInstanceInfo& instance, const TypeDescriptor& struct_type_desc, const size_t struct_offset, const size_t blackboard_storage_offset)
 	{
-		// note - this function is not recursive, since we don't expect to have nested blackboards
+		const StructDescriptor* struct_desc = struct_type_desc.get_struct_desc();
+		ROBOTICK_ASSERT(struct_desc != nullptr);
 
-		for (const FieldInfo& field : struct_entry.fields)
+		for (const FieldDescriptor& field : struct_desc->fields)
 		{
-			if (field.type == typeid(Blackboard))
+			if (field.type_id == GET_TYPE_ID(Blackboard))
 			{
-				Blackboard& blackboard = field.get_data<Blackboard>(state->workloads_buffer, workload_instance_info, struct_entry);
+				Blackboard& blackboard = field.get_data<Blackboard>(state->workloads_buffer, instance, struct_type_desc, struct_offset);
 				blackboard.bind(blackboard_storage_offset);
-
-				blackboard_storage_offset += blackboard.get_info()->total_datablock_size;
 			}
 		}
 	}
 
-	void Engine::bind_blackboards_for_instances(std::vector<WorkloadInstanceInfo>& instances, const size_t blackboards_data_start_offset)
+	void Engine::bind_blackboards_for_instances(HeapVector<WorkloadInstanceInfo>& instances, size_t start_offset)
 	{
-		size_t blackboard_storage_offset = blackboards_data_start_offset;
-
-		for (WorkloadInstanceInfo& instance : instances)
+		for (auto& instance : instances)
 		{
-			const auto* type = instance.type;
-			if (!type)
-			{
+			const WorkloadDescriptor* workload_desc = instance.workload_descriptor;
+			if (!workload_desc)
 				continue;
-			}
 
-			if (type->config_struct)
-			{
-				bind_blackboards_in_struct(instance, *type->config_struct, blackboard_storage_offset);
-			}
-
-			if (type->input_struct)
-			{
-				bind_blackboards_in_struct(instance, *type->input_struct, blackboard_storage_offset);
-			}
-
-			if (type->output_struct)
-			{
-				bind_blackboards_in_struct(instance, *type->output_struct, blackboard_storage_offset);
-			}
+			if (workload_desc->config_desc)
+				bind_blackboards_in_struct(instance, *workload_desc->config_desc, workload_desc->config_offset, start_offset);
+			if (workload_desc->inputs_desc)
+				bind_blackboards_in_struct(instance, *workload_desc->inputs_desc, workload_desc->inputs_offset, start_offset);
+			if (workload_desc->outputs_desc)
+				bind_blackboards_in_struct(instance, *workload_desc->outputs_desc, workload_desc->outputs_offset, start_offset);
 		}
 	}
 
-	void Engine::load(const Model& model)
+	void Engine::tick_remote_engine_connections(const TickInfo& tick_info)
 	{
-		if (!model.get_root().is_valid())
+		const bool enable_remote_engines_receiver = (state->remote_engine_senders.size() == 0); // placeholder for having config setting
+
+		if (enable_remote_engines_receiver)
 		{
-			throw std::runtime_error("Model has no root workload set via model.set_root(...)");
+			state->remote_engines_receiver.tick(tick_info);
 		}
 
-		state->instances.clear();
-		state->data_connections_all.clear();
-		state->data_connections_acquired_indices.clear();
-		state->root_instance = nullptr;
-		state->workloads_buffer = WorkloadsBuffer();
-		state->m_loaded_model = model;
-
-		const auto& workload_seeds = model.get_workload_seeds();
-
-		// compute how much room we need in our WorkloadsBuffer, and required offset for each workload object
-		size_t workloads_buffer_cursor = 0;
-		std::vector<size_t> aligned_offsets;
-		for (const auto& workload_seed : workload_seeds)
+		for (auto& remote_engine_sender : state->remote_engine_senders)
 		{
-			const auto* type = WorkloadRegistry::get().find(workload_seed.type);
-			if (!type)
-				throw std::runtime_error("Unknown workload type: " + workload_seed.type);
-
-			const size_t alignment = std::max<size_t>(type->alignment, alignof(std::max_align_t));
-			workloads_buffer_cursor = (workloads_buffer_cursor + alignment - 1) & ~(alignment - 1);
-			aligned_offsets.push_back(workloads_buffer_cursor);
-			workloads_buffer_cursor += type->size;
-		}
-
-		const size_t all_workloads_size = workloads_buffer_cursor;
-
-		// TODO: [#88] Temporary allocation strategy: pre-allocates workloads and an overestimated blackboards size.
-		// This will be replaced with a multi-stripe allocation model as outlined in ticket #88
-		state->workloads_buffer = WorkloadsBuffer(all_workloads_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
-		uint8_t* workloads_buffer_ptr = state->workloads_buffer.raw_ptr();
-
-		std::vector<std::future<WorkloadInstanceInfo>> preload_futures;
-		preload_futures.reserve(workload_seeds.size());
-
-		// construct + apply config + call pre_load_fn (multi-threaded):
-		for (size_t i = 0; i < workload_seeds.size(); ++i)
-		{
-			const auto& workload_seed = workload_seeds[i];
-			const auto* type = WorkloadRegistry::get().find(workload_seed.type);
-
-			const size_t instance_offset = aligned_offsets[i];
-			uint8_t* instance_ptr = workloads_buffer_ptr + instance_offset;
-
-			preload_futures.push_back(std::async(std::launch::async,
-				[=]() -> WorkloadInstanceInfo
-				{
-					if (type->construct)
-						type->construct(instance_ptr);
-
-					if (type->set_engine_fn)
-						type->set_engine_fn(instance_ptr, *this);
-
-					if (type->config_struct)
-					{
-						assert(type->config_struct->offset_within_workload != OFFSET_UNBOUND && "Struct offset not initialized");
-
-						apply_struct_fields(instance_ptr + type->config_struct->offset_within_workload, *type->config_struct, workload_seed.config);
-					}
-
-					if (type->pre_load_fn)
-						type->pre_load_fn(instance_ptr);
-
-					return WorkloadInstanceInfo{instance_offset, type, workload_seed.name, workload_seed.tick_rate_hz, {}, WorkloadInstanceStats{}};
-				}));
-		}
-
-		// wait for "pre_load" futures to complete and collect results:
-		state->instances.reserve(workload_seeds.size());
-		for (auto& fut : preload_futures)
-		{
-			state->instances.push_back(fut.get());
-		}
-
-		// Blackboards memory allocation and buffer-binding:
-		const size_t blackboards_buffer_size = compute_blackboard_memory_requirements(state->instances);
-		if (blackboards_buffer_size > robotick::DEFAULT_MAX_BLACKBOARDS_BYTES)
-		{
-			std::ostringstream msg;
-			msg << "[Engine::load] Required blackboard memory (" << blackboards_buffer_size << " bytes) exceeds platform default maximum ("
-				<< robotick::DEFAULT_MAX_BLACKBOARDS_BYTES << " bytes).\n"
-				<< "Increase DEFAULT_MAX_BLACKBOARDS_BYTES or allocate explicitly for your platform.";
-
-			throw std::runtime_error(msg.str());
-		}
-
-		if (blackboards_buffer_size > 0)
-		{
-			const size_t blackboards_data_start_offset = workloads_buffer_cursor;
-			workloads_buffer_cursor += blackboards_buffer_size;
-
-			assert(blackboards_data_start_offset >= all_workloads_size && "Blackboards data should all appear after workloads-data in buffer");
-
-			bind_blackboards_for_instances(state->instances, blackboards_data_start_offset);
-		}
-
-		// call load_fn (multi-threaded):
-		std::vector<std::future<void>> load_futures;
-		load_futures.reserve(workload_seeds.size());
-
-		for (size_t i = 0; i < workload_seeds.size(); ++i)
-		{
-			void* instance_ptr = state->instances[i].get_ptr(*this);
-			const auto* type = state->instances[i].type;
-
-			load_futures.push_back(std::async(std::launch::async,
-				[=]()
-				{
-					if (type->load_fn)
-						type->load_fn(instance_ptr);
-				}));
-		}
-
-		// wait for "load" futures to complete:
-		for (auto& fut : load_futures)
-		{
-			fut.get();
-		}
-
-		// Setup data connections from the model and store them in the engine state.
-		// We also collect pointers to all connections that still need to be acquired
-		// by a workload (typically handled by Grouped Workloads via set_children_fn() below).
-		state->data_connections_all = DataConnectionsFactory::create(state->workloads_buffer, model.get_data_connection_seeds(), state->instances);
-		std::vector<DataConnectionInfo*> data_connections_pending_acquisition;
-		for (auto& conn : state->data_connections_all)
-		{
-			data_connections_pending_acquisition.push_back(&conn);
-		}
-
-		// fixup child-instances:
-		for (size_t i = 0; i < workload_seeds.size(); ++i)
-		{
-			const auto& workload_seed = workload_seeds[i];
-			auto& instance = state->instances[i];
-
-			assert(instance.unique_name == workload_seed.name && "[Engine] Workload instances should be in same order as seeds (different names)");
-			assert(instance.type->name == workload_seed.type && "[Engine] Workload instances should be in same order as seeds (different types");
-
-			if (instance.type->set_children_fn)
-			{
-				for (auto child_handle : workload_seed.children)
-				{
-					const WorkloadInstanceInfo& child_workload = get_instance_info(child_handle.index);
-					instance.children.push_back(&child_workload);
-				}
-			}
-		}
-
-		// call set_children_fn on root-instance - we expect that to recursively do so for any children
-		// allowing them to set up their children, acquire responsibility for data-connections, etc as needed.
-		const WorkloadInstanceInfo* root_instance = &get_instance_info(model.get_root().index);
-		assert(root_instance != nullptr);
-
-		if (root_instance && root_instance->type && root_instance->type->set_children_fn)
-		{
-			root_instance->type->set_children_fn(root_instance->get_ptr(*this), root_instance->children, data_connections_pending_acquisition);
-		}
-
-		// acquire any pending data_connections have been requested for engine-handling - these should be all that remain:
-		auto new_end = std::remove_if(data_connections_pending_acquisition.begin(), data_connections_pending_acquisition.end(),
-			[this](const DataConnectionInfo* conn)
-			{
-				if (conn->expected_handler == DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine)
-				{
-					state->data_connections_acquired_indices.push_back(static_cast<size_t>(conn - state->data_connections_all.data()));
-					return true;
-				}
-				return false;
-			});
-		data_connections_pending_acquisition.erase(new_end, data_connections_pending_acquisition.end());
-
-		// validate that all pending data_connections have been acquired by workloads:
-		if (!data_connections_pending_acquisition.empty())
-		{
-			std::ostringstream msg;
-			msg << "Error: Not all data connections were acquired by workloads or engine.\n";
-			msg << "Unclaimed connections (" << data_connections_pending_acquisition.size() << "):\n";
-
-			for (const DataConnectionInfo* conn : data_connections_pending_acquisition)
-			{
-				msg << "  - " << conn->seed.source_field_path << " -> " << conn->seed.dest_field_path << '\n';
-			}
-
-			throw std::runtime_error(msg.str());
-		}
-
-		// setup each instance
-		for (auto& instance : state->instances)
-		{
-			if (instance.type->setup_fn)
-			{
-				void* instance_ptr = instance.get_ptr(*this);
-				assert(instance_ptr != nullptr && "Workload pointer should not be null at this point");
-
-				instance.type->setup_fn(instance_ptr);
-			}
-		}
-
-		state->root_instance = root_instance;
-		assert(state->root_instance != nullptr);
-	}
-
-	bool Engine::is_running() const
-	{
-		return state != nullptr && state->is_running;
-	}
-
-	void Engine::run(const std::atomic<bool>& stop_after_next_tick_flag)
-	{
-		using namespace std::chrono;
-
-		const WorkloadHandle root_handle = state->m_loaded_model.get_root();
-		if (root_handle.index >= state->instances.size())
-			throw std::runtime_error("Invalid root workload handle");
-
-		const auto& root_info = state->instances[root_handle.index];
-		void* root_ptr = root_info.get_ptr(*this);
-
-		if (root_info.tick_rate_hz <= 0 || !root_info.type->tick_fn || !root_ptr)
-			throw std::runtime_error("Root workload must have valid tick_rate_hz and tick()");
-
-		// call start() on all workloads
-		for (auto& inst : state->instances)
-		{
-			if (inst.type->start_fn)
-			{
-				inst.type->start_fn(inst.get_ptr(*this), inst.tick_rate_hz);
-			}
-		}
-
-		state->is_running = true; // flag that we're running - e.g. allows this to be seen in telemetry / asserts
-
-		const auto tick_interval_sec = duration<double>(1.0 / root_info.tick_rate_hz);
-		const auto tick_interval = duration_cast<steady_clock::duration>(tick_interval_sec);
-		auto next_tick_time = steady_clock::now();
-		auto last_tick_time = steady_clock::now();
-
-		// main tick-loop: (tick at least once, before checking stop_after_next_tick_flag - e.g. useful for testing)
-		do
-		{
-			const auto now_pre_tick = steady_clock::now();
-			const double time_delta = duration<double>(now_pre_tick - last_tick_time).count();
-			last_tick_time = now_pre_tick;
-
-			// update any data-connections owned by the engine:
-			for (size_t index : state->data_connections_acquired_indices)
-			{
-				state->data_connections_all[index].do_data_copy();
-			}
-
-			// Ensure all data writes complete before tick begins
-			std::atomic_thread_fence(std::memory_order_release);
-
-			// tick root (will cause children to tick recursively)
-			root_info.type->tick_fn(root_ptr, time_delta);
-
-			const auto now_post_tick = steady_clock::now();
-			root_info.mutable_stats.last_tick_duration = duration<double>(now_post_tick - now_pre_tick).count();
-
-			root_info.mutable_stats.last_time_delta = time_delta;
-			next_tick_time += tick_interval;
-
-			hybrid_sleep_until(time_point_cast<steady_clock::duration>(next_tick_time));
-
-		} while (!stop_after_next_tick_flag);
-
-		state->is_running = false; // flag that we're no longer running - e.g. allows this to be seen in telemetry / asserts
-
-		// call stop() on all children (do it safely here, rather than relying on stop() to propagate through hierarchy)
-		for (auto& inst : state->instances)
-		{
-			if (inst.type->stop_fn)
-			{
-				inst.type->stop_fn(inst.get_ptr(*this));
-			}
+			remote_engine_sender.tick(tick_info);
 		}
 	}
 

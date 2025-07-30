@@ -1,14 +1,41 @@
 {
     "cmake.useCMakePresets": "always",
-    "cmake.configurePreset": "dev-gcc",
+    "cmake.configurePreset": "linux-debug",
+    "cmake.buildPreset": "linux-debug",
     "cmake.sourceDirectory": "${workspaceFolder}",
     "cmake.buildDirectory": "${workspaceFolder}/build",
-    "terminal.integrated.defaultProfile.linux": "bash",
+    "cmake.testExplorer.enableOutput": true,
+    "cmake.testExplorer.useCTest": true,
+    "cmake.testExplorer.extraCTestArgs": "--test-dir ${workspaceFolder}/build/linux-debug/cpp/tests",
+    "testMate.cpp.testFramework": "catch2",
+    "testMate.cpp.enableTestDiscovery": true,
+    "testMate.cpp.debug.config.template": "Debug Robotick Tests (No Leak Check)",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/linux-debug/compile_commands.json",
     "C_Cpp.codeAnalysis.clangTidy.enabled": true,
     "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
-        "modernize-use-trailing-return-type"
+        "modernize-use-trailing-return-type",
+        "readability-uppercase-literal-suffix",
+        "readability-math-missing-parentheses"
     ],
+    "terminal.integrated.defaultProfile.linux": "bash",
+    "editor.formatOnSave": true,
+    "[cpp]": {
+        "editor.defaultFormatter": "xaver.clang-format"
+    },
+    "clang-format.style": "file",
+    "search.exclude": {
+        "**/lib": true,
+        "**/components/robotick-engine": true
+    },
+    "files.exclude": {
+        "**/components/robotick-engine": true
+    },
+    "files.watcherExclude": {
+        "**/components/robotick-engine/**": true
+    },
+    "search.useGlobalIgnoreFiles": true,
     "files.associations": {
+        "type_traits": "cpp",
         "any": "cpp",
         "array": "cpp",
         "atomic": "cpp",
@@ -57,7 +84,6 @@
         "string_view": "cpp",
         "system_error": "cpp",
         "tuple": "cpp",
-        "type_traits": "cpp",
         "utility": "cpp",
         "format": "cpp",
         "fstream": "cpp",
@@ -84,6 +110,26 @@
         "typeinfo": "cpp",
         "valarray": "cpp",
         "variant": "cpp",
-        "cassert": "cpp"
+        "coroutine": "cpp",
+        "resumable": "cpp",
+        "ios": "cpp",
+        "locale": "cpp",
+        "xfacet": "cpp",
+        "xhash": "cpp",
+        "xiosbase": "cpp",
+        "xlocale": "cpp",
+        "xlocbuf": "cpp",
+        "xlocinfo": "cpp",
+        "xlocmes": "cpp",
+        "xlocmon": "cpp",
+        "xlocnum": "cpp",
+        "xloctime": "cpp",
+        "xmemory": "cpp",
+        "xstring": "cpp",
+        "xtr1common": "cpp",
+        "xtree": "cpp",
+        "xutility": "cpp",
+        "ranges": "cpp",
+        "cfenv": "cpp"
     }
 }

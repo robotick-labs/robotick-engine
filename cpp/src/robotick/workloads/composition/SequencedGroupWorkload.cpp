@@ -1,11 +1,9 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
+#include "robotick/api.h"
+#include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/DataConnection.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
 
 #include <chrono>
 #include <cstdio>
@@ -22,72 +20,95 @@ namespace robotick
 			const WorkloadInstanceInfo* workload_info = nullptr;
 			void* workload_ptr = nullptr;
 
-			std::vector<const DataConnectionInfo*> connections_in;
+			List<const DataConnectionInfo*> connections_in;
 		};
 
 		const Engine* engine = nullptr;
-		std::vector<ChildWorkloadInfo> children;
+		HeapVector<ChildWorkloadInfo> children;
+
+		float delta_time_budget = 0.0f;
 
 		void set_engine(const Engine& engine_in) { engine = &engine_in; }
 
-		void set_children(const std::vector<const WorkloadInstanceInfo*>& child_workloads, std::vector<DataConnectionInfo*>& pending_connections)
+		ChildWorkloadInfo* find_child_workload(const WorkloadInstanceInfo& query_child)
 		{
-			assert(engine != nullptr && "Engine should have been set by now");
+			for (ChildWorkloadInfo& child : children)
+			{
+				if (child.workload_info == &query_child)
+				{
+					return &child;
+				}
+			}
 
-			// map from workload_info pointer to its ChildWorkloadInfo (for fast lookup)
-			children.reserve(child_workloads.size()); // <- reserve so we don't keep reallocating children during population
-			std::unordered_map<const WorkloadInstanceInfo*, ChildWorkloadInfo*> workload_to_child;
+			return nullptr;
+		}
+
+		void set_children(const HeapVector<const WorkloadInstanceInfo*>& child_workloads, HeapVector<DataConnectionInfo>& pending_connections)
+		{
+			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set by now");
+
+			children.initialize(child_workloads.size());
+			size_t child_index = 0;
 
 			// add child workloads and call set_children_fn on each, if present:
 			for (const WorkloadInstanceInfo* child_workload : child_workloads)
 			{
-				ChildWorkloadInfo& info = children.emplace_back();
+				ChildWorkloadInfo& info = children[child_index];
+				child_index++;
+
 				info.workload_info = child_workload;
 				info.workload_ptr = child_workload->get_ptr(*engine);
 
-				workload_to_child[child_workload] = &info;
+				ROBOTICK_ASSERT(info.workload_info && info.workload_info->type);
+				const WorkloadDescriptor* workload_desc = info.workload_info->type->get_workload_desc();
+				ROBOTICK_ASSERT(workload_desc);
 
-				if (info.workload_info && info.workload_info->type && info.workload_info->type->set_children_fn)
+				if (workload_desc->set_children_fn)
 				{
-					info.workload_info->type->set_children_fn(info.workload_ptr, info.workload_info->children, pending_connections);
+					workload_desc->set_children_fn(info.workload_ptr, info.workload_info->children, pending_connections);
 				}
 			}
 
 			// iterate + classify connections
-			std::vector<DataConnectionInfo*> remaining;
-			remaining.reserve(pending_connections.size());
-			for (DataConnectionInfo* conn : pending_connections)
+			for (DataConnectionInfo& conn : pending_connections)
 			{
-				const auto src_it = workload_to_child.find(conn->source_workload);
-				const auto dst_it = workload_to_child.find(conn->dest_workload);
-				const bool src_is_local = src_it != workload_to_child.end();
-				const bool dst_is_local = dst_it != workload_to_child.end();
+				if (conn.expected_handler != DataConnectionInfo::ExpectedHandler::Unassigned)
+				{
+					continue;
+				}
+
+				const bool src_is_local = find_child_workload(*conn.source_workload) != nullptr;
+
+				ChildWorkloadInfo* dest_child_info = find_child_workload(*conn.dest_workload);
+				const bool dst_is_local = (dest_child_info != nullptr);
 
 				if (src_is_local && dst_is_local)
 				{
-					dst_it->second->connections_in.push_back(conn);
-					assert(conn->expected_handler == DataConnectionInfo::ExpectedHandler::Unassigned);
-					conn->expected_handler = DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload;
+					ROBOTICK_ASSERT(dest_child_info != nullptr);
+					dest_child_info->connections_in.push_back(&conn);
+					conn.expected_handler = DataConnectionInfo::ExpectedHandler::SequencedGroupWorkload;
 				}
 				else
 				{
 					if (dst_is_local)
-						conn->expected_handler = DataConnectionInfo::ExpectedHandler::ParentGroupOrEngine;
-					remaining.push_back(conn);
+					{
+						conn.expected_handler = DataConnectionInfo::ExpectedHandler::DelegateToParent;
+					}
 				}
 			}
-			pending_connections.swap(remaining);
 		}
 
-		void tick(double time_delta)
+		void start(float tick_rate_hz) { delta_time_budget = tick_rate_hz > 0.0f ? 1.0f / tick_rate_hz : 0.0f; }
+
+		void tick(const TickInfo& tick_info)
 		{
-			assert(engine != nullptr && "Engine should have been set by now");
+			ROBOTICK_ASSERT(engine != nullptr && "Engine should have been set by now");
 
 			auto start_time = std::chrono::steady_clock::now();
 
 			for (auto& child_info : children)
 			{
-				if (child_info.workload_info != nullptr && child_info.workload_info->type->tick_fn != nullptr)
+				if (child_info.workload_info != nullptr && child_info.workload_info->workload_descriptor->tick_fn != nullptr)
 				{
 					const auto now_pre_tick = std::chrono::steady_clock::now();
 
@@ -98,21 +119,68 @@ namespace robotick
 					}
 
 					// tick the child:
-					child_info.workload_info->type->tick_fn(child_info.workload_ptr, time_delta);
+					TickInfo child_tick_info(tick_info);
+					child_tick_info.workload_stats = &child_info.workload_info->mutable_stats;
+
+					child_info.workload_info->workload_descriptor->tick_fn(child_info.workload_ptr, child_tick_info);
 
 					const auto now_post_tick = std::chrono::steady_clock::now();
-					child_info.workload_info->mutable_stats.last_tick_duration = std::chrono::duration<double>(now_post_tick - now_pre_tick).count();
+					child_info.workload_info->mutable_stats.last_tick_duration_ns =
+						static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(now_post_tick - now_pre_tick).count());
 
-					child_info.workload_info->mutable_stats.last_time_delta = time_delta;
+					constexpr float NanosecondsPerSecond = 1e9f;
+					child_info.workload_info->mutable_stats.last_time_delta_ns =
+						static_cast<uint32_t>(child_tick_info.delta_time * NanosecondsPerSecond);
 				}
 			}
 
-			auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_time).count();
+			const auto elapsed = std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::steady_clock::now() - start_time).count();
 
-			if (elapsed > time_delta)
+			const float overrun_fraction_allowed = 1.02f;
+			if (elapsed > (delta_time_budget * overrun_fraction_allowed))
 			{
-				std::printf("[Sequenced] Overrun: tick took %.3fms (budget %.3fms)\n", elapsed * 1000.0, time_delta * 1000.0);
+				print_overrun_debug_message(elapsed, delta_time_budget, children);
 			}
+		}
+
+		static void print_overrun_debug_message(float elapsed_seconds, float delta_time_budget, const HeapVector<ChildWorkloadInfo>& children)
+		{
+			struct Entry
+			{
+				const char* name;
+				uint32_t duration_ns;
+			};
+			Entry top1 = {nullptr, 0}, top2 = {nullptr, 0};
+			uint32_t other_ns = 0;
+
+			for (const auto& child : children)
+			{
+				const auto ns = child.workload_info->mutable_stats.last_tick_duration_ns;
+				const char* name = child.workload_info->seed->unique_name.c_str(); // More helpful than workload type
+
+				if (ns > top1.duration_ns)
+				{
+					top2 = top1;
+					top1 = {name, ns};
+				}
+				else if (ns > top2.duration_ns)
+				{
+					top2 = {name, ns};
+				}
+				else
+				{
+					other_ns += ns;
+				}
+			}
+
+			ROBOTICK_WARNING("[Sequenced] Overrun: tick took %.3fms (budget %.3fms) [%s=%.2fms, %s=%.2fms, other=%.2fms]\n",
+				elapsed_seconds * 1000.0f,
+				delta_time_budget * 1000.0f,
+				top1.name ? top1.name : "N/A",
+				top1.duration_ns / 1e6f,
+				top2.name ? top2.name : "N/A",
+				top2.duration_ns / 1e6f,
+				other_ns / 1e6f);
 		}
 	};
 
@@ -120,7 +188,10 @@ namespace robotick
 	{
 		SequencedGroupWorkloadImpl* impl = nullptr;
 
-		SequencedGroupWorkload() : impl(new SequencedGroupWorkloadImpl()) {}
+		SequencedGroupWorkload()
+			: impl(new SequencedGroupWorkloadImpl())
+		{
+		}
 		~SequencedGroupWorkload()
 		{
 			stop();
@@ -129,18 +200,18 @@ namespace robotick
 
 		void set_engine(const Engine& engine_in) { impl->set_engine(engine_in); }
 
-		void set_children(const std::vector<const WorkloadInstanceInfo*>& children, std::vector<DataConnectionInfo*>& pending_connections)
+		void set_children(const HeapVector<const WorkloadInstanceInfo*>& children, HeapVector<DataConnectionInfo>& pending_connections)
 		{
 			impl->set_children(children, pending_connections);
 		}
 
-		void start(double) { /* placeholder for consistency with SequencedGroup*/ }
+		void start(float tick_rate_hz) { impl->start(tick_rate_hz); }
 
-		void tick(double time_delta) { impl->tick(time_delta); }
+		void tick(const TickInfo& tick_info) { impl->tick(tick_info); }
 
 		void stop() { /* placeholder for consistency with SequencedGroup*/ }
 	};
 
-	static WorkloadAutoRegister<SequencedGroupWorkload> s_auto_register;
+	ROBOTICK_REGISTER_WORKLOAD(SequencedGroupWorkload)
 
 } // namespace robotick

@@ -1,12 +1,16 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/utils/ConsoleTable.h"
+
+#include "robotick/api_base.h"
+
 #include <algorithm>
+#include <charconv> // for std::from_chars
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <vector>
 
 namespace robotick
@@ -61,8 +65,12 @@ namespace robotick
 		}
 	} // namespace
 
-	void print_console_table(const std::string& title, const std::vector<std::string>& headers, const std::vector<size_t>& widths,
-		const std::vector<ConsoleTableRow>& rows, bool pretty_print, bool enable_unicode)
+	void print_console_table(const std::string& title,
+		const std::vector<std::string>& headers,
+		const std::vector<size_t>& widths,
+		const std::vector<ConsoleTableRow>& rows,
+		bool pretty_print,
+		bool enable_unicode)
 	{
 		constexpr const char* GREEN = "\033[32m";
 		constexpr const char* YELLOW = "\033[33m";
@@ -76,15 +84,26 @@ namespace robotick
 
 		if (!pretty_print)
 		{
-			for (auto& h : headers)
-				oss << h << "\t";
+			// Header row
+			for (size_t i = 0; i < headers.size(); ++i)
+				oss << std::setw(widths[i]) << std::left << headers[i];
 			oss << "\n";
-			for (auto& row : rows)
+
+			// Data rows with separating lines
+			for (const auto& row : rows)
 			{
-				for (auto& col : row.columns)
-					oss << col << "\t";
+				// Separator before each workload-row
+				if (row.columns.size() > 0 && row.columns[0].length())
+				{
+					for (size_t i = 0; i < headers.size(); ++i)
+						oss << std::string(widths[i], '-') << (i + 1 < headers.size() ? "" : "\n");
+				}
+
+				for (size_t i = 0; i < row.columns.size(); ++i)
+					oss << std::setw(widths[i]) << std::left << row.columns[i];
 				oss << "\n";
 			}
+
 			std::cout << oss.str() << std::flush;
 			return;
 		}
@@ -140,13 +159,20 @@ namespace robotick
 					if (pretty_print && headers[col].find('%') != std::string::npos)
 					{
 						// extract numeric prefix
-						double val = 0.0;
-						try
+						float val = 0.0f;
+						if (!cell.empty())
 						{
-							val = cell.empty() ? 0.0 : std::stod(cell);
-						}
-						catch (...)
-						{
+							const char* str = cell.data();
+							const char* end = str + cell.size();
+
+							std::from_chars_result result = std::from_chars(str, end, val);
+
+							if (result.ec != std::errc())
+							{
+								// Failed to parse — keep val = 0.0
+								// Optional: log a warning here
+								ROBOTICK_WARNING("Invalid float in cell: \"%.*s\"", static_cast<int>(cell.size()), cell.c_str());
+							}
 						}
 
 						const char* color = (val <= 105.0) ? GREEN : (val < 110.0) ? YELLOW : RED;

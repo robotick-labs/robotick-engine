@@ -1,4 +1,4 @@
-name: CI - Build & Test (ubuntu-x64.dev)
+name: CI - Build & Test (linux.dev)
 
 on:
   push:
@@ -9,46 +9,64 @@ on:
 jobs:
   docker-ci:
     runs-on: ubuntu-latest
-    name: Docker CI (ubuntu-x64.dev)
+    name: Build & Test (${{ matrix.preset }})
+
+    strategy:
+      matrix:
+        preset: [linux-debug, linux-development, linux-release]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: Cache Docker layers
-      uses: actions/cache@v4
-      with:
-        path: /tmp/.docker-cache
-        key: docker-${{ runner.os }}-${{ runner.os-version }}-${{ hashFiles('.devcontainer/Docker.ubuntu-x64.dev') }}
-        restore-keys: |
-          docker-${{ runner.os }}-
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.docker-cache
+          key: docker-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('docker/Docker.ubuntu.dev') }}
+          restore-keys: |
+            docker-${{ runner.os }}-
 
-    - name: Load Docker cache
-      run: |
-        mkdir -p /tmp/.docker-cache
-        if [ -f /tmp/.docker-cache/image.tar ]; then
-          docker load -i /tmp/.docker-cache/image.tar || true
-        fi
+      - name: Load Docker cache
+        run: |
+          mkdir -p /tmp/.docker-cache
+          if [ -f /tmp/.docker-cache/image.tar ]; then
+            docker load -i /tmp/.docker-cache/image.tar || true
+          fi
 
-    - name: Build Docker image (robotick-ci)
-      run: |
-        docker build -t robotick-ci \
-          -f .devcontainer/Docker.ubuntu-x64.dev \
-          .
+      - name: Build Docker image (robotick-ci)
+        run: |
+          docker build -t robotick-ci \
+            -f docker/Docker.ubuntu.dev \
+            .
 
-    - name: Save Docker image to cache
-      run: |
-        mkdir -p /tmp/.docker-cache
-        docker save robotick-ci > /tmp/.docker-cache/image.tar
+      - name: Save Docker image to cache
+        run: |
+          mkdir -p /tmp/.docker-cache
+          docker save robotick-ci > /tmp/.docker-cache/image.tar
 
-    - name: Run CI inside container
-      run: |
-        docker run --rm \
-          -v ${{ github.workspace }}:/workspace \
-          -w /workspace \
-          robotick-ci \
-          bash -c "
-            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release . &&
-            cmake --build build -j$(nproc) &&
-            ctest --test-dir build --output-on-failure --timeout 10
-          "
+      - name: Run CMake Build in Docker
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            robotick-ci \
+            bash -c "
+              set -e
+              cmake --preset ${{ matrix.preset }} &&
+              cmake --build --preset ${{ matrix.preset }} -j$(nproc)
+            "
+
+      - name: Run CTest in Docker (Debug Only)
+        if: matrix.preset == 'linux-debug'
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            robotick-ci \
+            bash -c "
+              set -e
+              ctest --test-dir build/linux-debug/cpp/tests --output-on-failure --timeout 10
+            "

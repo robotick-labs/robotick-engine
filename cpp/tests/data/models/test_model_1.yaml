@@ -1,0 +1,25 @@
+workloads:
+  - name: A
+    type: DummyModelWorkload
+    tick_rate_hz: 100.0
+    config:
+      entry_float: "2.0f"
+      entry_bool: "false"
+
+  - name: B
+    type: DummyModelWorkload
+    tick_rate_hz: 100.0
+    inputs:
+      entry_int: "10"
+      entry_string: "there"
+
+  - name: Group
+    type: DummyModelWorkload
+    tick_rate_hz: 100.0
+    children: [A, B]
+
+data_connections:
+  - source: A.output
+    dest: B.input
+
+root: Group

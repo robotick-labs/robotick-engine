@@ -1,0 +1,100 @@
+body {
+    margin: 0;
+    background: #222;
+    color: #fff;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    height: 100vh;
+    touch-action: none;
+}
+
+.stick-area {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    background: #555;
+    border-radius: 10px;
+}
+
+.knob {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    background: silver;
+    border-radius: 50%;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-family: sans-serif;
+    text-align: center;
+    width: 100vw;
+}
+
+.toggle-button {
+    padding: 10px 20px;
+    font-size: 1.1em;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 1em;
+    transition: background 0.2s;
+}
+
+.toggle-button.active {
+    background: #3c3;
+    color: #000;
+}
+
+.toggle-button.inactive {
+    background: silver;
+    color: #000;
+}
+
+.slider-group {
+    margin: 10px 0;
+}
+
+.slider-group label {
+    margin-right: 5px;
+}
+
+.camera-container {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90vw;
+    max-width: 600px;
+    max-height: 40vh;
+    overflow: hidden;
+    border-radius: 8px;
+    background: black;
+}
+
+#camera-stream {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+}
+
+@media screen and (max-height: 480px) and (orientation: landscape) {
+    .camera-container {
+
+        width: 25vw;
+        max-width: 300px;
+    }
+
+    .controls {
+        bottom: 10px;
+    }
+}

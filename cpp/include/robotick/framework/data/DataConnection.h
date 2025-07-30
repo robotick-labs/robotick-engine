@@ -3,9 +3,19 @@
 
 #pragma once
 
+#include "robotick/api_base.h"
+#include "robotick/framework/common/ArrayView.h"
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/HeapVector.h"
+#include "robotick/framework/common/Map.h"
+#include "robotick/framework/common/Pair.h"
+#include "robotick/framework/common/StringView.h"
+#include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/registry/TypeRegistry.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include <cassert>
+#include <charconv>
 #include <cstddef>
 #include <cstring>
 #include <stdexcept>
@@ -15,63 +25,90 @@
 
 namespace robotick
 {
-
+	class Engine;
 	class WorkloadInstanceInfo;
-	struct WorkloadsBuffer;
 
-	struct DataConnectionSeed
-	{
-		std::string source_field_path;
-		std::string dest_field_path;
-	};
+	struct DataConnectionSeed;
+	struct FieldDescriptor;
+	struct TypeDescriptor;
+	struct WorkloadsBuffer;
 
 	struct DataConnectionInfo
 	{
-		const DataConnectionSeed seed; // intentional copy of the original seed for safety
+		const DataConnectionSeed* seed = nullptr;
 		const void* source_ptr = nullptr;
 		void* dest_ptr = nullptr;
 		const WorkloadInstanceInfo* source_workload = nullptr;
 		const WorkloadInstanceInfo* dest_workload = nullptr;
 		size_t size = 0;
-		std::type_index type;
+		TypeId type;
 
 		enum class ExpectedHandler
 		{
 			Unassigned,
 			SequencedGroupWorkload,
-			ParentGroupOrEngine // set by a child-group if it wants parent-group (or Engine) to handle this update for them
+			Engine,
+			DelegateToParent // set by a child-group if it wants parent-group (or Engine) to handle this update for them
 		};
 		ExpectedHandler expected_handler = ExpectedHandler::Unassigned;
 
 		void do_data_copy() const noexcept
 		{
-			assert(source_ptr != nullptr && dest_ptr != nullptr && size > 0);
-			static_assert(std::is_trivially_copyable_v<std::byte>, "do_data_copy() assumes trivially-copyable payloads");
-			assert(source_ptr != dest_ptr && "Source and destination pointers are the same - this should have been caught in fixup");
+			ROBOTICK_ASSERT(source_ptr != nullptr && dest_ptr != nullptr && size > 0);
+			ROBOTICK_ASSERT(source_ptr != dest_ptr && "Source and destination pointers are the same - this should have been caught in fixup");
 
 			// If aliasing is possible, use std::memmove instead.
 			std::memcpy(dest_ptr, source_ptr, size);
 		}
 	};
 
-	struct ParsedFieldPath
-	{
-		FixedString64 workload_name;
-		FixedString64 section_name; // workload_name/section_name/field_path[0](/field_path[1])
-		std::vector<FixedString64> field_path;
-	};
+	using FieldConfigEntry = Pair<FixedString64, FixedString64>;
 
-	class FieldPathParseError : public std::runtime_error
+	class DataConnectionUtils
 	{
 	  public:
-		explicit FieldPathParseError(const std::string& msg);
-	};
+		/// @brief Creates and resolves data connections between workload instances based on the provided connection seeds.
+		static void create(HeapVector<DataConnectionInfo>& out_connections,
+			WorkloadsBuffer& workloads_buffer,
+			const ArrayView<const DataConnectionSeed*>& seeds,
+			const Map<const char*, WorkloadInstanceInfo*>& instances);
 
-	class DataConnectionsFactory
-	{
-	  public:
-		static std::vector<DataConnectionInfo> create(
-			WorkloadsBuffer& workloads_buffer, const std::vector<DataConnectionSeed>& seeds, const std::vector<WorkloadInstanceInfo>& instances);
+		/// @brief Applies a set of field configuration overrides to a given struct by matching and writing string-based field values.
+		static void apply_struct_field_values(
+			void* struct_ptr, const TypeDescriptor& struct_type_desc, const ArrayView<const FieldConfigEntry>& field_config_entries)
+		{
+			const StructDescriptor* struct_desc = struct_type_desc.get_struct_desc();
+			if (!struct_desc)
+			{
+				ROBOTICK_FATAL_EXIT("Struct with no struct desc");
+			}
+
+			for (const FieldConfigEntry& field_config_entry : field_config_entries)
+			{
+				const FieldDescriptor* found_field = struct_desc->find_field(field_config_entry.first.c_str());
+				if (!found_field)
+					continue;
+
+				ROBOTICK_ASSERT_MSG(found_field->offset_within_container != OFFSET_UNBOUND, "Field offset should have been correctly set by now");
+
+				void* field_ptr = static_cast<uint8_t*>(struct_ptr) + found_field->offset_within_container;
+				const FixedString64& value = field_config_entry.second;
+
+				const TypeDescriptor* field_type_desc = found_field->find_type_descriptor();
+				if (!field_type_desc)
+				{
+					ROBOTICK_FATAL_EXIT("Field offset should have been correctly set by now");
+				}
+
+				if (!field_type_desc->from_string(value.c_str(), field_ptr))
+				{
+					ROBOTICK_WARNING("Unable to parse value-string '%s' for field: %s", value.c_str(), found_field->name.c_str());
+				}
+			}
+		}
+
+		/// @brief Given a dot-separated field path (e.g. "MyWorkload.outputs.x"), returns the raw pointer, size in bytes, and field-descriptor
+		static std::tuple<void*, size_t, const FieldDescriptor*> find_field_info(const Engine& engine, const char* path);
 	};
 
 } // namespace robotick

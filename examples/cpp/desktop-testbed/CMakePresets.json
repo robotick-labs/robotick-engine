@@ -1,0 +1,70 @@
+{
+    "version": 4,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21
+    },
+    "configurePresets": [
+        {
+            "name": "desktop-testbed-linux-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "description": "Base preset for desktop-testbed on native Linux (x64 or ARM64)",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "/usr/bin/gcc",
+                "CMAKE_CXX_COMPILER": "/usr/bin/g++",
+                "ROBOTICK_PLATFORM_LINUX": "ON",
+                "ROBOTICK_ENABLE_PYTHON": "ON",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/../../../cmake/toolchain-linux-native.cmake",
+                "WORKLOAD_PRESET": "ubuntu-workloads-all",
+                "ROBOTICK_PROJECT_ROOT": "${sourceDir}"
+            }
+        },
+        {
+            "name": "desktop-testbed-linux-debug",
+            "inherits": "desktop-testbed-linux-base",
+            "description": "Debug build for desktop-testbed",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEBUG -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD"
+            }
+        },
+        {
+            "name": "desktop-testbed-linux-development",
+            "inherits": "desktop-testbed-linux-base",
+            "description": "Dev build with debug symbols for desktop-testbed",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEV -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD",
+                "ROBOTICK_BUILD_CONFIG_DEVELOPMENT": "ON"
+            }
+        },
+        {
+            "name": "desktop-testbed-linux-release",
+            "inherits": "desktop-testbed-linux-base",
+            "description": "Stripped and optimized release build for desktop-testbed",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_FLAGS_DEBUG": "-DNDEBUG -DROBOTICK_RELEASE -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD",
+                "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
+                "ROBOTICK_STRIP_PROBES": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "desktop-testbed-linux-debug",
+            "configurePreset": "desktop-testbed-linux-debug"
+        },
+        {
+            "name": "desktop-testbed-linux-development",
+            "configurePreset": "desktop-testbed-linux-development"
+        },
+        {
+            "name": "desktop-testbed-linux-release",
+            "configurePreset": "desktop-testbed-linux-release"
+        }
+    ]
+}

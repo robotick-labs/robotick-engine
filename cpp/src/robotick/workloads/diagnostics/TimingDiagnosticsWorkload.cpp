@@ -1,10 +1,7 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/registry/FieldRegistry.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
+#include "robotick/api.h"
 
 #include <chrono>
 #include <cmath>
@@ -19,35 +16,35 @@ namespace robotick
 	{
 		int log_rate_hz = 1;
 	};
-	ROBOTICK_BEGIN_FIELDS(TimingDiagnosticsConfig)
-	ROBOTICK_FIELD(TimingDiagnosticsConfig, log_rate_hz)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(TimingDiagnosticsConfig)
+	ROBOTICK_STRUCT_FIELD(TimingDiagnosticsConfig, int, log_rate_hz)
+	ROBOTICK_REGISTER_STRUCT_END(TimingDiagnosticsConfig)
 
 	struct TimingDiagnosticsInputs
 	{
 	};
-	ROBOTICK_BEGIN_FIELDS(TimingDiagnosticsInputs)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(TimingDiagnosticsInputs)
+	ROBOTICK_REGISTER_STRUCT_END(TimingDiagnosticsInputs)
 
 	struct TimingDiagnosticsOutputs
 	{
-		double last_tick_rate = 0.0;
-		double avg_tick_rate = 0.0;
-		double tick_stddev = 0.0;
+		float last_tick_rate = 0.0;
+		float avg_tick_rate = 0.0;
+		float tick_stddev = 0.0;
 	};
-	ROBOTICK_BEGIN_FIELDS(TimingDiagnosticsOutputs)
-	ROBOTICK_FIELD(TimingDiagnosticsOutputs, last_tick_rate)
-	ROBOTICK_FIELD(TimingDiagnosticsOutputs, avg_tick_rate)
-	ROBOTICK_FIELD(TimingDiagnosticsOutputs, tick_stddev)
-	ROBOTICK_END_FIELDS()
+	ROBOTICK_REGISTER_STRUCT_BEGIN(TimingDiagnosticsOutputs)
+	ROBOTICK_STRUCT_FIELD(TimingDiagnosticsOutputs, float, last_tick_rate)
+	ROBOTICK_STRUCT_FIELD(TimingDiagnosticsOutputs, float, avg_tick_rate)
+	ROBOTICK_STRUCT_FIELD(TimingDiagnosticsOutputs, float, tick_stddev)
+	ROBOTICK_REGISTER_STRUCT_END(TimingDiagnosticsOutputs)
 
 	// === Internal state (not registered) ===
 
 	struct TimingDiagnosticsInternalState
 	{
 		int count = 0;
-		double sum_dt = 0.0;
-		double sum_dt2 = 0.0;
+		float sum_dt = 0.0;
+		float sum_dt2 = 0.0;
 	};
 
 	// === Workload ===
@@ -67,15 +64,15 @@ namespace robotick
 			internal_state.sum_dt2 = 0.0;
 		}
 
-		void tick(double time_delta)
+		void tick(const TickInfo& tick_info)
 		{
-			if (config.log_rate_hz == 0 || time_delta <= 0.0)
+			if (config.log_rate_hz == 0 || tick_info.delta_time <= 0.0f)
 			{
 				return;
 			}
 
-			const double actual_dt = time_delta;
-			const double tick_rate = 1.0 / actual_dt;
+			const float actual_dt = tick_info.delta_time;
+			const float tick_rate = 1.0f / actual_dt;
 
 			outputs.last_tick_rate = tick_rate;
 
@@ -83,32 +80,32 @@ namespace robotick
 			internal_state.sum_dt += actual_dt;
 			internal_state.sum_dt2 += actual_dt * actual_dt;
 
-			const double tick_period = 1.0 / config.log_rate_hz;
+			const float tick_period = 1.0f / (float)config.log_rate_hz;
 
 			if (internal_state.sum_dt >= tick_period)
 			{
-				double mean_dt = internal_state.sum_dt / internal_state.count;
-				double mean_dt2 = internal_state.sum_dt2 / internal_state.count;
-				const double variance = std::max(0.0, mean_dt2 - mean_dt * mean_dt);
-				const double stddev = std::sqrt(variance);
+				float mean_dt = internal_state.sum_dt / (float)internal_state.count;
+				float mean_dt2 = internal_state.sum_dt2 / (float)internal_state.count;
+				const float variance = std::max(0.0f, mean_dt2 - mean_dt * mean_dt);
+				const float stddev = std::sqrt(variance);
 
-				outputs.avg_tick_rate = 1.0 / mean_dt;
+				outputs.avg_tick_rate = 1.0f / mean_dt;
 				outputs.tick_stddev = stddev;
 
-				static constexpr double seconds_to_microseconds = 1e6;
+				static constexpr float seconds_to_microseconds = 1e6f;
 
 				std::cerr << std::fixed;
 				std::cerr << "[TimingDiagnostics] avg: " << outputs.avg_tick_rate << " Hz, stddev: " << outputs.tick_stddev * seconds_to_microseconds
 						  << " µs\n";
 
 				internal_state.count = 0;
-				internal_state.sum_dt = 0.0;
-				internal_state.sum_dt2 = 0.0;
+				internal_state.sum_dt = 0.0f;
+				internal_state.sum_dt2 = 0.0f;
 			}
 		}
 	};
 
 	// === Auto-registration ===
 
-	ROBOTICK_DEFINE_WORKLOAD(TimingDiagnosticsWorkload)
+	ROBOTICK_REGISTER_WORKLOAD(TimingDiagnosticsWorkload, TimingDiagnosticsConfig, TimingDiagnosticsInputs, TimingDiagnosticsOutputs)
 } // namespace robotick

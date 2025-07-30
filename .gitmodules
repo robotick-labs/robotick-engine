@@ -1,0 +1,15 @@
+[submodule "cpp/lib/json"]
+	path = cpp/lib/json
+	url = https://github.com/nlohmann/json.git
+[submodule "cpp/lib/civetweb"]
+	path = cpp/lib/civetweb
+	url = https://github.com/civetweb/civetweb.git
+[submodule "platforms/esp32/components/M5GFX"]
+	path = platforms/esp32/components/M5GFX
+	url = https://github.com/m5stack/M5GFX.git
+[submodule "platforms/esp32/components/M5Unified"]
+	path = platforms/esp32/components/M5Unified
+	url = https://github.com/m5stack/M5Unified.git
+[submodule "platforms/esp32/components/cjson"]
+	path = platforms/esp32/components/cjson
+	url = https://github.com/DaveGamble/cJSON.git

@@ -1,171 +1,124 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/framework/utils/Constants.h"
-#include <cstring>
-#include <stdexcept>
+
+#include "robotick/api_base.h"
+#include "robotick/framework/common/ArrayView.h"
+#include "robotick/framework/registry/TypeMacros.h"
 
 namespace robotick
 {
-	uint8_t* BlackboardFieldInfo::get_data_ptr(Blackboard& blackboard) const
+	const StructDescriptor* Blackboard::resolve_descriptor(const void* instance)
 	{
-		void* blackboard_ptr = static_cast<void*>(&blackboard);
-		return static_cast<uint8_t*>(blackboard_ptr) + blackboard.get_datablock_offset() + this->offset_from_datablock;
+		const Blackboard* blackboard = static_cast<const Blackboard*>(instance);
+		return blackboard ? &(blackboard->get_struct_descriptor()) : nullptr;
 	}
 
-	const uint8_t* BlackboardFieldInfo::get_data_ptr(const Blackboard& blackboard) const
+	ROBOTICK_REGISTER_DYNAMIC_STRUCT(Blackboard, Blackboard::resolve_descriptor)
+
+	void Blackboard::initialize_fields(const HeapVector<FieldDescriptor>& fields)
 	{
-		const void* blackboard_ptr = static_cast<const void*>(&blackboard);
-		return static_cast<const uint8_t*>(blackboard_ptr) + blackboard.get_datablock_offset() + this->offset_from_datablock;
+		info.struct_descriptor.fields.use(const_cast<FieldDescriptor*>(fields.data()), fields.size());
+		compute_total_datablock_size();
 	}
 
-	bool BlackboardInfo::has_field(const std::string& key) const
+	void Blackboard::initialize_fields(const ArrayView<FieldDescriptor>& fields)
 	{
-		return schema_index_by_name.count(key) > 0;
+		info.struct_descriptor.fields = fields;
+		compute_total_datablock_size();
 	}
 
-	const BlackboardFieldInfo* BlackboardInfo::find_field(const std::string& key) const
+	inline size_t align_up(size_t value, size_t alignment)
 	{
-		auto it = schema_index_by_name.find(key);
-		if (it == schema_index_by_name.end())
-			return nullptr;
-		return &schema[it->second];
+		return (value + alignment - 1) & ~(alignment - 1);
 	}
 
-	void BlackboardInfo::verify_type(const std::string& key, std::type_index expected) const
+	static size_t compute_and_apply_layout(FieldDescriptor* fields, const size_t field_count, const size_t start_offset, const bool write_offsets)
 	{
-		const auto* field = find_field(key);
-		if (!field)
-			throw std::runtime_error("Blackboard::verify_type failed, missing key: " + key);
-		if (field->type != expected)
-			throw std::runtime_error("Blackboard::verify_type failed, type mismatch for key: " + key);
-	}
+		size_t current_offset = start_offset;
 
-	void* BlackboardInfo::get_field_ptr(Blackboard* bb, const std::string& key) const
-	{
-		auto it = schema_index_by_name.find(key);
-		if (it == schema_index_by_name.end())
-			throw std::runtime_error("BlackboardInfo::get_field_ptr failed for key: " + key);
-		if (datablock_offset_from_blackboard == OFFSET_UNBOUND)
-			throw std::runtime_error("Blackboard is not bound");
-
-		const auto& field = schema[it->second];
-		uint8_t* base = static_cast<uint8_t*>((void*)bb);
-		return base + datablock_offset_from_blackboard + field.offset_from_datablock;
-	}
-
-	const void* BlackboardInfo::get_field_ptr(const Blackboard* bb, const std::string& key) const
-	{
-		return const_cast<BlackboardInfo*>(this)->get_field_ptr(const_cast<Blackboard*>(bb), key);
-	}
-
-	std::pair<size_t, size_t> BlackboardInfo::type_size_and_align(std::type_index type)
-	{
-		if (type == typeid(int))
-			return {sizeof(int), alignof(int)};
-		if (type == typeid(double))
-			return {sizeof(double), alignof(double)};
-		if (type == typeid(FixedString64))
-			return {sizeof(FixedString64), alignof(FixedString64)};
-		if (type == typeid(FixedString128))
-			return {sizeof(FixedString128), alignof(FixedString128)};
-
-		throw std::runtime_error("Unsupported type in BlackboardInfo::type_size_and_align");
-	}
-
-	Blackboard::Blackboard(const std::vector<BlackboardFieldInfo>& source_schema)
-	{
-		info = std::make_shared<BlackboardInfo>();
-		info->schema.reserve(source_schema.size());
-
-		size_t offset = 0;
-		for (size_t i = 0; i < source_schema.size(); ++i)
+		for (size_t i = 0; i < field_count; ++i)
 		{
-			BlackboardFieldInfo field = source_schema[i];
-			auto [size, align] = BlackboardInfo::type_size_and_align(field.type);
-			offset = (offset + align - 1) & ~(align - 1);
-			field.offset_from_datablock = offset;
-			field.size = size;
+			FieldDescriptor& field = fields[i];
+			const TypeDescriptor* type = field.find_type_descriptor();
+			ROBOTICK_ASSERT_MSG(type != nullptr, "Field has no type descriptor");
 
-			info->schema_index_by_name[field.name.c_str()] = i;
-			info->schema.push_back(field);
-			offset += size;
+			current_offset = align_up(current_offset, type->alignment);
+
+			if (write_offsets)
+			{
+				field.offset_within_container = current_offset;
+			}
+
+			current_offset += type->size;
 		}
-		info->total_datablock_size = offset;
+
+		return current_offset;
 	}
 
-	void Blackboard::bind(size_t datablock_offset)
+	void Blackboard::compute_total_datablock_size()
 	{
-		if (info)
-			info->datablock_offset_from_blackboard = datablock_offset;
-		else
-			throw std::runtime_error("Blackboard::bind called on uninitialized Blackboard");
+		const size_t start_offset = 0;
+		const bool write_offsets = false;
+
+		info.total_datablock_size =
+			compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
 	}
 
-	size_t Blackboard::get_datablock_offset() const
+	void Blackboard::bind(const size_t datablock_offset)
 	{
-		if (!info)
-			throw std::runtime_error("Blackboard::get_datablock_offset called on uninitialized Blackboard");
+		const size_t start_offset = datablock_offset;
+		const bool write_offsets = true;
 
-		if (info->datablock_offset_from_blackboard == OFFSET_UNBOUND)
-			throw std::runtime_error("Blackboard::get_datablock_offset called on Blackboard before datablock_offset has been set");
-
-		return info->datablock_offset_from_blackboard;
+		compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
 	}
 
-	const std::vector<BlackboardFieldInfo>& Blackboard::get_schema() const
+	const FieldDescriptor* Blackboard::find_field(const char* field_name) const
 	{
-		if (!info)
-			throw std::runtime_error("Blackboard::get_schema called on uninitialized Blackboard");
-
-		return info->schema;
+		return info.find_field(field_name);
 	}
 
-	const BlackboardInfo* Blackboard::get_info() const
+	void* Blackboard::find_field_data(const char* field_name, const FieldDescriptor*& found_field) const
 	{
-		if (!info)
-			throw std::runtime_error("Blackboard::get_info called on uninitialized Blackboard");
+		found_field = find_field(field_name);
+		if (found_field)
+		{
+			void* field_data = found_field->get_data_ptr((void*)this);
+			return field_data;
+		}
 
-		return info.get();
+		return nullptr;
 	}
 
-	const BlackboardFieldInfo* Blackboard::get_field_info(const std::string& key) const
+	bool Blackboard::has(const char* field_name) const
 	{
-		if (!info)
-			throw std::runtime_error("Blackboard::get_field_info called on uninitialized Blackboard");
-
-		return info->find_field(key);
+		return (find_field(field_name) != nullptr);
 	}
 
-	template <typename T> void Blackboard::set(const std::string& key, const T& value)
+	bool Blackboard::set(const char* field_name, void* value, const size_t size)
 	{
-		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
-		info->verify_type(key, typeid(T));
-		void* ptr = info->get_field_ptr(this, key);
-		std::memcpy(ptr, &value, sizeof(T));
+		const FieldDescriptor* found_field = nullptr;
+		void* field_data = find_field_data(field_name, found_field);
+		if (field_data && found_field)
+		{
+			ROBOTICK_ASSERT(size == found_field->find_type_descriptor()->size);
+			memcpy(field_data, value, size);
+			return true;
+		}
+		return false;
 	}
 
-	template <typename T> T Blackboard::get(const std::string& key) const
+	void* Blackboard::get(const char* field_name, const size_t size) const
 	{
-		static_assert(std::is_trivially_copyable_v<T>, "Blackboard::get only supports trivially-copyable types");
-		info->verify_type(key, typeid(T));
-		const void* ptr = info->get_field_ptr(this, key);
-		T out;
-		std::memcpy(&out, ptr, sizeof(T));
-		return out;
+		const FieldDescriptor* found_field = nullptr;
+		void* field_data = find_field_data(field_name, found_field);
+		if (field_data && found_field)
+		{
+			ROBOTICK_ASSERT(size == found_field->find_type_descriptor()->size);
+			return field_data;
+		}
+		return nullptr;
 	}
-
-	// Explicit template instantiations
-	template void Blackboard::set<int>(const std::string&, const int&);
-	template void Blackboard::set<double>(const std::string&, const double&);
-	template void Blackboard::set<FixedString64>(const std::string&, const FixedString64&);
-	template void Blackboard::set<FixedString128>(const std::string&, const FixedString128&);
-
-	template int Blackboard::get<int>(const std::string&) const;
-	template double Blackboard::get<double>(const std::string&) const;
-	template FixedString64 Blackboard::get<FixedString64>(const std::string&) const;
-	template FixedString128 Blackboard::get<FixedString128>(const std::string&) const;
 
 } // namespace robotick

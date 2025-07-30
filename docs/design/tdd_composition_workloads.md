@@ -98,6 +98,7 @@ SyncedGroup (1kHz)
 | Tick sync                     | True sync                         | Sync possible but looser (main may lag)     |
 
 ### Thread Model (MCU: ISR + main loop)
+
 ```
 Timer ISR Thread →
                 ┌ Tick SensorUpdate ┐   ┌ Tick SensorUpdate ┐

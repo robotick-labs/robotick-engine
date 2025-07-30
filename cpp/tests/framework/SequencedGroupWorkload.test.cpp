@@ -1,11 +1,9 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/Model.h"
-#include "robotick/framework/registry/WorkloadRegistry.h"
-#include "utils/EngineInspector.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include <atomic>
 #include <catch2/catch_all.hpp>
@@ -13,7 +11,6 @@
 #include <thread>
 
 using namespace robotick;
-using namespace robotick::test;
 
 namespace
 {
@@ -22,115 +19,64 @@ namespace
 	struct DummyTickingWorkload
 	{
 		inline static int tick_count = 0;
-		void tick(double) { ++tick_count; }
+		void tick(const TickInfo&) { ++tick_count; }
 		static void reset() { tick_count = 0; }
 	};
 
-	struct DummyTickingWrapper
-	{
-		DummyTickingWorkload* impl = new DummyTickingWorkload();
-		~DummyTickingWrapper() { delete impl; }
-		void tick(double time_delta) { impl->tick(time_delta); }
-	};
-
-	struct DummyTickingRegister
-	{
-		DummyTickingRegister()
-		{
-			const WorkloadRegistryEntry entry = {"DummyTickingWorkload", sizeof(DummyTickingWrapper), alignof(DummyTickingWrapper),
-				[](void* p)
-				{
-					new (p) DummyTickingWrapper();
-				},
-				[](void* p)
-				{
-					static_cast<DummyTickingWrapper*>(p)->~DummyTickingWrapper();
-				},
-				nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-				[](void* p, double time_delta)
-				{
-					static_cast<DummyTickingWrapper*>(p)->tick(time_delta);
-				},
-				nullptr};
-
-			WorkloadRegistry::get().register_entry(entry);
-		}
-	};
-	static DummyTickingRegister s_register_dummy;
+	ROBOTICK_REGISTER_WORKLOAD(DummyTickingWorkload);
 
 	// === SlowTickWorkload ===
 
 	struct SlowTickWorkload
 	{
-		void tick(double) { std::this_thread::sleep_for(std::chrono::milliseconds(20)); }
+		void tick(const TickInfo&) { std::this_thread::sleep_for(std::chrono::milliseconds(20)); }
 	};
 
-	struct SlowWrapper
-	{
-		SlowTickWorkload impl;
-		void tick(double time_delta) { impl.tick(time_delta); }
-	};
+	ROBOTICK_REGISTER_WORKLOAD(SlowTickWorkload);
 
-	struct SlowTickRegister
-	{
-		SlowTickRegister()
-		{
-			const WorkloadRegistryEntry entry = {"SlowTickWorkload", sizeof(SlowWrapper), alignof(SlowWrapper),
-				[](void* p)
-				{
-					new (p) SlowWrapper();
-				},
-				[](void* p)
-				{
-					static_cast<SlowWrapper*>(p)->~SlowWrapper();
-				},
-				nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-				[](void* p, double time_delta)
-				{
-					static_cast<SlowWrapper*>(p)->tick(time_delta);
-				},
-				nullptr};
-
-			WorkloadRegistry::get().register_entry(entry);
-		}
-	};
-	static SlowTickRegister s_register_slow;
 } // namespace
 
-TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Child ticks are invoked in sequence")
+TEST_CASE("Unit/Workloads/SequencedGroupWorkload")
 {
-	DummyTickingWorkload::reset();
+	SECTION("Child ticks are invoked in sequence")
+	{
+		DummyTickingWorkload::reset();
 
-	Model model;
-	const auto child1 = model.add("DummyTickingWorkload", "child1", 50.0);
-	const auto child2 = model.add("DummyTickingWorkload", "child2", 50.0);
-	const auto group = model.add("SequencedGroupWorkload", "group", {child1, child2}, 50.0);
-	model.set_root(group);
+		Model model;
+		const WorkloadSeed& child1 = model.add("DummyTickingWorkload", "child1").set_tick_rate_hz(50.0);
+		const WorkloadSeed& child2 = model.add("DummyTickingWorkload", "child2").set_tick_rate_hz(50.0);
+		const WorkloadSeed& group = model.add("SequencedGroupWorkload", "group").set_children({&child1, &child2}).set_tick_rate_hz(50.0f);
+		model.set_root_workload(group);
 
-	Engine engine;
-	engine.load(model);
+		Engine engine;
+		engine.load(model);
 
-	const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
-	auto* group_ptr = group_info.get_ptr(engine);
-	REQUIRE(group_ptr != nullptr);
+		const auto& group_info = *engine.find_instance_info(group.unique_name);
+		auto* group_ptr = group_info.get_ptr(engine);
+		REQUIRE(group_ptr != nullptr);
 
-	REQUIRE_NOTHROW(group_info.type->start_fn(group_ptr, 50.0));
-	REQUIRE_NOTHROW(group_info.type->tick_fn(group_ptr, 0.01));
-	REQUIRE_NOTHROW(group_info.type->stop_fn(group_ptr));
+		const WorkloadDescriptor* workload_desc = group_info.type->get_workload_desc();
 
-	CHECK(DummyTickingWorkload::tick_count == 2);
-}
+		REQUIRE_NOTHROW(workload_desc->start_fn(group_ptr, 50.0f));
+		REQUIRE_NOTHROW(workload_desc->tick_fn(group_ptr, TICK_INFO_FIRST_10MS_100HZ));
+		REQUIRE_NOTHROW(workload_desc->stop_fn(group_ptr));
 
-TEST_CASE("Unit|Workloads|SequencedGroupWorkload|Overrun logs if exceeded")
-{
-	Model model;
-	const auto handle = model.add("SlowTickWorkload", "slow", 50.0);
-	const auto group = model.add("SequencedGroupWorkload", "group", {handle}, 1000.0);
-	model.set_root(group);
+		CHECK(DummyTickingWorkload::tick_count == 2);
+	}
 
-	Engine engine;
-	engine.load(model);
+	SECTION("Overrun logs if exceeded")
+	{
+		Model model;
+		const WorkloadSeed& workload_seed = model.add("SlowTickWorkload", "slow").set_tick_rate_hz(50.0f);
+		const WorkloadSeed& group_seed = model.add("SequencedGroupWorkload", "group").set_children({&workload_seed}).set_tick_rate_hz(1000.0f);
+		model.set_root_workload(group_seed);
 
-	const auto& group_info = EngineInspector::get_instance_info(engine, group.index);
-	REQUIRE_NOTHROW(group_info.type->tick_fn(group_info.get_ptr(engine), 0.001)); // 1ms budget, expect warning log
+		Engine engine;
+		engine.load(model);
+
+		const auto* group_info = engine.find_instance_info(group_seed.unique_name);
+		REQUIRE(group_info != nullptr);
+		REQUIRE_NOTHROW(
+			group_info->type->get_workload_desc()->tick_fn(group_info->get_ptr(engine), TICK_INFO_FIRST_1MS_1KHZ)); // 1ms budget, expect warning log
+	}
 }

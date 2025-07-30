@@ -1,0 +1,32 @@
+FROM ubuntu:24.04
+
+# 🛠️ Install base dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    build-essential \
+    cmake \
+    libopencv-dev \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && apt-get clean
+
+# 🧱 Root-level setup (install packages and MQTT libs)
+COPY ./1_setup_my_env_as_root.linux.sh /1_setup_my_env_as_root.linux.sh
+RUN chmod +x /1_setup_my_env_as_root.linux.sh && /1_setup_my_env_as_root.linux.sh
+
+# 🧑 User-level setup script
+COPY ./2_setup_my_env_as_user.linux.sh /2_setup_my_env_as_user.linux.sh
+
+# Set working directory where setup.py lives
+WORKDIR /workspace
+
+# Copy all source files into container
+COPY . .
+
+# 🚀 Run user-level script (system-wide editable Python install)
+RUN chmod +x ./2_setup_my_env_as_user.linux.sh && ./2_setup_my_env_as_user.linux.sh
+
+# 🧼 Optional: default interactive shell
+CMD ["bash"]

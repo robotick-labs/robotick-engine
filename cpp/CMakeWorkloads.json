@@ -1,0 +1,15 @@
+{
+    "version": 1,
+    "presets": {
+        "ubuntu-workloads-all": {
+            "mode": "exclude",
+            "workloads": [],
+            "comment": "all workloads should be able to compile on all platforms, even if they end up as stubs / simulated on some"
+        },
+        "esp32-s3-workloads-all": {
+            "mode": "exclude",
+            "workloads": [],
+            "comment": "all workloads should be able to compile on all platforms, even if they end up as stubs / simulated on some"
+        }
+    }
+}

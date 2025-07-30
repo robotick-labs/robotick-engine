@@ -1,10 +1,7 @@
 // Copyright Robotick Labs
-//
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
-
-#include "robotick/config/PlatformDefines.h"
 
 namespace robotick
 {
@@ -24,13 +21,9 @@ namespace robotick
 	// override it with a config option per deployment target.
 
 #if defined(ROBOTICK_PLATFORM_DESKTOP)
-	constexpr size_t DEFAULT_MAX_BLACKBOARDS_BYTES = 128 * 1024; // 128 KB
-#elif defined(ROBOTICK_PLATFORM_MOBILE)
-	constexpr size_t DEFAULT_MAX_BLACKBOARDS_BYTES = 64 * 1024; // 64 KB
-#elif defined(ROBOTICK_PLATFORM_EMBEDDED)
-	constexpr size_t DEFAULT_MAX_BLACKBOARDS_BYTES = 8 * 1024; // 8 KB
+	constexpr size_t DEFAULT_MAX_BLACKBOARDS_BYTES = 512 * 1024; // 512 KB
 #else
-	constexpr size_t DEFAULT_MAX_BLACKBOARDS_BYTES = 16 * 1024; // Fallback for unknown
+	constexpr size_t DEFAULT_MAX_BLACKBOARDS_BYTES = 0; // no blackboards on other platforms (e.g. embedded)
 #endif
 
 } // namespace robotick

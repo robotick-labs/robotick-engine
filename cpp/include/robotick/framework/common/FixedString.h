@@ -1,16 +1,27 @@
 // Copyright Robotick Labs
-//
-// SPDX-License-Identifier: Apache-2.0
-
 #pragma once
 
-#include <algorithm>
-#include <cstring>
-#include <iostream>
-#include <string>
+#include "robotick/framework/common/Hash.h"
+
+#include <stddef.h>
+#include <string.h>
 
 namespace robotick
 {
+	// constexpr min function
+	template <typename T> constexpr T min_val(T a, T b)
+	{
+		return (a < b) ? a : b;
+	}
+
+	// Lightweight replacement for strlen
+	constexpr size_t fixed_strlen(const char* str)
+	{
+		size_t len = 0;
+		while (str[len] != '\0')
+			++len;
+		return len;
+	}
 
 	template <size_t N> struct FixedString
 	{
@@ -22,52 +33,67 @@ namespace robotick
 
 		FixedString(const char* str)
 		{
-			const size_t len = std::min(std::strlen(str), N - 1);
-			std::memcpy(data, str, len);
+			const size_t len = min_val(fixed_strlen(str), N - 1);
+			memcpy(data, str, len);
 			data[len] = '\0';
 		}
 
-		FixedString(const std::string& str)
+		FixedString(const char* str, const size_t max_copy_length)
 		{
-			const size_t len = std::min(str.size(), N - 1);
-			std::memcpy(data, str.c_str(), len);
+			if (!str)
+			{
+				data[0] = '\0';
+				return;
+			}
+
+			const size_t len = min_val(fixed_strlen(str), min_val(max_copy_length, N - 1));
+			memcpy(data, str, len);
 			data[len] = '\0';
 		}
 
 		FixedString& operator=(const char* str)
 		{
-			const size_t len = std::min(std::strlen(str), N - 1);
-			std::memcpy(data, str, len);
+			const size_t len = min_val(fixed_strlen(str), N - 1);
+			memcpy(data, str, len);
 			data[len] = '\0';
 			return *this;
 		}
 
-		FixedString& operator=(const std::string& str)
-		{
-			const size_t len = std::min(str.size(), N - 1);
-			std::memcpy(data, str.c_str(), len);
-			data[len] = '\0';
-			return *this;
-		}
+		bool operator<(const FixedString<N>& other) const noexcept { return strcmp(data, other.data) < 0; }
+
+		char* str() { return data; }
 
 		const char* c_str() const { return data; }
 
 		operator const char*() const { return data; }
 
-		bool operator==(const char* other) const noexcept { return std::strncmp(data, other, N) == 0; }
-		bool operator==(const FixedString<N>& other) const { return std::strncmp(data, other.data, N) == 0; }
+		bool operator==(const char* other) const noexcept { return strcmp(data, other) == 0; }
+
+		bool operator==(const FixedString<N>& other) const { return strcmp(data, other.data) == 0; }
 
 		bool operator!=(const FixedString<N>& other) const { return !(*this == other); }
 
 		bool empty() const { return data[0] == '\0'; }
 
-		std::string to_string() const { return std::string(data); }
+		bool contains(const char query_char) const
+		{
+			const size_t str_length = length();
+			for (size_t i = 0; i < str_length; ++i)
+			{
+				if (data[i] == query_char)
+					return true;
+			}
+			return false;
+		}
+
+		size_t length() const { return fixed_strlen(data); };
+
+		constexpr size_t capacity() const { return N; }
 	};
 
-	// Stream output (e.g., for logging)
-	template <size_t N> inline std::ostream& operator<<(std::ostream& os, const FixedString<N>& str)
+	template <size_t N> inline size_t hash(const FixedString<N>& s)
 	{
-		return os << str.c_str();
+		return hash_string(s.data);
 	}
 
 	// Type aliases
