@@ -85,9 +85,11 @@ namespace robotick
 		return response.status_code;
 	}
 
-	void WebServer::start(uint16_t port, const char* web_root_folder, WebRequestHandler handler_in)
+	void WebServer::start(const char* name, uint16_t port, const char* web_root_folder, WebRequestHandler handler_in)
 	{
-		ROBOTICK_ASSERT(!running && "WebServer already started");
+		ROBOTICK_ASSERT_MSG(!running, "WebServer '%s' already started", name);
+
+		server_name = name;
 
 		handler = handler_in;
 
@@ -122,14 +124,14 @@ namespace robotick
 		ctx = mg_start(nullptr, nullptr, options);
 		if (!ctx)
 		{
-			ROBOTICK_FATAL_EXIT("WebServer failed to start CivetWeb on port %u", static_cast<unsigned int>(port));
+			ROBOTICK_FATAL_EXIT("WebServer '%s' failed to start CivetWeb on port %u", name, static_cast<unsigned int>(port));
 			return;
 		}
 
 		mg_set_request_handler(ctx, "/", &WebServer::callback, this);
 		running = true;
 
-		ROBOTICK_INFO("WebServer serving from '%s' at http://localhost:%u", document_root.c_str(), static_cast<unsigned int>(port));
+		ROBOTICK_INFO("WebServer '%s' serving from '%s' at http://localhost:%u", document_root.c_str(), name, static_cast<unsigned int>(port));
 	}
 
 	void WebServer::stop()

@@ -68,7 +68,8 @@ namespace robotick
 		void setup()
 		{
 #if defined(ROBOTICK_PLATFORM_DESKTOP)
-			state->server.start(config.port,
+			state->server.start("RemoteControl",
+				config.port,
 				config.web_root_folder.c_str(),
 				[&](const WebRequest& request, WebResponse& response)
 				{
@@ -131,10 +132,7 @@ namespace robotick
 			outputs.right.y = inputs_ref.right.y * inputs_ref.scale_right.y;
 		}
 
-		void stop()
-		{
-			state->server.stop();
-		}
+		void stop() { state->server.stop(); }
 
 		static float apply_dead_zone(float value, float dead_zone)
 		{

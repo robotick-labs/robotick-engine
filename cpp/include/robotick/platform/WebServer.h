@@ -3,24 +3,30 @@
 #include "robotick/framework/common/FixedVector.h"
 
 #include <cstdint>
-#include <functional>
-#include <string>
 
 struct mg_context;
 struct mg_connection;
 
 namespace robotick
 {
+	using WebRequestBodyBuffer = FixedVector1k;
+
+#if defined(ROBOTICK_PLATFORM_ESP32)
+	using WebResponseBodyBuffer = FixedVector2k;
+#else
+	using WebResponseBodyBuffer = FixedVector256k; // big enough for a generous jpg image
+#endif
+
 	struct WebRequest
 	{
 		FixedString128 uri;
 		FixedString8 method;
-		FixedVector256k body;
+		WebRequestBodyBuffer body;
 	};
 
 	struct WebResponse
 	{
-		FixedVector256k body;
+		WebResponseBodyBuffer body;
 		FixedString32 content_type = "text/plain"; // Default
 		int status_code = 404;					   // Default: NotFound (intuituve - meaning it's not been handled)
 	};
@@ -33,7 +39,7 @@ namespace robotick
 		WebServer();
 		~WebServer();
 
-		void start(uint16_t port, const char* web_root_folder, WebRequestHandler handler = nullptr);
+		void start(const char* name, uint16_t port, const char* web_root_folder = nullptr, WebRequestHandler handler = nullptr);
 		void stop();
 		bool is_running() const;
 
@@ -43,6 +49,8 @@ namespace robotick
 		mg_context* ctx;
 		bool running;
 		WebRequestHandler handler;
+
+		FixedString32 server_name;
 		FixedString512 document_root;
 	};
 } // namespace robotick
