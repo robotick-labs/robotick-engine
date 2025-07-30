@@ -1,17 +1,19 @@
-
 #if defined(ROBOTICK_PLATFORM_DESKTOP)
 
-#include "robotick/platform/WebServer.h"
 #include "robotick/api.h"
+#include "robotick/platform/WebServer.h"
 
 #include <civetweb.h>
-#include <filesystem>
+#include <cstdio>
+#include <cstring>
+#include <unistd.h> // for readlink
 
 namespace robotick
 {
 	WebServer::WebServer()
 		: ctx(nullptr)
 		, running(false)
+		, handler(nullptr)
 	{
 	}
 
@@ -28,84 +30,106 @@ namespace robotick
 	int WebServer::callback(struct mg_connection* conn, void* user_data)
 	{
 		WebServer* self = static_cast<WebServer*>(user_data);
-		if (!self)
+		if (!self || !self->handler)
 			return 0;
 
 		WebRequest request;
 		const struct mg_request_info* req_info = mg_get_request_info(conn);
-		request.uri = req_info->local_uri ? req_info->local_uri : "";
-		request.method = req_info->request_method ? req_info->request_method : "";
 
-		// Read body if present (e.g. for POST)
+		if (req_info->local_uri)
+			request.uri = req_info->local_uri;
+		if (req_info->request_method)
+			request.method = req_info->request_method;
+
+		// Read body if present
 		char buffer[1024];
 		int len = mg_read(conn, buffer, sizeof(buffer));
 		if (len > 0)
-			request.body = std::string(buffer, len);
+			request.body.set(buffer, len);
 
+		// Let CivetWeb handle the root (e.g., /index.html)
 		if (request.uri == "/")
-		{
-			return 0; // Let CivetWeb handle it (asking for default file - e.g. index.html)
-		}
-
-		// Try static file path
-		std::filesystem::path file_path = std::filesystem::path(self->document_root) / request.uri.substr(1); // Strip leading '/'
-		if (std::filesystem::exists(file_path))
-		{
-			return 0; // Let CivetWeb handle it
-		}
-
-		if (!self->handler)
 			return 0;
 
-		WebResponse response;
-		try
+		// Check if requested path exists as a file
 		{
-			self->handler(request, response);
-		}
-		catch (const std::exception& e)
-		{
-			ROBOTICK_WARNING("[WebServer] Exception in fallback handler for %s: %s", std::string(request.uri).c_str(), e.what());
-			response.body.set_from_string("[WebServer] Handler error");
-			response.status_code = 500; // Internal Server Error
+			FixedString512 file_path;
+
+			const char* uri_path = request.uri.c_str();
+			if (uri_path[0] == '/')
+				++uri_path;
+
+			file_path.format("%s/%s", self->document_root.c_str(), uri_path);
+
+			FILE* f = std::fopen(file_path.c_str(), "rb");
+			if (f)
+			{
+				std::fclose(f);
+				return 0; // Let CivetWeb serve it
+			}
 		}
 
+		WebResponse response;
+		self->handler(request, response);
+
 		mg_printf(conn,
-			"HTTP/1.1 200 OK\r\n"
+			"HTTP/1.1 %d OK\r\n"
 			"Content-Type: %s\r\n"
 			"Content-Length: %zu\r\n"
 			"\r\n",
+			response.status_code,
 			response.content_type.c_str(),
 			response.body.size());
-		mg_write(conn, response.body.data(), response.body.size());
 
+		mg_write(conn, response.body.data(), response.body.size());
 		return response.status_code;
 	}
 
-	void WebServer::start(uint16_t port, const std::string& web_root_folder, WebRequestHandler handler_in)
+	void WebServer::start(uint16_t port, const char* web_root_folder, WebRequestHandler handler_in)
 	{
 		ROBOTICK_ASSERT(!running && "WebServer already started");
-		handler = std::move(handler_in);
 
-		std::filesystem::path exe = std::filesystem::canonical("/proc/self/exe");
-		std::filesystem::path base_dir = exe.parent_path() / web_root_folder;
-		document_root = base_dir.string();
-		std::string port_str = std::to_string(port);
+		handler = handler_in;
 
-		const char* options[] = {
-			"listening_ports", port_str.c_str(), "document_root", document_root.c_str(), "enable_directory_listing", "no", nullptr};
+		// Read path to running executable
+		char exe_path[512] = {};
+		ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+		if (len < 0 || len >= static_cast<ssize_t>(sizeof(exe_path)))
+		{
+			ROBOTICK_FATAL_EXIT("Failed to read /proc/self/exe");
+			return;
+		}
+		exe_path[len] = '\0';
+
+		// Truncate to parent directory
+		for (ssize_t i = len - 1; i >= 0; --i)
+		{
+			if (exe_path[i] == '/')
+			{
+				exe_path[i + 1] = '\0';
+				break;
+			}
+		}
+
+		// Append web_root_folder to base dir
+		document_root.format("%s%s", exe_path, web_root_folder);
+
+		char port_str[16];
+		std::snprintf(port_str, sizeof(port_str), "%u", static_cast<unsigned int>(port));
+
+		const char* options[] = {"listening_ports", port_str, "document_root", document_root.c_str(), "enable_directory_listing", "no", nullptr};
 
 		ctx = mg_start(nullptr, nullptr, options);
 		if (!ctx)
 		{
-			ROBOTICK_FATAL_EXIT("WebServer failed to start CivetWeb on port %d", port);
+			ROBOTICK_FATAL_EXIT("WebServer failed to start CivetWeb on port %u", static_cast<unsigned int>(port));
 			return;
 		}
 
-		// Register fallback handler on `/` so it's considered for all requests
 		mg_set_request_handler(ctx, "/", &WebServer::callback, this);
 		running = true;
 
-		ROBOTICK_INFO("WebServer serving from '%s' at http://localhost:%d", web_root_folder.c_str(), port);
+		ROBOTICK_INFO("WebServer serving from '%s' at http://localhost:%u", document_root.c_str(), static_cast<unsigned int>(port));
 	}
 
 	void WebServer::stop()
@@ -121,4 +145,4 @@ namespace robotick
 	}
 } // namespace robotick
 
-#endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)
+#endif // ROBOTICK_PLATFORM_DESKTOP

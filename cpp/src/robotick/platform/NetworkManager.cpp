@@ -112,8 +112,12 @@ namespace robotick
 			return false;
 		}
 
-		std::string cmd =
-			"nmcli dev wifi hotspot ifname " + cfg.iface + " ssid " + cfg.ssid + " password " + cfg.password + " && ip a | grep " + cfg.iface;
+		FixedString256 cmd;
+		cmd.format("nmcli dev wifi hotspot ifname %s ssid %s password %s && ip a | grep %s",
+			cfg.iface.c_str(),
+			cfg.ssid.c_str(),
+			cfg.password.c_str(),
+			cfg.iface.c_str());
 
 		const int result = std::system(cmd.c_str());
 		const bool success = result == 0;
@@ -136,7 +140,8 @@ namespace robotick
 			return false;
 		}
 
-		std::string cmd = "nmcli dev wifi connect '" + cfg.ssid + "' password '" + cfg.password + "' ifname " + cfg.iface;
+		FixedString256 cmd;
+		cmd.format("nmcli dev wifi connect '%s' password '%s' ifname %s", cfg.ssid.c_str(), cfg.password.c_str(), cfg.iface.c_str());
 
 		const int result = std::system(cmd.c_str());
 		const bool success = result == 0;

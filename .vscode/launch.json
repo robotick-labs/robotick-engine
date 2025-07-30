@@ -60,7 +60,7 @@
             "preLaunchTask": "Build robotick_tests",
             "additionalSOLibSearchPath": "${workspaceFolder}/build/linux-debug",
             "sourceFileMap": {
-                "/workspace": "${workspaceFolder}"
+                "${workspaceFolder}": "${workspaceFolder}"
             },
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen"
