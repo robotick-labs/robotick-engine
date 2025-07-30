@@ -2,24 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Example: C++ - robotick_main",
+            "name": "Run Example: desktop-testbed",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/examples/cpp/desktop-testbed/build/desktop-testbed-linux-debug/desktop-testbed",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [
-                {
-                    "name": "LD_LIBRARY_PATH",
-                    "value": "${workspaceFolder}/examples/cpp/desktop-testbed/build/desktop-testbed-linux-debug"
-                },
-                {
-                    "name": "ROBOTICK_ENABLE_BACKTRACE",
-                    "value": "1"
-                }
-            ],
-            "externalConsole": false,
+            "cwd": "${workspaceFolder}/examples/cpp/desktop-testbed",
+            "preLaunchTask": "Build Example: desktop-testbed",
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
             "setupCommands": [
@@ -29,16 +17,14 @@
                     "ignoreFailures": true
                 }
             ],
-            "logging": {
-                "engineLogging": true
-            },
-            "preLaunchTask": "Build Example: C++ - robotick_main",
-            "additionalSOLibSearchPath": "${workspaceFolder}/build/linux-debug",
-            "sourceFileMap": {
-                "${workspaceFolder}": "${workspaceFolder}"
-            },
             "console": "integratedTerminal",
-            "internalConsoleOptions": "neverOpen"
+            "internalConsoleOptions": "neverOpen",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "${workspaceFolder}/examples/cpp/desktop-testbed/build/desktop-testbed-linux-debug"
+                }
+            ]
         },
         {
             "name": "Debug robotick_tests",

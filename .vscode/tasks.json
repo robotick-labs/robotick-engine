@@ -2,17 +2,17 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build Example: C++ - robotick_main",
+      "label": "Build Example: desktop-testbed",
       "type": "shell",
       "command": "cmake",
       "args": [
         "--build",
-        "${workspaceFolder}/build/${input:buildPreset}",
-        "--config",
-        "Debug",
-        "--target",
-        "robotick_main"
+        "--preset",
+        "desktop-testbed-linux-debug"
       ],
+      "options": {
+        "cwd": "${workspaceFolder}/examples/cpp/desktop-testbed"
+      },
       "group": {
         "kind": "build",
         "isDefault": true
