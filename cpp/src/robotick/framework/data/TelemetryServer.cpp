@@ -173,7 +173,7 @@ namespace robotick
 						value = "\"<invalid>\"";
 					}
 
-					res.body.append_from_string_format("\"%s\":%s", view.field_info->name.c_str(), value.c_str()); // value should be valid JSON
+					res.body.append_from_string_format("\"%s\":\"%s\"", view.field_info->name.c_str(), value.c_str()); // value should be valid JSON
 				});
 
 			res.body.append_from_string("},");
