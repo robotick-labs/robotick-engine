@@ -119,14 +119,18 @@ namespace robotick
 					}
 
 					// tick the child:
-					child_info.workload_info->workload_descriptor->tick_fn(child_info.workload_ptr, tick_info);
+					TickInfo child_tick_info(tick_info);
+					child_tick_info.workload_stats = &child_info.workload_info->mutable_stats;
+
+					child_info.workload_info->workload_descriptor->tick_fn(child_info.workload_ptr, child_tick_info);
 
 					const auto now_post_tick = std::chrono::steady_clock::now();
 					child_info.workload_info->mutable_stats.last_tick_duration_ns =
 						static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(now_post_tick - now_pre_tick).count());
 
 					constexpr float NanosecondsPerSecond = 1e9f;
-					child_info.workload_info->mutable_stats.last_time_delta_ns = static_cast<uint32_t>(tick_info.delta_time * NanosecondsPerSecond);
+					child_info.workload_info->mutable_stats.last_time_delta_ns =
+						static_cast<uint32_t>(child_tick_info.delta_time * NanosecondsPerSecond);
 				}
 			}
 

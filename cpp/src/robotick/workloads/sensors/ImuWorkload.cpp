@@ -12,9 +12,10 @@ namespace robotick
 
 	struct ImuConfig
 	{
-		// Currently unused, placeholder for future features
+		bool enable_debug_info = false;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(ImuConfig)
+	ROBOTICK_STRUCT_FIELD(ImuConfig, bool, enable_debug_info)
 	ROBOTICK_REGISTER_STRUCT_END(ImuConfig)
 
 	struct ImuInputs
@@ -26,36 +27,15 @@ namespace robotick
 
 	struct ImuOutputs
 	{
-		float accel_x = 0.0f;
-		float accel_y = 0.0f;
-		float accel_z = 0.0f;
-
-		float gyro_x = 0.0f;
-		float gyro_y = 0.0f;
-		float gyro_z = 0.0f;
-
-		float mag_x = 0.0f;
-		float mag_y = 0.0f;
-		float mag_z = 0.0f;
+		Vec3 accel;
+		Vec3 gyro;
+		Vec3 mag;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(ImuOutputs)
-	ROBOTICK_STRUCT_FIELD(ImuOutputs, float, accel_x)
-	ROBOTICK_STRUCT_FIELD(ImuOutputs, float, accel_y)
-	ROBOTICK_STRUCT_FIELD(ImuOutputs, float, accel_z)
-	ROBOTICK_STRUCT_FIELD(ImuOutputs, float, gyro_x)
-	ROBOTICK_STRUCT_FIELD(ImuOutputs, float, gyro_y)
-	ROBOTICK_STRUCT_FIELD(ImuOutputs, float, gyro_z)
-	ROBOTICK_STRUCT_FIELD(ImuOutputs, float, mag_x)
-	ROBOTICK_STRUCT_FIELD(ImuOutputs, float, mag_y)
-	ROBOTICK_STRUCT_FIELD(ImuOutputs, float, mag_z)
+	ROBOTICK_STRUCT_FIELD(ImuOutputs, Vec3, accel)
+	ROBOTICK_STRUCT_FIELD(ImuOutputs, Vec3, gyro)
+	ROBOTICK_STRUCT_FIELD(ImuOutputs, Vec3, mag)
 	ROBOTICK_REGISTER_STRUCT_END(ImuOutputs)
-
-	struct ImuState
-	{
-#if defined(ROBOTICK_PLATFORM_ESP32)
-		m5::IMU_Class* imu = nullptr;
-#endif // #if defined(ROBOTICK_PLATFORM_ESP32)
-	};
 
 	struct ImuWorkload
 	{
@@ -63,21 +43,19 @@ namespace robotick
 		ImuInputs inputs;
 		ImuOutputs outputs;
 
-		State<ImuState> state;
-
 #if defined(ROBOTICK_PLATFORM_ESP32)
 		void setup()
 		{
-			state->imu = &M5.Imu;
-			m5::IMU_Class* imu = state->imu;
-
-			if (!imu->isEnabled())
+			if (!M5.Imu.isEnabled())
 			{
 				ROBOTICK_INFO("IMU not enabled — attempting init...");
-				imu->begin();
+				if (!M5.Imu.begin())
+				{
+					ROBOTICK_FATAL_EXIT("IMU begin() failed.");
+				}
 			}
 
-			if (!imu->isEnabled())
+			if (!M5.Imu.isEnabled())
 			{
 				ROBOTICK_FATAL_EXIT("IMU still not enabled after init.");
 			}
@@ -85,62 +63,49 @@ namespace robotick
 			{
 				ROBOTICK_INFO("IMU initialized successfully");
 			}
-
-			// ROBOTICK_INFO("Accel Enabled: %d", imu->accelEnabled());
-			// ROBOTICK_INFO("Gyro Enabled: %d", imu->gyroEnabled());
-			// ROBOTICK_INFO("Magnet Enabled: %d", imu->magnetEnabled());
 		}
 
-		void tick(const TickInfo& /*tick_info*/)
+		void tick(const TickInfo& tick_info)
 		{
-			m5::IMU_Class* imu = state->imu;
+			M5.Imu.update();
+			const auto& imu_data = M5.Imu.getImuData();
 
-			float ax, ay, az;
-			if (imu && imu->getAccel(&ax, &ay, &az))
-			{
-				outputs.accel_x = ax;
-				outputs.accel_y = ay;
-				outputs.accel_z = az;
-			}
-			else
-			{
-				ROBOTICK_WARNING("IMU read failed (accelerometer)");
-			}
+			outputs.accel.x = imu_data.accel.x;
+			outputs.accel.y = imu_data.accel.y;
+			outputs.accel.z = imu_data.accel.z;
 
-			float gx, gy, gz;
-			if (imu && imu->getGyro(&gx, &gy, &gz))
-			{
-				outputs.gyro_x = gx;
-				outputs.gyro_y = gy;
-				outputs.gyro_z = gz;
-			}
-			else
-			{
-				ROBOTICK_WARNING("IMU read failed (gyroscope)");
-			}
+			outputs.gyro.x = imu_data.gyro.x;
+			outputs.gyro.y = imu_data.gyro.y;
+			outputs.gyro.z = imu_data.gyro.z;
 
-			float mx, my, mz;
-			if (imu && imu->getMag(&mx, &my, &mz))
+			outputs.mag.x = imu_data.mag.x;
+			outputs.mag.y = imu_data.mag.y;
+			outputs.mag.z = imu_data.mag.z;
+
+			if (config.enable_debug_info)
 			{
-				outputs.mag_x = mx;
-				outputs.mag_y = my;
-				outputs.mag_z = mz;
-			}
-			else
-			{
-				ROBOTICK_WARNING("IMU read failed (magnetometer)");
+				ROBOTICK_INFO(
+					"IMU: accel[%.2f %.2f %.2f] g\tgyro[%.2f %.2f %.2f] °/s\tmag[%.2f %.2f %.2f] µT\t| tick_duration %.2f ms\t| tick_delta %.2f ms",
+					outputs.accel.x,
+					outputs.accel.y,
+					outputs.accel.z,
+					outputs.gyro.x,
+					outputs.gyro.y,
+					outputs.gyro.z,
+					outputs.mag.x,
+					outputs.mag.y,
+					outputs.mag.z,
+					tick_info.workload_stats->get_last_tick_duration_ms(),
+					tick_info.workload_stats->get_last_time_delta_ms());
 			}
 		}
 #else
 		void setup() {}
 		void tick(const TickInfo& /*tick_info*/)
 		{
-			outputs.accel_x = 0.0f;
-			outputs.accel_y = 0.0f;
-			outputs.accel_z = 0.0f;
-			outputs.gyro_x = 0.0f;
-			outputs.gyro_y = 0.0f;
-			outputs.gyro_z = 0.0f;
+			outputs.accel = Vec3();
+			outputs.gyro = Vec3();
+			outputs.mag = Vec3();
 		}
 #endif // ROBOTICK_PLATFORM_ESP32
 	};

@@ -7,6 +7,7 @@
 
 namespace robotick
 {
+	struct WorkloadInstanceStats;
 
 	struct TickInfo
 	{
@@ -14,6 +15,8 @@ namespace robotick
 		float time_now = 0.0;	  // Time since engine start [seconds] — derived from time_now_ns each tick (so no floating-point drift)
 		uint64_t time_now_ns = 0; // Monotonic time since engine start [nanoseconds] — resolution and drift depend purely on platform timer quality
 		uint64_t tick_count = 0;  // Number of ticks since engine start
+
+		const WorkloadInstanceStats* workload_stats = nullptr;
 	};
 
 	static const TickInfo TICK_INFO_FIRST_1MS_1KHZ = {

@@ -45,7 +45,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 							out.path = path;
 							out.recv_ptr = &recv_value;
 							out.size = sizeof(int);
-							out.type_hash = 0;
+							out.type_desc = TypeRegistry::get().find_by_name("int");
 							return true;
 						}
 						return false;
@@ -177,7 +177,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 						f.path = "x";
 						f.recv_ptr = &recv_value;
 						f.size = sizeof(int);
-						f.type_hash = 0;
+						f.type_desc = TypeRegistry::get().find_by_name("int");
 						return true;
 					});
 				receiver_ready = true;
@@ -263,7 +263,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 						f.recv_ptr = &recv_value;
 						f.size = sizeof(int);
 						f.path = "x";
-						f.type_hash = 0;
+						f.type_desc = TypeRegistry::get().find_by_name("int");
 						return true;
 					});
 				ready = true;

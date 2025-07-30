@@ -5,14 +5,14 @@
             "name": "Example: C++ - robotick_main",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/linux-debug/robotick_main",
+            "program": "${workspaceFolder}/examples/cpp/desktop-testbed/build/desktop-testbed-linux-debug/desktop-testbed",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
                 {
                     "name": "LD_LIBRARY_PATH",
-                    "value": "${workspaceFolder}/build/linux-debug"
+                    "value": "${workspaceFolder}/examples/cpp/desktop-testbed/build/desktop-testbed-linux-debug"
                 },
                 {
                     "name": "ROBOTICK_ENABLE_BACKTRACE",
@@ -35,7 +35,7 @@
             "preLaunchTask": "Build Example: C++ - robotick_main",
             "additionalSOLibSearchPath": "${workspaceFolder}/build/linux-debug",
             "sourceFileMap": {
-                "/workspace": "${workspaceFolder}"
+                "${workspaceFolder}": "${workspaceFolder}"
             },
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen"

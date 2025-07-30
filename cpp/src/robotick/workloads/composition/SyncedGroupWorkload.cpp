@@ -164,13 +164,8 @@ namespace robotick
 			const auto tick_interval_sec = std::chrono::duration<float>(1.0f / child.seed->tick_rate_hz);
 			const auto tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(tick_interval_sec);
 
-			std::string thread_name(child.seed->unique_name.c_str(), 15);
-
-			Thread::set_name(thread_name);
-			Thread::set_affinity(2);
-			Thread::set_priority_high();
-
 			TickInfo tick_info;
+			tick_info.workload_stats = &child.mutable_stats;
 
 			auto workload_tick_fn = child.workload_descriptor->tick_fn;
 

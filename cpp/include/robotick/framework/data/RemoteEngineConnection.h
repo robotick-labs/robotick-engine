@@ -15,6 +15,7 @@
 namespace robotick
 {
 	struct TickInfo;
+	struct TypeDescriptor;
 
 	class RemoteEngineConnection
 	{
@@ -66,7 +67,7 @@ namespace robotick
 			const void* send_ptr = nullptr;
 			void* recv_ptr = nullptr;
 			size_t size = 0;
-			uint32_t type_hash;
+			const TypeDescriptor* type_desc = nullptr;
 		};
 
 		using BinderCallback = std::function<bool(const char* path, Field& out_field)>;

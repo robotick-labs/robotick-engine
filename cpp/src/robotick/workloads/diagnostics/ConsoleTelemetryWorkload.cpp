@@ -168,11 +168,9 @@ namespace robotick
 			row.inputs = input_entries.empty() ? "-" : join(input_entries, "\n");
 			row.outputs = output_entries.empty() ? "-" : join(output_entries, "\n");
 
-			static constexpr float s_milliseconds_per_nanosecond = 1e-6f;
-
-			row.tick_duration_ms = s_milliseconds_per_nanosecond * (float)info.mutable_stats.last_tick_duration_ns;
-			row.tick_delta_ms = s_milliseconds_per_nanosecond * (float)info.mutable_stats.last_time_delta_ns;
-			row.goal_interval_ms = info.seed->tick_rate_hz > 0.0 ? 1000.0f / info.seed->tick_rate_hz : -1.0;
+			row.tick_duration_ms = info.mutable_stats.get_last_tick_duration_ms();
+			row.tick_delta_ms = info.mutable_stats.get_last_time_delta_ms();
+			row.goal_interval_ms = (info.seed->tick_rate_hz > 0.0) ? (1000.0f / info.seed->tick_rate_hz) : -1.0f;
 		}
 
 		static std::string depth_prefix(size_t depth, const std::string& name)

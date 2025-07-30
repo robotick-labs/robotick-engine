@@ -43,6 +43,7 @@ namespace robotick
 		static void sleep_ms(uint32_t ms);
 		static void hybrid_sleep_until(std::chrono::steady_clock::time_point target_time);
 
+	  protected:
 		static void set_name(const std::string& name);
 		static void set_priority_high();
 		static void set_affinity(int core);
