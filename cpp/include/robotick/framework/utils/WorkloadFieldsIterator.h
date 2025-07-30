@@ -25,6 +25,12 @@ namespace robotick
 	{
 		static void for_each_workload(const Engine& engine, std::function<void(const WorkloadInstanceInfo&)> callback);
 
+		static void for_each_field_in_struct(const WorkloadInstanceInfo& instance,
+			const TypeDescriptor* struct_type,
+			const size_t struct_offset,
+			WorkloadsBuffer& workloads_buffer,
+			std::function<void(const WorkloadFieldView&)> callback);
+
 		static void for_each_field_in_workload(const Engine& engine,
 			const WorkloadInstanceInfo& instance,
 			WorkloadsBuffer* workloads_override,

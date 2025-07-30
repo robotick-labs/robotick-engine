@@ -4,9 +4,6 @@
 
 #include <cstdint>
 
-struct mg_context;
-struct mg_connection;
-
 namespace robotick
 {
 	using WebRequestBodyBuffer = FixedVector1k;
@@ -33,6 +30,8 @@ namespace robotick
 
 	using WebRequestHandler = std::function<void(const WebRequest&, WebResponse&)>;
 
+	struct WebServerImpl;
+
 	class WebServer
 	{
 	  public:
@@ -43,12 +42,15 @@ namespace robotick
 		void stop();
 		bool is_running() const;
 
-	  private:
-		static int callback(struct mg_connection* conn, void* user_data);
+		WebRequestHandler get_handler() const { return handler; };
+		const char* get_server_name() const { return server_name.c_str(); };
+		const char* get_document_root() const { return document_root.c_str(); };
 
-		mg_context* ctx;
-		bool running;
-		WebRequestHandler handler;
+	  private:
+		WebServerImpl* impl = nullptr;
+
+		bool running = false;
+		WebRequestHandler handler = nullptr;
 
 		FixedString32 server_name;
 		FixedString512 document_root;

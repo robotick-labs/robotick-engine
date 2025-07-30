@@ -7,11 +7,13 @@
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/data/RemoteEngineConnection.h"
+#include "robotick/framework/data/TelemetryServer.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/Model.h"
 #include "robotick/framework/utils/TypeId.h"
 #include "robotick/platform/PlatformEvents.h"
 #include "robotick/platform/Threading.h"
+#include "robotick/platform/WebServer.h"
 
 namespace robotick
 {
@@ -21,6 +23,8 @@ namespace robotick
 		bool is_running = false;
 
 		WorkloadsBuffer workloads_buffer;
+
+		TelemetryServer telemetry_server;
 
 		const WorkloadInstanceInfo* root_instance = nullptr;
 		HeapVector<WorkloadInstanceInfo> instances;
@@ -53,12 +57,14 @@ namespace robotick
 
 	extern "C" void robotick_force_register_primitives();
 	extern "C" void robotick_force_register_fixed_vector_types();
+	extern "C" void robotick_force_register_vec3_types();
 
 	void Engine::load(const Model& model)
 	{
 		// ensure out standard types don't get pruned by the linker:
 		robotick_force_register_primitives();
 		robotick_force_register_fixed_vector_types();
+		robotick_force_register_vec3_types();
 
 		if (!model.get_root_workload())
 			ROBOTICK_FATAL_EXIT("Model has no root workload");
@@ -275,6 +281,8 @@ namespace robotick
 			if (inst.workload_descriptor->start_fn)
 				inst.workload_descriptor->start_fn(inst.get_ptr(*this), inst.seed->tick_rate_hz);
 		}
+
+		state->telemetry_server.start(*this);
 
 		state->is_running = true;
 

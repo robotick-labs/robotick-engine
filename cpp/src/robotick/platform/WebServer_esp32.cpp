@@ -51,8 +51,8 @@ namespace robotick
 		WebRequest request;
 		WebResponse response;
 
-		request.method.set_from_cstr(http_method_str(req->method));
-		request.uri.set_from_cstr(req->uri);
+		request.method = http_method_str((http_method)req->method);
+		request.uri = req->uri;
 
 		if (req->method == HTTP_POST && req->content_len > 0 && req->content_len < request.body.capacity())
 		{
@@ -66,12 +66,18 @@ namespace robotick
 		httpd_resp_set_type(req, response.content_type.c_str());
 		httpd_resp_send(req, reinterpret_cast<const char*>(response.body.data()), response.body.size());
 
+		ROBOTICK_INFO("WebServer - %s %s - response code %i (%i bytes)",
+			request.method.c_str(),
+			request.uri.c_str(),
+			response.status_code,
+			response.body.size());
+
 		return ESP_OK;
 	}
 
 	void WebServer::start(const char* name, uint16_t port, const char* /*unused*/, WebRequestHandler handler_in)
 	{
-		ROBOTICK_ASSERT(!is_running() && "WebServer '%s' already running", name);
+		ROBOTICK_ASSERT_MSG(!is_running(), "WebServer '%s' already running", name);
 
 		server_name = name;
 
@@ -79,6 +85,7 @@ namespace robotick
 		state->handler = handler_in;
 
 		httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+		config.stack_size = 8192; // Increase from default 4096 to 8KB
 		config.server_port = port;
 		config.uri_match_fn = httpd_uri_match_wildcard;
 

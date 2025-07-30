@@ -10,11 +10,14 @@
 
 namespace robotick
 {
-	WebServer::WebServer()
-		: ctx(nullptr)
-		, running(false)
-		, handler(nullptr)
+	struct WebServerImpl
 	{
+		mg_context* ctx = nullptr;
+	};
+
+	WebServer::WebServer()
+	{
+		impl = new WebServerImpl();
 	}
 
 	WebServer::~WebServer()
@@ -27,10 +30,10 @@ namespace robotick
 		return running;
 	}
 
-	int WebServer::callback(struct mg_connection* conn, void* user_data)
+	int web_server_callback(struct mg_connection* conn, void* user_data)
 	{
 		WebServer* self = static_cast<WebServer*>(user_data);
-		if (!self || !self->handler)
+		if (!self || !self->get_handler())
 			return 0;
 
 		WebRequest request;
@@ -59,7 +62,7 @@ namespace robotick
 			if (uri_path[0] == '/')
 				++uri_path;
 
-			file_path.format("%s/%s", self->document_root.c_str(), uri_path);
+			file_path.format("%s/%s", self->get_document_root(), uri_path);
 
 			FILE* f = std::fopen(file_path.c_str(), "rb");
 			if (f)
@@ -70,7 +73,7 @@ namespace robotick
 		}
 
 		WebResponse response;
-		self->handler(request, response);
+		self->get_handler()(request, response);
 
 		mg_printf(conn,
 			"HTTP/1.1 %d OK\r\n"
@@ -121,14 +124,14 @@ namespace robotick
 
 		const char* options[] = {"listening_ports", port_str, "document_root", document_root.c_str(), "enable_directory_listing", "no", nullptr};
 
-		ctx = mg_start(nullptr, nullptr, options);
-		if (!ctx)
+		impl->ctx = mg_start(nullptr, nullptr, options);
+		if (!impl->ctx)
 		{
 			ROBOTICK_FATAL_EXIT("WebServer '%s' failed to start CivetWeb on port %u", name, static_cast<unsigned int>(port));
 			return;
 		}
 
-		mg_set_request_handler(ctx, "/", &WebServer::callback, this);
+		mg_set_request_handler(impl->ctx, "/", &web_server_callback, this);
 		running = true;
 
 		ROBOTICK_INFO("WebServer '%s' serving from '%s' at http://localhost:%u", document_root.c_str(), name, static_cast<unsigned int>(port));
@@ -139,8 +142,8 @@ namespace robotick
 		if (!running)
 			return;
 
-		mg_stop(ctx);
-		ctx = nullptr;
+		mg_stop(impl->ctx);
+		impl->ctx = nullptr;
 		running = false;
 
 		ROBOTICK_INFO("WebServer stopped.");

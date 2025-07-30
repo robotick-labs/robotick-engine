@@ -82,7 +82,35 @@ static inline void get_network_hotspot_config(robotick::NetworkHotspotConfig& ho
 {
 	hotspot_config.ssid = "BARR.e";
 	hotspot_config.password = "tortoise123";
-	hotspot_config.iface = "wlp88s0f0";
+	hotspot_config.iface = "wlan0";
+
+	// or run manually: sudo nmcli dev wifi hotspot ifname wlan0 ssid BARR.e password tortoise123
+	// or look up wifi device name (E.g. wlp88s0f0) using nmcli device status
+	// e.g. sudo nmcli dev wifi hotspot ifname wlp88s0f0 ssid BARR.e password tortoise123
+}
+
+static void connect_to_wifi_hotspot()
+{
+	// connect to our local wifi-hotspot while the engine's spinning up (hard-coded creds for now) - needs security pass later:
+	robotick::NetworkHotspotConfig hotspot_config;
+	get_network_hotspot_config(hotspot_config);
+
+	robotick::NetworkClientConfig client_config;
+	client_config.type = hotspot_config.type;
+	client_config.iface = "wlan0"; // TBC - may not even be needed on ESP?
+	client_config.ssid = hotspot_config.ssid;
+	client_config.password = hotspot_config.password;
+
+	const bool hotspot_success = robotick::NetworkClient::connect(client_config);
+	if (hotspot_success)
+	{
+		ROBOTICK_INFO("esp32-testbed  - successfully connected to wifi hotspot!");
+	}
+	else
+	{
+		ROBOTICK_WARNING("esp32-testbed  - Failed to connect to wifi-hotspot!");
+	}
+	ROBOTICK_INFO("\n");
 }
 
 ROBOTICK_ENTRYPOINT
@@ -92,6 +120,9 @@ ROBOTICK_ENTRYPOINT
 	ROBOTICK_INFO("esp32-testbed - Started on CPU%d", xPortGetCoreID());
 
 	robotick::ensure_workloads();
+
+	ROBOTICK_INFO("esp32-testbed  - connecting to wifi hotspot...");
+	connect_to_wifi_hotspot();
 
 	ROBOTICK_INFO("esp32-testbed - Launching Robotick engine task on core 1...");
 
