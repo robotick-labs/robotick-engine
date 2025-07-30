@@ -85,7 +85,7 @@ namespace robotick
 		state->handler = handler_in;
 
 		httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-		config.stack_size = 8192; // Increase from default 4096 to 8KB
+		config.stack_size = 12288; // Increase from default 4096 to 8KB
 		config.server_port = port;
 		config.uri_match_fn = httpd_uri_match_wildcard;
 
