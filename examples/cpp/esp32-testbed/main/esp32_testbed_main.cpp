@@ -80,13 +80,13 @@ void run_engine_on_core1(void* param)
 
 static inline void get_network_hotspot_config(robotick::NetworkHotspotConfig& hotspot_config)
 {
-	hotspot_config.ssid = "BARR.e";
-	hotspot_config.password = "tortoise123";
-	hotspot_config.iface = "wlan0";
+	hotspot_config.ssid = "Robotick";
+	hotspot_config.password = "robotick123";
+	hotspot_config.iface = "wlp88s0f0";
 
-	// or run manually: sudo nmcli dev wifi hotspot ifname wlan0 ssid BARR.e password tortoise123
+	// or run manually: sudo nmcli dev wifi hotspot ifname wlan0 ssid Robotick password robotick123
 	// or look up wifi device name (E.g. wlp88s0f0) using nmcli device status
-	// e.g. sudo nmcli dev wifi hotspot ifname wlp88s0f0 ssid BARR.e password tortoise123
+	// e.g. sudo nmcli dev wifi hotspot ifname wlp88s0f0 ssid Robotick password robotick123
 }
 
 static void connect_to_wifi_hotspot()
