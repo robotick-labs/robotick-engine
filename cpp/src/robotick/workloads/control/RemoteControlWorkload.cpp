@@ -80,7 +80,7 @@ namespace robotick
 						{
 							response.status_code = 400;
 							response.body.set_from_string("Invalid JSON format.");
-							return;
+							return true; // handled
 						}
 
 						const nlohmann::json& json = json_opt;
@@ -108,13 +108,17 @@ namespace robotick
 						try_set_vec2_from_json("right", w.right);
 
 						response.status_code = 200;
+						return true; // handled
 					}
 					else if (request.method == "GET" && request.uri == "/api/jpeg_data")
 					{
 						response.body.set(inputs.jpeg_data.data(), inputs.jpeg_data.size());
 						response.content_type = "image/jpeg";
 						response.status_code = 200;
+						return true; // handled
 					}
+
+					return false; // not handled
 				});
 #endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)
 		}

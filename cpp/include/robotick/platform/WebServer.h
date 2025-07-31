@@ -1,6 +1,8 @@
 #pragma once
 
+#include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/common/FixedVector.h"
+#include "robotick/framework/common/Pair.h"
 
 #include <cstdint>
 
@@ -9,16 +11,29 @@ namespace robotick
 	using WebRequestBodyBuffer = FixedVector1k;
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
-	using WebResponseBodyBuffer = FixedVector2k;
+	using WebResponseBodyBuffer = FixedVector8k;
 #else
 	using WebResponseBodyBuffer = FixedVector256k; // big enough for a generous jpg image
 #endif
 
 	struct WebRequest
 	{
-		FixedString128 uri;
 		FixedString8 method;
+
+		FixedString128 uri;
+		FixedVector<Pair<FixedString32, FixedString64>, 8> query_params;
+
 		WebRequestBodyBuffer body;
+
+		const char* find_query_param(const char* key) const
+		{
+			for (const auto& pair : query_params)
+			{
+				if (pair.first == key)
+					return pair.second.c_str();
+			}
+			return nullptr;
+		}
 	};
 
 	struct WebResponse
@@ -28,7 +43,7 @@ namespace robotick
 		int status_code = 404;					   // Default: NotFound (intuituve - meaning it's not been handled)
 	};
 
-	using WebRequestHandler = std::function<void(const WebRequest&, WebResponse&)>;
+	using WebRequestHandler = std::function<bool(const WebRequest&, WebResponse&)>;
 
 	struct WebServerImpl;
 

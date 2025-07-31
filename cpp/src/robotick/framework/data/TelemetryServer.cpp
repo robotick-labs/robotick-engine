@@ -22,86 +22,48 @@ namespace robotick
 				if (!req.method.equals("GET"))
 				{
 					res.status_code = 404;
-					return;
+					return true;
 				}
 
-				if (req.uri.equals("/telemetry"))
+				if (!engine)
 				{
-					constexpr const char telemetry_html[] = R"(
-					<!DOCTYPE html>
-					<html>
-					<head>
-					<meta charset="utf-8">
-					<title>Robot Telemetry</title>
-					<style>
-						body { font-family: sans-serif; padding: 1em; background: #f0f0f0; }
-						table { border-collapse: collapse; width: 100%; background: white; }
-						th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
-						th { background: #eee; }
-						pre { margin: 0; }
-					</style>
-					</head>
-					<body>
-					<h1>Robot Telemetry</h1>
-					<table id="telemetry">
-						<thead>
-						<tr>
-							<th>Name</th><th>Type</th><th>Tick (ms)</th><th>Goal (ms)</th><th>Load %</th>
-						</tr>
-						</thead>
-						<tbody></tbody>
-					</table>
-					<script>
-						async function refreshTelemetry() {
-							try {
-								const res = await fetch('/telemetry/workloads');
-								const text = await res.text();
-								console.log("Telemetry raw response:", text);
-								const data = JSON.parse(text);
-
-								const tbody = document.querySelector("#telemetry tbody");
-								tbody.innerHTML = "";
-
-								if (!Array.isArray(data.workloads)) return;
-
-								for (const w of data.workloads) {
-									const name = w.name ?? "–";
-									const type = w.type ?? "–";
-
-									let dt_ms = typeof w.dt_ms === "number" ? w.dt_ms.toFixed(2) : "–";
-									let goal_ms = typeof w.goal_ms === "number" ? w.goal_ms.toFixed(2) : "–";
-									let load_pct = typeof w.load_pct === "number" ? w.load_pct.toFixed(1) : "–";
-
-									const row = document.createElement("tr");
-									row.innerHTML = `<td>${name}</td><td>${type}</td><td>${dt_ms}</td><td>${goal_ms}</td><td>${load_pct}</td>`;
-									tbody.appendChild(row);
-								}
-							} catch (err) {
-								console.error("Failed to fetch telemetry:", err);
-							}
-						}
-
-						setInterval(refreshTelemetry, 1000);
-						refreshTelemetry();
-					</script>
-					</body>
-					</html>
-					)";
-
-					res.status_code = 200;
-					res.content_type = "text/html";
-					res.body.set_from_string(telemetry_html);
-					return;
+					res.body.set_from_string("{\"error\":\"no engine available\"}");
+					res.status_code = 500;
+					return true;
 				}
-				else if (req.uri.equals("/telemetry/workloads"))
+
+				if (req.uri.equals("/"))
+				{
+					handle_get_home_page(req, res);
+					return true;
+				}
+				else if (req.uri.equals("/api/telemetry/workloads"))
 				{
 					handle_get_workloads(req, res);
-					return;
+					return true;
+				}
+				else if (req.uri.equals("/api/telemetry/workload/stats"))
+				{
+					handle_get_workload_stats(req, res);
+					return true;
+				}
+				else if (req.uri.equals("/api/telemetry/workload/config"))
+				{
+					handle_get_workload_config(req, res);
+					return true;
+				}
+				else if (req.uri.equals("/api/telemetry/workload/inputs"))
+				{
+					handle_get_workload_inputs(req, res);
+					return true;
+				}
+				else if (req.uri.equals("/api/telemetry/workload/outputs"))
+				{
+					handle_get_workload_outputs(req, res);
+					return true;
 				}
 
-				// Not handled
-				res.body.set_from_string("Unknown endpoint");
-				res.status_code = 404;
+				return false;
 			});
 	}
 
@@ -110,110 +72,321 @@ namespace robotick
 		web_server.stop();
 	}
 
-	void TelemetryServer::handle_get_workloads(const WebRequest& /*unused*/, WebResponse& res)
+	void TelemetryServer::handle_get_home_page(const WebRequest& /*unused*/, WebResponse& res)
 	{
-		if (!engine)
-		{
-			res.body.set_from_string("{\"error\":\"no engine available\"}");
-			res.status_code = 500;
-			res.content_type = "application/json";
-			return;
-		}
+		constexpr const char telemetry_html[] = R"(
+			<!DOCTYPE html>
+			<html>
+			<head>
+			<meta charset="utf-8">
+			<title>Robotick | Telemetry</title>
+			<style>
+				body { font-family: sans-serif; padding: 1em; background: #f0f0f0; }
+				table { border-collapse: collapse; width: 100%; background: white; }
+				th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; vertical-align: top; }
+				th { background: #eee; }
+				pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+				div.multiline {
+					white-space: pre-wrap;
+					word-break: break-word;
+					overflow-wrap: anywhere;
+				}
+			</style>
+			</head>
+			<body>
+			<h1>Robotick | Telemetry</h1>
+			<table id="telemetry">
+				<thead>
+				<tr>
+					<th>Unique Name</th>
+					<th>Type</th>
+					<th>Config</th>
+					<th>Inputs</th>
+					<th>Outputs</th>
+					<th>Self Duration (ms)</th>
+					<th>Time Delta (ms)</th>
+					<th>Goal Period (ms)</th>
+					<th>Usage %</th>
+				</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+			<script>
+				const workloads = [];
+				let workloadIndex = 0;
 
-		WorkloadsBuffer& mirror_buffer = engine->get_workloads_buffer(); // TODO - consider making it into a mirror, but not on-demand
+				async function fetchJSON(url) {
+					try {
+						const res = await fetch(url);
+						return await res.json();
+					} catch (err) {
+						console.warn("Failed to fetch:", url, err);
+						return null;
+					}
+				}
 
+				async function fetchWorkloadDetails(name) {
+					const [config, inputs, outputs] = await Promise.all([
+						fetchJSON(`/api/telemetry/workload/config?name=${name}`),
+						fetchJSON(`/api/telemetry/workload/inputs?name=${name}`),
+						fetchJSON(`/api/telemetry/workload/outputs?name=${name}`),
+					]);
+
+					const wl = workloads.find(w => w.name === name);
+					if (!wl) return;
+					wl.config = config;
+					wl.inputs = inputs;
+					wl.outputs = outputs;
+				}
+
+				async function fetchWorkloadLiveData(name) {
+					const stats = await fetchJSON(`/api/telemetry/workload/stats?name=${name}`);
+					const inputs = await fetchJSON(`/api/telemetry/workload/inputs?name=${name}`);
+					const outputs = await fetchJSON(`/api/telemetry/workload/outputs?name=${name}`);
+
+					const wl = workloads.find(w => w.name === name);
+					if (!wl) return;
+
+					if (stats) {
+						wl.self_ms = stats.self_ms;
+						wl.dt_ms = stats.dt_ms;
+						wl.goal_ms = stats.goal_ms;
+					}
+					if (inputs) wl.inputs = inputs;
+					if (outputs) wl.outputs = outputs;
+
+					renderTelemetryTable();
+				}
+
+				function formatKeyValue(obj) {
+					if (!obj || typeof obj !== "object") return "–";
+					return Object.entries(obj).map(([k, v]) => `${k}: ${v}`).join("\n");
+				}
+
+				function renderTelemetryTable() {
+					const tbody = document.querySelector("#telemetry tbody");
+					tbody.innerHTML = "";
+
+					for (const w of workloads) {
+						const row = document.createElement("tr");
+
+						const raw_self = typeof w.self_ms === "number" ? w.self_ms : null;
+						const raw_goal = typeof w.goal_ms === "number" ? w.goal_ms : null;
+
+						const self_ms = typeof w.self_ms === "number" ? w.self_ms.toFixed(1) : "–";
+						const dt_ms = typeof w.dt_ms === "number" ? w.dt_ms.toFixed(1) : "–";
+						const goal_ms = typeof w.goal_ms === "number" ? w.goal_ms.toFixed(1) : "–";
+
+						const load_pct = (raw_self !== null && raw_goal > 0)
+							? ((raw_self / raw_goal) * 100).toFixed(1)
+							: "–";
+
+						const config = formatKeyValue(w.config);
+						const inputs = formatKeyValue(w.inputs);
+						const outputs = formatKeyValue(w.outputs);
+
+						row.innerHTML = `
+							<td>${w.name}</td>
+							<td>${w.type}</td>
+							<td><div class="multiline">${config}</div></td>
+							<td><div class="multiline">${inputs}</div></td>
+							<td><div class="multiline">${outputs}</div></td>
+							<td>${self_ms}</td>
+							<td>${dt_ms}</td>
+							<td>${goal_ms}</td>
+							<td>${load_pct}</td>
+						`;
+						tbody.appendChild(row);
+					}
+				}
+
+				async function loadInitialData() {
+					const data = await fetchJSON('/api/telemetry/workloads');
+					if (!data || !Array.isArray(data.workloads)) return;
+
+					for (const w of data.workloads) {
+						workloads.push({
+							name: w.name ?? "–",
+							type: w.type ?? "–",
+							dt_ms: null,
+							goal_ms: null,
+							load_pct: null,
+							config: null,
+							inputs: null,
+							outputs: null
+						});
+						fetchWorkloadDetails(w.name);
+					}
+				}
+
+				// Periodically fetch live stats + I/O
+				setInterval(() => {
+					if (workloads.length === 0) return;
+					const w = workloads[workloadIndex % workloads.length];
+					workloadIndex++;
+					fetchWorkloadLiveData(w.name);
+				}, 100);
+
+				loadInitialData();
+			</script>
+			</body>
+			</html>
+			)";
+
+		res.status_code = 200;
+		res.content_type = "text/html";
+		res.body.set_from_string(telemetry_html);
+	}
+
+	void TelemetryServer::handle_get_workloads(const WebRequest& /*req*/, WebResponse& res)
+	{
 		const auto& instances = engine->get_all_instance_info();
 		res.body.clear();
 		res.body.append_from_string("{\"workloads\":[");
 
 		bool first = true;
-		for (const robotick::WorkloadInstanceInfo& info : instances)
+		for (const auto& info : instances)
 		{
 			if (!first)
 				res.body.append_from_string(",");
 			first = false;
-
-			// Type & name
-			res.body.append_from_string_format("{\"name\":\"%s\",\"type\":\"%s\",", info.seed->unique_name.c_str(), info.type->name.c_str());
-
-			// Placeholder performance metrics
-			res.body.append_from_string_format("\"dt_ms\":%.2f,\"goal_ms\":%.2f,\"load_pct\":%.1f,",
-				info.mutable_stats.get_last_tick_duration_ms(),									// dt_ms placeholder
-				info.mutable_stats.get_last_time_delta_ms(),									// goal_ms placeholder
-				(info.seed->tick_rate_hz > 0.0) ? (1000.0f / info.seed->tick_rate_hz) : -1.0f); // load_pct placeholder
-
-			// Config fields
-			res.body.append_from_string("\"config\":{");
-			bool first_config = true;
-			WorkloadFieldsIterator::for_each_field_in_struct(info,
-				info.type->get_workload_desc()->config_desc,
-				info.type->get_workload_desc()->config_offset,
-				mirror_buffer,
-				[&](const WorkloadFieldView& view)
-				{
-					if (!first_config)
-						res.body.append_from_string(",");
-					first_config = false;
-
-					const TypeDescriptor* field_type_desc =
-						view.subfield_info ? view.subfield_info->find_type_descriptor() : view.field_info->find_type_descriptor();
-
-					void* field_ptr = view.field_ptr;
-
-					FixedString256 value;
-					if (field_type_desc && field_ptr && mirror_buffer.contains_object(field_ptr, field_type_desc->size))
-					{
-						if (!field_type_desc->to_string(field_ptr, value.data, value.capacity()))
-						{
-							value.format("\"<%s>\"", field_type_desc->name);
-						}
-					}
-					else
-					{
-						value = "\"<invalid>\"";
-					}
-
-					res.body.append_from_string_format("\"%s\":\"%s\"", view.field_info->name.c_str(), value.c_str()); // value should be valid JSON
-				});
-
-			res.body.append_from_string("},");
-
-			// Inputs
-			res.body.append_from_string("\"inputs\":[");
-			bool first_input = true;
-			WorkloadFieldsIterator::for_each_field_in_struct(info,
-				info.type->get_workload_desc()->inputs_desc,
-				info.type->get_workload_desc()->inputs_offset,
-				mirror_buffer,
-				[&](const WorkloadFieldView& view)
-				{
-					if (!first_input)
-						res.body.append_from_string(",");
-					first_input = false;
-					res.body.append_from_string_format("\"%s\"", view.field_info->name.c_str());
-				});
-			res.body.append_from_string("],");
-
-			// Outputs
-			res.body.append_from_string("\"outputs\":[");
-			bool first_output = true;
-			WorkloadFieldsIterator::for_each_field_in_struct(info,
-				info.type->get_workload_desc()->outputs_desc,
-				info.type->get_workload_desc()->outputs_offset,
-				mirror_buffer,
-				[&](const WorkloadFieldView& view)
-				{
-					if (!first_output)
-						res.body.append_from_string(",");
-					first_output = false;
-					res.body.append_from_string_format("\"%s\"", view.field_info->name.c_str());
-				});
-			res.body.append_from_string("]}");
+			res.body.append_from_string_format("{\"name\":\"%s\",\"type\":\"%s\"}", info.seed->unique_name.c_str(), info.type->name.c_str());
 		}
 
 		res.body.append_from_string("]}");
-		res.content_type = "application/json";
 		res.status_code = 200;
+		res.content_type = "application/json";
+	}
+
+	void TelemetryServer::handle_get_workload_stats(const WebRequest& req, WebResponse& res)
+	{
+		const char* workload_unique_name = req.find_query_param("name");
+		const WorkloadInstanceInfo* info = workload_unique_name != nullptr ? engine->find_instance_info(workload_unique_name) : nullptr;
+		if (!info)
+		{
+			res.body.set_from_string("{\"error\":\"not found\"}");
+			res.status_code = 404;
+			return;
+		}
+
+		res.body.clear();
+		res.body.append_from_string_format("{\"self_ms\":%.2f,\"dt_ms\":%.2f,\"goal_ms\":%.1f}",
+			info->mutable_stats.get_last_tick_duration_ms(),
+			info->mutable_stats.get_last_time_delta_ms(),
+			(info->seed->tick_rate_hz > 0.0) ? (1000.0f / info->seed->tick_rate_hz) : -1.0f);
+
+		res.status_code = 200;
+		res.content_type = "application/json";
+	}
+
+	void TelemetryServer::handle_get_workload_config(const WebRequest& req, WebResponse& res)
+	{
+		const char* workload_unique_name = req.find_query_param("name");
+		const WorkloadInstanceInfo* info = workload_unique_name != nullptr ? engine->find_instance_info(workload_unique_name) : nullptr;
+		if (!info)
+		{
+			res.body.set_from_string("{\"error\":\"not found\"}");
+			res.status_code = 404;
+			return;
+		}
+
+		WorkloadsBuffer& mirror = engine->get_workloads_buffer();
+		res.body.clear();
+		res.body.append_from_string("{");
+
+		bool first = true;
+		WorkloadFieldsIterator::for_each_field_in_struct(*info,
+			info->type->get_workload_desc()->config_desc,
+			info->type->get_workload_desc()->config_offset,
+			mirror,
+			[&](const WorkloadFieldView& view)
+			{
+				if (!first)
+					res.body.append_from_string(",");
+				first = false;
+
+				const TypeDescriptor* td = view.subfield_info ? view.subfield_info->find_type_descriptor() : view.field_info->find_type_descriptor();
+				FixedString256 value = "\"<invalid>\"";
+
+				if (td && view.field_ptr && mirror.contains_object(view.field_ptr, td->size))
+				{
+					td->to_string(view.field_ptr, value.data, value.capacity());
+				}
+
+				res.body.append_from_string_format("\"%s\":\"%s\"", view.field_info->name.c_str(), value.c_str());
+			});
+
+		res.body.append_from_string("}");
+		res.status_code = 200;
+		res.content_type = "application/json";
+	}
+
+	void TelemetryServer::handle_get_workload_io(const WebRequest& req, WebResponse& res, bool inputs)
+	{
+		const char* workload_unique_name = req.find_query_param("name");
+		const WorkloadInstanceInfo* info = workload_unique_name != nullptr ? engine->find_instance_info(workload_unique_name) : nullptr;
+
+		if (!info)
+		{
+			res.body.set_from_string("{\"error\":\"not found\"}");
+			res.status_code = 404;
+			return;
+		}
+
+		WorkloadsBuffer& mirror = engine->get_workloads_buffer();
+		const TypeDescriptor* desc = inputs ? info->type->get_workload_desc()->inputs_desc : info->type->get_workload_desc()->outputs_desc;
+		size_t offset = inputs ? info->type->get_workload_desc()->inputs_offset : info->type->get_workload_desc()->outputs_offset;
+
+		res.body.clear();
+		res.body.append_from_string("{");
+
+		bool first = true;
+		WorkloadFieldsIterator::for_each_field_in_struct(*info,
+			desc,
+			offset,
+			mirror,
+			[&](const WorkloadFieldView& view)
+			{
+				if (!first)
+					res.body.append_from_string(",");
+				first = false;
+
+				const TypeDescriptor* td = view.subfield_info ? view.subfield_info->find_type_descriptor() : view.field_info->find_type_descriptor();
+
+				FixedString256 value = "\"<invalid>\"";
+				if (td && view.field_ptr && mirror.contains_object(view.field_ptr, td->size))
+				{
+					if (!td->to_string(view.field_ptr, value.data, value.capacity()))
+					{
+						value.format("<%s>", td->name);
+					}
+				}
+
+				const char* subfieldSeperator = "";
+				const char* subfieldName = "";
+				if (view.subfield_info)
+				{
+					subfieldSeperator = ".";
+					subfieldName = view.subfield_info->name.c_str();
+				}
+
+				res.body.append_from_string_format(
+					"\"%s%s%s\":\"%s\"", view.field_info->name.c_str(), subfieldSeperator, subfieldName, value.c_str());
+			});
+
+		res.body.append_from_string("}");
+		res.status_code = 200;
+		res.content_type = "application/json";
+	}
+
+	void TelemetryServer::handle_get_workload_inputs(const WebRequest& req, WebResponse& res)
+	{
+		handle_get_workload_io(req, res, true);
+	}
+
+	void TelemetryServer::handle_get_workload_outputs(const WebRequest& req, WebResponse& res)
+	{
+		handle_get_workload_io(req, res, false);
 	}
 
 } // namespace robotick

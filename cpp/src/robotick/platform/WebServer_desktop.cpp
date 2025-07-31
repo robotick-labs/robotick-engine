@@ -30,6 +30,38 @@ namespace robotick
 		return running;
 	}
 
+	void parse_query_string(const char* qs, WebRequest& request)
+	{
+		if (!qs || *qs == '\0')
+			return;
+
+		while (*qs && request.query_params.size() < request.query_params.capacity())
+		{
+			FixedString32 key;
+			FixedString64 value;
+
+			// Parse key
+			const char* key_start = qs;
+			while (*qs && *qs != '=' && *qs != '&')
+				++qs;
+			key = FixedString32(key_start, qs - key_start);
+
+			if (*qs == '=')
+				++qs;
+
+			// Parse value
+			const char* val_start = qs;
+			while (*qs && *qs != '&')
+				++qs;
+			value = FixedString64(val_start, qs - val_start);
+
+			request.query_params.add({key, value});
+
+			if (*qs == '&')
+				++qs;
+		}
+	}
+
 	int web_server_callback(struct mg_connection* conn, void* user_data)
 	{
 		WebServer* self = static_cast<WebServer*>(user_data);
@@ -41,18 +73,18 @@ namespace robotick
 
 		if (req_info->local_uri)
 			request.uri = req_info->local_uri;
+
 		if (req_info->request_method)
 			request.method = req_info->request_method;
+
+		if (req_info->query_string)
+			parse_query_string(req_info->query_string, request);
 
 		// Read body if present
 		char buffer[1024];
 		int len = mg_read(conn, buffer, sizeof(buffer));
 		if (len > 0)
 			request.body.set(buffer, len);
-
-		// Let CivetWeb handle the root (e.g., /index.html)
-		if (request.uri == "/")
-			return 0;
 
 		// Check if requested path exists as a file
 		{
@@ -73,19 +105,33 @@ namespace robotick
 		}
 
 		WebResponse response;
-		self->get_handler()(request, response);
+		if (self->get_handler()(request, response))
+		{
+			mg_printf(conn,
+				"HTTP/1.1 %d OK\r\n"
+				"Content-Type: %s\r\n"
+				"Content-Length: %zu\r\n"
+				"\r\n",
+				response.status_code,
+				response.content_type.c_str(),
+				response.body.size());
 
-		mg_printf(conn,
-			"HTTP/1.1 %d OK\r\n"
-			"Content-Type: %s\r\n"
-			"Content-Length: %zu\r\n"
-			"\r\n",
-			response.status_code,
-			response.content_type.c_str(),
-			response.body.size());
+			mg_write(conn, response.body.data(), response.body.size());
 
-		mg_write(conn, response.body.data(), response.body.size());
-		return response.status_code;
+			constexpr bool verbose_http = false;
+			if (verbose_http || response.status_code >= 400)
+			{
+				ROBOTICK_INFO("WebServer - %s %s - response code %i (%i bytes)",
+					request.method.c_str(),
+					request.uri.c_str(),
+					response.status_code,
+					(int)response.body.size());
+			}
+
+			return response.status_code;
+		}
+
+		return 0; // fallback (not handled - let CivetWeb handle the request)
 	}
 
 	void WebServer::start(const char* name, uint16_t port, const char* web_root_folder, WebRequestHandler handler_in)

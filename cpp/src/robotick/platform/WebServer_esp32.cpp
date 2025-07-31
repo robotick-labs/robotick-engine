@@ -42,6 +42,38 @@ namespace robotick
 		return static_cast<WebServerImpl*>(impl)->server != nullptr;
 	}
 
+	void parse_query_string(const char* qs, WebRequest& request)
+	{
+		if (!qs || *qs == '\0')
+			return;
+
+		while (*qs && request.query_params.size() < request.query_params.capacity())
+		{
+			FixedString32 key;
+			FixedString64 value;
+
+			// Parse key
+			const char* key_start = qs;
+			while (*qs && *qs != '=' && *qs != '&')
+				++qs;
+			key = FixedString32(key_start, qs - key_start);
+
+			if (*qs == '=')
+				++qs;
+
+			// Parse value
+			const char* val_start = qs;
+			while (*qs && *qs != '&')
+				++qs;
+			value = FixedString64(val_start, qs - val_start);
+
+			request.query_params.add({key, value});
+
+			if (*qs == '&')
+				++qs;
+		}
+	}
+
 	static esp_err_t handle_http_request(httpd_req_t* req)
 	{
 		WebServerImpl* state = static_cast<WebServerImpl*>(req->user_ctx);
@@ -52,7 +84,22 @@ namespace robotick
 		WebResponse response;
 
 		request.method = http_method_str((http_method)req->method);
-		request.uri = req->uri;
+
+		// parse the uri as needed:
+		{
+			const char* full_uri = req->uri;
+			const char* qs = strchr(full_uri, '?');
+
+			// Set clean URI (excluding query string)
+			if (qs)
+				request.uri = FixedString128(full_uri, qs - full_uri); // up to but not including '?'
+			else
+				request.uri = full_uri;
+
+			// Parse query string if present
+			if (qs)
+				parse_query_string(qs + 1, request); // skip '?'
+		}
 
 		if (req->method == HTTP_POST && req->content_len > 0 && req->content_len < request.body.capacity())
 		{
@@ -61,16 +108,49 @@ namespace robotick
 				request.body.set_size(static_cast<size_t>(read));
 		}
 
-		state->handler(request, response);
+		if (state->handler(request, response))
+		{
+			httpd_resp_set_type(req, response.content_type.c_str());
 
-		httpd_resp_set_type(req, response.content_type.c_str());
-		httpd_resp_send(req, reinterpret_cast<const char*>(response.body.data()), response.body.size());
+			static constexpr size_t kMaxChunkSize = 1024;
 
-		ROBOTICK_INFO("WebServer - %s %s - response code %i (%i bytes)",
-			request.method.c_str(),
-			request.uri.c_str(),
-			response.status_code,
-			response.body.size());
+			if (response.body.size() <= kMaxChunkSize)
+			{
+				httpd_resp_send(req, reinterpret_cast<const char*>(response.body.data()), response.body.size());
+			}
+			else
+			{
+				const char* data = reinterpret_cast<const char*>(response.body.data());
+				size_t remaining = response.body.size();
+
+				while (remaining > 0)
+				{
+					size_t chunk_size = std::min(remaining, kMaxChunkSize);
+					if (httpd_resp_send_chunk(req, data, chunk_size) != ESP_OK)
+					{
+						ROBOTICK_WARNING("WebServer - failed to send chunk");
+						break;
+					}
+					data += chunk_size;
+					remaining -= chunk_size;
+				}
+				httpd_resp_send_chunk(req, nullptr, 0); // Finalize chunked transfer
+			}
+
+			constexpr bool verbose_http = false;
+			if (verbose_http || response.status_code >= 400)
+			{
+				ROBOTICK_INFO("WebServer - %s %s - response code %i (%i bytes)",
+					request.method.c_str(),
+					request.uri.c_str(),
+					response.status_code,
+					response.body.size());
+			}
+		}
+		else
+		{
+			httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Not found");
+		}
 
 		return ESP_OK;
 	}
@@ -85,7 +165,7 @@ namespace robotick
 		state->handler = handler_in;
 
 		httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-		config.stack_size = 12288; // Increase from default 4096 to 8KB
+		config.stack_size = 16384; // Increase from default 4096 to 8KB
 		config.server_port = port;
 		config.uri_match_fn = httpd_uri_match_wildcard;
 
