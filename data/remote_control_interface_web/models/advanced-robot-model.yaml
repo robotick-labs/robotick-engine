@@ -1,0 +1,136 @@
+network_hotspot:
+  ssid: "ASTROBOT"
+  password: "roversecure1"
+  iface: "wlan0"
+
+model:
+  core:
+    tick_rate_hz: 100.0  # fastest control loop base rate
+
+    workloads:
+
+      # 🧠 Core estimation & control
+      - id: imu
+        type: ImuSensorWorkload
+        tick_rate_hz: 200.0  # fast IMU updates
+      - id: wheel_odometry
+        type: WheelOdometryWorkload
+        tick_rate_hz: 100.0
+      - id: pose_fusion
+        type: EkfFusionWorkload
+        tick_rate_hz: 100.0
+
+      - id: locomotion
+        type: LeggedLocomotionController
+        tick_rate_hz: 100.0
+      - id: foot_placement
+        type: TerrainAwareStepPlanner
+        tick_rate_hz: 50.0
+
+      # 🤖 Manipulation
+      - id: arm_kinematics
+        type: InverseKinematicsWorkload
+        tick_rate_hz: 50.0
+      - id: gripper_control
+        type: GripperPIDWorkload
+        tick_rate_hz: 30.0
+
+      # 🧭 Navigation stack
+      - id: slam
+        type: VisualInertialSLAM
+        tick_rate_hz: 30.0
+      - id: global_planner
+        type: MissionPlannerWorkload
+        tick_rate_hz: 5.0
+      - id: local_planner
+        type: ObstacleAvoidanceWorkload
+        tick_rate_hz: 20.0
+
+      # 👁️ Perception
+      - id: stereo_vision
+        type: StereoDepthCameraWorkload
+        tick_rate_hz: 15.0
+      - id: object_detector
+        type: NeuralDetectorWorkload
+        tick_rate_hz: 5.0
+      - id: semantic_mapper
+        type: SceneGraphBuilder
+        tick_rate_hz: 1.0
+
+      # 📡 Communications
+      - id: telemetry
+        type: MqttTelemetryWorkload
+        tick_rate_hz: 2.0
+      - id: file_downlink
+        type: DataLoggerUploader
+        tick_rate_hz: 0.2
+
+      # ❤️ Human/Mission Interface
+      - id: emotion_display
+        type: EyeFaceDisplayWorkload
+        tick_rate_hz: 10.0
+      - id: voice_responder
+        type: IntentRecognitionWorkload
+        tick_rate_hz: 5.0
+      - id: heartbeat
+        type: HeartbeatDisplayWorkload
+        tick_rate_hz: 1.0
+
+      # 🧵 Threading groups
+      - id: fast_loop
+        type: SyncedGroupWorkload
+        tick_rate_hz: 100.0
+        children: [imu, wheel_odometry, pose_fusion, locomotion, foot_placement]
+      - id: manipulation_loop
+        type: SequencedGroupWorkload
+        tick_rate_hz: 50.0
+        children: [arm_kinematics, gripper_control]
+      - id: perception_loop
+        type: SyncedGroupWorkload
+        tick_rate_hz: 15.0
+        children: [stereo_vision, object_detector, semantic_mapper]
+      - id: mission_loop
+        type: SyncedGroupWorkload
+        tick_rate_hz: 10.0
+        children: [slam, global_planner, local_planner]
+      - id: ui_loop
+        type: SyncedGroupWorkload
+        tick_rate_hz: 5.0
+        children: [emotion_display, voice_responder, heartbeat]
+      - id: comms_loop
+        type: SequencedGroupWorkload
+        tick_rate_hz: 2.0
+        children: [telemetry, file_downlink]
+
+      # 🔁 Root tick orchestrator
+      - id: root
+        type: SequencedGroupWorkload
+        tick_rate_hz: 100.0
+        children: [fast_loop, manipulation_loop, perception_loop, mission_loop, ui_loop, comms_loop]
+
+    data_connections:
+      - from: imu.outputs.orientation
+        to: pose_fusion.inputs.imu_orientation
+      - from: wheel_odometry.outputs.delta_pose
+        to: pose_fusion.inputs.odometry_delta
+
+      - from: pose_fusion.outputs.fused_pose
+        to: locomotion.inputs.current_pose
+      - from: pose_fusion.outputs.fused_pose
+        to: slam.inputs.initial_pose
+      - from: stereo_vision.outputs.depth_map
+        to: local_planner.inputs.depth_data
+      - from: slam.outputs.map
+        to: mission_planner.inputs.map_data
+      - from: mission_planner.outputs.target_path
+        to: local_planner.inputs.navigation_goal
+
+      - from: camera.outputs.scene
+        to: object_detector.inputs.image
+      - from: object_detector.outputs.detections
+        to: semantic_mapper.inputs.detections
+
+      - from: semantic_mapper.outputs.semantic_map
+        to: face.inputs.scene_summary
+
+    root: root
