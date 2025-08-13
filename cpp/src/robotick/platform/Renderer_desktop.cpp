@@ -1,6 +1,7 @@
 #if defined(ROBOTICK_PLATFORM_DESKTOP)
 
 #include "robotick/api.h"
+#include "robotick/platform/PlatformEvents.h"
 #include "robotick/platform/Renderer.h"
 
 #include <SDL2/SDL.h>
@@ -14,8 +15,15 @@ namespace robotick
 	static TTF_Font* font = nullptr;
 	static int current_font_size = 0;
 
+	bool is_windowed_mode()
+	{
+		const char* env = std::getenv("ROBOTICK_WINDOWED");
+		return env && std::atoi(env) != 0;
+	}
+
 	void Renderer::init()
 	{
+		SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 
 		if (SDL_Init(SDL_INIT_VIDEO) != 0)
@@ -28,8 +36,12 @@ namespace robotick
 		if (SDL_GetCurrentDisplayMode(0, &display_mode) != 0)
 			ROBOTICK_FATAL_EXIT("SDL_GetCurrentDisplayMode failed: %s", SDL_GetError());
 
-		window = SDL_CreateWindow(
-			"Robotick_Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, display_mode.w, display_mode.h, SDL_WINDOW_FULLSCREEN_DESKTOP);
+		const bool is_windowed = is_windowed_mode();
+		const uint32_t window_flags = is_windowed ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP;
+		const int width = is_windowed ? display_mode.w / 4 : display_mode.w;
+		const int height = is_windowed ? display_mode.h / 4 : display_mode.w;
+
+		window = SDL_CreateWindow("Robotick Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, window_flags);
 		if (!window)
 			ROBOTICK_FATAL_EXIT("SDL_CreateWindow failed: %s", SDL_GetError());
 
@@ -84,6 +96,8 @@ namespace robotick
 	void Renderer::present()
 	{
 		SDL_RenderPresent(renderer);
+
+		poll_platform_events();
 	}
 
 	void Renderer::draw_ellipse_filled(const Vec2& center, const float rx, const float ry, const Color& color)

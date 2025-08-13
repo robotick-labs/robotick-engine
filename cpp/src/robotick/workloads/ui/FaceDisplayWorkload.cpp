@@ -110,7 +110,7 @@ namespace robotick
 		{
 			auto& blink = state->eye_blink_progress;
 			const int center_y = 120;
-			const int eye_w = 35;
+			const int eye_w = 40;
 			const int eye_h = 65;
 			const int eye_spacing = 200;
 

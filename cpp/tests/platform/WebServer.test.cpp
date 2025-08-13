@@ -89,17 +89,19 @@ TEST_CASE("Unit/Platform/WebServer/WebServer serves static file and fallback han
 	std::string last_body;
 
 	WebServer server;
-	server.start(8089,
+	server.start("Test",
+		8089,
 		"data/remote_control_interface_web",
 		[&](const WebRequest& request, WebResponse& response)
 		{
 			fallback_called = true;
 			last_method = request.method;
-			last_body = request.body;
+			last_body = (const char*)request.body.begin();
 
 			std::string body_string = std::string("Custom: ") + std::string(request.uri);
 			response.body.set_from_string(body_string.c_str());
 			response.content_type = "text/plain";
+			return true; // handled
 		});
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Give server time to bind

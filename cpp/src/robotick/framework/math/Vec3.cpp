@@ -42,3 +42,8 @@ ROBOTICK_STRUCT_FIELD(Vec3, float, z)
 ROBOTICK_REGISTER_STRUCT_END(Vec3)
 
 #endif // #if defined(ROBOTICK_DEFAULT_REAL_IS_DOUBLE)
+
+extern "C" void robotick_force_register_vec3_types()
+{
+	// This function exists solely to force this TU to be retained
+}

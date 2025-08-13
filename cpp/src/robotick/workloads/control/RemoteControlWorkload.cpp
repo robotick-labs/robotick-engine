@@ -68,7 +68,8 @@ namespace robotick
 		void setup()
 		{
 #if defined(ROBOTICK_PLATFORM_DESKTOP)
-			state->server.start(config.port,
+			state->server.start("RemoteControl",
+				config.port,
 				config.web_root_folder.c_str(),
 				[&](const WebRequest& request, WebResponse& response)
 				{
@@ -79,7 +80,7 @@ namespace robotick
 						{
 							response.status_code = 400;
 							response.body.set_from_string("Invalid JSON format.");
-							return;
+							return true; // handled
 						}
 
 						const nlohmann::json& json = json_opt;
@@ -107,13 +108,17 @@ namespace robotick
 						try_set_vec2_from_json("right", w.right);
 
 						response.status_code = 200;
+						return true; // handled
 					}
 					else if (request.method == "GET" && request.uri == "/api/jpeg_data")
 					{
 						response.body.set(inputs.jpeg_data.data(), inputs.jpeg_data.size());
 						response.content_type = "image/jpeg";
 						response.status_code = 200;
+						return true; // handled
 					}
+
+					return false; // not handled
 				});
 #endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)
 		}
@@ -131,10 +136,7 @@ namespace robotick
 			outputs.right.y = inputs_ref.right.y * inputs_ref.scale_right.y;
 		}
 
-		void stop()
-		{
-			state->server.stop();
-		}
+		void stop() { state->server.stop(); }
 
 		static float apply_dead_zone(float value, float dead_zone)
 		{

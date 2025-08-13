@@ -1,33 +1,51 @@
 #pragma once
 
-#if defined(ROBOTICK_PLATFORM_DESKTOP)
-
+#include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/common/FixedVector.h"
+#include "robotick/framework/common/Pair.h"
 
 #include <cstdint>
-#include <functional>
-#include <string>
-
-struct mg_context;
-struct mg_connection;
 
 namespace robotick
 {
+	using WebRequestBodyBuffer = FixedVector1k;
+
+#if defined(ROBOTICK_PLATFORM_ESP32)
+	using WebResponseBodyBuffer = FixedVector8k;
+#else
+	using WebResponseBodyBuffer = FixedVector256k; // big enough for a generous jpg image
+#endif
+
 	struct WebRequest
 	{
-		std::string_view uri;
-		std::string_view method;
-		std::string body;
+		FixedString8 method;
+
+		FixedString128 uri;
+		FixedVector<Pair<FixedString32, FixedString64>, 8> query_params;
+
+		WebRequestBodyBuffer body;
+
+		const char* find_query_param(const char* key) const
+		{
+			for (const auto& pair : query_params)
+			{
+				if (pair.first == key)
+					return pair.second.c_str();
+			}
+			return nullptr;
+		}
 	};
 
 	struct WebResponse
 	{
-		FixedVector256k body;
-		std::string content_type = "text/plain"; // Default
-		int status_code = 404;					 // Default: NotFound (intuituve - meaning it's not been handled)
+		WebResponseBodyBuffer body;
+		FixedString32 content_type = "text/plain"; // Default
+		int status_code = 404;					   // Default: NotFound (intuituve - meaning it's not been handled)
 	};
 
-	using WebRequestHandler = std::function<void(const WebRequest&, WebResponse&)>;
+	using WebRequestHandler = std::function<bool(const WebRequest&, WebResponse&)>;
+
+	struct WebServerImpl;
 
 	class WebServer
 	{
@@ -35,54 +53,21 @@ namespace robotick
 		WebServer();
 		~WebServer();
 
-		void start(uint16_t port, const std::string& web_root_folder, WebRequestHandler handler = nullptr);
+		void start(const char* name, uint16_t port, const char* web_root_folder = nullptr, WebRequestHandler handler = nullptr);
 		void stop();
 		bool is_running() const;
 
+		WebRequestHandler get_handler() const { return handler; };
+		const char* get_server_name() const { return server_name.c_str(); };
+		const char* get_document_root() const { return document_root.c_str(); };
+
 	  private:
-		static int callback(struct mg_connection* conn, void* user_data);
+		WebServerImpl* impl = nullptr;
 
-		mg_context* ctx;
-		bool running;
-		WebRequestHandler handler;
-		std::string document_root;
+		bool running = false;
+		WebRequestHandler handler = nullptr;
+
+		FixedString32 server_name;
+		FixedString512 document_root;
 	};
 } // namespace robotick
-
-#else // !defined(ROBOTICK_PLATFORM_DESKTOP)
-
-#include <cstdint>
-#include <functional>
-#include <string>
-
-namespace robotick
-{
-	struct WebRequest
-	{
-		std::string_view uri;
-		std::string_view method;
-		std::string body;
-	};
-
-	struct WebResponse
-	{
-		std::string body;
-		std::string content_type = "text/plain";
-		int status_code = 404;
-	};
-
-	using WebRequestHandler = std::function<void(const WebRequest&, WebResponse&)>;
-
-	class WebServer
-	{
-	  public:
-		inline WebServer() {}
-		inline ~WebServer() {}
-
-		inline void start(uint16_t /*port*/, const std::string& /*web_root_folder*/, WebRequestHandler /*handler*/ = nullptr) {}
-		inline void stop() {}
-		inline bool is_running() const { return false; }
-	};
-} // namespace robotick
-
-#endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)

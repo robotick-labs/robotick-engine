@@ -43,11 +43,10 @@ void populate_model_hello_rc(robotick::Model& model)
 
 	const robotick::WorkloadSeed& camera = model.add("CameraWorkload", "camera").set_tick_rate_hz(tick_rate_hz_main);
 
-	const robotick::WorkloadSeed& console_telem = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(tick_rate_hz_console);
+	// const robotick::WorkloadSeed& console_telem = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(tick_rate_hz_console);
 
-	const robotick::WorkloadSeed& root = model.add("SyncedGroupWorkload", "root_group")
-											 .set_children({&console_telem, &remote_control, &face, &camera})
-											 .set_tick_rate_hz(tick_rate_hz_main);
+	const robotick::WorkloadSeed& root =
+		model.add("SyncedGroupWorkload", "root_group").set_children({&remote_control, &face, &camera}).set_tick_rate_hz(tick_rate_hz_main);
 
 	model.connect("camera.outputs.jpeg_data", "remote_control.inputs.jpeg_data");
 

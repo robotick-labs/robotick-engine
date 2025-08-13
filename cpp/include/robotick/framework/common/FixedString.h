@@ -3,8 +3,10 @@
 
 #include "robotick/framework/common/Hash.h"
 
+#include <cstdio>
 #include <stddef.h>
 #include <string.h>
+#include <utility>
 
 namespace robotick
 {
@@ -67,6 +69,8 @@ namespace robotick
 
 		operator const char*() const { return data; }
 
+		bool equals(const char* other) const noexcept { return strcmp(data, other) == 0; }
+
 		bool operator==(const char* other) const noexcept { return strcmp(data, other) == 0; }
 
 		bool operator==(const FixedString<N>& other) const { return strcmp(data, other.data) == 0; }
@@ -89,6 +93,15 @@ namespace robotick
 		size_t length() const { return fixed_strlen(data); };
 
 		constexpr size_t capacity() const { return N; }
+
+		template <typename... Args> void format(const char* fmt, Args&&... args)
+		{
+			const int written = std::snprintf(data, N, fmt, std::forward<Args>(args)...);
+			if (written < 0)
+			{
+				data[0] = '\0';
+			}
+		}
 	};
 
 	template <size_t N> inline size_t hash(const FixedString<N>& s)
