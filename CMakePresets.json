@@ -22,33 +22,58 @@
             }
         },
         {
-            "name": "linux-debug",
+            "name": "test-linux-debug",
             "inherits": "linux-base",
             "description": "Linux Debug build (no optimizations, full asserts)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEBUG -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD",
+                "ROBOTICK_WORKLOADS_USE_ALL": "ON",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEBUG -DROBOTICK_ENABLE_MODEL_HEAP",
                 "ROBOTICK_BUILD_TESTS": "ON"
             }
         },
         {
-            "name": "linux-development",
-            "inherits": "linux-base",
-            "description": "Linux Development build (optimized with probes)",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-                "CMAKE_CXX_FLAGS_DEBUG": "-g -O1 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEV -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD",
-                "ROBOTICK_BUILD_CONFIG_DEVELOPMENT": "ON"
-            }
-        },
-        {
-            "name": "linux-release",
+            "name": "test-linux-release",
             "inherits": "linux-base",
             "description": "Linux Release build (stripped, fastest)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_CXX_FLAGS_DEBUG": "-DNDEBUG -DROBOTICK_RELEASE -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD",
+                "ROBOTICK_WORKLOADS_USE_ALL": "ON",
+                "CMAKE_CXX_FLAGS_RELEASE": "-DNDEBUG -DROBOTICK_RELEASE -DROBOTICK_ENABLE_MODEL_HEAP",
+                "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
+                "ROBOTICK_STRIP_PROBES": "ON"
+            }
+        },
+
+        {
+            "name": "desktop-testbed-linux-base",
+            "hidden": true,
+            "inherits": "linux-base",
+            "cacheVariables": {
+                "ROBOTICK_ENABLE_PYTHON": "OFF",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-linux-native.cmake",
+                "WORKLOAD_PRESET": "ubuntu-workloads-all",
+                "ROBOTICK_PROJECT_ROOT": "${sourceDir}/examples/desktop-testbed"
+            }
+        },
+        {
+            "name": "desktop-testbed-linux-debug",
+            "inherits": "desktop-testbed-linux-base",
+            "description": "Debug build for desktop-testbed",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEBUG -DROBOTICK_ENABLE_MODEL_HEAP"
+            }
+        },
+        {
+            "name": "desktop-testbed-linux-release",
+            "inherits": "desktop-testbed-linux-base",
+            "description": "Stripped and optimized release build for desktop-testbed",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_FLAGS_RELEASE": "-DNDEBUG -DROBOTICK_RELEASE -DROBOTICK_ENABLE_MODEL_HEAP -DROBOTICK_ENABLE_MODEL_LOAD",
                 "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
                 "ROBOTICK_STRIP_PROBES": "ON"
             }
@@ -74,16 +99,20 @@
     ],
     "buildPresets": [
         {
-            "name": "linux-debug",
-            "configurePreset": "linux-debug"
+            "name": "test-linux-debug",
+            "configurePreset": "test-linux-debug"
         },
         {
-            "name": "linux-development",
-            "configurePreset": "linux-development"
+            "name": "test-linux-release",
+            "configurePreset": "test-linux-release"
         },
         {
-            "name": "linux-release",
-            "configurePreset": "linux-release"
+            "name": "desktop-testbed-linux-debug",
+            "configurePreset": "desktop-testbed-linux-debug"
+        },
+        {
+            "name": "desktop-testbed-linux-release",
+            "configurePreset": "desktop-testbed-linux-release"
         },
         {
             "name": "esp32s3-debug",

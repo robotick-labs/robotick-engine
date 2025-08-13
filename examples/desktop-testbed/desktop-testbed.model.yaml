@@ -1,0 +1,26 @@
+# desktop-testbed.model.yaml
+version: 1
+
+workloads:
+  - type: RemoteControlWorkload
+    unique_name: remote_control
+
+  - type: FaceDisplayWorkload
+    unique_name: face
+
+  - type: CameraWorkload
+    unique_name: camera
+
+  - type: SyncedGroupWorkload
+    unique_name: root_group
+    tick_rate_hz: 30.0
+    children:
+      - remote_control
+      - face
+      - camera
+
+connections:
+  - from: camera.outputs.jpeg_data
+    to: remote_control.inputs.jpeg_data
+
+root_workload: root_group

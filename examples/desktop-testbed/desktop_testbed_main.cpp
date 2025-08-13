@@ -15,23 +15,6 @@ void signal_handler()
 	g_stop_flag.set();
 }
 
-void populate_model_hello_world(robotick::Model& model)
-{
-	const robotick::WorkloadSeed& console = model.add("ConsoleTelemetryWorkload", "console").set_tick_rate_hz(5.0f);
-
-	const robotick::WorkloadSeed& test_state_1 = model.add("TimingDiagnosticsWorkload", "test_state_1");
-
-	const robotick::WorkloadSeed& test_state_2 =
-		model.add("PythonWorkload", "test_state_2")
-			.set_tick_rate_hz(1.0f)
-			.set_config({{"script_name", "robotick.workloads.optional.test.hello_workload"}, {"class_name", "HelloWorkload"}});
-
-	const robotick::WorkloadSeed& root =
-		model.add("SyncedGroupWorkload", "root_group").set_children({&console, &test_state_1, &test_state_2}).set_tick_rate_hz(1000.0f);
-
-	model.set_root_workload(root);
-}
-
 void populate_model_hello_rc(robotick::Model& model)
 {
 	const float tick_rate_hz_main = 30.0f;	 //  slightly slower than the 30Hz at which the camera updates, so as to not need to wait for reads

@@ -33,12 +33,48 @@ if(ROBOTICK_ENABLE_ASAN)
     add_link_options(-fsanitize=address)
 endif()
 
-# ===================================
-# ✅ Source Collection
-# ===================================
+# -----------------------------------------------
+# Discover all .cpp files (excluding workloads/)
+# -----------------------------------------------
+file(GLOB_RECURSE ALL_CPP_SOURCES
+    src/robotick/*.cpp
+)
 
-set(ROBOTICK_ENGINE_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
-include(${ROBOTICK_ENGINE_SOURCE_DIR}/cmake/RobotickWorkloadFilter.cmake)
+if(NOT ROBOTICK_WORKLOADS_USE_ALL)
+    # Manually exclude workload files
+    set(FILTERED_SOURCES "")
+    foreach(src ${ALL_CPP_SOURCES})
+        string(FIND "${src}" "/src/robotick/workloads/" match_pos)
+        if(match_pos EQUAL -1)
+            list(APPEND FILTERED_SOURCES "${src}")
+        endif()
+    endforeach()
+    set(ALL_CPP_SOURCES "${FILTERED_SOURCES}")
+endif()
+
+# -----------------------------------------------
+# Partition out Python-related files
+# -----------------------------------------------
+set(CORE_SOURCES "")
+set(PYTHON_SOURCES "")
+foreach(file ${ALL_CPP_SOURCES})
+    if(file MATCHES ".*/PythonRuntime.cpp$" OR file MATCHES ".*/PythonWorkload.cpp$")
+        if(ROBOTICK_ENABLE_PYTHON)
+            list(APPEND CORE_SOURCES ${file})
+            list(APPEND PYTHON_SOURCES ${file})
+        endif()
+    else()
+        list(APPEND CORE_SOURCES ${file})
+    endif()
+endforeach()
+
+# Export results
+set(CORE_SOURCES ${CORE_SOURCES} PARENT_SCOPE)
+set(PYTHON_SOURCES ${PYTHON_SOURCES} PARENT_SCOPE)
+
+list(LENGTH CORE_SOURCES CORE_COUNT)
+list(LENGTH PYTHON_SOURCES PYTHON_COUNT)
+message(STATUS "📦 CORE_SOURCES: ${CORE_COUNT}  |  PYTHON_SOURCES: ${PYTHON_COUNT}")
 
 # =========================
 # ✅ Core Framework Library

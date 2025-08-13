@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        preset: [linux-debug, linux-development, linux-release]
+        preset: [linux-debug, linux-release]
 
     steps:
       - name: Checkout repository
