@@ -12,6 +12,6 @@ WORKDIR /workspace
 COPY . .
 
 # Run the symlink script
-RUN bash make_symlinks.sh
+RUN bash tools/make_esp32_symlinks.sh
 
 

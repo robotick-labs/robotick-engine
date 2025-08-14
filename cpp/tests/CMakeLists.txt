@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(robotick_tests)
+project(robotick_engine_tests)
 
 # ========================
 # ✅ Enable CTest + Warnings
@@ -14,32 +14,16 @@ add_compile_options(-Wall -Wextra -Werror)
 # ✅ Catch2 (Test Framework)
 # ========================
 
-include(FetchContent)
+set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
+find_package(Catch2 3 CONFIG)
 
-# Automatically download Catch2 if not already present
-FetchContent_Declare(
-  Catch2
-  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG        v3.4.0
-)
-
-# Disable -Werror inside Catch2 (even if it tries to re-enable it)
-set(CATCH_ENABLE_EXCEPTIONS ON CACHE BOOL "" FORCE)
-set(CATCH_WARNINGS_AS_ERRORS OFF CACHE BOOL "" FORCE)
-set(CATCH_ENABLE_WERROR OFF CACHE BOOL "" FORCE)
-
-FetchContent_MakeAvailable(Catch2)
-
-# Manually remove -Werror from Catch2 targets if needed
-get_target_property(_catch2_opts Catch2 COMPILE_OPTIONS)
-if(_catch2_opts)
-  list(REMOVE_ITEM _catch2_opts "-Werror")
-  set_target_properties(Catch2 PROPERTIES COMPILE_OPTIONS "${_catch2_opts}")
+if (Catch2_FOUND)
+    message(STATUS "✅ Found Catch2: ${Catch2_DIR}")
+else()
+    message(FATAL_ERROR "❌ Catch2 v3 not found. Please install it:\n"
+                        "    sudo apt install catch2")
 endif()
 
-# Avoid clang-tidy warnings inside Catch2 (external lib)
-set_target_properties(Catch2 PROPERTIES CXX_CLANG_TIDY "")
-set_target_properties(Catch2WithMain PROPERTIES CXX_CLANG_TIDY "")
 
 # ========================
 # ✅ Test Sources & Target
@@ -58,48 +42,48 @@ if(false) # enable to debug test-sources
 endif()
 
 # Build test executable
-add_executable(robotick_tests ${ROBOTICK_TEST_SOURCES})
+add_executable(robotick_engine_tests ${ROBOTICK_TEST_SOURCES})
 
 # AddressSanitizer (optional runtime debug support)
 # Uncomment to enable memory error detection during testing (impacts performance)
 # if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-#   message(STATUS "🔎 Enabling AddressSanitizer for robotick_tests")
-#   target_compile_options(robotick_tests PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-#   target_link_options(robotick_tests PRIVATE -fsanitize=address)
+#   message(STATUS "🔎 Enabling AddressSanitizer for robotick_engine_tests")
+#   target_compile_options(robotick_engine_tests PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+#   target_link_options(robotick_engine_tests PRIVATE -fsanitize=address)
 # endif()
 
 # Link against core framework and Catch2
-target_link_libraries(robotick_tests
+target_link_libraries(robotick_engine_tests
   PRIVATE
     robotick-engine
     Catch2::Catch2WithMain
 )
 
 # Link against curl lib (for WebServer testing)
-target_link_libraries(robotick_tests PRIVATE curl)
+target_link_libraries(robotick_engine_tests PRIVATE curl)
 
 # ✅ Re-enable exceptions just for test target
-target_compile_options(robotick_tests PRIVATE -fexceptions)
+target_compile_options(robotick_engine_tests PRIVATE -fexceptions)
 
-target_compile_definitions(robotick_tests PRIVATE ROBOTICK_ENABLE_PYTHON=1)
-target_compile_definitions(robotick_tests PRIVATE ROBOTICK_TEST_MODE=1)
-target_compile_definitions(robotick_tests PRIVATE CATCH_CONFIG_ENABLE_EXCEPTIONS)
+target_compile_definitions(robotick_engine_tests PRIVATE ROBOTICK_ENABLE_PYTHON=1)
+target_compile_definitions(robotick_engine_tests PRIVATE ROBOTICK_TEST_MODE=1)
+target_compile_definitions(robotick_engine_tests PRIVATE CATCH_CONFIG_ENABLE_EXCEPTIONS)
 
 # Discover Catch2 TEST_CASEs automatically
 include(Catch)
-catch_discover_tests(robotick_tests)
+catch_discover_tests(robotick_engine_tests)
 
 # Ensure robotick-engine is built before running tests
-add_dependencies(robotick_tests robotick-engine)
+add_dependencies(robotick_engine_tests robotick-engine)
 
 # ========================
 # ✅ Runtime DLL Copy (for VS Code / Debugging)
 # ========================
 
-add_custom_command(TARGET robotick_tests POST_BUILD
+add_custom_command(TARGET robotick_engine_tests POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:robotick-engine>
-    $<TARGET_FILE_DIR:robotick_tests>
+    $<TARGET_FILE_DIR:robotick_engine_tests>
 )
 
 # =======================================================
