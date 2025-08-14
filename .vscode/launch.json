@@ -27,10 +27,10 @@
             ]
         },
         {
-            "name": "Debug robotick_tests",
+            "name": "Debug robotick_engine_tests",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/linux-debug/cpp/tests/robotick_tests",
+            "program": "${workspaceFolder}/build/linux-debug/cpp/tests/robotick_engine_tests",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -57,7 +57,7 @@
             "logging": {
                 "engineLogging": true
             },
-            "preLaunchTask": "Build robotick_tests",
+            "preLaunchTask": "Build robotick_engine_tests",
             "additionalSOLibSearchPath": "${workspaceFolder}/build/linux-debug",
             "sourceFileMap": {
                 "${workspaceFolder}": "${workspaceFolder}"

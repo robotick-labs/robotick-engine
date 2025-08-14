@@ -242,7 +242,7 @@ endif()
 
 if (ROBOTICK_BUILD_TESTS)
     include(CTest)
-    add_test(NAME robotick_tests
-             COMMAND robotick_tests
+    add_test(NAME robotick_engine_tests
+             COMMAND robotick_engine_tests
              WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/cpp/tests)
 endif()

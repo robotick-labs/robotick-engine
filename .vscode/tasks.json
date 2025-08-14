@@ -20,7 +20,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Build robotick_tests",
+      "label": "Build robotick_engine_tests",
       "type": "shell",
       "command": "cmake",
       "args": [
@@ -29,7 +29,7 @@
         "--config",
         "Debug",
         "--target",
-        "robotick_tests"
+        "robotick_engine_tests"
       ],
       "group": {
         "kind": "build",
