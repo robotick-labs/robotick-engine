@@ -1,0 +1,1 @@
+idf.py -p /dev/ttyACM1 flash monitor
