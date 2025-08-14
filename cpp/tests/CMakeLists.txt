@@ -14,32 +14,16 @@ add_compile_options(-Wall -Wextra -Werror)
 # ✅ Catch2 (Test Framework)
 # ========================
 
-include(FetchContent)
+set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
+find_package(Catch2 3 CONFIG)
 
-# Automatically download Catch2 if not already present
-FetchContent_Declare(
-  Catch2
-  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG        v3.4.0
-)
-
-# Disable -Werror inside Catch2 (even if it tries to re-enable it)
-set(CATCH_ENABLE_EXCEPTIONS ON CACHE BOOL "" FORCE)
-set(CATCH_WARNINGS_AS_ERRORS OFF CACHE BOOL "" FORCE)
-set(CATCH_ENABLE_WERROR OFF CACHE BOOL "" FORCE)
-
-FetchContent_MakeAvailable(Catch2)
-
-# Manually remove -Werror from Catch2 targets if needed
-get_target_property(_catch2_opts Catch2 COMPILE_OPTIONS)
-if(_catch2_opts)
-  list(REMOVE_ITEM _catch2_opts "-Werror")
-  set_target_properties(Catch2 PROPERTIES COMPILE_OPTIONS "${_catch2_opts}")
+if (Catch2_FOUND)
+    message(STATUS "✅ Found Catch2: ${Catch2_DIR}")
+else()
+    message(FATAL_ERROR "❌ Catch2 v3 not found. Please install it:\n"
+                        "    sudo apt install catch2")
 endif()
 
-# Avoid clang-tidy warnings inside Catch2 (external lib)
-set_target_properties(Catch2 PROPERTIES CXX_CLANG_TIDY "")
-set_target_properties(Catch2WithMain PROPERTIES CXX_CLANG_TIDY "")
 
 # ========================
 # ✅ Test Sources & Target

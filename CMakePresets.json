@@ -42,22 +42,6 @@
                 "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
                 "ROBOTICK_STRIP_PROBES": "ON"
             }
-        },
-        {
-            "name": "esp32s3-debug",
-            "displayName": "ESP32-S3 Debug (VS Code Friendly)",
-            "generator": "Ninja",
-            "description": "Debug build for ESP32-S3 using Espressif toolchain and SDK",
-            "binaryDir": "${sourceDir}/build/${presetName}",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "ROBOTICK_PLATFORM_ESP32": "ON",
-                "ROBOTICK_BUILD_TESTS": "OFF"
-            },
-            "environment": {
-                "IDF_PATH": "C:/Espressif/frameworks/esp-idf-v5.4.1",
-                "IDF_TOOLS_PATH": "C:/Espressif"
-            }
         }
     ],
     "buildPresets": [
@@ -68,10 +52,6 @@
         {
             "name": "robotick-engine-tests-linux-release",
             "configurePreset": "robotick-engine-tests-linux-release"
-        },
-        {
-            "name": "esp32s3-debug",
-            "configurePreset": "esp32s3-debug"
         }
     ]
 }

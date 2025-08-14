@@ -4,6 +4,7 @@ echo "🔧 Installing system dependencies as root..."
 
 apt-get update && apt-get install -y \
   build-essential \
+  catch2 \
   cmake \
   clang \
   clang-tidy \
