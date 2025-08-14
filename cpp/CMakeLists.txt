@@ -36,20 +36,13 @@ endif()
 # -----------------------------------------------
 # Discover all .cpp files (excluding workloads/)
 # -----------------------------------------------
-file(GLOB_RECURSE ALL_CPP_SOURCES
-    src/robotick/*.cpp
+file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_LIST_DIR}/src/robotick/*.cpp
 )
 
 if(NOT ROBOTICK_WORKLOADS_USE_ALL)
-    # Manually exclude workload files
-    set(FILTERED_SOURCES "")
-    foreach(src ${ALL_CPP_SOURCES})
-        string(FIND "${src}" "/src/robotick/workloads/" match_pos)
-        if(match_pos EQUAL -1)
-            list(APPEND FILTERED_SOURCES "${src}")
-        endif()
-    endforeach()
-    set(ALL_CPP_SOURCES "${FILTERED_SOURCES}")
+    # Exclude any sources under src/robotick/workloads/ (absolute or relative paths)
+    list(FILTER ALL_CPP_SOURCES EXCLUDE REGEX ".*/src/robotick/workloads/.*|^src/robotick/workloads/.*")
 endif()
 
 # -----------------------------------------------

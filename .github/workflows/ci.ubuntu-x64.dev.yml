@@ -13,7 +13,11 @@ jobs:
 
     strategy:
       matrix:
-        preset: [linux-debug, linux-release]
+        preset:
+          [
+            robotick-engine-tests-linux-debug,
+            robotick-engine-tests-linux-release,
+          ]
 
     steps:
       - name: Checkout repository

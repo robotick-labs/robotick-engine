@@ -2,42 +2,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run Example: desktop-testbed",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/examples/cpp/desktop-testbed/build/desktop-testbed-linux-debug/desktop-testbed",
-            "cwd": "${workspaceFolder}/examples/cpp/desktop-testbed",
-            "preLaunchTask": "Build Example: desktop-testbed",
-            "MIMode": "gdb",
-            "miDebuggerPath": "/usr/bin/gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "console": "integratedTerminal",
-            "internalConsoleOptions": "neverOpen",
-            "environment": [
-                {
-                    "name": "LD_LIBRARY_PATH",
-                    "value": "${workspaceFolder}/examples/cpp/desktop-testbed/build/desktop-testbed-linux-debug"
-                }
-            ]
-        },
-        {
             "name": "Debug robotick_engine_tests",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/linux-debug/cpp/tests/robotick_engine_tests",
+            "program": "${workspaceFolder}/build/robotick-engine-tests-linux-debug/cpp/tests/robotick_engine_tests",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
                 {
                     "name": "LD_LIBRARY_PATH",
-                    "value": "${workspaceFolder}/build/linux-debug"
+                    "value": "${workspaceFolder}/build/robotick-engine-tests-linux-debug"
                 },
                 {
                     "name": "ROBOTICK_ENABLE_BACKTRACE",
@@ -58,7 +33,7 @@
                 "engineLogging": true
             },
             "preLaunchTask": "Build robotick_engine_tests",
-            "additionalSOLibSearchPath": "${workspaceFolder}/build/linux-debug",
+            "additionalSOLibSearchPath": "${workspaceFolder}/build/robotick-engine-tests-linux-debug",
             "sourceFileMap": {
                 "${workspaceFolder}": "${workspaceFolder}"
             },
