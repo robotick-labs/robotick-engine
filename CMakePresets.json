@@ -26,7 +26,6 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "ROBOTICK_WORKLOADS_USE_ALL": "ON",
                 "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEBUG -DROBOTICK_ENABLE_MODEL_HEAP",
                 "ROBOTICK_BUILD_TESTS": "ON"
             }
@@ -37,7 +36,6 @@
             "description": "Linux Release build (stripped, fastest)",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "ROBOTICK_WORKLOADS_USE_ALL": "ON",
                 "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG -DROBOTICK_RELEASE -DROBOTICK_ENABLE_MODEL_HEAP",
                 "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
                 "ROBOTICK_STRIP_PROBES": "ON"

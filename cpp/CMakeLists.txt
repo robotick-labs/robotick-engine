@@ -34,16 +34,11 @@ if(ROBOTICK_ENABLE_ASAN)
 endif()
 
 # -----------------------------------------------
-# Discover all .cpp files (excluding workloads/)
+# Discover all .cpp files
 # -----------------------------------------------
 file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_LIST_DIR}/src/robotick/*.cpp
 )
-
-if(NOT ROBOTICK_WORKLOADS_USE_ALL)
-    # Exclude any sources under src/robotick/workloads/ (absolute or relative paths)
-    list(FILTER ALL_CPP_SOURCES EXCLUDE REGEX ".*/src/robotick/workloads/.*|^src/robotick/workloads/.*")
-endif()
 
 # -----------------------------------------------
 # Partition out Python-related files
