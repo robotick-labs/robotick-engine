@@ -180,7 +180,10 @@ namespace robotick
 		mg_set_request_handler(impl->ctx, "/", &web_server_callback, this);
 		running = true;
 
-		ROBOTICK_INFO("WebServer '%s' serving from '%s' at http://localhost:%u", document_root.c_str(), name, static_cast<unsigned int>(port));
+		ROBOTICK_INFO("WebServer '%s' serving from '%s' at http://localhost:%u",
+			name,
+			web_root_folder ? document_root.c_str() : "<no files>",
+			static_cast<unsigned int>(port));
 	}
 
 	void WebServer::stop()
