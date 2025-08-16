@@ -99,7 +99,7 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
 			model.set_root_workload(root);
 
 			Engine engine;
@@ -141,7 +141,7 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
 			model.set_root_workload(root);
 
 			Engine engine;
@@ -184,7 +184,7 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
 			model.set_root_workload(root);
 
 			Engine engine;
@@ -226,7 +226,7 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
 			model.set_root_workload(root);
 
 			Engine engine;
@@ -269,7 +269,7 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
 			model.set_root_workload(root);
 
 			Engine engine;
@@ -340,7 +340,7 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
 			model.set_root_workload(root);
 
 			Engine engine;
@@ -371,7 +371,7 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
 			model.set_root_workload(root);
 
 			Engine engine;
@@ -402,7 +402,7 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
 			model.set_root_workload(root);
 
 			Engine engine;
@@ -443,7 +443,7 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
 			model.set_root_workload(root);
 
 			Engine engine;
@@ -463,7 +463,7 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
 			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
+			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
 			model.set_root_workload(root);
 
 			Engine engine;

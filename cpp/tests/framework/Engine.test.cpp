@@ -11,6 +11,11 @@
 
 namespace robotick::test
 {
+	struct TestSequencedGroupWorkload
+	{
+	};
+
+	ROBOTICK_REGISTER_WORKLOAD(TestSequencedGroupWorkload)
 
 	namespace
 	{
@@ -102,7 +107,7 @@ namespace robotick::test
 			Model model;
 			const WorkloadSeed& a = model.add("DummyWorkload", "one").set_tick_rate_hz(1.0f).set_config({{"value", "1"}});
 			const WorkloadSeed& b = model.add("DummyWorkload", "two").set_tick_rate_hz(1.0f).set_config({{"value", "2"}});
-			const WorkloadSeed& root = model.add("SequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&a, &b});
+			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&a, &b});
 			model.set_root_workload(root);
 
 			Engine engine;
