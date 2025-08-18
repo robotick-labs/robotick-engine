@@ -140,15 +140,6 @@ target_compile_definitions(civetweb PRIVATE NO_SSL)
 # ✅ Auto-add License Headers
 # =========================
 
-if (DEFINED ROBOTICK_ENABLE_PYTHON)
-    find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
-    add_custom_target(add_license
-        COMMAND ${CMAKE_COMMAND} -E echo "Adding Apache 2.0 headers..."
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/add_license_header.py ${CMAKE_SOURCE_DIR}
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-endif()
-
 if (ROBOTICK_BUILD_TESTS)
     include(CTest)
     add_test(NAME robotick_engine_tests
