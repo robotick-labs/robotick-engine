@@ -455,7 +455,7 @@ namespace robotick::test
 
 			HeapVector<DataConnectionInfo> resolved;
 			ROBOTICK_REQUIRE_ERROR_MSG(
-				DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, engine.get_all_instance_info_map()), ("Subfield"));
+				DataConnectionUtils::create(resolved, engine.get_workloads_buffer(), seeds, engine.get_all_instance_info_map()), ("sub-field"));
 		}
 
 		SECTION("Different subfields allowed")

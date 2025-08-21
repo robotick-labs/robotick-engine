@@ -75,37 +75,7 @@ namespace robotick
 
 		/// @brief Applies a set of field configuration overrides to a given struct by matching and writing string-based field values.
 		static void apply_struct_field_values(
-			void* struct_ptr, const TypeDescriptor& struct_type_desc, const ArrayView<const FieldConfigEntry>& field_config_entries)
-		{
-			const StructDescriptor* struct_desc = struct_type_desc.get_struct_desc();
-			if (!struct_desc)
-			{
-				ROBOTICK_FATAL_EXIT("Struct with no struct desc");
-			}
-
-			for (const FieldConfigEntry& field_config_entry : field_config_entries)
-			{
-				const FieldDescriptor* found_field = struct_desc->find_field(field_config_entry.first.c_str());
-				if (!found_field)
-					continue;
-
-				ROBOTICK_ASSERT_MSG(found_field->offset_within_container != OFFSET_UNBOUND, "Field offset should have been correctly set by now");
-
-				void* field_ptr = static_cast<uint8_t*>(struct_ptr) + found_field->offset_within_container;
-				const FixedString64& value = field_config_entry.second;
-
-				const TypeDescriptor* field_type_desc = found_field->find_type_descriptor();
-				if (!field_type_desc)
-				{
-					ROBOTICK_FATAL_EXIT("Field offset should have been correctly set by now");
-				}
-
-				if (!field_type_desc->from_string(value.c_str(), field_ptr))
-				{
-					ROBOTICK_WARNING("Unable to parse value-string '%s' for field: %s", value.c_str(), found_field->name.c_str());
-				}
-			}
-		}
+			void* struct_ptr, const TypeDescriptor& struct_type_desc, const ArrayView<const FieldConfigEntry>& field_config_entries);
 
 		/// @brief Given a dot-separated field path (e.g. "MyWorkload.outputs.x"), returns the raw pointer, size in bytes, and field-descriptor
 		static std::tuple<void*, size_t, const FieldDescriptor*> find_field_info(const Engine& engine, const char* path);

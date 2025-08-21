@@ -34,15 +34,16 @@ namespace robotick
 		}
 
 		/** @brief Compare with another StringView for equality */
-		bool operator==(const StringView& other) const noexcept { return strncmp(data, other.data, length()) == 0; }
+		bool operator==(const StringView& other) const noexcept { return this->equals(other.c_str()); }
 
 		/** @brief Compare with another StringView for inequality */
 		bool operator!=(const StringView& other) const noexcept { return !(*this == other); }
 
 		/** @brief Compare with a null-terminated C string */
-		bool operator==(const char* other) const noexcept
+		bool operator==(const char* other) const noexcept { return this->equals(other); }
+
+		bool equals(const char* other) const noexcept
 		{
-			return strncmp(data, other, length()) == 0;
 			if (!data && !other)
 				return true;
 			if (!data || !other)

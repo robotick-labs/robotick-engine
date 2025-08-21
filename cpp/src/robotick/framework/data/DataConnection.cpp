@@ -56,15 +56,11 @@ namespace robotick
 		static const FieldDescriptor* find_field(const TypeDescriptor* struct_entry, const char* field_name)
 		{
 			if (!struct_entry)
-			{
 				return nullptr;
-			}
 
 			const StructDescriptor* struct_desc = struct_entry->get_struct_desc();
 			if (!struct_desc)
-			{
 				return nullptr;
-			}
 
 			const FieldDescriptor* found_field = struct_desc->find_field(field_name);
 			return found_field;
@@ -100,6 +96,63 @@ namespace robotick
 			return token;
 		}
 
+		// Walks a dotted member path inside an already-addressable container (supports static or dynamic structs).
+		// Example: container_ptr=ptr_to_vec2, container_type=Vec2, dotted="x" or "position.x"
+		static bool resolve_nested_member(void* container_ptr,
+			const TypeDescriptor* container_type,
+			const char* dotted,
+			void** out_ptr,
+			const TypeDescriptor** out_type,
+			const FieldDescriptor** out_field)
+		{
+			if (!container_ptr || !container_type || !dotted || !*dotted)
+				return false;
+
+			auto get_struct_desc = [](const TypeDescriptor* td, void* base) -> const StructDescriptor*
+			{
+				if (const StructDescriptor* s = td->get_struct_desc())
+					return s;
+				if (const DynamicStructDescriptor* d = td->get_dynamic_struct_desc())
+					return d->get_struct_descriptor(base);
+				return nullptr;
+			};
+
+			const char* cursor = dotted;
+			void* cur_ptr = container_ptr;
+			const TypeDescriptor* cur_type = container_type;
+			const StructDescriptor* cur_struct = get_struct_desc(cur_type, cur_ptr);
+
+			// Iterate tokens until cursor reaches '\0'
+			while (*cursor)
+			{
+				if (!cur_struct)
+					return false;
+
+				FixedString64 token = extract_next_token(cursor);
+				const FieldDescriptor* fld = cur_struct->find_field(token.c_str());
+				if (!fld)
+					return false;
+
+				void* fld_ptr = fld->get_data_ptr(cur_ptr);
+				const TypeDescriptor* fld_type = fld->find_type_descriptor();
+				if (!fld_type)
+					return false;
+
+				cur_ptr = fld_ptr;
+				cur_type = fld_type;
+				cur_struct = get_struct_desc(cur_type, cur_ptr);
+
+				if (out_field)
+					*out_field = fld;
+				if (out_ptr)
+					*out_ptr = fld_ptr;
+				if (out_type)
+					*out_type = fld_type;
+			}
+
+			return true;
+		}
+
 		ResolvedField resolve_field_ptr(const char* path, const Map<const char*, WorkloadInstanceInfo*>& instances, WorkloadsBuffer& workloads_buffer)
 		{
 			const char* path_cursor = path;
@@ -125,43 +178,31 @@ namespace robotick
 				ROBOTICK_FATAL_EXIT("Field '%s' not found in path: %s", field_token.c_str(), path);
 
 			const uint8_t* ptr = (uint8_t*)field->get_data_ptr(workloads_buffer, *workload, *struct_type, struct_offset);
-			TypeId type = field->type_id;
 			const TypeDescriptor* field_type_desc = field->find_type_descriptor();
 			if (!field_type_desc)
-				ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has unknown type '%s'", field_token.c_str(), path, type.get_debug_name());
+				ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has unknown type '%s'", field_token.c_str(), path, field->type_id.get_debug_name());
+			TypeId type = field->type_id;
 			size_t size = field_type_desc->size;
 
-			// Step 4: optional subfield
-			if (*path_cursor != '\0') // There’s still more of the path
+			// Step 4: optional subfield chain
+			if (*path_cursor != '\0')
 			{
-				const FixedString64 subfield_token = extract_next_token(path_cursor);
+				void* sub_ptr = const_cast<uint8_t*>(ptr);
+				const TypeDescriptor* sub_type = field_type_desc;
+				const FieldDescriptor* sub_desc = nullptr;
 
-				const StructDescriptor* struct_desc = field_type_desc->get_struct_desc();
-				if (!struct_desc)
+				if (!resolve_nested_member(sub_ptr, sub_type, path_cursor, &sub_ptr, &sub_type, &sub_desc))
 				{
-					if (const DynamicStructDescriptor* dynamic_struct_desc = field_type_desc->get_dynamic_struct_desc())
-					{
-						struct_desc = dynamic_struct_desc->get_struct_descriptor(ptr);
-					}
+					ROBOTICK_FATAL_EXIT("Invalid sub-field path after '%s' in: %s", field_token.c_str(), path);
 				}
 
-				if (struct_desc)
-				{
-					const FieldDescriptor* sub_field = struct_desc->find_field(subfield_token.c_str());
-					if (!sub_field)
-						ROBOTICK_FATAL_EXIT("Subfield '%s' not found in path: %s", subfield_token.c_str(), path);
+				ptr = static_cast<const uint8_t*>(sub_ptr);
+				type = sub_type->id;
+				size = sub_type->size;
 
-					ptr = (uint8_t*)sub_field->get_data_ptr((void*)ptr);
-					type = sub_field->type_id;
-					const TypeDescriptor* sub_field_type_desc = sub_field->find_type_descriptor();
-					if (!sub_field_type_desc)
-						ROBOTICK_FATAL_EXIT("Subfield '%s' in path '%s' has unknown type", subfield_token.c_str(), path);
-					size = sub_field_type_desc->size;
-				}
-				else
-				{
-					ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has no sub-field", field_token.c_str(), path);
-				}
+				// consume any remaining chars (resolve_nested_member advanced the cursor via extract_next_token)
+				while (*path_cursor)
+					++path_cursor;
 			}
 
 			if (*path_cursor != '\0')
@@ -178,11 +219,8 @@ namespace robotick
 		for (const DataConnectionInfo& query_connection : query_connections)
 		{
 			if (query_connection.dest_ptr == query_dest_ptr)
-			{
 				return true;
-			}
 		}
-
 		return false;
 	}
 
@@ -218,13 +256,51 @@ namespace robotick
 		}
 	}
 
+	void DataConnectionUtils::apply_struct_field_values(
+		void* struct_ptr, const TypeDescriptor& struct_type_desc, const ArrayView<const FieldConfigEntry>& field_config_entries)
+	{
+		if (!struct_ptr)
+			ROBOTICK_FATAL_EXIT("Struct-ptr not provided");
+
+		const StructDescriptor* struct_desc = struct_type_desc.get_struct_desc();
+		if (!struct_desc)
+			ROBOTICK_FATAL_EXIT("Struct with no struct desc");
+
+		(void)struct_desc; // not directly used now, but kept for parity with earlier checks
+
+		for (const FieldConfigEntry& field_config_entry : field_config_entries)
+		{
+			const char* dotted = field_config_entry.first.c_str();
+			const FixedString64& value = field_config_entry.second;
+
+			void* target_ptr = nullptr;
+			const TypeDescriptor* target_type = nullptr;
+			const FieldDescriptor* target_field = nullptr;
+
+			if (!resolve_nested_member(struct_ptr, &struct_type_desc, dotted, &target_ptr, &target_type, &target_field))
+			{
+				ROBOTICK_WARNING("Unable to find field '%s'", dotted);
+				continue;
+			}
+
+			if (!target_type)
+				ROBOTICK_FATAL_EXIT("Type resolution failed for field '%s'", dotted);
+
+			if (!target_type->from_string(value.c_str(), target_ptr))
+			{
+				ROBOTICK_WARNING(
+					"Unable to parse value-string '%s' for field: %s", value.c_str(), target_field ? target_field->name.c_str() : dotted);
+			}
+		}
+	}
+
 	std::tuple<void*, size_t, const FieldDescriptor*> DataConnectionUtils::find_field_info(const Engine& engine, const char* path)
 	{
 		const WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
 		const Map<const char*, WorkloadInstanceInfo*>& instances = engine.get_all_instance_info_map();
 		const char* path_cursor = path;
 
-		// workload.section.field[.blackboard_field]
+		// workload.section.field[.subfield...]
 		const FixedString64 workload_token = extract_next_token(path_cursor);
 		auto* workload_info_ptr = instances.find(workload_token.c_str());
 		if (!workload_info_ptr)
@@ -258,38 +334,25 @@ namespace robotick
 		void* base_ptr = field->get_data_ptr(const_cast<WorkloadsBuffer&>(workloads_buffer), *workload_info, *struct_type, struct_offset);
 		size_t size = field_type_desc->size;
 
-		// optional field.subfield
+		// optional subfield chain
 		if (*path_cursor != '\0')
 		{
-			const FixedString64 subfield_token = extract_next_token(path_cursor);
+			void* sub_ptr = base_ptr;
+			const TypeDescriptor* sub_type = field_type_desc;
+			const FieldDescriptor* sub_desc = nullptr;
 
-			const StructDescriptor* struct_desc = field_type_desc->get_struct_desc();
-			if (!struct_desc)
+			if (!resolve_nested_member(sub_ptr, sub_type, path_cursor, &sub_ptr, &sub_type, &sub_desc))
 			{
-				if (const DynamicStructDescriptor* dynamic_struct_desc = field_type_desc->get_dynamic_struct_desc())
-				{
-					struct_desc = dynamic_struct_desc->get_struct_descriptor(base_ptr);
-				}
+				ROBOTICK_FATAL_EXIT("Invalid sub-field path after '%s' in: %s", field_token.c_str(), path);
 			}
 
-			if (struct_desc)
-			{
-				const FieldDescriptor* sub_field = struct_desc->find_field(subfield_token.c_str());
-				if (!sub_field)
-					ROBOTICK_FATAL_EXIT("Subfield '%s' not found in path: %s", subfield_token.c_str(), path);
+			base_ptr = sub_ptr;
+			size = sub_type->size;
+			field = sub_desc;
 
-				base_ptr = (uint8_t*)sub_field->get_data_ptr(base_ptr);
-				const TypeDescriptor* sub_field_type_desc = sub_field->find_type_descriptor();
-				if (!sub_field_type_desc)
-					ROBOTICK_FATAL_EXIT("Subfield '%s' in path '%s' has unknown type", subfield_token.c_str(), path);
-
-				size = sub_field_type_desc->size;
-				field = sub_field;
-			}
-			else
-			{
-				ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has no sub-field", field_token.c_str(), path);
-			}
+			// consume any remaining chars
+			while (*path_cursor)
+				++path_cursor;
 		}
 
 		return {base_ptr, size, field};
