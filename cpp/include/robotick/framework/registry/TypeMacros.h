@@ -90,10 +90,9 @@ namespace robotick
 	volatile bool g_##WorkloadTypeName##_NoDeadStrip = false;                                                                                        \
 	ROBOTICK_SUPPRESS_UNUSED_WARNING_END
 
-#define ROBOTICK_REGISTER_WORKLOAD_1(Type) ROBOTICK_REGISTER_WORKLOAD_BASE(Type, nullptr, nullptr, nullptr)
-#define ROBOTICK_REGISTER_WORKLOAD_2(Type, Config) ROBOTICK_REGISTER_WORKLOAD_BASE(Type, &s_type_desc_##Config, nullptr, nullptr)
-#define ROBOTICK_REGISTER_WORKLOAD_3(Type, Config, Inputs)                                                                                           \
-	ROBOTICK_REGISTER_WORKLOAD_BASE(Type, &s_type_desc_##Config, &s_type_desc_##Inputs, nullptr)
+#define ROBOTICK_REGISTER_WORKLOAD_1(Type) ROBOTICK_REGISTER_WORKLOAD_BASE(Type, void, void, void)
+#define ROBOTICK_REGISTER_WORKLOAD_2(Type, Config) ROBOTICK_REGISTER_WORKLOAD_BASE(Type, &s_type_desc_##Config, void, void)
+#define ROBOTICK_REGISTER_WORKLOAD_3(Type, Config, Inputs) ROBOTICK_REGISTER_WORKLOAD_BASE(Type, &s_type_desc_##Config, &s_type_desc_##Inputs, void)
 #define ROBOTICK_REGISTER_WORKLOAD_4(Type, Config, Inputs, Outputs)                                                                                  \
 	ROBOTICK_REGISTER_WORKLOAD_BASE(Type, &s_type_desc_##Config, &s_type_desc_##Inputs, &s_type_desc_##Outputs)
 

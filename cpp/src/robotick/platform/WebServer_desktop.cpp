@@ -109,6 +109,8 @@ namespace robotick
 		{
 			mg_printf(conn,
 				"HTTP/1.1 %d OK\r\n"
+				"Access-Control-Allow-Origin: *\r\n"
+				"Access-Control-Allow-Headers: Content-Type\r\n"
 				"Content-Type: %s\r\n"
 				"Content-Length: %zu\r\n"
 				"\r\n",

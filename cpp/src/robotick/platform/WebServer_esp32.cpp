@@ -111,6 +111,9 @@ namespace robotick
 		if (state->handler(request, response))
 		{
 			httpd_resp_set_type(req, response.content_type.c_str());
+			httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+			httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+			httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 
 			static constexpr size_t kMaxChunkSize = 1024;
 
