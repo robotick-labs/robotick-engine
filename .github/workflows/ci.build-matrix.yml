@@ -12,6 +12,7 @@ jobs:
     name: Build & Test (${{ matrix.platform }} - ${{ matrix.preset }})
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - platform: linux
