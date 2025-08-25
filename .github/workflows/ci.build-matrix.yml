@@ -77,6 +77,8 @@ jobs:
             ${{ matrix.docker_image }} \
             bash -c "
               set -Eeuo pipefail
+              export TERM=xterm-256color
+              set -x
 
               if [ '${{ matrix.platform }}' == 'esp32' ]; then
                 echo '🚧 ESP32 Setup'
@@ -90,14 +92,18 @@ jobs:
                 fi
 
                 bash /workspace/tools/make_esp32_symlinks.sh
-                ./1_idf_clean.sh
-                ./2_idf_build.sh
+                ./1_idf_clean.sh || (echo '❌ Idf Clean failed' && exit 1)
+                ./2_idf_build.sh || (echo '❌ Idf Build failed' && exit 1)
 
               else
                 echo '🚧 Linux Setup'
                 bash tools/setup_my_env_as_root.linux.sh
                 cmake --preset ${{ matrix.preset }}
                 cmake --build --preset ${{ matrix.preset }} -j$(nproc)
+
+                if [ '${{ matrix.preset }}' == 'robotick-engine-tests-linux-debug' ]; then
+                  ctest --test-dir build/linux-debug/cpp/tests --output-on-failure --timeout 120 -j$(nproc)
+                fi
               fi
             "
 
@@ -111,16 +117,3 @@ jobs:
         with:
           path: build/
           key: esp32-build-${{ runner.os }}-idf-release-v5.4-${{ hashFiles('sdkconfig', '**/CMakeLists.txt', '**/*.c', '**/*.cpp', '**/*.h', '**/*.hpp') }}
-
-      - name: ✅ Run CTest (Linux Debug Only)
-        if: matrix.platform == 'linux' && matrix.preset == 'robotick-engine-tests-linux-debug'
-        run: |
-          docker run --rm \
-            --user root \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04 \
-            bash -c "
-              set -Eeuo pipefail
-              ctest --test-dir build/linux-debug/cpp/tests --output-on-failure --timeout 120 -j$(nproc)
-            "
