@@ -102,7 +102,7 @@ jobs:
                 cmake --build --preset ${{ matrix.preset }} -j$(nproc)
 
                 if [ '${{ matrix.preset }}' == 'robotick-engine-tests-linux-debug' ]; then
-                  ctest --test-dir build/linux-debug --output-on-failure --timeout 120 -j$(nproc)
+                  ctest --test-dir build/${{ matrix.preset }} --output-on-failure --timeout 120 -j$(nproc)
                 fi
               fi
             "
