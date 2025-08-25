@@ -5,10 +5,19 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     name: Build & Test (${{ matrix.platform }} - ${{ matrix.preset }})
 
     strategy:
@@ -31,17 +40,26 @@ jobs:
         with:
           submodules: recursive
 
+      - name: 📂 Restore build/ cache (ESP32 only)
+        if: matrix.platform == 'esp32'
+        uses: actions/cache/restore@v4
+        id: build-cache
+        with:
+          path: build/
+          key: esp32-build-${{ runner.os }}-idf-release-v5.4-${{ hashFiles('sdkconfig', '**/CMakeLists.txt', '**/*.c', '**/*.cpp', '**/*.h', '**/*.hpp') }}
+          restore-keys: |
+            esp32-build-${{ runner.os }}-idf-release-v5.4-
+
       - name: 📂 Cache Docker image
         id: docker-cache
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/docker-${{ matrix.platform }}-cache
-          key: docker-${{ matrix.platform }}-${{ matrix.docker_image }}-v1
+          key: docker-${{ matrix.platform }}-${{ matrix.platform == 'esp32' && 'idf-v5.4' || 'cpp-ubuntu-24.04' }}-v1
 
       - name: ⬇️ Load Docker image from cache
         if: steps.docker-cache.outputs.cache-hit == 'true'
-        run: |
-          docker load -i "${{ runner.temp }}/docker-${{ matrix.platform }}-cache/image.tar"
+        run: docker load -i "${{ runner.temp }}/docker-${{ matrix.platform }}-cache/image.tar"
 
       - name: ⬇️ Pull and cache Docker image
         if: steps.docker-cache.outputs.cache-hit != 'true'
@@ -55,20 +73,23 @@ jobs:
           docker run --rm \
             --user root \
             -v ${{ github.workspace }}:/workspace \
-            -w /workspace${{ matrix.platform == 'esp32' && '/tools/esp32-compile-check' || '' }} \
+            -w /workspace \
             ${{ matrix.docker_image }} \
             bash -c "
               set -Eeuo pipefail
 
               if [ '${{ matrix.platform }}' == 'esp32' ]; then
                 echo '🚧 ESP32 Setup'
+                cd tools/esp32-compile-check
+
                 if ! command -v ninja >/dev/null 2>&1; then
-                  export DEBIAN_FRONTEND=noninteractive
-                  apt-get update -yq
-                  apt-get install -y --no-install-recommends ninja-build
+                  DEBIAN_FRONTEND=noninteractive apt-get update -yq
+                  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ninja-build ccache
+                  apt-get clean
                   rm -rf /var/lib/apt/lists/*
                 fi
-                bash tools/make_esp32_symlinks.sh
+
+                bash /workspace/tools/make_esp32_symlinks.sh
                 ./1_idf_clean.sh
                 ./2_idf_build.sh
 
@@ -76,9 +97,20 @@ jobs:
                 echo '🚧 Linux Setup'
                 bash tools/setup_my_env_as_root.linux.sh
                 cmake --preset ${{ matrix.preset }}
-                cmake --build --preset ${{ matrix.preset }} -j\$(nproc)
+                cmake --build --preset ${{ matrix.preset }} -j$(nproc)
               fi
             "
+
+      - name: 📂 Fix build/ permissions (ESP32 only)
+        if: matrix.platform == 'esp32' && success()
+        run: sudo chown -R $USER:$USER build
+
+      - name: 📂 Save build/ cache (ESP32 only)
+        if: matrix.platform == 'esp32' && success()
+        uses: actions/cache/save@v4
+        with:
+          path: build/
+          key: esp32-build-${{ runner.os }}-idf-release-v5.4-${{ hashFiles('sdkconfig', '**/CMakeLists.txt', '**/*.c', '**/*.cpp', '**/*.h', '**/*.hpp') }}
 
       - name: ✅ Run CTest (Linux Debug Only)
         if: matrix.platform == 'linux' && matrix.preset == 'robotick-engine-tests-linux-debug'
@@ -90,26 +122,5 @@ jobs:
             mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04 \
             bash -c "
               set -Eeuo pipefail
-              ctest --test-dir build/linux-debug/cpp/tests --output-on-failure --timeout 10
+              ctest --test-dir build/linux-debug/cpp/tests --output-on-failure --timeout 120 -j$(nproc)
             "
-
-      - name: 📂 Restore build/ cache (ESP32 only)
-        if: matrix.platform == 'esp32'
-        uses: actions/cache/restore@v4
-        id: build-cache
-        with:
-          path: build/
-          key: esp32-build-${{ runner.os }}-idf-release-v5.4-${{ hashFiles('sdkconfig', '**/CMakeLists.txt', '**/*.c', '**/*.cpp', '**/*.h', '**/*.hpp') }}
-          restore-keys: |
-            esp32-build-${{ runner.os }}-idf-release-v5.4-
-
-      - name: 📂 Save build/ cache (ESP32 only)
-        if: matrix.platform == 'esp32' && success()
-        uses: actions/cache/save@v4
-        with:
-          path: build/
-          key: esp32-build-${{ runner.os }}-idf-release-v5.4-${{ hashFiles('sdkconfig', '**/CMakeLists.txt', '**/*.c', '**/*.cpp', '**/*.h', '**/*.hpp') }}
-
-      - name: 📂 Fix build/ permissions (ESP32 only)
-        if: matrix.platform == 'esp32' && success()
-        run: sudo chown -R $USER:$USER build
