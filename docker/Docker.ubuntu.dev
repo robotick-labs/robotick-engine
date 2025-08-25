@@ -13,20 +13,14 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 # 🧱 Root-level setup (install packages and MQTT libs)
-COPY ./tools/1_setup_my_env_as_root.linux.sh /tools/1_setup_my_env_as_root.linux.sh
-RUN chmod +x /tools/1_setup_my_env_as_root.linux.sh && /tools/1_setup_my_env_as_root.linux.sh
-
-# 🧑 User-level setup script
-COPY ./tools/2_setup_my_env_as_user.linux.sh /tools/2_setup_my_env_as_user.linux.sh
+COPY ./tools/setup_my_env_as_root.linux.sh /tools/setup_my_env_as_root.linux.sh
+RUN chmod +x /tools/setup_my_env_as_root.linux.sh && /tools/setup_my_env_as_root.linux.sh
 
 # Set working directory where setup.py lives
 WORKDIR /workspace
 
 # Copy all source files into container
 COPY . .
-
-# 🚀 Run user-level script (system-wide editable Python install)
-RUN chmod +x ./tools/2_setup_my_env_as_user.linux.sh && ./tools/2_setup_my_env_as_user.linux.sh
 
 # 🧼 Optional: default interactive shell
 CMD ["bash"]
