@@ -89,11 +89,7 @@ if (DEFINED ROBOTICK_PLATFORM_LINUX)
     find_package(SDL2 REQUIRED)
     target_link_libraries(robotick-engine PRIVATE civetweb)
     target_link_libraries(robotick-engine PRIVATE SDL2::SDL2)
-    target_link_libraries(robotick-engine PRIVATE SDL2_gfx)
-    target_link_libraries(robotick-engine PRIVATE SDL2_ttf)
     target_include_directories(robotick-engine PRIVATE /usr/include/SDL2)
-    target_include_directories(robotick-engine PRIVATE ${SDL2_GFX_INCLUDE_DIRS})
-    target_include_directories(robotick-engine PRIVATE ${SDL2_TTF_INCLUDE_DIRS})
 endif()
 
 # =========================
