@@ -53,6 +53,8 @@ namespace robotick
 			data[len] = '\0';
 		}
 
+		void clear() { data[0] = '\0'; }
+
 		FixedString& operator=(const char* str)
 		{
 			const size_t len = min_val(fixed_strlen(str), N - 1);

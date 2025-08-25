@@ -14,6 +14,7 @@ set(PLATFORM_DETECTED FALSE)
 if (DEFINED ROBOTICK_PLATFORM_LINUX)
     message(STATUS "✅ Platform: ROBOTICK_PLATFORM_LINUX")
     set(PLATFORM_DETECTED TRUE)
+    add_compile_definitions(ROBOTICK_PLATFORM_LINUX)
 endif()
 
 if (DEFINED ROBOTICK_PLATFORM_ESP32)
@@ -24,6 +25,7 @@ endif()
 if (DEFINED ROBOTICK_PLATFORM_DESKTOP)
     message(STATUS "✅ Platform: ROBOTICK_PLATFORM_DESKTOP")
     set(PLATFORM_DETECTED TRUE)
+    add_compile_definitions(ROBOTICK_PLATFORM_DESKTOP)
 endif()
 
 if (NOT PLATFORM_DETECTED)
@@ -56,6 +58,12 @@ file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
 
 list(LENGTH ALL_CPP_SOURCES ALL_CPP_SOURCES_COUNT)
 message(STATUS "📦 ALL_CPP_SOURCES: ${ALL_CPP_SOURCES_COUNT}")
+
+# =========================
+# ✅ Add JSON Submodule
+# =========================
+
+add_subdirectory(lib/json)
 
 # =========================
 # ✅ Core Framework Library
@@ -121,12 +129,6 @@ if (ROBOTICK_BUILD_TESTS)
 else()
     message(STATUS "❌ ROBOTICK_BUILD_TESTS - OFF")
 endif()
-
-# =========================
-# ✅ Add JSON Submodule
-# =========================
-
-add_subdirectory(lib/json)
 
 # =========================
 # ✅ Add civetweb (minimal)
