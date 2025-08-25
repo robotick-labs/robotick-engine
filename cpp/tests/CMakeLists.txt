@@ -65,7 +65,6 @@ target_link_libraries(robotick_engine_tests PRIVATE curl)
 # ✅ Re-enable exceptions just for test target
 target_compile_options(robotick_engine_tests PRIVATE -fexceptions)
 
-target_compile_definitions(robotick_engine_tests PRIVATE ROBOTICK_ENABLE_PYTHON=1)
 target_compile_definitions(robotick_engine_tests PRIVATE ROBOTICK_TEST_MODE=1)
 target_compile_definitions(robotick_engine_tests PRIVATE CATCH_CONFIG_ENABLE_EXCEPTIONS)
 

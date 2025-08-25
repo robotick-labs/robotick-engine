@@ -16,7 +16,6 @@
                 "CMAKE_CXX_COMPILER": "/usr/bin/g++",
                 "ROBOTICK_PLATFORM_LINUX": "ON",
                 "ROBOTICK_PLATFORM_DESKTOP": "ON",
-                "ROBOTICK_ENABLE_PYTHON": "ON",
                 "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-linux-native.cmake"
             }
         },

@@ -17,49 +17,21 @@ jobs:
         with:
           submodules: recursive
 
-      - name: 💾 Cache Docker layers
+      - name: 💾 Cache IDF image
         uses: actions/cache@v4
         with:
-          path: /tmp/.docker-cache-esp32s3
-          key: docker-esp32s3-${{ hashFiles('docker/Docker.esp32s3.dev') }}
-          restore-keys: |
-            docker-esp32s3-
+          path: /tmp/idf-cache
+          key: idf-docker-esp32s3-${{ runner.os }}
 
-      - name: 📦 Load Docker cache
+      - name: ⬇️ Load or Pull ESP-IDF image
         run: |
-          mkdir -p /tmp/.docker-cache-esp32s3
-          if [ -f /tmp/.docker-cache-esp32s3/image.tar ]; then
-            docker load -i /tmp/.docker-cache-esp32s3/image.tar || true
+          mkdir -p /tmp/idf-cache
+          if [ -f /tmp/idf-cache/image.tar ]; then
+            docker load -i /tmp/idf-cache/image.tar || true
+          else
+            docker pull espressif/idf:release-v5.4
+            docker save espressif/idf:release-v5.4 -o /tmp/idf-cache/image.tar
           fi
-
-      - name: 🧹 Free disk space (dotnet/android/ghc)
-        run: |
-          # This job does not use .NET, Android SDK, or GHC.
-          # These are wiped deliberately to reclaim ~15 GB disk space on GitHub-hosted runners
-          # in order to give space for Docker image building and other items.
-          sudo rm -rf /usr/share/dotnet \
-                      /usr/local/lib/android \
-                      /opt/ghc || true
-          df -h
-
-      - name: 🧹 Prune Docker system
-        run: |
-          # Intentionally prune everything to free ~15 GB; no other jobs in this workflow
-          docker system prune -af || true
-          df -h
-
-      - name: 🏗️ Build Docker image (robotick-dev:esp32s3)
-        run: |
-          docker build \
-            --cache-from robotick-dev:esp32s3 \
-            -t robotick-dev:esp32s3 \
-            -f docker/Docker.esp32s3.dev \
-            .
-
-      - name: 💾 Save Docker image to cache
-        run: |
-          mkdir -p /tmp/.docker-cache-esp32s3
-          docker save robotick-dev:esp32s3 > /tmp/.docker-cache-esp32s3/image.tar
 
       - name: 🔧 Run IDF Clean + Build inside Docker
         run: |
@@ -67,10 +39,13 @@ jobs:
             --user root \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace/tools/esp32-compile-check \
-            -e TERM=xterm-256color \
-            robotick-dev:esp32s3 \
+            espressif/idf:release-v5.4 \
             bash -c "
               set -e
+              echo '📦 Installing ninja...'
+              apt-get update && apt-get install -y ninja-build
+              echo '🔗 Creating symlinks...'
+              bash /workspace/tools/make_esp32_symlinks.sh
               echo '🧹 Running IDF clean...'
               ./1_idf_clean.sh
               echo '🛠️  Running IDF build...'

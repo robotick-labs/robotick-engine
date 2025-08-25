@@ -20,57 +20,52 @@ jobs:
           ]
 
     steps:
-      - name: Checkout repository
+      - name: 🧾 Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Cache Docker layers
+      - name: 💾 Cache devcontainer image
         uses: actions/cache@v4
         with:
-          path: /tmp/.docker-cache
-          key: docker-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('docker/Docker.ubuntu.dev') }}
-          restore-keys: |
-            docker-${{ runner.os }}-
+          path: /tmp/devcontainer-cache
+          key: devcontainer-cpp-${{ runner.os }}
 
-      - name: Load Docker cache
+      - name: ⬇️ Load or Pull devcontainer image
         run: |
-          mkdir -p /tmp/.docker-cache
-          if [ -f /tmp/.docker-cache/image.tar ]; then
-            docker load -i /tmp/.docker-cache/image.tar || true
+          mkdir -p /tmp/devcontainer-cache
+          if [ -f /tmp/devcontainer-cache/image.tar ]; then
+            docker load -i /tmp/devcontainer-cache/image.tar || true
+          else
+            docker pull mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04
+            docker save mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04 -o /tmp/devcontainer-cache/image.tar
           fi
 
-      - name: Build Docker image (robotick-ci)
-        run: |
-          docker build -t robotick-ci \
-            -f docker/Docker.ubuntu.dev \
-            .
-
-      - name: Save Docker image to cache
-        run: |
-          mkdir -p /tmp/.docker-cache
-          docker save robotick-ci > /tmp/.docker-cache/image.tar
-
-      - name: Run CMake Build in Docker
+      - name: 🛠️ Run CMake build inside devcontainers/cpp image
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            robotick-ci \
+            mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04 \
             bash -c "
               set -e
-              cmake --preset ${{ matrix.preset }} &&
-              cmake --build --preset ${{ matrix.preset }} -j$(nproc)
+              echo '🔧 Running setup...'
+              bash tools/setup_my_env_as_root.linux.sh
+              echo '🛠️ Configuring with CMake...'
+              cmake --preset ${{ matrix.preset }}
+              echo '🔨 Building...'
+              cmake --build --preset ${{ matrix.preset }} -j\$(nproc)
             "
 
-      - name: Run CTest in Docker (Debug Only)
-        if: matrix.preset == 'linux-debug'
+      - name: ✅ Run CTest (Debug Only)
+        if: matrix.preset == 'robotick-engine-tests-linux-debug'
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            robotick-ci \
+            mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04 \
             bash -c "
               set -e
+              echo '🧪 Running CTest...'
               ctest --test-dir build/linux-debug/cpp/tests --output-on-failure --timeout 10
             "

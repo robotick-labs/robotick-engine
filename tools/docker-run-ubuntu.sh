@@ -20,13 +20,20 @@ if docker ps -a --format '{{.Names}}' | grep -q "^robotick-dev$"; then
     docker rm -f robotick-dev
 fi
 
-# 🚀 Run container with mounts and ssh agent
+# 🚀 Run official devcontainers/cpp image with mounts and ssh-agent
 docker run -it \
   --user root \
   -v "$(pwd)":/workspace \
+  -w /workspace \
   -v "$HOME/.robotick-vscode-server":/root/.vscode-server \
   -v "$SSH_AUTH_SOCK:/ssh-agent" \
   -e SSH_AUTH_SOCK=/ssh-agent \
   --name robotick-dev \
-  robotick-dev:linux \
-  bash
+  mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04 \
+  bash -c "
+    set -e
+    echo '🔧 Running setup...'
+    bash tools/setup_my_env_as_root.linux.sh
+    echo '🚀 Environment ready.'
+    exec bash
+  "

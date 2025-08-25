@@ -20,8 +20,7 @@ if docker ps -a --format '{{.Names}}' | grep -q "^robotick-dev-esp32s3$"; then
     docker rm -f robotick-dev-esp32s3
 fi
 
-# 🚀 Run container with mounts and ssh agent
-
+# 🚀 Run official Espressif image
 docker run -it \
   --user root \
   --privileged \
@@ -30,8 +29,15 @@ docker run -it \
   -v "$HOME/.robotick-vscode-server":/root/.vscode-server \
   -v "$SSH_AUTH_SOCK:/ssh-agent" \
   -e SSH_AUTH_SOCK=/ssh-agent \
+  -w /workspace \
   --name robotick-dev-esp32s3 \
-  robotick-dev:esp32s3 \
-  bash
-
-
+  espressif/idf:release-v5.4 \
+  bash -c "
+    set -e
+    echo '📦 Installing ninja...'
+    apt-get update && apt-get install -y ninja-build
+    echo '🔗 Running symlink setup...'
+    bash tools/make_esp32_symlinks.sh
+    echo '🚀 Ready. Launching shell.'
+    exec bash
+  "
