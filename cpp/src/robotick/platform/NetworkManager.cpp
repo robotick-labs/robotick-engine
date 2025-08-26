@@ -173,18 +173,6 @@ namespace robotick
 	{
 		return false;
 	}
-	bool NetworkHotspot::stop()
-	{
-		return false;
-	}
-	bool NetworkClient::connect(const NetworkClientConfig&)
-	{
-		return false;
-	}
-	bool NetworkClient::is_connected()
-	{
-		return false;
-	}
 
 } // namespace robotick
 

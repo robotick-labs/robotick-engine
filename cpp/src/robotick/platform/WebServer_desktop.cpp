@@ -109,6 +109,9 @@ namespace robotick
 		{
 			mg_printf(conn,
 				"HTTP/1.1 %d OK\r\n"
+				"Access-Control-Allow-Origin: *\r\n"
+				"Access-Control-Allow-Headers: Content-Type\r\n"
+				"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
 				"Content-Type: %s\r\n"
 				"Content-Length: %zu\r\n"
 				"\r\n",
@@ -163,12 +166,23 @@ namespace robotick
 		}
 
 		// Append web_root_folder to base dir
-		document_root.format("%s%s", exe_path, web_root_folder);
+		bool has_docroot = (web_root_folder && web_root_folder[0] != '\0');
+		if (has_docroot)
+		{
+			document_root.format("%s%s", exe_path, web_root_folder);
+		}
+		else
+		{
+			document_root.clear();
+		}
 
 		char port_str[16];
 		std::snprintf(port_str, sizeof(port_str), "%u", static_cast<unsigned int>(port));
 
-		const char* options[] = {"listening_ports", port_str, "document_root", document_root.c_str(), "enable_directory_listing", "no", nullptr};
+		const char* options_with_docroot[] = {
+			"listening_ports", port_str, "document_root", document_root.c_str(), "enable_directory_listing", "no", nullptr};
+		const char* options_no_docroot[] = {"listening_ports", port_str, "enable_directory_listing", "no", nullptr};
+		const char** options = has_docroot ? options_with_docroot : options_no_docroot;
 
 		impl->ctx = mg_start(nullptr, nullptr, options);
 		if (!impl->ctx)
@@ -180,7 +194,10 @@ namespace robotick
 		mg_set_request_handler(impl->ctx, "/", &web_server_callback, this);
 		running = true;
 
-		ROBOTICK_INFO("WebServer '%s' serving from '%s' at http://localhost:%u", document_root.c_str(), name, static_cast<unsigned int>(port));
+		ROBOTICK_INFO("WebServer '%s' serving from '%s' at http://localhost:%u",
+			name,
+			has_docroot ? document_root.c_str() : "<no files>",
+			static_cast<unsigned int>(port));
 	}
 
 	void WebServer::stop()

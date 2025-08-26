@@ -203,6 +203,11 @@ namespace robotick
 		 */
 		T* data() { return &data_buffer[0]; };
 
+		/**
+		 * @brief Returns const pointer to start of our data-buffer
+		 */
+		const T* data() const { return &data_buffer[0]; };
+
 	  private:
 		T data_buffer[Capacity]{}; ///< Underlying storage.
 		uint32_t count = 0;		   ///< Current number of elements.

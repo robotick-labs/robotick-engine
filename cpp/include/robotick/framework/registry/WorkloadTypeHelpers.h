@@ -190,37 +190,34 @@ namespace robotick::registry
 	{
 		WorkloadDescriptor desc{};
 
+		// if we have a member of each of config/inputs/outputs, AND we've been provided with a
+		// corresponding type (e.g. since it's not an empty struct) then register it:
+
 		if constexpr (has_member_config<T>::value)
 		{
-			desc.config_offset = offsetof(T, config);
-			desc.config_desc = config_type;
-			ROBOTICK_ASSERT(desc.config_desc);
-		}
-		else
-		{
-			desc.config_offset = SIZE_MAX;
+			if (config_type)
+			{
+				desc.config_offset = offsetof(T, config);
+				desc.config_desc = config_type;
+			}
 		}
 
 		if constexpr (has_member_inputs<T>::value)
 		{
-			desc.inputs_offset = offsetof(T, inputs);
-			desc.inputs_desc = inputs_type;
-			ROBOTICK_ASSERT(desc.inputs_desc);
-		}
-		else
-		{
-			desc.inputs_offset = SIZE_MAX;
+			if (inputs_type)
+			{
+				desc.inputs_offset = offsetof(T, inputs);
+				desc.inputs_desc = inputs_type;
+			}
 		}
 
 		if constexpr (has_member_outputs<T>::value)
 		{
-			desc.outputs_offset = offsetof(T, outputs);
-			desc.outputs_desc = outputs_type;
-			ROBOTICK_ASSERT(desc.outputs_desc);
-		}
-		else
-		{
-			desc.outputs_offset = SIZE_MAX;
+			if (outputs_type)
+			{
+				desc.outputs_offset = offsetof(T, outputs);
+				desc.outputs_desc = outputs_type;
+			}
 		}
 
 		// init function pointers:

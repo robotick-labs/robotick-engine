@@ -19,22 +19,7 @@ static constexpr uint32_t ENGINE_STACK_SIZE = 8192; // in bytes
 static constexpr UBaseType_t ENGINE_TASK_PRIORITY = 5;
 static constexpr BaseType_t ENGINE_CORE_ID = 1;
 
-namespace robotick
-{
-	void ensure_workloads()
-	{
-		ROBOTICK_KEEP_WORKLOAD(BaseXWorkload)
-		ROBOTICK_KEEP_WORKLOAD(ConsoleTelemetryWorkload)
-		ROBOTICK_KEEP_WORKLOAD(FaceDisplayWorkload)
-		ROBOTICK_KEEP_WORKLOAD(HeartbeatDisplayWorkload)
-		ROBOTICK_KEEP_WORKLOAD(ImuWorkload)
-		ROBOTICK_KEEP_WORKLOAD(SequencedGroupWorkload)
-		ROBOTICK_KEEP_WORKLOAD(SyncedGroupWorkload)
-		ROBOTICK_KEEP_WORKLOAD(SteeringMixerWorkload)
-		ROBOTICK_KEEP_WORKLOAD(TimingDiagnosticsWorkload)
-	}
-
-} // namespace robotick
+// no need to "ensure" the workloads - they won't exist here anyway - we just want to test esp32 compiles with this build
 
 void populate_model(robotick::Model& model)
 {
@@ -118,8 +103,6 @@ ROBOTICK_ENTRYPOINT
 	M5.begin();
 
 	ROBOTICK_INFO("esp32-testbed - Started on CPU%d", xPortGetCoreID());
-
-	robotick::ensure_workloads();
 
 	ROBOTICK_INFO("esp32-testbed  - connecting to wifi hotspot...");
 	connect_to_wifi_hotspot();

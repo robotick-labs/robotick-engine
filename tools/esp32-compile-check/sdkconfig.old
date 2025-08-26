@@ -533,7 +533,7 @@ CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 # CONFIG_ESPTOOLPY_FLASHSIZE_32MB is not set
 # CONFIG_ESPTOOLPY_FLASHSIZE_64MB is not set
 # CONFIG_ESPTOOLPY_FLASHSIZE_128MB is not set
-CONFIG_ESPTOOLPY_FLASHSIZE="2MB"
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
 # CONFIG_ESPTOOLPY_HEADER_FLASHSIZE_UPDATE is not set
 CONFIG_ESPTOOLPY_BEFORE_RESET=y
 # CONFIG_ESPTOOLPY_BEFORE_NORESET is not set
@@ -547,25 +547,14 @@ CONFIG_ESPTOOLPY_MONITOR_BAUD=115200
 #
 # Partition Table
 #
-# ⛔ Disable predefined tables
 # CONFIG_PARTITION_TABLE_SINGLE_APP is not set
 # CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE is not set
 # CONFIG_PARTITION_TABLE_TWO_OTA is not set
 # CONFIG_PARTITION_TABLE_TWO_OTA_LARGE is not set
-
-# ✅ Enable custom partition table
 CONFIG_PARTITION_TABLE_CUSTOM=y
-
-# ✅ Point to your custom CSV (should exist at project root or known path)
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
-
-# 🔁 Ignore this if you're using a custom one (it's only for built-in options)
-# CONFIG_PARTITION_TABLE_FILENAME="partitions_singleapp.csv"
-
-# ✅ Leave the offset as default unless doing advanced layout
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
 CONFIG_PARTITION_TABLE_OFFSET=0x8000
-
-# ✅ Keep MD5 checksum on for safety
 CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
