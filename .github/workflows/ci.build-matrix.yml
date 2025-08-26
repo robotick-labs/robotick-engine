@@ -35,40 +35,35 @@ jobs:
             docker_image: espressif/idf:release-v5.4
 
     steps:
-      - name: 📜 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: 📂 Restore build/ cache (ESP32 only)
-        if: matrix.platform == 'esp32'
-        uses: actions/cache/restore@v4
-        id: build-cache
-        with:
-          path: build/
-          key: esp32-build-${{ runner.os }}-idf-release-v5.4-${{ hashFiles('sdkconfig', '**/CMakeLists.txt', '**/*.c', '**/*.cpp', '**/*.h', '**/*.hpp') }}
-          restore-keys: |
-            esp32-build-${{ runner.os }}-idf-release-v5.4-
-
-      - name: 📂 Cache Docker image
+      - name: Restore Docker image cache
         id: docker-cache
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/docker-${{ matrix.platform }}-cache
           key: docker-${{ matrix.platform }}-${{ matrix.platform == 'esp32' && 'idf-v5.4' || 'cpp-ubuntu-24.04' }}-v1
+          restore-keys: |
+            docker-${{ matrix.platform }}-
 
-      - name: ⬇️ Load Docker image from cache
+      - name: Echo Docker cache-hit status
+        run: echo "Cache hit? ${{ steps.docker-cache.outputs.cache-hit }}"
+
+      - name: Load Docker image from cache
         if: steps.docker-cache.outputs.cache-hit == 'true'
         run: docker load -i "${{ runner.temp }}/docker-${{ matrix.platform }}-cache/image.tar"
 
-      - name: ⬇️ Pull and cache Docker image
+      - name: Pull and cache Docker image
         if: steps.docker-cache.outputs.cache-hit != 'true'
         run: |
           docker pull ${{ matrix.docker_image }}
           mkdir -p "${{ runner.temp }}/docker-${{ matrix.platform }}-cache"
           docker save ${{ matrix.docker_image }} -o "${{ runner.temp }}/docker-${{ matrix.platform }}-cache/image.tar"
 
-      - name: 🛠️ Run Build inside Docker
+      - name: Run Build inside Docker
         run: |
           docker run --rm \
             --user root \
@@ -102,18 +97,7 @@ jobs:
                 cmake --build --preset ${{ matrix.preset }} -j$(nproc)
 
                 if [ '${{ matrix.preset }}' == 'robotick-engine-tests-linux-debug' ]; then
-                  ctest --test-dir build/${{ matrix.preset }} --output-on-failure --timeout 120 -j$(nproc)
+                  ctest --test-dir build/${{ matrix.preset }}/cpp/tests --output-on-failure --timeout 120 --fail-if-no-tests -j$(nproc)
                 fi
               fi
             "
-
-      - name: 📂 Fix build/ permissions (ESP32 only)
-        if: matrix.platform == 'esp32' && success()
-        run: sudo chown -R $USER:$USER build
-
-      - name: 📂 Save build/ cache (ESP32 only)
-        if: matrix.platform == 'esp32' && success()
-        uses: actions/cache/save@v4
-        with:
-          path: build/
-          key: esp32-build-${{ runner.os }}-idf-release-v5.4-${{ hashFiles('sdkconfig', '**/CMakeLists.txt', '**/*.c', '**/*.cpp', '**/*.h', '**/*.hpp') }}
