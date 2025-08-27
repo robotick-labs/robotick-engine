@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Find directory of this script
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 # Start ssh-agent if needed
 if [ -z "$SSH_AUTH_SOCK" ]; then
     echo "🛑 SSH_AUTH_SOCK not set. Starting agent..."
@@ -37,7 +40,7 @@ docker run -it \
     echo '📦 Installing ninja...'
     apt-get update && apt-get install -y ninja-build
     echo '🔗 Running symlink setup...'
-    bash tools/make_esp32_symlinks.sh
+    bash \"$SCRIPT_DIR/make_esp32_symlinks.sh\"
     echo '🚀 Ready. Launching shell.'
     exec bash
   "
