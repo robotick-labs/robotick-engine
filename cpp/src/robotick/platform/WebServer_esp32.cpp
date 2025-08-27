@@ -161,6 +161,20 @@ namespace robotick
 	void WebServer::start(const char* name, uint16_t port, const char* /*unused*/, WebRequestHandler handler_in)
 	{
 		ROBOTICK_ASSERT_MSG(!is_running(), "WebServer '%s' already running", name);
+			
+		esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+		if (!netif)
+		{
+			ROBOTICK_WARNING("WebServer '%s' not started: netif not found (likely Wi-Fi not initialized yet)", name);
+			return;
+		}
+
+		esp_netif_ip_info_t ip_info;
+		if (esp_netif_get_ip_info(netif, &ip_info) != ESP_OK || ip_info.ip.addr == 0)
+		{
+			ROBOTICK_WARNING("WebServer '%s' not started: no valid IP yet (likely Wi-Fi not connected)", name);
+			return;
+		}
 
 		server_name = name;
 
