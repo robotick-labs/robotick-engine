@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -z "${1:-}" ]; then
+  echo "Usage: $(basename "$0") <feature-name>"
+  exit 1
+fi
+
+FEATURE_NAME="feature/$1"
+
+echo "👉 Switching to main..."
+git fetch origin main
+git checkout main
+git reset --hard origin/main
+
+if git show-ref --verify --quiet refs/heads/"$FEATURE_NAME"; then
+  echo "🧹 Deleting local branch '$FEATURE_NAME'..."
+  git branch -D "$FEATURE_NAME"
+fi
+
+echo "🌱 Creating fresh branch '$FEATURE_NAME' from main..."
+git checkout -b "$FEATURE_NAME"
+
+echo "🚀 Force pushing to origin (overwrites remote branch if it exists)..."
+git push -u origin "$FEATURE_NAME" --force-with-lease
+
+echo "✅ Done! Branch '$FEATURE_NAME' is now reset to match main."

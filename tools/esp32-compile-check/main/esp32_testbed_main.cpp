@@ -100,8 +100,6 @@ static void connect_to_wifi_hotspot()
 
 ROBOTICK_ENTRYPOINT
 {
-	M5.begin();
-
 	ROBOTICK_INFO("esp32-testbed - Started on CPU%d", xPortGetCoreID());
 
 	ROBOTICK_INFO("esp32-testbed  - connecting to wifi hotspot...");

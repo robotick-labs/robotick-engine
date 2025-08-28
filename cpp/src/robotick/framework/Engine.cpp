@@ -12,6 +12,7 @@
 #include "robotick/framework/model/Model.h"
 #include "robotick/framework/utils/TypeId.h"
 #include "robotick/platform/PlatformEvents.h"
+#include "robotick/platform/System.h"
 #include "robotick/platform/Threading.h"
 #include "robotick/platform/WebServer.h"
 
@@ -61,6 +62,9 @@ namespace robotick
 
 	void Engine::load(const Model& model)
 	{
+		// initialize the host-system
+		System::initialize();
+
 		// ensure out standard types don't get pruned by the linker:
 		robotick_force_register_primitives();
 		robotick_force_register_fixed_vector_types();
