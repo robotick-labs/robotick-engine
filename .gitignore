@@ -1,16 +1,8 @@
-robotick/__pycache__/*
+**/__pycache__/*
 *.pyc
 robotick.egg-info
-*/MUJOCO_LOG.TXT
-.obsidian/*
 build/*
 **/build/*
 *.log
-Testing/*
 cpp/build/*
-*_LOG.TXT
-out/*
-my_git_config.sh
-examples/cpp/esp32-blink/build
-examples/cpp/esp32-blink/components
 .venv
