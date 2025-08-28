@@ -9,4 +9,4 @@
 	url = https://github.com/DaveGamble/cJSON.git
 [submodule "tools/esp32-compile-check/components/M5Unified"]
 	path = tools/esp32-compile-check/components/M5Unified
-	url = ./tools/esp32-compile-check/components/M5Unified
+	url = https://github.com/m5stack/M5Unified.git
