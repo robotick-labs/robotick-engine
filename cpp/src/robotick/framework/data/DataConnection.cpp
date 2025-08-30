@@ -241,10 +241,15 @@ namespace robotick
 			const ResolvedField dst = resolve_field_ptr(seed.dest_field_path.c_str(), instances, workloads_buffer);
 
 			if (src.type != dst.type)
-				ROBOTICK_FATAL_EXIT("Type mismatch: %s vs %s", seed.source_field_path.c_str(), seed.dest_field_path.c_str());
+				ROBOTICK_FATAL_EXIT("Type mismatch: %s vs %s (%s vs %s)",
+					seed.source_field_path.c_str(),
+					seed.dest_field_path.c_str(),
+					src.type.get_debug_name(),
+					dst.type.get_debug_name());
 
 			if (src.size != dst.size)
-				ROBOTICK_FATAL_EXIT("Size mismatch: %s vs %s", seed.source_field_path.c_str(), seed.dest_field_path.c_str());
+				ROBOTICK_FATAL_EXIT(
+					"Size mismatch: %s vs %s (%i vs %i)", seed.source_field_path.c_str(), seed.dest_field_path.c_str(), (int)src.size, (int)dst.size);
 
 			if (has_connection_to_field(out_connections, dst.ptr))
 				ROBOTICK_FATAL_EXIT("Duplicate connection to field: %s", seed.dest_field_path.c_str());
