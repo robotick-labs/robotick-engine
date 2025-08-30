@@ -63,7 +63,7 @@ namespace robotick
 		static const StructDescriptor* resolve_descriptor(const void* instance);
 
 	  public: // non-API accessors - used for setup and lower-level querying of Blackboard
-		void bind(const size_t datablock_offset);
+		void bind(size_t& datablock_offset);
 
 		const StructDescriptor& get_struct_descriptor() const { return info.struct_descriptor; };
 		const BlackboardInfo& get_info() const { return info; };

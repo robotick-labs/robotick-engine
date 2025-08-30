@@ -66,12 +66,13 @@ namespace robotick
 			compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
 	}
 
-	void Blackboard::bind(const size_t datablock_offset)
+	void Blackboard::bind(size_t& datablock_offset)
 	{
 		const size_t start_offset = datablock_offset;
 		const bool write_offsets = true;
 
-		compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
+		datablock_offset =
+			compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
 	}
 
 	const FieldDescriptor* Blackboard::find_field(const char* field_name) const
