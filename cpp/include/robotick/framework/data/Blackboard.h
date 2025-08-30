@@ -35,6 +35,9 @@ namespace robotick
 		void initialize_fields(const HeapVector<FieldDescriptor>& fields);
 		void initialize_fields(const ArrayView<FieldDescriptor>& fields);
 
+		static const StructDescriptor* resolve_descriptor(const void* instance);
+
+	  public: // field-query methods (by name - slower as requires string-based lookup)
 		const FieldDescriptor* find_field(const char* field_name) const;
 		void* find_field_data(const char* field_name, const FieldDescriptor*& found_field) const;
 
@@ -60,7 +63,27 @@ namespace robotick
 			return T();
 		}
 
-		static const StructDescriptor* resolve_descriptor(const void* instance);
+	  public: // field-query methods (by pre-cached FieldDescriptor - fast)
+		bool set(const FieldDescriptor& field, void* value, size_t size);
+		void* get(const FieldDescriptor& field, size_t size) const;
+
+		template <typename T> bool set(const FieldDescriptor& field, const T& value)
+		{
+			static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
+			return set(field, (void*)&value, sizeof(T));
+		}
+
+		template <typename T> T get(const FieldDescriptor& field) const
+		{
+			void* found_value = get(field, sizeof(T));
+			if (found_value)
+			{
+				return *static_cast<T*>(found_value);
+			}
+
+			ROBOTICK_FATAL_EXIT("Blackboard::get called with invalid field reference: '%s'", field.name.c_str());
+			return T();
+		}
 
 	  public: // non-API accessors - used for setup and lower-level querying of Blackboard
 		void bind(size_t& datablock_offset);
