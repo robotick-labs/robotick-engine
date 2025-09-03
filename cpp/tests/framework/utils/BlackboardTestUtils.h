@@ -27,7 +27,12 @@ namespace robotick
 			Blackboard* blackboard_ptr = buffer.as<Blackboard>(0);
 			new (blackboard_ptr) Blackboard();
 			blackboard_ptr->initialize_fields(fields);
-			blackboard_ptr->bind(sizeof(Blackboard));
+#
+			size_t datablock_offset = sizeof(Blackboard);
+			blackboard_ptr->bind(datablock_offset);
+
+			ROBOTICK_ASSERT_MSG(datablock_offset == total_size, "Datablock-offset pointer should have been incremented ready for next blackboard");
+
 			return {std::move(buffer), blackboard_ptr};
 		}
 	};

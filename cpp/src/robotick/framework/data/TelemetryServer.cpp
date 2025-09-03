@@ -279,82 +279,37 @@ namespace robotick
 		res.content_type = "application/json";
 	}
 
-	void TelemetryServer::handle_get_workload_config(const WebRequest& req, WebResponse& res)
+	static void emit_fields_as_json(WebResponseBodyBuffer& out,
+		const WorkloadInstanceInfo& info,
+		const TypeDescriptor* struct_desc,
+		size_t struct_offset,
+		WorkloadsBuffer& buffer)
 	{
-		const char* workload_unique_name = req.find_query_param("name");
-		const WorkloadInstanceInfo* info = workload_unique_name != nullptr ? engine->find_instance_info(workload_unique_name) : nullptr;
-		if (!info)
-		{
-			res.body.set_from_string("{\"error\":\"not found\"}");
-			res.status_code = 404;
-			return;
-		}
-
-		WorkloadsBuffer& mirror = engine->get_workloads_buffer();
-		res.body.clear();
-		res.body.append_from_string("{");
+		out.append_from_string("{");
 
 		bool first = true;
-		WorkloadFieldsIterator::for_each_field_in_struct(*info,
-			info->type->get_workload_desc()->config_desc,
-			info->type->get_workload_desc()->config_offset,
-			mirror,
+		WorkloadFieldsIterator::for_each_field_in_struct(info,
+			struct_desc,
+			struct_offset,
+			buffer,
 			[&](const WorkloadFieldView& view)
 			{
 				if (!first)
-					res.body.append_from_string(",");
+					out.append_from_string(",");
 				first = false;
 
-				const TypeDescriptor* td = view.subfield_info ? view.subfield_info->find_type_descriptor() : view.field_info->find_type_descriptor();
-				FixedString256 value = "\"<invalid>\"";
-
-				if (td && view.field_ptr && mirror.contains_object(view.field_ptr, td->size))
+				const char* subfield_separator = "";
+				const char* subfield_name = "";
+				if (view.subfield_info)
 				{
-					td->to_string(view.field_ptr, value.data, value.capacity());
+					subfield_separator = ".";
+					subfield_name = view.subfield_info->name.c_str();
 				}
 
-				res.body.append_from_string_format("\"%s\":\"%s\"", view.field_info->name.c_str(), value.c_str());
-			});
-
-		res.body.append_from_string("}");
-		res.status_code = 200;
-		res.content_type = "application/json";
-	}
-
-	void TelemetryServer::handle_get_workload_io(const WebRequest& req, WebResponse& res, bool inputs)
-	{
-		const char* workload_unique_name = req.find_query_param("name");
-		const WorkloadInstanceInfo* info = workload_unique_name != nullptr ? engine->find_instance_info(workload_unique_name) : nullptr;
-
-		if (!info)
-		{
-			res.body.set_from_string("{\"error\":\"not found\"}");
-			res.status_code = 404;
-			return;
-		}
-
-		WorkloadsBuffer& mirror = engine->get_workloads_buffer();
-		const TypeDescriptor* desc = inputs ? info->type->get_workload_desc()->inputs_desc : info->type->get_workload_desc()->outputs_desc;
-		size_t offset = inputs ? info->type->get_workload_desc()->inputs_offset : info->type->get_workload_desc()->outputs_offset;
-
-		res.body.clear();
-		res.body.append_from_string("{");
-
-		bool first = true;
-		WorkloadFieldsIterator::for_each_field_in_struct(*info,
-			desc,
-			offset,
-			mirror,
-			[&](const WorkloadFieldView& view)
-			{
-				if (!first)
-					res.body.append_from_string(",");
-				first = false;
-
 				const TypeDescriptor* td = view.subfield_info ? view.subfield_info->find_type_descriptor() : view.field_info->find_type_descriptor();
 
 				FixedString256 value = "\"<invalid>\"";
-				if (td && view.field_ptr && mirror.contains_object(view.field_ptr, td->size))
+				if (td && view.field_ptr && buffer.contains_object(view.field_ptr, td->size))
 				{
 					if (!td->to_string(view.field_ptr, value.data, value.capacity()))
 					{
@@ -362,19 +317,54 @@ namespace robotick
 					}
 				}
 
-				const char* subfieldSeperator = "";
-				const char* subfieldName = "";
-				if (view.subfield_info)
-				{
-					subfieldSeperator = ".";
-					subfieldName = view.subfield_info->name.c_str();
-				}
-
-				res.body.append_from_string_format(
-					"\"%s%s%s\":\"%s\"", view.field_info->name.c_str(), subfieldSeperator, subfieldName, value.c_str());
+				out.append_from_string_format("\"%s%s%s\":\"%s\"", view.field_info->name.c_str(), subfield_separator, subfield_name, value.c_str());
 			});
 
-		res.body.append_from_string("}");
+		out.append_from_string("}");
+	}
+
+	void TelemetryServer::handle_get_workload_config(const WebRequest& req, WebResponse& res)
+	{
+		const char* name = req.find_query_param("name");
+		const WorkloadInstanceInfo* info = name ? engine->find_instance_info(name) : nullptr;
+
+		if (!info)
+		{
+			res.body.set_from_string("{\"error\":\"not found\"}");
+			res.status_code = 404;
+			return;
+		}
+
+		WorkloadsBuffer& mirror = engine->get_workloads_buffer();
+		res.body.clear();
+
+		emit_fields_as_json(res.body, *info, info->type->get_workload_desc()->config_desc, info->type->get_workload_desc()->config_offset, mirror);
+
+		res.status_code = 200;
+		res.content_type = "application/json";
+	}
+
+	void TelemetryServer::handle_get_workload_io(const WebRequest& req, WebResponse& res, bool inputs)
+	{
+		const char* name = req.find_query_param("name");
+		const WorkloadInstanceInfo* info = name ? engine->find_instance_info(name) : nullptr;
+
+		if (!info)
+		{
+			res.body.set_from_string("{\"error\":\"not found\"}");
+			res.status_code = 404;
+			return;
+		}
+
+		const WorkloadDescriptor* desc = info->type->get_workload_desc();
+		const TypeDescriptor* struct_desc = inputs ? desc->inputs_desc : desc->outputs_desc;
+		size_t struct_offset = inputs ? desc->inputs_offset : desc->outputs_offset;
+
+		WorkloadsBuffer& mirror = engine->get_workloads_buffer();
+		res.body.clear();
+
+		emit_fields_as_json(res.body, *info, struct_desc, struct_offset, mirror);
+
 		res.status_code = 200;
 		res.content_type = "application/json";
 	}
