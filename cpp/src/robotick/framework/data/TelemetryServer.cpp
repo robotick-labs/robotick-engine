@@ -8,14 +8,12 @@
 
 namespace robotick
 {
-	constexpr uint16_t TELEMETRY_SERVER_PORT = 7090;
-
-	void TelemetryServer::start(const Engine& engine_in)
+	void TelemetryServer::start(const Engine& engine_in, const uint16_t telemetry_port)
 	{
 		engine = &engine_in;
 
 		web_server.start("Telemetry",
-			TELEMETRY_SERVER_PORT,
+			telemetry_port,
 			nullptr,
 			[this](const WebRequest& req, WebResponse& res)
 			{

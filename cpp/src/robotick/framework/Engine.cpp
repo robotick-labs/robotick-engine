@@ -286,7 +286,7 @@ namespace robotick
 				inst.workload_descriptor->start_fn(inst.get_ptr(*this), inst.seed->tick_rate_hz);
 		}
 
-		state->telemetry_server.start(*this);
+		state->telemetry_server.start(*this, state->model->get_telemetry_port());
 
 		state->is_running = true;
 

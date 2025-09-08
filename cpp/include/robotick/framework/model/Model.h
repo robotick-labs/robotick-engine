@@ -51,6 +51,8 @@ namespace robotick
 
 		void set_root_workload(const WorkloadSeed& root_workload, bool auto_finalize_and_validate = true);
 
+		void set_telemetry_port(const u_int16_t telemetry_port);
+
 		// general-purpose finalise function (bakes and validates as needed):
 		void finalize();
 
@@ -60,6 +62,7 @@ namespace robotick
 		const ArrayView<const RemoteModelSeed*>& get_remote_models() const { return remote_models; }
 
 		const WorkloadSeed* get_root_workload() const { return root_workload; }
+		uint16_t get_telemetry_port() const { return telemetry_port; };
 
 	  protected:
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
@@ -74,6 +77,8 @@ namespace robotick
 		ArrayView<const RemoteModelSeed*> remote_models;
 
 		const WorkloadSeed* root_workload = nullptr;
+
+		uint16_t telemetry_port = 7090;
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 		List<WorkloadSeed> workload_seeds_storage;

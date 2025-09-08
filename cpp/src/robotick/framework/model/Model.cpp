@@ -207,6 +207,11 @@ namespace robotick
 		}
 	}
 
+	void Model::set_telemetry_port(const uint16_t in_telemetry_port)
+	{
+		telemetry_port = in_telemetry_port;
+	}
+
 	void Model::finalize()
 	{
 		if (!root_workload)
