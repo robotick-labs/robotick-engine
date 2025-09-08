@@ -526,7 +526,7 @@ namespace robotick
 	}
 
 	void Engine::bind_blackboards_in_struct(
-		WorkloadInstanceInfo& instance, const TypeDescriptor& struct_type_desc, const size_t struct_offset, const size_t blackboard_storage_offset)
+		WorkloadInstanceInfo& instance, const TypeDescriptor& struct_type_desc, const size_t struct_offset, size_t& blackboard_storage_offset)
 	{
 		const StructDescriptor* struct_desc = struct_type_desc.get_struct_desc();
 		ROBOTICK_ASSERT(struct_desc != nullptr);

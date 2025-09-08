@@ -66,12 +66,13 @@ namespace robotick
 			compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
 	}
 
-	void Blackboard::bind(const size_t datablock_offset)
+	void Blackboard::bind(size_t& datablock_offset)
 	{
 		const size_t start_offset = datablock_offset;
 		const bool write_offsets = true;
 
-		compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
+		datablock_offset =
+			compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
 	}
 
 	const FieldDescriptor* Blackboard::find_field(const char* field_name) const
@@ -98,24 +99,42 @@ namespace robotick
 
 	bool Blackboard::set(const char* field_name, void* value, const size_t size)
 	{
-		const FieldDescriptor* found_field = nullptr;
-		void* field_data = find_field_data(field_name, found_field);
-		if (field_data && found_field)
+		const FieldDescriptor* found_field = find_field(field_name);
+		if (found_field)
 		{
-			ROBOTICK_ASSERT(size == found_field->find_type_descriptor()->size);
-			memcpy(field_data, value, size);
-			return true;
+			return set(*found_field, value, size);
 		}
 		return false;
 	}
 
 	void* Blackboard::get(const char* field_name, const size_t size) const
 	{
-		const FieldDescriptor* found_field = nullptr;
-		void* field_data = find_field_data(field_name, found_field);
-		if (field_data && found_field)
+		const FieldDescriptor* found_field = find_field(field_name);
+		if (found_field)
 		{
-			ROBOTICK_ASSERT(size == found_field->find_type_descriptor()->size);
+			return get(*found_field, size);
+		}
+		return nullptr;
+	}
+
+	bool Blackboard::set(const FieldDescriptor& field, void* value, size_t size)
+	{
+		void* field_data = field.get_data_ptr((void*)this);
+		if (field_data)
+		{
+			ROBOTICK_ASSERT(size == field.find_type_descriptor()->size);
+			memcpy(field_data, value, size);
+			return true;
+		}
+		return false;
+	}
+
+	void* Blackboard::get(const FieldDescriptor& field, size_t size) const
+	{
+		void* field_data = field.get_data_ptr((void*)this);
+		if (field_data)
+		{
+			ROBOTICK_ASSERT(size == field.find_type_descriptor()->size);
 			return field_data;
 		}
 		return nullptr;

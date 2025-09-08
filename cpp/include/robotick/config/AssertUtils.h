@@ -31,7 +31,10 @@ inline const char* robotick_filename(const char* path)
 	return slash ? slash + 1 : path;
 }
 
-#define ROBOTICK_INTERNAL_LOG(level, fmt, ...) fprintf(stderr, "[%s] %s:%d: " fmt "\n", level, robotick_filename(__FILE__), __LINE__, ##__VA_ARGS__);
+#define ROBOTICK_INTERNAL_LOG_RAW(level, file, line, func, fmt, ...)                                                                                 \
+	fprintf(stderr, "[%s] %s:%d (%s): " fmt "\n", level, robotick_filename(file), line, func, ##__VA_ARGS__)
+
+#define ROBOTICK_INTERNAL_LOG(level, fmt, ...) ROBOTICK_INTERNAL_LOG_RAW(level, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 
 // =====================================================================
 // ✅ TEST ERROR HANDLER
@@ -53,16 +56,16 @@ namespace robotick
 		FixedString256 msg;
 	};
 
-	inline void report_error(const char* message)
+	inline void report_error(const char* message, const char* file, int line, const char* func)
 	{
-		fprintf(stderr, "\033[1;31m[ERROR] %s\033[0m\n", message);
+		fprintf(stderr, "\033[1;31m[ERROR] %s:%d (%s): %s\033[0m\n", robotick_filename(file), line, func, message);
 		throw TestError(message);
 	}
 #else
-	inline void report_error(const char* message)
+	inline void report_error(const char* message, const char* file, int line, const char* func)
 	{
 		ROBOTICK_BREAKPOINT();
-		fprintf(stderr, "\033[1;31m[ERROR] %s\033[0m\n", message);
+		fprintf(stderr, "\033[1;31m[ERROR] %s:%d (%s): %s\033[0m\n", robotick_filename(file), line, func, message);
 		exit(1);
 	}
 #endif
@@ -119,8 +122,8 @@ namespace robotick
 	{                                                                                                                                                \
 		char __robotick_error_buf[1024];                                                                                                             \
 		snprintf(__robotick_error_buf, sizeof(__robotick_error_buf), __VA_ARGS__);                                                                   \
-		robotick::report_error(__robotick_error_buf);                                                                                                \
-	} while (0) /* @noreturn */
+		robotick::report_error(__robotick_error_buf, __FILE__, __LINE__, __func__);                                                                  \
+	} while (0)
 
 #define ROBOTICK_WARNING(...)                                                                                                                        \
 	do                                                                                                                                               \
