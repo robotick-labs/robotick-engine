@@ -62,7 +62,7 @@ namespace robotick
 		}
 	};
 
-	using FieldConfigEntry = Pair<FixedString64, FixedString64>;
+	using FieldConfigEntry = Pair<StringView, StringView>;
 
 	class DataConnectionUtils
 	{

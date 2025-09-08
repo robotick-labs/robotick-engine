@@ -276,7 +276,7 @@ namespace robotick
 		for (const FieldConfigEntry& field_config_entry : field_config_entries)
 		{
 			const char* dotted = field_config_entry.first.c_str();
-			const FixedString64& value = field_config_entry.second;
+			const StringView& value = field_config_entry.second;
 
 			void* target_ptr = nullptr;
 			const TypeDescriptor* target_type = nullptr;
