@@ -34,6 +34,8 @@ namespace robotick
 
 #endif
 		// non-dynamic modifiers:
+		void set_model_name(const char* in_model_name) { model_name = in_model_name; }
+
 		template <size_t N> void use_workload_seeds(const WorkloadSeed* (&in_seeds)[N]) { use_workload_seeds(in_seeds, N); }
 		void use_workload_seeds(const WorkloadSeed** all_workloads, size_t num_workloads);
 
@@ -57,6 +59,8 @@ namespace robotick
 		void finalize();
 
 		// accessors:
+		const char* get_model_name() const { return model_name.c_str(); };
+
 		const ArrayView<const WorkloadSeed*>& get_workload_seeds() const { return workload_seeds; }
 		const ArrayView<const DataConnectionSeed*>& get_data_connection_seeds() const { return data_connection_seeds; }
 		const ArrayView<const RemoteModelSeed*>& get_remote_models() const { return remote_models; }
@@ -72,6 +76,8 @@ namespace robotick
 #endif
 
 	  private:
+		StringView model_name;
+
 		ArrayView<const WorkloadSeed*> workload_seeds;
 		ArrayView<const DataConnectionSeed*> data_connection_seeds;
 		ArrayView<const RemoteModelSeed*> remote_models;

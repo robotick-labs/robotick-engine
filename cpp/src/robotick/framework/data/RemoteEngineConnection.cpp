@@ -186,19 +186,15 @@ namespace robotick
 	void RemoteEngineConnection::tick(const TickInfo& tick_info)
 	{
 		discovery.tick();
-		ROBOTICK_INFO("HERE 1");
 
 		if (state == State::Disconnected)
 		{
-			ROBOTICK_INFO("HERE 2 - %f", time_sec_to_reconnect);
 			if (time_sec_to_reconnect > 0.0F)
 			{
 				// wait a bit longer before trying to reconnect (try every RECONNECT_ATTEMPT_INTERVAL_SEC)
 				time_sec_to_reconnect -= (float)tick_info.delta_time;
 				return;
 			}
-
-			ROBOTICK_INFO("HERE 3");
 
 			if (mode == Mode::Sender)
 			{
@@ -249,17 +245,12 @@ namespace robotick
 		static constexpr float BROADCAST_INTERVAL_SEC = 0.1f;
 		static float time_since_last_broadcast = 0.0f;
 
-		ROBOTICK_INFO("HERE A");
-
 		time_since_last_broadcast += tick_info.delta_time;
 
 		if (resolved_port < 0)
 		{
-			ROBOTICK_INFO("HERE B");
-
 			if (time_since_last_broadcast >= BROADCAST_INTERVAL_SEC)
 			{
-				ROBOTICK_INFO("HERE B");
 				discovery.broadcast_discovery_request(target_model_name.c_str());
 				time_since_last_broadcast = 0.0f;
 			}

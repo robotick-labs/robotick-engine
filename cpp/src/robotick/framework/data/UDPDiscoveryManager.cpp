@@ -187,7 +187,10 @@ namespace robotick
 				return;
 			}
 			if (!my_model_id.equals(target_id))
+			{
+				ROBOTICK_INFO("Requested target-id '%s' doesn't match my own '%s' - ignoring it.", target_id, my_model_id.c_str());
 				return;
+			}
 
 			char reply[256];
 			int reply_len = snprintf(reply, sizeof(reply), "%s %s %d", PEER_REPLY_MSG, my_model_id.c_str(), listen_port);
