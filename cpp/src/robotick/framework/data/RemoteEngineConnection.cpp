@@ -9,10 +9,12 @@
 #include <csignal> // For signal(), SIGPIPE, SIG_IGN
 #include <cstring>
 #include <fcntl.h>
+#include <mutex>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <unordered_map>
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
 #include "esp_netif.h"
@@ -20,10 +22,9 @@
 
 namespace robotick
 {
-
 	namespace
 	{
-		constexpr float RECONNECT_ATTEMPT_INTERVAL_SEC = 1.0f;
+		constexpr float RECONNECT_ATTEMPT_INTERVAL_SEC = 0.01f;
 
 		bool is_network_stack_ready()
 		{
@@ -93,14 +94,12 @@ namespace robotick
 
 		if (state == State::Disconnected)
 		{
-			ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::Disconnected] - disconnected%s", color_start, mode_str, color_end);
+			ROBOTICK_INFO("%s[%s] [-> State::Disconnected] - disconnected%s", color_start, mode_str, color_end);
 		}
 		else if (state == State::ReadyForHandshake)
 		{
-			ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForHandshake] - socket-connection established, ready for handshake%s",
-				color_start,
-				mode_str,
-				color_end);
+			ROBOTICK_INFO(
+				"%s[%s] [-> State::ReadyForHandshake] - socket-connection established, ready for handshake%s", color_start, mode_str, color_end);
 		}
 		else if (state == State::ReadyForFieldsRequest)
 		{
@@ -108,11 +107,8 @@ namespace robotick
 			if (show_always || prev_state != State::ReadyForFields) // only show after connecting, to minimise spam
 			{
 				const char* field_data_str = is_receiver ? "send" : "receive";
-				ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFieldsRequest] - ready to %s fields-request!%s",
-					color_start,
-					mode_str,
-					field_data_str,
-					color_end);
+				ROBOTICK_INFO(
+					"%s[%s] [-> State::ReadyForFieldsRequest] - ready to %s fields-request!%s", color_start, mode_str, field_data_str, color_end);
 			}
 		}
 		else if (state == State::ReadyForFields)
@@ -121,24 +117,52 @@ namespace robotick
 			if (show_always)
 			{
 				const char* field_data_str = is_receiver ? "receive" : "send";
-				ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFields] - ready to %s fields-data!%s",
-					color_start,
-					mode_str,
-					field_data_str,
-					color_end);
+				ROBOTICK_INFO("%s[%s] [-> State::ReadyForFields] - ready to %s fields-data!%s", color_start, mode_str, field_data_str, color_end);
 			}
 		}
 		else
 		{
-			ROBOTICK_FATAL_EXIT("RemoteEngineConnection [%s] - unknown state %i", mode_str, static_cast<int>(state));
+			ROBOTICK_FATAL_EXIT("[%s] - unknown state %i", mode_str, static_cast<int>(state));
 		}
 	}
 
-	// configure() should be a called on all connections first - establishing our operation mode (sender / receiver) and remote-connection info
-	void RemoteEngineConnection::configure(const ConnectionConfig& config_in, Mode mode_in)
+	void RemoteEngineConnection::configure_sender(const char* my_name, const char* target_name)
 	{
-		config = config_in;
-		mode = mode_in;
+		mode = Mode::Sender;
+		my_model_name = my_name;
+		target_model_name = target_name;
+		resolved_host = "";
+		resolved_port = -1;
+
+		discovery.set_on_discovered(
+			[this](const UDPDiscoveryManager::PeerInfo& info)
+			{
+				if (info.model_id == target_model_name)
+				{
+					resolved_host = info.ip;
+					resolved_port = info.port;
+
+					ROBOTICK_INFO("Discovered peer [%s] at %s:%d", info.model_id.c_str(), info.ip.c_str(), info.port);
+				}
+				else
+				{
+					ROBOTICK_WARNING("Discovered unexpected peer [%s] at %s:%d", info.model_id.c_str(), info.ip.c_str(), info.port);
+				}
+			});
+
+		discovery.initialize(my_model_name.c_str(), 0, DiscoveryMode::Sender);
+
+		set_state(State::Disconnected);
+	}
+
+	void RemoteEngineConnection::configure_receiver(const char* in_my_model_name)
+	{
+		mode = Mode::Receiver;
+		my_model_name = in_my_model_name;
+		target_model_name = ""; // receivers don't target
+		listen_port = 0;		// we'll bind(0) and discover the port
+
+		set_state(State::Disconnected);
 	}
 
 	// register_field() should be called on all sender connections - telling it which field(s) it should send
@@ -161,8 +185,12 @@ namespace robotick
 
 	void RemoteEngineConnection::tick(const TickInfo& tick_info)
 	{
+		discovery.tick();
+		ROBOTICK_INFO("HERE 1");
+
 		if (state == State::Disconnected)
 		{
+			ROBOTICK_INFO("HERE 2 - %f", time_sec_to_reconnect);
 			if (time_sec_to_reconnect > 0.0F)
 			{
 				// wait a bit longer before trying to reconnect (try every RECONNECT_ATTEMPT_INTERVAL_SEC)
@@ -170,9 +198,11 @@ namespace robotick
 				return;
 			}
 
+			ROBOTICK_INFO("HERE 3");
+
 			if (mode == Mode::Sender)
 			{
-				tick_disconnected_sender();
+				tick_disconnected_sender(tick_info);
 			}
 			else
 			{
@@ -211,11 +241,32 @@ namespace robotick
 		return state == State::ReadyForFieldsRequest || state == State::ReadyForFields;
 	}
 
-	void RemoteEngineConnection::tick_disconnected_sender()
+	void RemoteEngineConnection::tick_disconnected_sender(const TickInfo& tick_info)
 	{
 		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::tick_disconnected_sender() should only be called in Mode::Sender");
 
-		ROBOTICK_INFO("RemoteEngineConnection::tick_disconnected_sender() [Sender] Attempting to connect to %s:%d", config.host.c_str(), config.port);
+		// Broadcast DISCOVER_PEER periodically until resolved
+		static constexpr float BROADCAST_INTERVAL_SEC = 0.1f;
+		static float time_since_last_broadcast = 0.0f;
+
+		ROBOTICK_INFO("HERE A");
+
+		time_since_last_broadcast += tick_info.delta_time;
+
+		if (resolved_port < 0)
+		{
+			ROBOTICK_INFO("HERE B");
+
+			if (time_since_last_broadcast >= BROADCAST_INTERVAL_SEC)
+			{
+				ROBOTICK_INFO("HERE B");
+				discovery.broadcast_discovery_request(target_model_name.c_str());
+				time_since_last_broadcast = 0.0f;
+			}
+
+			// Wait until our on_discovered callback fires
+			return;
+		}
 
 		socket_fd = create_tcp_socket();
 		if (socket_fd < 0)
@@ -225,13 +276,14 @@ namespace robotick
 
 		sockaddr_in addr{};
 		addr.sin_family = AF_INET;
-		addr.sin_port = htons(config.port);
+		addr.sin_port = htons(resolved_port);
 
-		if (inet_pton(AF_INET, config.host.c_str(), &addr.sin_addr) != 1)
+		if (inet_pton(AF_INET, resolved_host.c_str(), &addr.sin_addr) != 1)
 		{
+			ROBOTICK_WARNING("Invalid IP address: %s", resolved_host.c_str());
 			close(socket_fd);
 			socket_fd = -1;
-			ROBOTICK_WARNING("Invalid IP address: %s", config.host.c_str());
+			resolved_port = -1;
 			return;
 		}
 
@@ -239,14 +291,19 @@ namespace robotick
 		{
 			if (errno != EINPROGRESS)
 			{
+				ROBOTICK_WARNING("Failed to connect to %s:%d", resolved_host.c_str(), resolved_port);
 				close(socket_fd);
 				socket_fd = -1;
-				ROBOTICK_WARNING("Failed to connect to %s:%d", config.host.c_str(), config.port);
+				resolved_port = -1; // Reset so we retry discovery
 				return;
 			}
 		}
 
-		ROBOTICK_INFO("Sender connection initiated to %s:%d", config.host.c_str(), config.port);
+		ROBOTICK_INFO("Sender [%s] initiated connection to [%s] @ %s:%d",
+			my_model_name.c_str(),
+			target_model_name.c_str(),
+			resolved_host.c_str(),
+			resolved_port);
 
 		set_state(State::ReadyForHandshake);
 	}
@@ -265,18 +322,44 @@ namespace robotick
 
 			sockaddr_in addr{};
 			addr.sin_family = AF_INET;
-			addr.sin_port = htons(config.port);
+			addr.sin_port = htons(0); // 👈 ask OS for ephemeral port
 			addr.sin_addr.s_addr = INADDR_ANY;
 
 			if (bind(socket_fd, (sockaddr*)&addr, sizeof(addr)) < 0)
+			{
 				ROBOTICK_WARNING("Failed to bind socket");
+				close(socket_fd);
+				socket_fd = -1;
+				return;
+			}
+
+			// 👇 Learn what port we were assigned
+			sockaddr_in bound_addr{};
+			socklen_t addr_len = sizeof(bound_addr);
+			if (getsockname(socket_fd, (sockaddr*)&bound_addr, &addr_len) == 0)
+			{
+				listen_port = ntohs(bound_addr.sin_port);
+				ROBOTICK_INFO("Receiver [%s] listening on port %d", my_model_name.c_str(), listen_port);
+
+				discovery.initialize(my_model_name.c_str(), listen_port, DiscoveryMode::Receiver);
+			}
+			else
+			{
+				ROBOTICK_WARNING("Failed to get bound port");
+			}
 
 			if (listen(socket_fd, 1) < 0)
+			{
 				ROBOTICK_WARNING("Failed to listen on socket");
+				close(socket_fd);
+				socket_fd = -1;
+				return;
+			}
 
 			return;
 		}
 
+		// Accept incoming connection
 		sockaddr_in client_addr{};
 		socklen_t client_len = sizeof(client_addr);
 		int client_fd = accept(socket_fd, (sockaddr*)&client_addr, &client_len);
@@ -292,7 +375,8 @@ namespace robotick
 
 		close(socket_fd);
 		socket_fd = client_fd;
-		ROBOTICK_INFO("Receiver connection accepted on port %d", config.port);
+
+		ROBOTICK_INFO("Receiver [%s] accepted connection on port %d", my_model_name.c_str(), listen_port);
 
 		set_state(State::ReadyForHandshake);
 	}
@@ -334,6 +418,7 @@ namespace robotick
 		const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 		if (tick_result == InProgressMessage::Result::ConnectionLost)
 		{
+			ROBOTICK_WARNING("Connection lost sending handshake from Sender");
 			disconnect();
 			return;
 		}
@@ -365,6 +450,7 @@ namespace robotick
 		const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 		if (tick_result == InProgressMessage::Result::ConnectionLost)
 		{
+			ROBOTICK_WARNING("Connection lost receiving handshake from Sender");
 			disconnect();
 			return;
 		}
@@ -436,6 +522,7 @@ namespace robotick
 			const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 			if (tick_result == InProgressMessage::Result::ConnectionLost)
 			{
+				ROBOTICK_WARNING("Connection lost receiving field-request from Receiver");
 				disconnect();
 				return;
 			}
@@ -457,6 +544,7 @@ namespace robotick
 			const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 			if (tick_result == InProgressMessage::Result::ConnectionLost)
 			{
+				ROBOTICK_WARNING("Connection lost sending field-request from Receiver");
 				disconnect();
 				return;
 			}
@@ -491,6 +579,7 @@ namespace robotick
 		const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 		if (tick_result == InProgressMessage::Result::ConnectionLost)
 		{
+			ROBOTICK_WARNING("Connection lost sending field-data from Sender");
 			disconnect();
 			return;
 		}
@@ -515,6 +604,7 @@ namespace robotick
 		const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 		if (tick_result == InProgressMessage::Result::ConnectionLost)
 		{
+			ROBOTICK_WARNING("Connection lost receiving field-data from Sender");
 			disconnect();
 			return;
 		}
@@ -599,6 +689,12 @@ namespace robotick
 		{
 			// receiver gets told what fields to use by sender, on handshake.  We should therefore clear then whenever we disconnect
 			fields.clear();
+		}
+
+		if (mode == Mode::Sender)
+		{
+			resolved_host.clear();
+			resolved_port = -1;
 		}
 
 		set_state(State::Disconnected);

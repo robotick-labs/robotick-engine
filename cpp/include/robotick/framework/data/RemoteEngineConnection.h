@@ -5,6 +5,7 @@
 
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/data/InProgressMessage.h"
+#include "robotick/framework/data/UDPDiscoveryManager.h"
 
 #include <cstdint>
 #include <functional>
@@ -55,12 +56,6 @@ namespace robotick
 			ConnectionLost
 		};
 
-		struct ConnectionConfig
-		{
-			FixedString64 host;
-			int port;
-		};
-
 		struct Field
 		{
 			FixedString64 path;
@@ -80,7 +75,8 @@ namespace robotick
 		RemoteEngineConnection(RemoteEngineConnection&&) noexcept = delete;
 		RemoteEngineConnection& operator=(RemoteEngineConnection&&) noexcept = delete;
 
-		void configure(const ConnectionConfig& config, Mode mode);
+		void configure_sender(const char* my_model_name, const char* target_model_name);
+		void configure_receiver(const char* my_model_name);
 
 		void tick(const TickInfo& tick_info);
 
@@ -97,7 +93,7 @@ namespace robotick
 		[[nodiscard]] State get_state() const { return state; };
 		void set_state(const State state);
 
-		void tick_disconnected_sender();
+		void tick_disconnected_sender(const TickInfo& tick_info);
 		void tick_disconnected_receiver();
 		void tick_send_handshake();
 		void tick_receive_handshake_and_bind();
@@ -110,7 +106,18 @@ namespace robotick
 
 		// things we set up once on startup:
 		Mode mode;
-		ConnectionConfig config;
+
+		FixedString64 my_model_name;	 // always set to name of host-model
+		FixedString64 target_model_name; // empty on receivers; non-empty on senders
+
+		// runtime endpoint data (resolved by discovery)
+		FixedString64 resolved_host; // e.g. "127.0.0.1"
+		int resolved_port = -1;
+
+		// receiver's bound port (for announce)
+		int listen_port = 0;
+
+		UDPDiscoveryManager discovery;
 		BinderCallback binder;
 
 		// set on startup (register_field()) on Sender; on tick_receive_handshake_and_bind() on Receiver:

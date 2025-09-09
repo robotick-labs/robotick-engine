@@ -348,14 +348,12 @@ namespace robotick
 		}
 	}
 
-	constexpr int DEFAULT_REMOTE_ENGINE_PORT = 7262;
-
 	void Engine::setup_remote_engines_receiver()
 	{
 		ROBOTICK_INFO("Setting up remote engines receiver...");
 
-		state->remote_engines_receiver.configure(
-			RemoteEngineConnection::ConnectionConfig{"", DEFAULT_REMOTE_ENGINE_PORT}, RemoteEngineConnection::Mode::Receiver);
+		const char* my_model_name = "my_model_name_receiver_TEMP"; // TODO - get this from Model its self
+		state->remote_engines_receiver.configure_receiver(my_model_name);
 
 		state->remote_engines_receiver.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& out)
@@ -405,11 +403,8 @@ namespace robotick
 			RemoteEngineConnection& remote_engine_connection = state->remote_engine_senders[remote_engine_index];
 			remote_engine_index++;
 
-			RemoteEngineConnection::ConnectionConfig config;
-			config.host = remote_model_seed->comms_channel.c_str();
-			config.port = DEFAULT_REMOTE_ENGINE_PORT;
-
-			remote_engine_connection.configure(config, RemoteEngineConnection::Mode::Sender);
+			const char* my_model_name = "my_model_name_SENDER_TEMP"; // TODO - get this from Model its self
+			remote_engine_connection.configure_sender(my_model_name, remote_model_seed->model_name.c_str());
 
 			for (const auto* remote_data_connection_seed : remote_model_seed->remote_data_connection_seeds)
 			{
