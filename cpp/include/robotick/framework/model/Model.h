@@ -53,7 +53,7 @@ namespace robotick
 
 		void set_root_workload(const WorkloadSeed& root_workload, bool auto_finalize_and_validate = true);
 
-		void set_telemetry_port(const u_int16_t telemetry_port);
+		void set_telemetry_port(const uint16_t telemetry_port);
 
 		// general-purpose finalise function (bakes and validates as needed):
 		void finalize();

@@ -180,8 +180,8 @@ namespace robotick
 		std::snprintf(port_str, sizeof(port_str), "%u", static_cast<unsigned int>(port));
 
 		const char* options_with_docroot[] = {
-			"listening_ports", port_str, "document_root", document_root.c_str(), "enable_directory_listing", "no", nullptr};
-		const char* options_no_docroot[] = {"listening_ports", port_str, "enable_directory_listing", "no", nullptr};
+			"listening_ports", port_str, "document_root", document_root.c_str(), "enable_directory_listing", "no", nullptr, nullptr};
+		const char* options_no_docroot[] = {"listening_ports", port_str, "enable_directory_listing", "no", nullptr, nullptr};
 		const char** options = has_docroot ? options_with_docroot : options_no_docroot;
 
 		impl->ctx = mg_start(nullptr, nullptr, options);
