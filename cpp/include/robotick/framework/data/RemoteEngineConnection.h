@@ -115,7 +115,7 @@ namespace robotick
 		int remote_port = -1;
 
 		// receiver's bound port (for announce)
-		int listen_port = 0;
+		int listen_port = 0; // ask OS for ephemeral port first time; reuse assigned port thereafter
 
 		BinderCallback binder;
 

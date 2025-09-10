@@ -157,6 +157,7 @@ namespace robotick
 	void RemoteEngineConnection::configure_sender(
 		const char* in_my_model_name, const char* in_target_model_name, const char* in_remote_ip, int in_remote_port)
 	{
+		mode = Mode::Sender;
 		my_model_name = in_my_model_name;
 		target_model_name = in_target_model_name;
 		remote_ip = in_remote_ip;
@@ -298,7 +299,7 @@ namespace robotick
 
 			sockaddr_in addr{};
 			addr.sin_family = AF_INET;
-			addr.sin_port = htons(0); // ask OS for ephemeral port
+			addr.sin_port = htons(listen_port);
 			addr.sin_addr.s_addr = INADDR_ANY;
 
 			if (bind(socket_fd, (sockaddr*)&addr, sizeof(addr)) < 0)
