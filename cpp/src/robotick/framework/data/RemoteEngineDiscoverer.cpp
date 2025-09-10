@@ -10,6 +10,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#define ROBOTICK_REMOTE_ENGINE_DISCOVERER_VERBOSE 0
+
 namespace robotick
 {
 	constexpr const char* MULTICAST_GROUP = "239.10.77.42";
@@ -40,7 +42,9 @@ namespace robotick
 		time_sec_to_broadcast = 0.0f;
 		init_send_socket();
 		init_recv_socket();
-		ROBOTICK_INFO("[%s] Sender initialized (looking for: %s)", my_model_id.c_str(), target_model_id.c_str());
+
+		ROBOTICK_INFO_IF(
+			ROBOTICK_REMOTE_ENGINE_DISCOVERER_VERBOSE, "[%s] Sender initialized (looking for: %s)", my_model_id.c_str(), target_model_id.c_str());
 	}
 
 	void RemoteEngineDiscoverer::initialize_receiver(const char* my_model_name)
@@ -49,7 +53,8 @@ namespace robotick
 		my_model_id = my_model_name;
 		init_recv_socket();
 		init_send_socket();
-		ROBOTICK_INFO("[%s] Receiver initialized", my_model_id.c_str());
+
+		ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_DISCOVERER_VERBOSE, "[%s] Receiver initialized", my_model_id.c_str());
 	}
 
 	void RemoteEngineDiscoverer::reset_discovery()
@@ -151,7 +156,7 @@ namespace robotick
 		target.sin_port = htons(DISCOVERY_PORT);
 		target.sin_addr.s_addr = inet_addr(MULTICAST_GROUP);
 
-		ROBOTICK_INFO("[%s] Broadcasting discovery: '%s'", my_model_id.c_str(), buffer);
+		ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_DISCOVERER_VERBOSE, "[%s] Broadcasting discovery: '%s'", my_model_id.c_str(), buffer);
 		sendto(send_fd, buffer, len, 0, (sockaddr*)&target, sizeof(target));
 
 		status = DiscoveryStatus::WaitingForReply;
@@ -207,14 +212,16 @@ namespace robotick
 
 			if (!my_model_id.equals(target_id))
 			{
-				ROBOTICK_INFO("[%s] Ignoring discovery for target '%s'", my_model_id.c_str(), target_id);
+				ROBOTICK_INFO_IF(
+					ROBOTICK_REMOTE_ENGINE_DISCOVERER_VERBOSE, "[%s] Ignoring discovery for target '%s'", my_model_id.c_str(), target_id);
 				return;
 			}
 
 			int dynamic_rec_port = listen_port;
 			if (on_requested_cb)
 			{
-				ROBOTICK_INFO("[%s] Discovery request from '%s', invoking callback", my_model_id.c_str(), source_id);
+				ROBOTICK_INFO_IF(
+					ROBOTICK_REMOTE_ENGINE_DISCOVERER_VERBOSE, "[%s] Discovery request from '%s', invoking callback", my_model_id.c_str(), source_id);
 				on_requested_cb(source_id, dynamic_rec_port);
 			}
 
@@ -226,7 +233,8 @@ namespace robotick
 			dest.sin_port = htons(reply_port);
 			inet_pton(AF_INET, sender_ip, &dest.sin_addr);
 
-			ROBOTICK_INFO("[%s] Replying to discovery from %s:%d", my_model_id.c_str(), sender_ip, reply_port);
+			ROBOTICK_INFO_IF(
+				ROBOTICK_REMOTE_ENGINE_DISCOVERER_VERBOSE, "[%s] Replying to discovery from %s:%d", my_model_id.c_str(), sender_ip, reply_port);
 			sendto(send_fd, reply, reply_len, 0, (sockaddr*)&dest, sizeof(dest));
 		}
 		else if (strncmp(data, PEER_REPLY_MSG, strlen(PEER_REPLY_MSG)) == 0 && mode == DiscoveryMode::Sender)
@@ -244,7 +252,12 @@ namespace robotick
 			info.ip = inet_ntoa(sender.sin_addr);
 			info.port = port;
 
-			ROBOTICK_INFO("[%s] Received peer reply from '%s' (%s:%d)", my_model_id.c_str(), model_id, info.ip.c_str(), port);
+			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_DISCOVERER_VERBOSE,
+				"[%s] Received peer reply from '%s' (%s:%d)",
+				my_model_id.c_str(),
+				model_id,
+				info.ip.c_str(),
+				port);
 			if (on_discovered_cb)
 				on_discovered_cb(info);
 

@@ -48,6 +48,8 @@
 //
 // =================================================================================================
 
+#define ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE 0
+
 namespace robotick
 {
 	namespace
@@ -279,8 +281,12 @@ namespace robotick
 			}
 		}
 
-		ROBOTICK_INFO(
-			"Sender [%s] initiated connection to [%s] @ %s:%d", my_model_name.c_str(), target_model_name.c_str(), remote_ip.c_str(), remote_port);
+		ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE,
+			"Sender [%s] initiated connection to [%s] @ %s:%d",
+			my_model_name.c_str(),
+			target_model_name.c_str(),
+			remote_ip.c_str(),
+			remote_port);
 
 		set_state(State::ReadyForHandshake);
 	}
@@ -402,7 +408,7 @@ namespace robotick
 		{
 			in_progress_message.vacate(); // vacate ready for next user
 
-			ROBOTICK_INFO("Sender handshake sent with %zu field(s)", fields.size());
+			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender handshake sent with %zu field(s)", fields.size());
 			set_state(State::ReadyForFieldsRequest);
 		}
 	}
