@@ -11,6 +11,8 @@ namespace robotick::test
 {
 	// === Test workload + structs ===
 
+	static constexpr int VALUE_TO_TRANSMIT = 123;
+
 	struct RemoteInputs
 	{
 		int remote_x = 0;
@@ -21,7 +23,7 @@ namespace robotick::test
 
 	struct RemoteOutputs
 	{
-		int local_x = 123;
+		int local_x = VALUE_TO_TRANSMIT;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(RemoteOutputs)
 	ROBOTICK_STRUCT_FIELD(RemoteOutputs, int, local_x)
@@ -40,55 +42,55 @@ namespace robotick::test
 
 	TEST_CASE("Integration/Framework/RemoteEngineConnections", "[RemoteEngineConnections]")
 	{
-		// --- Setup brain (sender)
-		Model brain_model;
-		const auto& brain_seed = brain_model.add("TestRemoteWorkload", "remote_tx").set_tick_rate_hz(100.0f);
-		brain_model.set_root_workload(brain_seed);
-		brain_model.set_model_name("brain_model");
+		// --- Setup sender
+		Model sender_model;
+		sender_model.set_model_name("sender_model");
 
-		// --- Setup spine (receiver)
-		Model spine_model;
-		const auto& spine_seed = spine_model.add("TestRemoteWorkload", "remote_rx").set_tick_rate_hz(100.0f);
-		spine_model.set_root_workload(spine_seed);
-		spine_model.set_model_name("spine_model");
-		spine_model.set_telemetry_port(7091); // so as to not conflict with the above
+		auto& remote = sender_model.add_remote_model("receiver_model", "ip:127.0.0.1");
+		remote.connect("sender_workload.outputs.local_x", "receiver_workload.inputs.remote_x");
 
-		// Declare spine expects remote data from brain
-		auto& remote = spine_model.add_remote_model("brain", "ip:127.0.0.1");
-		remote.connect("remote_tx.outputs.local_x", "remote_rx.inputs.remote_x");
+		const auto& sender_seed = sender_model.add("TestRemoteWorkload", "sender_workload").set_tick_rate_hz(100.0f);
+		sender_model.set_root_workload(sender_seed);
+
+		// --- Setup receiver
+		Model receiver_model;
+		receiver_model.set_model_name("receiver_model");
+		const auto& receiver_seed = receiver_model.add("TestRemoteWorkload", "receiver_workload").set_tick_rate_hz(100.0f);
+		receiver_model.set_telemetry_port(7091); // so as to not conflict with the above
+		receiver_model.set_root_workload(receiver_seed);
 
 		// --- Load both engines
-		Engine brain;
-		Engine spine;
+		Engine sender;
+		Engine receiver;
 
-		brain.load(brain_model);
-		spine.load(spine_model);
+		sender.load(sender_model);
+		receiver.load(receiver_model);
 
 		AtomicFlag stop_flag(false);
 		AtomicFlag success_flag(false);
 
 		// --- Threaded run
-		std::thread brain_thread(
+		std::thread sender_thread(
 			[&]()
 			{
-				brain.run(stop_flag);
+				sender.run(stop_flag);
 			});
 
-		std::thread spine_thread(
+		std::thread receiver_thread(
 			[&]()
 			{
-				spine.run(stop_flag);
+				receiver.run(stop_flag);
 			});
 
 		// --- Watch for success or timeout
-		auto* brain_workload = brain.find_instance<TestRemoteWorkload>("remote_tx");
-		auto* spine_workload = spine.find_instance<TestRemoteWorkload>("remote_rx");
+		auto* sender_workload = sender.find_instance<TestRemoteWorkload>("sender_workload");
+		auto* receiver_workload = receiver.find_instance<TestRemoteWorkload>("receiver_workload");
 
 		const auto start = std::chrono::steady_clock::now();
 
 		while (!stop_flag.is_set())
 		{
-			if (spine_workload && brain_workload && spine_workload->inputs.remote_x == brain_workload->outputs.local_x)
+			if (receiver_workload && sender_workload && receiver_workload->inputs.remote_x == sender_workload->outputs.local_x)
 			{
 				success_flag.set();
 				break;
@@ -104,8 +106,11 @@ namespace robotick::test
 
 		stop_flag.set();
 
-		brain_thread.join();
-		spine_thread.join();
+		sender_thread.join();
+		receiver_thread.join();
+
+		REQUIRE(sender_workload->outputs.local_x == VALUE_TO_TRANSMIT);
+		REQUIRE(receiver_workload->inputs.remote_x == VALUE_TO_TRANSMIT);
 
 		REQUIRE(success_flag.is_set());
 	}

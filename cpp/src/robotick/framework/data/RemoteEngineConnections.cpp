@@ -15,20 +15,24 @@ namespace robotick
 		const char* my_model_name = model.get_model_name();
 		ROBOTICK_ASSERT(my_model_name != nullptr);
 
+		ROBOTICK_INFO("[REC::setup] Setting up RemoteEngineConnections for model '%s'", my_model_name);
+
 		discoverer_receiver.initialize_receiver(my_model_name);
 		discoverer_receiver.set_on_incoming_connection_requested(
 			[this, &model](const char* source_model_id, int& rec_port_out)
 			{
+				ROBOTICK_INFO("[REC::receiver] Incoming discovery request from model '%s'", source_model_id);
 				RemoteEngineConnection& conn = dynamic_receivers.push_back();
 				conn.configure_receiver(model.get_model_name());
 
 				conn.set_field_binder(
 					[this](const char* path, RemoteEngineConnection::Field& out)
 					{
+						ROBOTICK_INFO("[REC::receiver] Binding field '%s'", path);
 						auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*engine, path);
 						if (!ptr)
 						{
-							ROBOTICK_FATAL_EXIT("Receiver failed to bind field: %s", path);
+							ROBOTICK_FATAL_EXIT("[REC::receiver] Receiver failed to bind field: %s", path);
 						}
 						out.path = path;
 						out.recv_ptr = ptr;
@@ -37,7 +41,6 @@ namespace robotick
 						return true;
 					});
 
-				// Tick to get assigned port
 				for (int i = 0; i < 10; ++i)
 				{
 					conn.tick(TICK_INFO_FIRST_10MS_100HZ);
@@ -50,62 +53,70 @@ namespace robotick
 
 		const auto& remote_model_seeds = model.get_remote_models();
 		if (remote_model_seeds.empty())
+		{
+			ROBOTICK_INFO("[REC::setup - %s] No remote models declared; skipping sender setup", my_model_name);
 			return;
+		}
 
+		ROBOTICK_INFO("[REC::setup] Declared %d remote model(s)", (int)remote_model_seeds.size());
 		senders.initialize(remote_model_seeds.size());
-		discoverer_sender.initialize_sender(my_model_name, "*"); // Wildcard target
-
-		discoverer_sender.set_on_remote_model_discovered(
-			[this, &model](const RemoteEngineDiscoverer::PeerInfo& peer)
-			{
-				for (auto& pending : pending_senders)
-				{
-					if (pending.remote_model_name == peer.model_id)
-					{
-						if (!pending.connection->has_basic_connection())
-						{
-							pending.connection->configure_sender(model.get_model_name(), peer.model_id.c_str(), peer.ip.c_str(), peer.port);
-						}
-					}
-				}
-			});
+		discoverer_senders.initialize(remote_model_seeds.size());
 
 		uint32_t index = 0;
 		for (const auto* remote_model : remote_model_seeds)
 		{
+			ROBOTICK_INFO("[REC::setup] Remote model seed: '%s'", remote_model->model_name.c_str());
 			if (remote_model->remote_data_connection_seeds.empty())
+			{
+				ROBOTICK_INFO("[REC::setup] Model '%s' has no connections; skipping", remote_model->model_name.c_str());
 				continue;
+			}
 
-			RemoteEngineConnection& conn = senders[index++];
+			RemoteEngineConnection& remote_connection = senders[index];
+			RemoteEngineDiscoverer& discoverer_sender = discoverer_senders[index];
+			index++;
 
-			PendingSender& p = pending_senders.push_back();
-			p.remote_model_name = remote_model->model_name;
-			p.connection = &conn;
+			discoverer_sender.initialize_sender(my_model_name, remote_model->model_name.c_str());
+			discoverer_sender.set_on_remote_model_discovered(
+				[&](const RemoteEngineDiscoverer::PeerInfo& peer)
+				{
+					ROBOTICK_INFO("[REC::sender] Discovered remote model '%s' at %s:%d", peer.model_id.c_str(), peer.ip.c_str(), peer.port);
+					ROBOTICK_INFO("[REC::sender] Configuring sender to model '%s'", peer.model_id.c_str());
+					remote_connection.configure_sender(model.get_model_name(), peer.model_id.c_str(), peer.ip.c_str(), peer.port);
+				});
 
 			for (const auto* conn_seed : remote_model->remote_data_connection_seeds)
 			{
-				auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*engine, conn_seed->source_field_path.c_str());
+				const char* src = conn_seed->source_field_path.c_str();
+				const char* dst = conn_seed->dest_field_path.c_str();
+				ROBOTICK_INFO("[REC::setup] Binding sender field '%s' → '%s'", src, dst);
+
+				auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*engine, src);
 				if (!ptr)
 				{
-					ROBOTICK_FATAL_EXIT("Failed to resolve source: %s", conn_seed->source_field_path.c_str());
+					ROBOTICK_FATAL_EXIT("[REC::setup] Failed to resolve sender source: %s", src);
 				}
 
 				RemoteEngineConnection::Field f;
-				f.path = conn_seed->dest_field_path.c_str();
+				f.path = dst;
 				f.send_ptr = ptr;
 				f.size = size;
 				f.type_desc = field_desc->find_type_descriptor();
 				ROBOTICK_ASSERT(f.type_desc);
 
-				conn.register_field(f);
+				remote_connection.register_field(f);
 			}
 		}
+
+		ROBOTICK_INFO("[REC::setup] Finished setup");
 	}
 
 	void RemoteEngineConnections::tick(const TickInfo& tick_info)
 	{
 		discoverer_receiver.tick(tick_info);
-		discoverer_sender.tick(tick_info);
+
+		for (auto& discoverer_sender : discoverer_senders)
+			discoverer_sender.tick(tick_info);
 
 		for (auto& r : dynamic_receivers)
 			r.tick(tick_info);

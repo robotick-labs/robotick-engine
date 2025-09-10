@@ -317,7 +317,7 @@ namespace robotick
 			last_tick_time = now;
 
 			// update remote data-connections
-			// state->remote_engine_connections.tick(tick_info);
+			state->remote_engine_connections.tick(tick_info);
 
 			// update local data-connections
 			for (const DataConnectionInfo* data_connection : state->data_connections_acquired)

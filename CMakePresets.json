@@ -26,7 +26,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/workspace -DROBOTICK_DEBUG -DROBOTICK_ENABLE_MODEL_HEAP",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-omit-frame-pointer -fdebug-prefix-map=${sourceDir}=/robotick-engine -DROBOTICK_DEBUG -DROBOTICK_ENABLE_MODEL_HEAP",
                 "ROBOTICK_BUILD_TESTS": "ON"
             }
         },

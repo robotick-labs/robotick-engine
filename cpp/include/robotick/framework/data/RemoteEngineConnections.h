@@ -22,18 +22,10 @@ namespace robotick
 	  private:
 		Engine* engine = nullptr;
 
-		RemoteEngineDiscoverer discoverer_receiver;
-		RemoteEngineDiscoverer discoverer_sender;
-
-		List<RemoteEngineConnection> dynamic_receivers;
+		HeapVector<RemoteEngineDiscoverer> discoverer_senders;
 		HeapVector<RemoteEngineConnection> senders;
 
-		struct PendingSender
-		{
-			FixedString64 remote_model_name;
-			RemoteEngineConnection* connection = nullptr;
-		};
-
-		List<PendingSender> pending_senders;
+		RemoteEngineDiscoverer discoverer_receiver;
+		List<RemoteEngineConnection> dynamic_receivers;
 	};
 } // namespace robotick
