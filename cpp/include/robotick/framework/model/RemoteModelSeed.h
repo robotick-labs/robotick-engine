@@ -31,11 +31,8 @@ namespace robotick
 
 		RemoteModelSeed() = default;
 
-		RemoteModelSeed(
-			const StringView& model_name, const Mode comms_mode, const StringView& comms_channel, const ArrayView<const DataConnectionSeed*>& seeds)
+		RemoteModelSeed(const StringView& model_name, const ArrayView<const DataConnectionSeed*>& seeds)
 			: model_name(model_name)
-			, comms_mode(comms_mode)
-			, comms_channel(comms_channel)
 			, remote_data_connection_seeds(seeds)
 		{
 		}

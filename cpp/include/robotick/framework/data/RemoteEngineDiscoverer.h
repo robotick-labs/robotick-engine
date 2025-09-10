@@ -19,7 +19,7 @@ namespace robotick
 		{
 			FixedString64 model_id;
 			FixedString64 ip; // e.g. "192.168.1.42"
-			int port;
+			uint16_t port;
 		};
 
 		// Callback fired on sender when a receiver responds to our discovery broadcast
@@ -27,7 +27,7 @@ namespace robotick
 
 		// Callback fired on receiver when a discovery request arrives from a remote model
 		// Should populate the dynamic receiver port to use when replying
-		using OnIncomingConnectionRequested = std::function<void(const char* source_model_id, int& rec_port_id)>;
+		using OnIncomingConnectionRequested = std::function<void(const char* source_model_id, uint16_t& rec_port_id)>;
 
 		RemoteEngineDiscoverer();
 		~RemoteEngineDiscoverer();
@@ -71,8 +71,8 @@ namespace robotick
 		int recv_fd = -1;
 		int send_fd = -1;
 		int reply_fd = -1; // Sender uses this to receive unicast replies
-		int sender_reply_port = 0;
-		int listen_port = 0; // Service port used in replies from receiver
+		uint16_t sender_reply_port = 0;
+		uint16_t listen_port = 0; // Service port used in replies from receiver
 
 		FixedString64 my_model_id;
 		FixedString64 target_model_id;

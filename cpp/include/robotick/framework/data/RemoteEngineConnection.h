@@ -74,7 +74,7 @@ namespace robotick
 		RemoteEngineConnection(RemoteEngineConnection&&) noexcept = delete;
 		RemoteEngineConnection& operator=(RemoteEngineConnection&&) noexcept = delete;
 
-		void configure_sender(const char* in_my_model_name, const char* in_target_model_name, const char* in_remote_ip, int in_remote_port);
+		void configure_sender(const char* in_my_model_name, const char* in_target_model_name, const char* in_remote_ip, uint16_t in_remote_port);
 		void configure_receiver(const char* my_model_name);
 
 		void tick(const TickInfo& tick_info);
@@ -87,7 +87,7 @@ namespace robotick
 		bool has_basic_connection() const; // we have established a basic connection, but perhaps but yet completed handshake
 
 		bool is_ready() const; // we have finished our handshake and ready for field-data exchange through out tick() method
-		int get_listen_port() const { return listen_port; };
+		uint16_t get_listen_port() const { return listen_port; }
 
 	  private:
 		[[nodiscard]] State get_state() const { return state; };
@@ -112,10 +112,10 @@ namespace robotick
 
 		// runtime endpoint data
 		FixedString64 remote_ip;
-		int remote_port = -1;
+		uint16_t remote_port = 0;
 
 		// receiver's bound port (for announce)
-		int listen_port = 0; // ask OS for ephemeral port first time; reuse assigned port thereafter
+		uint16_t listen_port = 0; // ask OS for ephemeral port first time; reuse assigned port thereafter
 
 		BinderCallback binder;
 

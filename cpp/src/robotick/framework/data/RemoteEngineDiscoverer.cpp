@@ -217,7 +217,7 @@ namespace robotick
 				return;
 			}
 
-			int dynamic_rec_port = listen_port;
+			uint16_t dynamic_rec_port = listen_port;
 			if (on_requested_cb)
 			{
 				ROBOTICK_INFO_IF(

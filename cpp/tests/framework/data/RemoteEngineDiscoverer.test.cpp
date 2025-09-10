@@ -26,7 +26,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		receiver.initialize_receiver(model_to_find);
 
 		receiver.set_on_incoming_connection_requested(
-			[&](const char* source_id, int& port_out)
+			[&](const char* source_id, uint16_t& port_out)
 			{
 				requested = true;
 				REQUIRE(std::string(source_id) == sender_model);
@@ -63,7 +63,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		sender.initialize_sender("sender-model", "nonexistent-model");
 
 		receiver.set_on_incoming_connection_requested(
-			[](const char*, int& port_out)
+			[](const char*, uint16_t& port_out)
 			{
 				port_out = 45681;
 			});
@@ -105,13 +105,13 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		send_b.initialize_sender(model_b, model_a);
 
 		recv_a.set_on_incoming_connection_requested(
-			[&](const char* src, int& out)
+			[&](const char* src, uint16_t& out)
 			{
 				REQUIRE(std::string(src) == model_b);
 				out = port_a;
 			});
 		recv_b.set_on_incoming_connection_requested(
-			[&](const char* src, int& out)
+			[&](const char* src, uint16_t& out)
 			{
 				REQUIRE(std::string(src) == model_a);
 				out = port_b;
@@ -151,7 +151,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 	{
 		const char* model_self = "gamma";
 		const char* model_peer = "omega";
-		constexpr int reply_port = 30303;
+		constexpr uint16_t reply_port = 30303;
 
 		std::atomic<int> discovery_count{0};
 
@@ -162,7 +162,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		send.initialize_sender(model_peer, model_self);
 
 		recv.set_on_incoming_connection_requested(
-			[&](const char* src, int& out)
+			[&](const char* src, uint16_t& out)
 			{
 				REQUIRE(std::string(src) == model_peer);
 				out = reply_port;

@@ -18,12 +18,19 @@ namespace robotick
 	class RemoteEngineConnections
 	{
 	  public:
+		RemoteEngineConnections() = default;
+		RemoteEngineConnections(const RemoteEngineConnections&) = delete;
+		RemoteEngineConnections& operator=(const RemoteEngineConnections&) = delete;
+		RemoteEngineConnections(RemoteEngineConnections&&) noexcept = default;
+		RemoteEngineConnections& operator=(RemoteEngineConnections&&) noexcept = default;
+
 		void setup(Engine& engine, const Model& model);
 		void tick(const TickInfo& tick_info);
 
 	  private:
 		Engine* engine = nullptr;
 
+		// Invariant: discoverer_senders[i] corresponds to senders[i]
 		HeapVector<RemoteEngineDiscoverer> discoverer_senders;
 		HeapVector<RemoteEngineConnection> senders;
 

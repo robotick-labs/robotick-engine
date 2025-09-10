@@ -157,7 +157,7 @@ namespace robotick
 	}
 
 	void RemoteEngineConnection::configure_sender(
-		const char* in_my_model_name, const char* in_target_model_name, const char* in_remote_ip, int in_remote_port)
+		const char* in_my_model_name, const char* in_target_model_name, const char* in_remote_ip, uint16_t in_remote_port)
 	{
 		mode = Mode::Sender;
 		my_model_name = in_my_model_name;

@@ -23,7 +23,7 @@ namespace robotick
 
 		discoverer_receiver.initialize_receiver(my_model_name);
 		discoverer_receiver.set_on_incoming_connection_requested(
-			[this, &model](const char* source_model_id, int& rec_port_out)
+			[this, &model](const char* source_model_id, uint16_t& rec_port_out)
 			{
 				ROBOTICK_INFO_IF(log_verbose, "[REC::receiver] Incoming discovery request from model '%s'", source_model_id);
 				RemoteEngineConnection& conn = dynamic_receivers.push_back();
