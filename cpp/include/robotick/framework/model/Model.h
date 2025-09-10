@@ -59,7 +59,7 @@ namespace robotick
 		void finalize();
 
 		// accessors:
-		const char* get_model_name() const { return model_name.c_str(); };
+		const char* get_model_name() const { return model_name.empty() ? "model_name_not_set" : model_name.c_str(); };
 
 		const ArrayView<const WorkloadSeed*>& get_workload_seeds() const { return workload_seeds; }
 		const ArrayView<const DataConnectionSeed*>& get_data_connection_seeds() const { return data_connection_seeds; }
