@@ -38,7 +38,19 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 				return false;
 			});
 
-		sender.configure_sender("test-sender", "test-receiver");
+		int receiver_listen_port = 0;
+		for (int i = 0; i < 50; ++i)
+		{
+			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			receiver_listen_port = receiver.get_listen_port();
+			if (receiver_listen_port > 0)
+			{
+				break;
+			}
+			Thread::sleep_ms(10);
+		}
+
+		sender.configure_sender("test-sender", "test-receiver", "localhost", receiver_listen_port);
 		sender.register_field({"x", &send_value, nullptr, sizeof(int), 0});
 
 		for (int i = 0; i < 50; ++i)
@@ -72,7 +84,19 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 				return true;
 			});
 
-		sender.configure_sender("test-sender", "test-receiver");
+		int receiver_listen_port = 0;
+		for (int i = 0; i < 50; ++i)
+		{
+			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			receiver_listen_port = receiver.get_listen_port();
+			if (receiver_listen_port > 0)
+			{
+				break;
+			}
+			Thread::sleep_ms(10);
+		}
+
+		sender.configure_sender("test-sender", "test-receiver", "localhost", receiver_listen_port);
 		sender.register_field({"blob", send_buffer.data(), nullptr, send_buffer.size(), 0});
 
 		for (int i = 0; i < 50; ++i)
@@ -94,11 +118,11 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 		int recv_value = 0;
 		int send_value = target_value;
 
-		RemoteEngineConnection rx;
-		RemoteEngineConnection tx;
+		RemoteEngineConnection receiver;
+		RemoteEngineConnection sender;
 
-		rx.configure_receiver("test-receiver");
-		rx.set_field_binder(
+		receiver.configure_receiver("test-receiver");
+		receiver.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& out)
 			{
 				if (strcmp(path, "x") == 0)
@@ -112,13 +136,25 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 				return false;
 			});
 
-		tx.configure_sender("test-sender", "test-receiver");
-		tx.register_field({"x", &send_value, nullptr, sizeof(int), 0});
+		int receiver_listen_port = 0;
+		for (int i = 0; i < 50; ++i)
+		{
+			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			receiver_listen_port = receiver.get_listen_port();
+			if (receiver_listen_port > 0)
+			{
+				break;
+			}
+			Thread::sleep_ms(10);
+		}
+
+		sender.configure_sender("test-sender", "test-receiver", "localhost", receiver_listen_port);
+		sender.register_field({"x", &send_value, nullptr, sizeof(int), 0});
 
 		for (int i = 0; i < 50; ++i)
 		{
-			rx.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
-			tx.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
 			Thread::sleep_ms(20);
 			if (recv_value == target_value)
 				break;
@@ -128,17 +164,17 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 
 		ROBOTICK_INFO("Disconnecting...");
 
-		tx.disconnect();
+		sender.disconnect();
 		Thread::sleep_ms(50);
 
 		// Reconnect
 		send_value = target_value_later;
-		tx.tick(robotick::TICK_INFO_FIRST_100MS_10HZ); // allow reconnect
+		sender.tick(robotick::TICK_INFO_FIRST_100MS_10HZ); // allow reconnect
 
 		for (int i = 0; i < 50; ++i)
 		{
-			rx.tick(robotick::TICK_INFO_FIRST_100MS_10HZ);
-			tx.tick(robotick::TICK_INFO_FIRST_100MS_10HZ);
+			receiver.tick(robotick::TICK_INFO_FIRST_100MS_10HZ);
+			sender.tick(robotick::TICK_INFO_FIRST_100MS_10HZ);
 			Thread::sleep_ms(20);
 			if (recv_value == target_value_later)
 				break;
@@ -152,11 +188,11 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 		int recv_value = 0;
 		int send_value = 11;
 
-		RemoteEngineConnection rx;
-		RemoteEngineConnection tx;
+		RemoteEngineConnection receiver;
+		RemoteEngineConnection sender;
 
-		rx.configure_receiver("test-receiver");
-		rx.set_field_binder(
+		receiver.configure_receiver("test-receiver");
+		receiver.set_field_binder(
 			[&](const char*, RemoteEngineConnection::Field& f)
 			{
 				f.recv_ptr = &recv_value;
@@ -166,13 +202,25 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 				return true;
 			});
 
-		tx.configure_sender("test-sender", "test-receiver");
-		tx.register_field({"x", &send_value, nullptr, sizeof(int), 0});
+		int receiver_listen_port = 0;
+		for (int i = 0; i < 50; ++i)
+		{
+			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			receiver_listen_port = receiver.get_listen_port();
+			if (receiver_listen_port > 0)
+			{
+				break;
+			}
+			Thread::sleep_ms(10);
+		}
+
+		sender.configure_sender("test-sender", "test-receiver", "localhost", receiver_listen_port);
+		sender.register_field({"x", &send_value, nullptr, sizeof(int), 0});
 
 		for (int i = 0; i < 200 && recv_value != 11; ++i)
 		{
-			rx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
-			tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
+			receiver.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
+			sender.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
 			Thread::sleep_ms(1);
 		}
 
@@ -183,8 +231,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 
 		for (int i = 0; i < 200 && recv_value != 22; ++i)
 		{
-			rx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
-			tx.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
+			receiver.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
+			sender.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
 			Thread::sleep_ms(1);
 		}
 
@@ -258,8 +306,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 			int send_value = 0;
 			int recv_value = 0;
 
-			RemoteEngineConnection rx;
-			RemoteEngineConnection tx;
+			RemoteEngineConnection receiver;
+			RemoteEngineConnection sender;
 		};
 
 		Peer a{}, b{}, c{};
@@ -275,8 +323,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 		// Configure receivers
 		auto setup_receiver = [](Peer& self, const char* expected_sender_id)
 		{
-			self.rx.configure_receiver(self.id);
-			self.rx.set_field_binder(
+			self.receiver.configure_receiver(self.id);
+			self.receiver.set_field_binder(
 				[&self, expected_sender_id](const char* path, RemoteEngineConnection::Field& f)
 				{
 					if (strcmp(path, expected_sender_id) == 0)
@@ -292,10 +340,10 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 		};
 
 		// Configure senders
-		auto setup_sender = [](RemoteEngineConnection& tx, const char* from_id, const char* to_id, const char* field_path, int* value_ptr)
+		auto setup_sender = [](RemoteEngineConnection& sender, const char* from_id, const char* to_id, const char* field_path, int* value_ptr)
 		{
-			tx.configure_sender(from_id, to_id);
-			tx.register_field({field_path, value_ptr, nullptr, sizeof(int), 0});
+			sender.configure_sender(from_id, to_id);
+			sender.register_field({field_path, value_ptr, nullptr, sizeof(int), 0});
 		};
 
 		// Ring: A → B → C → A
@@ -303,21 +351,21 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 		setup_receiver(b, "peer-a"); // B receives from A
 		setup_receiver(c, "peer-b"); // C receives from B
 
-		setup_sender(a.tx, "peer-a", "peer-b", "peer-a", &a.send_value);
-		setup_sender(b.tx, "peer-b", "peer-c", "peer-b", &b.send_value);
-		setup_sender(c.tx, "peer-c", "peer-a", "peer-c", &c.send_value);
+		setup_sender(a.sender, "peer-a", "peer-b", "peer-a", &a.send_value);
+		setup_sender(b.sender, "peer-b", "peer-c", "peer-b", &b.send_value);
+		setup_sender(c.sender, "peer-c", "peer-a", "peer-c", &c.send_value);
 
 		// Tick until all values arrive
 		for (int i = 0; i < 100; ++i)
 		{
-			a.rx.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
-			a.tx.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			a.receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			a.sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
 
-			b.rx.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
-			b.tx.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			b.receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			b.sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
 
-			c.rx.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
-			c.tx.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			c.receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			c.sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
 
 			Thread::sleep_ms(10);
 
@@ -343,8 +391,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 			const char* id;
 			int recv_value = 0;
 			int send_value = 0;
-			RemoteEngineConnection rx;
-			RemoteEngineConnection tx;
+			RemoteEngineConnection receiver;
+			RemoteEngineConnection sender;
 		};
 
 		Peer a{}, b{}, c{};
@@ -356,8 +404,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 		c.send_value = 333;
 
 		// Configure receivers
-		a.rx.configure_receiver("peer-a");
-		a.rx.set_field_binder(
+		a.receiver.configure_receiver("peer-a");
+		a.receiver.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& f)
 			{
 				if (strcmp(path, "peer-c") == 0)
@@ -371,8 +419,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 				return false;
 			});
 
-		b.rx.configure_receiver("peer-b");
-		b.rx.set_field_binder(
+		b.receiver.configure_receiver("peer-b");
+		b.receiver.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& f)
 			{
 				if (strcmp(path, "peer-a") == 0)
@@ -386,34 +434,34 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 				return false;
 			});
 
-		c.rx.configure_receiver("peer-c");
-		c.rx.set_field_binder(
+		c.receiver.configure_receiver("peer-c");
+		c.receiver.set_field_binder(
 			[](const char*, RemoteEngineConnection::Field&)
 			{
 				return false; // C is only a sender in this direction
 			});
 
 		// Configure senders
-		a.tx.configure_sender("peer-a", "peer-b");
-		a.tx.register_field({"peer-a", &a.send_value, nullptr, sizeof(int), 0});
+		a.sender.configure_sender("peer-a", "peer-b");
+		a.sender.register_field({"peer-a", &a.send_value, nullptr, sizeof(int), 0});
 
 		RemoteEngineConnection a_to_c;
 		a_to_c.configure_sender("peer-a", "peer-c");
 		a_to_c.register_field({"peer-a", &a.send_value, nullptr, sizeof(int), 0});
 
-		c.tx.configure_sender("peer-c", "peer-a");
-		c.tx.register_field({"peer-c", &c.send_value, nullptr, sizeof(int), 0});
+		c.sender.configure_sender("peer-c", "peer-a");
+		c.sender.register_field({"peer-c", &c.send_value, nullptr, sizeof(int), 0});
 
 		// Tick loop
 		for (int i = 0; i < 200; ++i)
 		{
-			a.rx.tick(TICK_INFO_FIRST_10MS_100HZ);
-			b.rx.tick(TICK_INFO_FIRST_10MS_100HZ);
-			c.rx.tick(TICK_INFO_FIRST_10MS_100HZ);
+			a.receiver.tick(TICK_INFO_FIRST_10MS_100HZ);
+			b.receiver.tick(TICK_INFO_FIRST_10MS_100HZ);
+			c.receiver.tick(TICK_INFO_FIRST_10MS_100HZ);
 
-			a.tx.tick(TICK_INFO_FIRST_10MS_100HZ);
+			a.sender.tick(TICK_INFO_FIRST_10MS_100HZ);
 			a_to_c.tick(TICK_INFO_FIRST_10MS_100HZ);
-			c.tx.tick(TICK_INFO_FIRST_10MS_100HZ);
+			c.sender.tick(TICK_INFO_FIRST_10MS_100HZ);
 
 			Thread::sleep_ms(10);
 
@@ -435,7 +483,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 		{
 			const char* id;
 			int value = 0;
-			RemoteEngineConnection tx;
+			RemoteEngineConnection sender;
 		};
 
 		struct Receiver
@@ -464,10 +512,10 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 		a.id = "peer-a";
 
 		// Configure A's receivers
-		auto setup_receiver = [](RemoteEngineConnection& rx, const char* self_id, const char* expected_sender, int* target)
+		auto setup_receiver = [](RemoteEngineConnection& receiver, const char* self_id, const char* expected_sender, int* target)
 		{
-			rx.configure_receiver(self_id);
-			rx.set_field_binder(
+			receiver.configure_receiver(self_id);
+			receiver.set_field_binder(
 				[=](const char* path, RemoteEngineConnection::Field& f)
 				{
 					if (strcmp(path, expected_sender) == 0)
@@ -487,15 +535,15 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 		setup_receiver(a.rx_d, "peer-a", "peer-d", &a.recv_from_d);
 
 		// Configure each sender
-		auto setup_sender = [](RemoteEngineConnection& tx, const char* from, const char* to, const char* path, int* value_ptr)
+		auto setup_sender = [](RemoteEngineConnection& sender, const char* from, const char* to, const char* path, int* value_ptr)
 		{
-			tx.configure_sender(from, to);
-			tx.register_field({path, value_ptr, nullptr, sizeof(int), 0});
+			sender.configure_sender(from, to);
+			sender.register_field({path, value_ptr, nullptr, sizeof(int), 0});
 		};
 
-		setup_sender(b.tx, "peer-b", "peer-a", "peer-b", &b.value);
-		setup_sender(c.tx, "peer-c", "peer-a", "peer-c", &c.value);
-		setup_sender(d.tx, "peer-d", "peer-a", "peer-d", &d.value);
+		setup_sender(b.sender, "peer-b", "peer-a", "peer-b", &b.value);
+		setup_sender(c.sender, "peer-c", "peer-a", "peer-c", &c.value);
+		setup_sender(d.sender, "peer-d", "peer-a", "peer-d", &d.value);
 
 		// Tick loop
 		for (int i = 0; i < 200; ++i)
@@ -504,9 +552,9 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
 			a.rx_c.tick(TICK_INFO_FIRST_10MS_100HZ);
 			a.rx_d.tick(TICK_INFO_FIRST_10MS_100HZ);
 
-			b.tx.tick(TICK_INFO_FIRST_10MS_100HZ);
-			c.tx.tick(TICK_INFO_FIRST_10MS_100HZ);
-			d.tx.tick(TICK_INFO_FIRST_10MS_100HZ);
+			b.sender.tick(TICK_INFO_FIRST_10MS_100HZ);
+			c.sender.tick(TICK_INFO_FIRST_10MS_100HZ);
+			d.sender.tick(TICK_INFO_FIRST_10MS_100HZ);
 
 			Thread::sleep_ms(10);
 

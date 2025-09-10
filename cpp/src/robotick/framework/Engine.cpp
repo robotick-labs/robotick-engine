@@ -403,8 +403,8 @@ namespace robotick
 			RemoteEngineConnection& remote_engine_connection = state->remote_engine_senders[remote_engine_index];
 			remote_engine_index++;
 
-			const char* my_model_name = state->model->get_model_name();
-			remote_engine_connection.configure_sender(my_model_name, remote_model_seed->model_name.c_str());
+			// const char* my_model_name = state->model->get_model_name();
+			// remote_engine_connection.configure_sender(my_model_name, remote_model_seed->model_name.c_str());
 
 			for (const auto* remote_data_connection_seed : remote_model_seed->remote_data_connection_seeds)
 			{

@@ -5,7 +5,6 @@
 
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/data/InProgressMessage.h"
-#include "robotick/framework/data/RemoteEngineDiscoverer.h"
 
 #include <cstdint>
 #include <functional>
@@ -75,7 +74,7 @@ namespace robotick
 		RemoteEngineConnection(RemoteEngineConnection&&) noexcept = delete;
 		RemoteEngineConnection& operator=(RemoteEngineConnection&&) noexcept = delete;
 
-		void configure_sender(const char* my_model_name, const char* target_model_name);
+		void configure_sender(const char* in_my_model_name, const char* in_target_model_name, const char* in_remote_ip, int in_remote_port);
 		void configure_receiver(const char* my_model_name);
 
 		void tick(const TickInfo& tick_info);
@@ -88,12 +87,13 @@ namespace robotick
 		bool has_basic_connection() const; // we have established a basic connection, but perhaps but yet completed handshake
 
 		bool is_ready() const; // we have finished our handshake and ready for field-data exchange through out tick() method
+		int get_listen_port() const { return listen_port; };
 
 	  private:
 		[[nodiscard]] State get_state() const { return state; };
 		void set_state(const State state);
 
-		void tick_disconnected_sender(const TickInfo& tick_info);
+		void tick_disconnected_sender();
 		void tick_disconnected_receiver();
 		void tick_send_handshake();
 		void tick_receive_handshake_and_bind();
@@ -110,14 +110,13 @@ namespace robotick
 		FixedString64 my_model_name;	 // always set to name of host-model
 		FixedString64 target_model_name; // empty on receivers; non-empty on senders
 
-		// runtime endpoint data (resolved by discovery)
-		FixedString64 resolved_host; // e.g. "127.0.0.1"
-		int resolved_port = -1;
+		// runtime endpoint data
+		FixedString64 remote_ip;
+		int remote_port = -1;
 
 		// receiver's bound port (for announce)
 		int listen_port = 0;
 
-		RemoteEngineDiscoverer discovery;
 		BinderCallback binder;
 
 		// set on startup (register_field()) on Sender; on tick_receive_handshake_and_bind() on Receiver:
