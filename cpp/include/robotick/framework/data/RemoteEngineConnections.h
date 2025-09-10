@@ -4,6 +4,8 @@
 #pragma once
 
 #include "robotick/api.h"
+#include "robotick/framework/common/HeapVector.h"
+#include "robotick/framework/common/List.h"
 #include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/framework/data/RemoteEngineDiscoverer.h"
 

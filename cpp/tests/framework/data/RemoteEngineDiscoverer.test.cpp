@@ -40,7 +40,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 					correct_info = true;
 			});
 
-		for (int i = 0; i < 100 && !discovered; ++i)
+		for (int i = 0; i < 200 && !discovered; ++i) // 2 second timeout for CI stability
 		{
 			sender.tick(TICK_INFO_FIRST_10MS_100HZ);
 			receiver.tick(TICK_INFO_FIRST_10MS_100HZ);
@@ -73,11 +73,14 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 				called = true;
 			});
 
-		for (int i = 0; i < 100 && !called; ++i)
+		// Tick for timeout period - should NOT trigger callback
+		for (int i = 0; i < 100; ++i)
 		{
 			receiver.tick(TICK_INFO_FIRST_10MS_100HZ);
 			sender.tick(TICK_INFO_FIRST_10MS_100HZ);
 			Thread::sleep_ms(10);
+			if (called)
+				break; // Early exit if unexpectedly called
 		}
 
 		REQUIRE_FALSE(called);

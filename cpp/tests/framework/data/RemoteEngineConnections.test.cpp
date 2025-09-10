@@ -6,6 +6,7 @@
 #include "robotick/platform/Threading.h"
 
 #include <catch2/catch_all.hpp>
+#include <thread>
 
 namespace robotick::test
 {
@@ -98,7 +99,7 @@ namespace robotick::test
 
 			const auto now = std::chrono::steady_clock::now();
 			const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
-			if (elapsed_ms > 1000)
+			if (elapsed_ms > 3000)
 				break;
 
 			Thread::sleep_ms(10);

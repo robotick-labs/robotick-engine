@@ -105,7 +105,7 @@ namespace robotick
 		void tick_ready_for_fields();
 
 		// things we set up once on startup:
-		Mode mode;
+		Mode mode = Mode::Sender;
 
 		FixedString64 my_model_name;	 // always set to name of host-model
 		FixedString64 target_model_name; // empty on receivers; non-empty on senders
