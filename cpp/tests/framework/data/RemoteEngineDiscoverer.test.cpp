@@ -1,4 +1,4 @@
-#include "robotick/framework/data/UDPDiscoveryManager.h"
+#include "robotick/framework/data/RemoteEngineDiscoverer.h"
 #include "robotick/api.h"
 #include "robotick/platform/Threading.h"
 
@@ -8,7 +8,7 @@
 
 using namespace robotick;
 
-TEST_CASE("Integration/Framework/Data/UDPDiscoveryManager")
+TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 {
 	SECTION("Discovery exchange triggers callback with correct info")
 	{
@@ -19,8 +19,8 @@ TEST_CASE("Integration/Framework/Data/UDPDiscoveryManager")
 		std::atomic<bool> discovered{false};
 		std::atomic<bool> correct_info{false};
 
-		UDPDiscoveryManager sender;
-		UDPDiscoveryManager receiver;
+		RemoteEngineDiscoverer sender;
+		RemoteEngineDiscoverer receiver;
 
 		sender.initialize_sender(sender_model, model_to_find);
 		receiver.initialize_receiver(model_to_find);
@@ -33,7 +33,7 @@ TEST_CASE("Integration/Framework/Data/UDPDiscoveryManager")
 				port_out = 7263;
 			});
 		sender.set_on_remote_model_discovered(
-			[&](const UDPDiscoveryManager::PeerInfo& info)
+			[&](const RemoteEngineDiscoverer::PeerInfo& info)
 			{
 				discovered = true;
 				if (info.model_id == model_to_find && info.port == 7263)
@@ -56,8 +56,8 @@ TEST_CASE("Integration/Framework/Data/UDPDiscoveryManager")
 	{
 		std::atomic<bool> called{false};
 
-		UDPDiscoveryManager receiver;
-		UDPDiscoveryManager sender;
+		RemoteEngineDiscoverer receiver;
+		RemoteEngineDiscoverer sender;
 
 		receiver.initialize_receiver("receiver-model");
 		sender.initialize_sender("sender-model", "nonexistent-model");
@@ -93,8 +93,8 @@ TEST_CASE("Integration/Framework/Data/UDPDiscoveryManager")
 		std::atomic<bool> a_discovered{false}, b_discovered{false};
 		std::atomic<bool> a_correct{false}, b_correct{false};
 
-		UDPDiscoveryManager recv_a, send_a;
-		UDPDiscoveryManager recv_b, send_b;
+		RemoteEngineDiscoverer recv_a, send_a;
+		RemoteEngineDiscoverer recv_b, send_b;
 
 		recv_a.initialize_receiver(model_a);
 		send_a.initialize_sender(model_a, model_b);
@@ -152,8 +152,8 @@ TEST_CASE("Integration/Framework/Data/UDPDiscoveryManager")
 
 		std::atomic<int> discovery_count{0};
 
-		UDPDiscoveryManager recv;
-		UDPDiscoveryManager send;
+		RemoteEngineDiscoverer recv;
+		RemoteEngineDiscoverer send;
 
 		recv.initialize_receiver(model_self);
 		send.initialize_sender(model_peer, model_self);

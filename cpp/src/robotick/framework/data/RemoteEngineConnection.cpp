@@ -163,7 +163,7 @@ namespace robotick
 		resolved_port = -1;
 
 		discovery.set_on_remote_model_discovered(
-			[this](const UDPDiscoveryManager::PeerInfo& info)
+			[this](const RemoteEngineDiscoverer::PeerInfo& info)
 			{
 				if (info.model_id == target_model_name)
 				{

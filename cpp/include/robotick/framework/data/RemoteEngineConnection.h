@@ -5,7 +5,7 @@
 
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/data/InProgressMessage.h"
-#include "robotick/framework/data/UDPDiscoveryManager.h"
+#include "robotick/framework/data/RemoteEngineDiscoverer.h"
 
 #include <cstdint>
 #include <functional>
@@ -117,7 +117,7 @@ namespace robotick
 		// receiver's bound port (for announce)
 		int listen_port = 0;
 
-		UDPDiscoveryManager discovery;
+		RemoteEngineDiscoverer discovery;
 		BinderCallback binder;
 
 		// set on startup (register_field()) on Sender; on tick_receive_handshake_and_bind() on Receiver:

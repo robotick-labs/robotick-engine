@@ -13,7 +13,7 @@ namespace robotick
 {
 	struct TickInfo;
 
-	class UDPDiscoveryManager
+	class RemoteEngineDiscoverer
 	{
 	  public:
 		struct PeerInfo
@@ -30,8 +30,8 @@ namespace robotick
 		// Should populate the dynamic receiver port to use when replying
 		using OnIncomingConnectionRequested = std::function<void(const char* source_model_id, int& rec_port_id)>;
 
-		UDPDiscoveryManager();
-		~UDPDiscoveryManager();
+		RemoteEngineDiscoverer();
+		~RemoteEngineDiscoverer();
 
 		void initialize_sender(const char* my_model_name, const char* target_model_name);
 		void initialize_receiver(const char* my_model_name);

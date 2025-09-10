@@ -1,7 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/data/UDPDiscoveryManager.h"
+#include "robotick/framework/data/RemoteEngineDiscoverer.h"
 #include "robotick/api.h"
 
 #include <arpa/inet.h>
@@ -19,11 +19,11 @@ namespace robotick
 	constexpr const char* DISCOVER_MSG = "DISCOVER_PEER";
 	constexpr const char* PEER_REPLY_MSG = "PEER_HERE";
 
-	UDPDiscoveryManager::UDPDiscoveryManager()
+	RemoteEngineDiscoverer::RemoteEngineDiscoverer()
 	{
 	}
 
-	UDPDiscoveryManager::~UDPDiscoveryManager()
+	RemoteEngineDiscoverer::~RemoteEngineDiscoverer()
 	{
 		if (recv_fd >= 0)
 			close(recv_fd);
@@ -31,7 +31,7 @@ namespace robotick
 			close(send_fd);
 	}
 
-	void UDPDiscoveryManager::initialize_sender(const char* my_model_name, const char* target_model_name)
+	void RemoteEngineDiscoverer::initialize_sender(const char* my_model_name, const char* target_model_name)
 	{
 		mode = DiscoveryMode::Sender;
 		my_model_id = my_model_name;
@@ -40,36 +40,39 @@ namespace robotick
 		time_sec_to_broadcast = 0.0f;
 		init_send_socket();
 		init_recv_socket();
+		ROBOTICK_INFO("[%s] Sender initialized (looking for: %s)", my_model_id.c_str(), target_model_id.c_str());
 	}
 
-	void UDPDiscoveryManager::initialize_receiver(const char* my_model_name)
+	void RemoteEngineDiscoverer::initialize_receiver(const char* my_model_name)
 	{
 		mode = DiscoveryMode::Receiver;
 		my_model_id = my_model_name;
 		init_recv_socket();
 		init_send_socket();
+		ROBOTICK_INFO("[%s] Receiver initialized", my_model_id.c_str());
 	}
 
-	void UDPDiscoveryManager::reset_discovery()
+	void RemoteEngineDiscoverer::reset_discovery()
 	{
 		if (mode == DiscoveryMode::Sender)
 		{
 			status = DiscoveryStatus::ReadyToBroadcast;
 			time_sec_to_broadcast = 0.0f;
+			ROBOTICK_INFO("[%s] Discovery reset", my_model_id.c_str());
 		}
 	}
 
-	void UDPDiscoveryManager::set_on_remote_model_discovered(OnRemoteModelDiscovered cb)
+	void RemoteEngineDiscoverer::set_on_remote_model_discovered(OnRemoteModelDiscovered cb)
 	{
 		on_discovered_cb = std::move(cb);
 	}
 
-	void UDPDiscoveryManager::set_on_incoming_connection_requested(OnIncomingConnectionRequested cb)
+	void RemoteEngineDiscoverer::set_on_incoming_connection_requested(OnIncomingConnectionRequested cb)
 	{
 		on_requested_cb = std::move(cb);
 	}
 
-	void UDPDiscoveryManager::init_recv_socket()
+	void RemoteEngineDiscoverer::init_recv_socket()
 	{
 		recv_fd = socket(AF_INET, SOCK_DGRAM, 0);
 		if (recv_fd < 0)
@@ -122,41 +125,40 @@ namespace robotick
 		fcntl(recv_fd, F_SETFL, flags | O_NONBLOCK);
 	}
 
-	void UDPDiscoveryManager::init_send_socket()
+	void RemoteEngineDiscoverer::init_send_socket()
 	{
 		send_fd = socket(AF_INET, SOCK_DGRAM, 0);
 		if (send_fd < 0)
 			return;
 
 		unsigned char ttl = 1;
-		socklen_t ttl_len = sizeof(ttl);
-		setsockopt(send_fd, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, ttl_len);
+		setsockopt(send_fd, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
 
 		unsigned char loop = 1;
-		socklen_t loop_len = sizeof(loop);
-		setsockopt(send_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, loop_len);
+		setsockopt(send_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
 	}
 
-	void UDPDiscoveryManager::broadcast_discovery_request(const char* target_model_name)
+	void RemoteEngineDiscoverer::broadcast_discovery_request(const char* target_model_name)
 	{
 		if (send_fd < 0)
 			return;
 
 		char buffer[256];
-		int len = snprintf(buffer, sizeof(buffer), "%s %s %d", DISCOVER_MSG, target_model_name, sender_reply_port);
+		int len = snprintf(buffer, sizeof(buffer), "%s %s %s %d", DISCOVER_MSG, target_model_name, my_model_id.c_str(), sender_reply_port);
 
 		sockaddr_in target{};
 		target.sin_family = AF_INET;
 		target.sin_port = htons(DISCOVERY_PORT);
 		target.sin_addr.s_addr = inet_addr(MULTICAST_GROUP);
 
+		ROBOTICK_INFO("[%s] Broadcasting discovery: '%s'", my_model_id.c_str(), buffer);
 		sendto(send_fd, buffer, len, 0, (sockaddr*)&target, sizeof(target));
+
 		status = DiscoveryStatus::WaitingForReply;
 	}
 
-	void UDPDiscoveryManager::tick(const TickInfo& tick_info)
+	void RemoteEngineDiscoverer::tick(const TickInfo& tick_info)
 	{
-		// Always poll for incoming packets
 		char buffer[256];
 		sockaddr_in sender{};
 		socklen_t addr_len = sizeof(sender);
@@ -187,25 +189,34 @@ namespace robotick
 		}
 	}
 
-	void UDPDiscoveryManager::handle_incoming_packet(const char* data, const sockaddr_in& sender)
+	void RemoteEngineDiscoverer::handle_incoming_packet(const char* data, const sockaddr_in& sender)
 	{
 		char sender_ip[INET_ADDRSTRLEN] = {};
 		inet_ntop(AF_INET, &sender.sin_addr, sender_ip, sizeof(sender_ip));
 
 		if (strncmp(data, DISCOVER_MSG, strlen(DISCOVER_MSG)) == 0 && mode == DiscoveryMode::Receiver)
 		{
-			char target_id[64] = {};
-			char source_id[64] = {};
+			char target_id[64] = {}, source_id[64] = {};
 			int reply_port = -1;
+
 			if (sscanf(data, "%*s %63s %63s %d", target_id, source_id, &reply_port) != 3)
+			{
+				ROBOTICK_WARNING("[%s] Malformed DISCOVER_PEER: '%s'", my_model_id.c_str(), data);
 				return;
+			}
 
 			if (!my_model_id.equals(target_id))
+			{
+				ROBOTICK_INFO("[%s] Ignoring discovery for target '%s'", my_model_id.c_str(), target_id);
 				return;
+			}
 
 			int dynamic_rec_port = listen_port;
 			if (on_requested_cb)
+			{
+				ROBOTICK_INFO("[%s] Discovery request from '%s', invoking callback", my_model_id.c_str(), source_id);
 				on_requested_cb(source_id, dynamic_rec_port);
+			}
 
 			char reply[256];
 			int reply_len = snprintf(reply, sizeof(reply), "%s %s %d", PEER_REPLY_MSG, my_model_id.c_str(), dynamic_rec_port);
@@ -215,6 +226,7 @@ namespace robotick
 			dest.sin_port = htons(reply_port);
 			inet_pton(AF_INET, sender_ip, &dest.sin_addr);
 
+			ROBOTICK_INFO("[%s] Replying to discovery from %s:%d", my_model_id.c_str(), sender_ip, reply_port);
 			sendto(send_fd, reply, reply_len, 0, (sockaddr*)&dest, sizeof(dest));
 		}
 		else if (strncmp(data, PEER_REPLY_MSG, strlen(PEER_REPLY_MSG)) == 0 && mode == DiscoveryMode::Sender)
@@ -222,18 +234,21 @@ namespace robotick
 			char model_id[64] = {};
 			int port = -1;
 			if (sscanf(data, "%*s %63s %d", model_id, &port) != 2)
+			{
+				ROBOTICK_WARNING("[%s] Malformed PEER_HERE: '%s'", my_model_id.c_str(), data);
 				return;
+			}
 
 			PeerInfo info;
 			info.model_id = model_id;
 			info.ip = inet_ntoa(sender.sin_addr);
 			info.port = port;
 
+			ROBOTICK_INFO("[%s] Received peer reply from '%s' (%s:%d)", my_model_id.c_str(), model_id, info.ip.c_str(), port);
 			if (on_discovered_cb)
 				on_discovered_cb(info);
 
 			status = DiscoveryStatus::Discovered;
 		}
 	}
-
 } // namespace robotick
