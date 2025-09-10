@@ -14,6 +14,7 @@ namespace robotick
 {
 	constexpr const char* MULTICAST_GROUP = "239.10.77.42";
 	constexpr int DISCOVERY_PORT = 49777;
+	constexpr float BROADCAST_INTERVAL_SEC = 0.1f; // 10Hz
 
 	constexpr const char* DISCOVER_MSG = "DISCOVER_PEER";
 	constexpr const char* PEER_REPLY_MSG = "PEER_HERE";
@@ -30,22 +31,42 @@ namespace robotick
 			close(send_fd);
 	}
 
-	void UDPDiscoveryManager::initialize(const char* my_model_name, int service_port, DiscoveryMode mode)
+	void UDPDiscoveryManager::initialize_sender(const char* my_model_name, const char* target_model_name)
 	{
-		this->mode = mode;
-		this->my_model_id = my_model_name;
-		this->listen_port = service_port;
+		mode = DiscoveryMode::Sender;
+		my_model_id = my_model_name;
+		target_model_id = target_model_name;
+		status = DiscoveryStatus::ReadyToBroadcast;
+		time_sec_to_broadcast = 0.0f;
+		init_send_socket();
+		init_recv_socket();
+	}
 
-		if (mode == DiscoveryMode::Receiver)
+	void UDPDiscoveryManager::initialize_receiver(const char* my_model_name)
+	{
+		mode = DiscoveryMode::Receiver;
+		my_model_id = my_model_name;
+		init_recv_socket();
+		init_send_socket();
+	}
+
+	void UDPDiscoveryManager::reset_discovery()
+	{
+		if (mode == DiscoveryMode::Sender)
 		{
-			init_recv_socket(); // receive multicast discovery
-			init_send_socket(); // send unicast reply
+			status = DiscoveryStatus::ReadyToBroadcast;
+			time_sec_to_broadcast = 0.0f;
 		}
-		else if (mode == DiscoveryMode::Sender)
-		{
-			init_send_socket(); // send multicast discovery
-			init_recv_socket(); // receive unicast reply
-		}
+	}
+
+	void UDPDiscoveryManager::set_on_remote_model_discovered(OnRemoteModelDiscovered cb)
+	{
+		on_discovered_cb = std::move(cb);
+	}
+
+	void UDPDiscoveryManager::set_on_incoming_connection_requested(OnIncomingConnectionRequested cb)
+	{
+		on_requested_cb = std::move(cb);
 	}
 
 	void UDPDiscoveryManager::init_recv_socket()
@@ -87,25 +108,14 @@ namespace robotick
 			ip_mreq mreq{};
 			mreq.imr_multiaddr.s_addr = inet_addr(MULTICAST_GROUP);
 			mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-
-			if (setsockopt(recv_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
-			{
-				ROBOTICK_WARNING("[%s] Failed to join multicast group", my_model_id.c_str());
-				close(recv_fd);
-				recv_fd = -1;
-				return;
-			}
+			setsockopt(recv_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
 		}
 		else
 		{
-			// Store dynamically assigned reply port (for DISCOVER_PEER)
 			sockaddr_in bound{};
 			socklen_t len = sizeof(bound);
 			if (getsockname(recv_fd, (sockaddr*)&bound, &len) == 0)
-			{
 				sender_reply_port = ntohs(bound.sin_port);
-				ROBOTICK_INFO("[%s] Sender recv socket bound to ephemeral port %d", my_model_id.c_str(), sender_reply_port);
-			}
 		}
 
 		int flags = fcntl(recv_fd, F_GETFL, 0);
@@ -116,28 +126,20 @@ namespace robotick
 	{
 		send_fd = socket(AF_INET, SOCK_DGRAM, 0);
 		if (send_fd < 0)
-		{
-			ROBOTICK_WARNING("[%s] Failed to create send socket", my_model_id.c_str());
 			return;
-		}
 
 		unsigned char ttl = 1;
-		setsockopt(send_fd, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+		socklen_t ttl_len = sizeof(ttl);
+		setsockopt(send_fd, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, ttl_len);
 
 		unsigned char loop = 1;
-		setsockopt(send_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
-
-		ROBOTICK_INFO("[%s] Send socket initialized", my_model_id.c_str());
-	}
-
-	void UDPDiscoveryManager::set_on_discovered(OnDiscoveredCallback cb)
-	{
-		callback = std::move(cb);
+		socklen_t loop_len = sizeof(loop);
+		setsockopt(send_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, loop_len);
 	}
 
 	void UDPDiscoveryManager::broadcast_discovery_request(const char* target_model_name)
 	{
-		if (mode != DiscoveryMode::Sender || send_fd < 0)
+		if (send_fd < 0)
 			return;
 
 		char buffer[256];
@@ -148,26 +150,41 @@ namespace robotick
 		target.sin_port = htons(DISCOVERY_PORT);
 		target.sin_addr.s_addr = inet_addr(MULTICAST_GROUP);
 
-		ROBOTICK_INFO("[%s] Sending DISCOVER_PEER -> '%s'", my_model_id.c_str(), buffer);
 		sendto(send_fd, buffer, len, 0, (sockaddr*)&target, sizeof(target));
+		status = DiscoveryStatus::WaitingForReply;
 	}
 
-	void UDPDiscoveryManager::tick()
+	void UDPDiscoveryManager::tick(const TickInfo& tick_info)
 	{
+		// Always poll for incoming packets
 		char buffer[256];
 		sockaddr_in sender{};
 		socklen_t addr_len = sizeof(sender);
 
-		int fd = recv_fd;
-		if (fd < 0)
-			return;
+		if (recv_fd >= 0)
+		{
+			int len = recvfrom(recv_fd, buffer, sizeof(buffer) - 1, 0, (sockaddr*)&sender, &addr_len);
+			if (len > 0)
+			{
+				buffer[len] = '\0';
+				handle_incoming_packet(buffer, sender);
+			}
+		}
 
-		int len = recvfrom(fd, buffer, sizeof(buffer) - 1, 0, (sockaddr*)&sender, &addr_len);
-		if (len <= 0)
-			return;
+		// Sender-mode periodic broadcast
+		if (mode == DiscoveryMode::Sender)
+		{
+			if (time_sec_to_broadcast > 0.0f)
+			{
+				time_sec_to_broadcast -= static_cast<float>(tick_info.delta_time);
+				return;
+			}
 
-		buffer[len] = '\0';
-		handle_incoming_packet(buffer, sender);
+			broadcast_discovery_request(target_model_id.c_str());
+
+			// Reset countdown
+			time_sec_to_broadcast = BROADCAST_INTERVAL_SEC;
+		}
 	}
 
 	void UDPDiscoveryManager::handle_incoming_packet(const char* data, const sockaddr_in& sender)
@@ -175,52 +192,47 @@ namespace robotick
 		char sender_ip[INET_ADDRSTRLEN] = {};
 		inet_ntop(AF_INET, &sender.sin_addr, sender_ip, sizeof(sender_ip));
 
-		ROBOTICK_INFO("[%s] Received: '%s' from %s:%d", my_model_id.c_str(), data, sender_ip, ntohs(sender.sin_port));
-
 		if (strncmp(data, DISCOVER_MSG, strlen(DISCOVER_MSG)) == 0 && mode == DiscoveryMode::Receiver)
 		{
 			char target_id[64] = {};
+			char source_id[64] = {};
 			int reply_port = -1;
-			if (sscanf(data, "DISCOVER_PEER %63s %d", target_id, &reply_port) != 2)
-			{
-				ROBOTICK_WARNING("[%s] Malformed discovery request: '%s'", my_model_id.c_str(), data);
+			if (sscanf(data, "%*s %63s %63s %d", target_id, source_id, &reply_port) != 3)
 				return;
-			}
+
 			if (!my_model_id.equals(target_id))
-			{
-				ROBOTICK_INFO("Requested target-id '%s' doesn't match my own '%s' - ignoring it.", target_id, my_model_id.c_str());
 				return;
-			}
+
+			int dynamic_rec_port = listen_port;
+			if (on_requested_cb)
+				on_requested_cb(source_id, dynamic_rec_port);
 
 			char reply[256];
-			int reply_len = snprintf(reply, sizeof(reply), "%s %s %d", PEER_REPLY_MSG, my_model_id.c_str(), listen_port);
+			int reply_len = snprintf(reply, sizeof(reply), "%s %s %d", PEER_REPLY_MSG, my_model_id.c_str(), dynamic_rec_port);
 
 			sockaddr_in dest{};
 			dest.sin_family = AF_INET;
 			dest.sin_port = htons(reply_port);
 			inet_pton(AF_INET, sender_ip, &dest.sin_addr);
 
-			ROBOTICK_INFO("[%s] Sending PEER_HERE reply to %s:%d", my_model_id.c_str(), sender_ip, reply_port);
 			sendto(send_fd, reply, reply_len, 0, (sockaddr*)&dest, sizeof(dest));
 		}
 		else if (strncmp(data, PEER_REPLY_MSG, strlen(PEER_REPLY_MSG)) == 0 && mode == DiscoveryMode::Sender)
 		{
 			char model_id[64] = {};
 			int port = -1;
-			if (sscanf(data, "PEER_HERE %63s %d", model_id, &port) != 2 || port <= 0)
-			{
-				ROBOTICK_WARNING("[%s] Malformed or invalid PEER_REPLY_MSG: '%s'", my_model_id.c_str(), data);
+			if (sscanf(data, "%*s %63s %d", model_id, &port) != 2)
 				return;
-			}
 
-			if (callback)
-			{
-				PeerInfo info;
-				info.model_id = model_id;
-				info.ip = inet_ntoa(sender.sin_addr);
-				info.port = port;
-				callback(info);
-			}
+			PeerInfo info;
+			info.model_id = model_id;
+			info.ip = inet_ntoa(sender.sin_addr);
+			info.port = port;
+
+			if (on_discovered_cb)
+				on_discovered_cb(info);
+
+			status = DiscoveryStatus::Discovered;
 		}
 	}
 

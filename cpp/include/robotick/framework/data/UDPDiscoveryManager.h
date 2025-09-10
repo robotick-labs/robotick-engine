@@ -4,16 +4,14 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
+#include <chrono>
 #include <functional>
-#include <netinet/in.h> // Needed for sockaddr_in
+
+struct sockaddr_in;
 
 namespace robotick
 {
-	enum class DiscoveryMode
-	{
-		Sender,	 // Only sends multicast discovery requests, and listens for unicast replies
-		Receiver // Listens for multicast discovery messages, and replies via unicast
-	};
+	struct TickInfo;
 
 	class UDPDiscoveryManager
 	{
@@ -25,24 +23,51 @@ namespace robotick
 			int port;
 		};
 
-		using OnDiscoveredCallback = std::function<void(const PeerInfo&)>;
+		// Callback fired on sender when a receiver responds to our discovery broadcast
+		using OnRemoteModelDiscovered = std::function<void(const PeerInfo&)>;
+
+		// Callback fired on receiver when a discovery request arrives from a remote model
+		// Should populate the dynamic receiver port to use when replying
+		using OnIncomingConnectionRequested = std::function<void(const char* source_model_id, int& rec_port_id)>;
 
 		UDPDiscoveryManager();
 		~UDPDiscoveryManager();
 
-		void initialize(const char* my_model_name, int service_port, DiscoveryMode mode); // setup sockets based on mode
-		void broadcast_discovery_request(const char* target_model_name);				  // emits DISCOVER_PEER <target> <reply_port>
-		void set_on_discovered(OnDiscoveredCallback cb);								  // called with PEER_HERE response
+		void initialize_sender(const char* my_model_name, const char* target_model_name);
+		void initialize_receiver(const char* my_model_name);
 
-		void tick(); // poll socket(s)
+		// Register callbacks for sender/receiver mode
+		void set_on_incoming_connection_requested(OnIncomingConnectionRequested cb);
+		void set_on_remote_model_discovered(OnRemoteModelDiscovered cb);
+
+		// Tick function should be called every frame or periodically
+		void tick(const TickInfo& tick_info);
+
+		// Reset state and resume periodic broadcasts
+		void reset_discovery();
 
 	  protected:
 		void init_send_socket();
 		void init_recv_socket();
+		void broadcast_discovery_request(const char* target_model_name);
 		void handle_incoming_packet(const char* data, const sockaddr_in& sender);
 
 	  private:
+		enum class DiscoveryMode
+		{
+			Sender,	 // Broadcasts multicast discovery, listens for replies
+			Receiver // Listens for multicast discovery, replies via unicast
+		};
+
+		enum class DiscoveryStatus
+		{
+			ReadyToBroadcast,
+			WaitingForReply,
+			Discovered
+		};
+
 		DiscoveryMode mode = DiscoveryMode::Sender;
+		DiscoveryStatus status = DiscoveryStatus::ReadyToBroadcast;
 
 		int recv_fd = -1;
 		int send_fd = -1;
@@ -51,6 +76,11 @@ namespace robotick
 		int listen_port = 0; // Service port used in replies from receiver
 
 		FixedString64 my_model_id;
-		OnDiscoveredCallback callback = nullptr;
+		FixedString64 target_model_id;
+
+		OnRemoteModelDiscovered on_discovered_cb = nullptr;
+		OnIncomingConnectionRequested on_requested_cb = nullptr;
+
+		float time_sec_to_broadcast = 0.0f;
 	};
 } // namespace robotick

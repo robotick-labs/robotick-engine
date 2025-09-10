@@ -20,6 +20,34 @@
 #include "esp_netif.h"
 #endif
 
+// =================================================================================================
+//
+// RemoteEngineConnection — One-to-One Engine Data Link
+//
+// This class enables structured data exchange between two Robotick engines over TCP.
+// It handles:
+//   - Connection setup (discovery + handshake)
+//   - Field registration (sender-side)
+//   - Field binding (receiver-side)
+//   - Framed data transmission (via tick())
+//
+// Design Constraints:
+//   • Each instance connects **to or from a single remote engine**.
+//   • To support multiple peers, instantiate one sender or receiver per peer.
+//
+//   ➤ Sender: configure_sender(local_id, remote_id)
+//     - Connects to one remote receiver.
+//     - Sends a fixed set of fields.
+//
+//   ➤ Receiver: configure_receiver(local_id)
+//     - Listens for one remote sender.
+//     - Binds fields via a user-defined FieldBinder.
+//
+// This 1:1 design avoids multiplexing logic, simplifies routing, and ensures deterministic tick behavior.
+// Use the Engine or a higher-level orchestration layer to manage multiple RemoteEngineConnections.
+//
+// =================================================================================================
+
 namespace robotick
 {
 	namespace
@@ -134,7 +162,7 @@ namespace robotick
 		resolved_host = "";
 		resolved_port = -1;
 
-		discovery.set_on_discovered(
+		discovery.set_on_remote_model_discovered(
 			[this](const UDPDiscoveryManager::PeerInfo& info)
 			{
 				if (info.model_id == target_model_name)
@@ -150,7 +178,7 @@ namespace robotick
 				}
 			});
 
-		discovery.initialize(my_model_name.c_str(), 0, DiscoveryMode::Sender);
+		// discovery.initialize(my_model_name.c_str(), 0, DiscoveryMode::Sender);
 
 		set_state(State::Disconnected);
 	}
@@ -185,7 +213,7 @@ namespace robotick
 
 	void RemoteEngineConnection::tick(const TickInfo& tick_info)
 	{
-		discovery.tick();
+		discovery.tick(tick_info);
 
 		if (state == State::Disconnected)
 		{
@@ -251,7 +279,7 @@ namespace robotick
 		{
 			if (time_since_last_broadcast >= BROADCAST_INTERVAL_SEC)
 			{
-				discovery.broadcast_discovery_request(target_model_name.c_str());
+				// discovery.broadcast_discovery_request(target_model_name.c_str());
 				time_since_last_broadcast = 0.0f;
 			}
 
@@ -332,7 +360,7 @@ namespace robotick
 				listen_port = ntohs(bound_addr.sin_port);
 				ROBOTICK_INFO("Receiver [%s] listening on port %d", my_model_name.c_str(), listen_port);
 
-				discovery.initialize(my_model_name.c_str(), listen_port, DiscoveryMode::Receiver);
+				// discovery.initialize(my_model_name.c_str(), listen_port, DiscoveryMode::Receiver);
 			}
 			else
 			{
