@@ -9,21 +9,52 @@
 #include <csignal> // For signal(), SIGPIPE, SIG_IGN
 #include <cstring>
 #include <fcntl.h>
+#include <mutex>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <unordered_map>
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
 #include "esp_netif.h"
 #endif
 
+// =================================================================================================
+//
+// RemoteEngineConnection — One-to-One Engine Data Link
+//
+// This class enables structured data exchange between two Robotick engines over TCP.
+// It handles:
+//   - Connection setup (handshake)
+//   - Field registration (sender-side)
+//   - Field binding (receiver-side)
+//   - Framed data transmission (via tick())
+//
+// Design Constraints:
+//   • Each instance connects **to or from a single remote engine**.
+//   • To support multiple peers, instantiate one sender or receiver per peer.
+//
+//   ➤ Sender: configure_sender(local_id, remote_id)
+//     - Connects to one remote receiver.
+//     - Sends a fixed set of fields.
+//
+//   ➤ Receiver: configure_receiver(local_id)
+//     - Listens for one remote sender.
+//     - Binds fields via a user-defined FieldBinder.
+//
+// This 1:1 design avoids multiplexing logic, simplifies routing, and ensures deterministic tick behavior.
+// Use the Engine or a higher-level orchestration layer to manage multiple RemoteEngineConnections.
+//
+// =================================================================================================
+
+#define ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE 0
+
 namespace robotick
 {
-
 	namespace
 	{
-		constexpr float RECONNECT_ATTEMPT_INTERVAL_SEC = 1.0f;
+		constexpr float RECONNECT_ATTEMPT_INTERVAL_SEC = 0.01f;
 
 		bool is_network_stack_ready()
 		{
@@ -93,14 +124,12 @@ namespace robotick
 
 		if (state == State::Disconnected)
 		{
-			ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::Disconnected] - disconnected%s", color_start, mode_str, color_end);
+			ROBOTICK_INFO("%s[%s] [-> State::Disconnected] - disconnected%s", color_start, mode_str, color_end);
 		}
 		else if (state == State::ReadyForHandshake)
 		{
-			ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForHandshake] - socket-connection established, ready for handshake%s",
-				color_start,
-				mode_str,
-				color_end);
+			ROBOTICK_INFO(
+				"%s[%s] [-> State::ReadyForHandshake] - socket-connection established, ready for handshake%s", color_start, mode_str, color_end);
 		}
 		else if (state == State::ReadyForFieldsRequest)
 		{
@@ -108,11 +137,8 @@ namespace robotick
 			if (show_always || prev_state != State::ReadyForFields) // only show after connecting, to minimise spam
 			{
 				const char* field_data_str = is_receiver ? "send" : "receive";
-				ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFieldsRequest] - ready to %s fields-request!%s",
-					color_start,
-					mode_str,
-					field_data_str,
-					color_end);
+				ROBOTICK_INFO(
+					"%s[%s] [-> State::ReadyForFieldsRequest] - ready to %s fields-request!%s", color_start, mode_str, field_data_str, color_end);
 			}
 		}
 		else if (state == State::ReadyForFields)
@@ -121,24 +147,35 @@ namespace robotick
 			if (show_always)
 			{
 				const char* field_data_str = is_receiver ? "receive" : "send";
-				ROBOTICK_INFO("%sRemoteEngineConnection [%s] [-> State::ReadyForFields] - ready to %s fields-data!%s",
-					color_start,
-					mode_str,
-					field_data_str,
-					color_end);
+				ROBOTICK_INFO("%s[%s] [-> State::ReadyForFields] - ready to %s fields-data!%s", color_start, mode_str, field_data_str, color_end);
 			}
 		}
 		else
 		{
-			ROBOTICK_FATAL_EXIT("RemoteEngineConnection [%s] - unknown state %i", mode_str, static_cast<int>(state));
+			ROBOTICK_FATAL_EXIT("[%s] - unknown state %i", mode_str, static_cast<int>(state));
 		}
 	}
 
-	// configure() should be a called on all connections first - establishing our operation mode (sender / receiver) and remote-connection info
-	void RemoteEngineConnection::configure(const ConnectionConfig& config_in, Mode mode_in)
+	void RemoteEngineConnection::configure_sender(
+		const char* in_my_model_name, const char* in_target_model_name, const char* in_remote_ip, uint16_t in_remote_port)
 	{
-		config = config_in;
-		mode = mode_in;
+		mode = Mode::Sender;
+		my_model_name = in_my_model_name;
+		target_model_name = in_target_model_name;
+		remote_ip = in_remote_ip;
+		remote_port = in_remote_port;
+
+		set_state(State::Disconnected);
+	}
+
+	void RemoteEngineConnection::configure_receiver(const char* in_my_model_name)
+	{
+		mode = Mode::Receiver;
+		my_model_name = in_my_model_name;
+		target_model_name = ""; // receivers don't target
+		listen_port = 0;		// we'll bind(0) and discover the port
+
+		set_state(State::Disconnected);
 	}
 
 	// register_field() should be called on all sender connections - telling it which field(s) it should send
@@ -215,8 +252,6 @@ namespace robotick
 	{
 		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::tick_disconnected_sender() should only be called in Mode::Sender");
 
-		ROBOTICK_INFO("RemoteEngineConnection::tick_disconnected_sender() [Sender] Attempting to connect to %s:%d", config.host.c_str(), config.port);
-
 		socket_fd = create_tcp_socket();
 		if (socket_fd < 0)
 		{
@@ -225,13 +260,13 @@ namespace robotick
 
 		sockaddr_in addr{};
 		addr.sin_family = AF_INET;
-		addr.sin_port = htons(config.port);
+		addr.sin_port = htons(remote_port);
 
-		if (inet_pton(AF_INET, config.host.c_str(), &addr.sin_addr) != 1)
+		if (inet_pton(AF_INET, remote_ip.c_str(), &addr.sin_addr) != 1)
 		{
+			ROBOTICK_WARNING("Invalid IP address: %s", remote_ip.c_str());
 			close(socket_fd);
 			socket_fd = -1;
-			ROBOTICK_WARNING("Invalid IP address: %s", config.host.c_str());
 			return;
 		}
 
@@ -239,14 +274,19 @@ namespace robotick
 		{
 			if (errno != EINPROGRESS)
 			{
+				ROBOTICK_WARNING("Failed to connect to %s:%d", remote_ip.c_str(), remote_port);
 				close(socket_fd);
 				socket_fd = -1;
-				ROBOTICK_WARNING("Failed to connect to %s:%d", config.host.c_str(), config.port);
 				return;
 			}
 		}
 
-		ROBOTICK_INFO("Sender connection initiated to %s:%d", config.host.c_str(), config.port);
+		ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE,
+			"Sender [%s] initiated connection to [%s] @ %s:%d",
+			my_model_name.c_str(),
+			target_model_name.c_str(),
+			remote_ip.c_str(),
+			remote_port);
 
 		set_state(State::ReadyForHandshake);
 	}
@@ -265,18 +305,42 @@ namespace robotick
 
 			sockaddr_in addr{};
 			addr.sin_family = AF_INET;
-			addr.sin_port = htons(config.port);
+			addr.sin_port = htons(listen_port);
 			addr.sin_addr.s_addr = INADDR_ANY;
 
 			if (bind(socket_fd, (sockaddr*)&addr, sizeof(addr)) < 0)
+			{
 				ROBOTICK_WARNING("Failed to bind socket");
+				close(socket_fd);
+				socket_fd = -1;
+				return;
+			}
+
+			// 👇 Learn what port we were assigned
+			sockaddr_in bound_addr{};
+			socklen_t addr_len = sizeof(bound_addr);
+			if (getsockname(socket_fd, (sockaddr*)&bound_addr, &addr_len) == 0)
+			{
+				listen_port = ntohs(bound_addr.sin_port);
+				ROBOTICK_INFO("Receiver [%s] listening on port %d", my_model_name.c_str(), listen_port);
+			}
+			else
+			{
+				ROBOTICK_WARNING("Failed to get bound port");
+			}
 
 			if (listen(socket_fd, 1) < 0)
+			{
 				ROBOTICK_WARNING("Failed to listen on socket");
+				close(socket_fd);
+				socket_fd = -1;
+				return;
+			}
 
 			return;
 		}
 
+		// Accept incoming connection
 		sockaddr_in client_addr{};
 		socklen_t client_len = sizeof(client_addr);
 		int client_fd = accept(socket_fd, (sockaddr*)&client_addr, &client_len);
@@ -292,7 +356,8 @@ namespace robotick
 
 		close(socket_fd);
 		socket_fd = client_fd;
-		ROBOTICK_INFO("Receiver connection accepted on port %d", config.port);
+
+		ROBOTICK_INFO("Receiver [%s] accepted connection on port %d", my_model_name.c_str(), listen_port);
 
 		set_state(State::ReadyForHandshake);
 	}
@@ -334,6 +399,7 @@ namespace robotick
 		const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 		if (tick_result == InProgressMessage::Result::ConnectionLost)
 		{
+			ROBOTICK_WARNING("Connection lost sending handshake from Sender");
 			disconnect();
 			return;
 		}
@@ -342,7 +408,7 @@ namespace robotick
 		{
 			in_progress_message.vacate(); // vacate ready for next user
 
-			ROBOTICK_INFO("Sender handshake sent with %zu field(s)", fields.size());
+			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender handshake sent with %zu field(s)", fields.size());
 			set_state(State::ReadyForFieldsRequest);
 		}
 	}
@@ -365,6 +431,7 @@ namespace robotick
 		const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 		if (tick_result == InProgressMessage::Result::ConnectionLost)
 		{
+			ROBOTICK_WARNING("Connection lost receiving handshake from Sender");
 			disconnect();
 			return;
 		}
@@ -436,6 +503,7 @@ namespace robotick
 			const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 			if (tick_result == InProgressMessage::Result::ConnectionLost)
 			{
+				ROBOTICK_WARNING("Connection lost receiving field-request from Receiver");
 				disconnect();
 				return;
 			}
@@ -457,6 +525,7 @@ namespace robotick
 			const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 			if (tick_result == InProgressMessage::Result::ConnectionLost)
 			{
+				ROBOTICK_WARNING("Connection lost sending field-request from Receiver");
 				disconnect();
 				return;
 			}
@@ -491,6 +560,7 @@ namespace robotick
 		const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 		if (tick_result == InProgressMessage::Result::ConnectionLost)
 		{
+			ROBOTICK_WARNING("Connection lost sending field-data from Sender");
 			disconnect();
 			return;
 		}
@@ -515,6 +585,7 @@ namespace robotick
 		const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
 		if (tick_result == InProgressMessage::Result::ConnectionLost)
 		{
+			ROBOTICK_WARNING("Connection lost receiving field-data from Sender");
 			disconnect();
 			return;
 		}

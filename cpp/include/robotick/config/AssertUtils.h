@@ -150,6 +150,14 @@ namespace robotick
 		ROBOTICK_INTERNAL_LOG("INFO", __VA_ARGS__);                                                                                                  \
 	} while (0);
 
+#define ROBOTICK_INFO_IF(cond, ...)                                                                                                                  \
+	do                                                                                                                                               \
+	{                                                                                                                                                \
+		if (!cond)                                                                                                                                   \
+			break;                                                                                                                                   \
+		ROBOTICK_INTERNAL_LOG("INFO", __VA_ARGS__);                                                                                                  \
+	} while (0);
+
 // =====================================================================
 // ✅ TEST MACROS
 // =====================================================================

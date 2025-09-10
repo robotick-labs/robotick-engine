@@ -66,11 +66,6 @@ namespace robotick
 
 		size_t compute_blackboard_memory_requirements(const HeapVector<WorkloadInstanceInfo>& instances);
 
-		void setup_remote_engine_senders(const Model& model);
-		void setup_remote_engines_receiver();
-
-		void tick_remote_engine_connections(const TickInfo& tick_info);
-
 	  private:
 		struct State;
 		State* state = nullptr;

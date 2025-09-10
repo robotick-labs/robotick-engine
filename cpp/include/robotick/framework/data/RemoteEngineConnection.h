@@ -55,12 +55,6 @@ namespace robotick
 			ConnectionLost
 		};
 
-		struct ConnectionConfig
-		{
-			FixedString64 host;
-			int port;
-		};
-
 		struct Field
 		{
 			FixedString64 path;
@@ -80,7 +74,8 @@ namespace robotick
 		RemoteEngineConnection(RemoteEngineConnection&&) noexcept = delete;
 		RemoteEngineConnection& operator=(RemoteEngineConnection&&) noexcept = delete;
 
-		void configure(const ConnectionConfig& config, Mode mode);
+		void configure_sender(const char* in_my_model_name, const char* in_target_model_name, const char* in_remote_ip, uint16_t in_remote_port);
+		void configure_receiver(const char* my_model_name);
 
 		void tick(const TickInfo& tick_info);
 
@@ -92,6 +87,7 @@ namespace robotick
 		bool has_basic_connection() const; // we have established a basic connection, but perhaps but yet completed handshake
 
 		bool is_ready() const; // we have finished our handshake and ready for field-data exchange through out tick() method
+		uint16_t get_listen_port() const { return listen_port; }
 
 	  private:
 		[[nodiscard]] State get_state() const { return state; };
@@ -109,8 +105,18 @@ namespace robotick
 		void tick_ready_for_fields();
 
 		// things we set up once on startup:
-		Mode mode;
-		ConnectionConfig config;
+		Mode mode = Mode::Sender;
+
+		FixedString64 my_model_name;	 // always set to name of host-model
+		FixedString64 target_model_name; // empty on receivers; non-empty on senders
+
+		// runtime endpoint data
+		FixedString64 remote_ip;
+		uint16_t remote_port = 0;
+
+		// receiver's bound port (for announce)
+		uint16_t listen_port = 0; // ask OS for ephemeral port first time; reuse assigned port thereafter
+
 		BinderCallback binder;
 
 		// set on startup (register_field()) on Sender; on tick_receive_handshake_and_bind() on Receiver:

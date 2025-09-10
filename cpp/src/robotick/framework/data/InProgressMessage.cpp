@@ -105,8 +105,16 @@ namespace robotick
 			return Result::ConnectionLost;
 		}
 
+		// ⚠ Only treat 0 bytes as connection lost for recv()
 		if (bytes == 0)
-			return Result::ConnectionLost;
+		{
+			if (stage == Stage::Receiving)
+				return Result::ConnectionLost;
+
+			// Sending 0 bytes isn’t fatal — just try again later
+			Thread::sleep_ms(1);
+			return Result::InProgress;
+		}
 
 		cursor += bytes;
 

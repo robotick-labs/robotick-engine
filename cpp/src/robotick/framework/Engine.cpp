@@ -6,7 +6,7 @@
 #include "robotick/api.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/DataConnection.h"
-#include "robotick/framework/data/RemoteEngineConnection.h"
+#include "robotick/framework/data/RemoteEngineConnections.h"
 #include "robotick/framework/data/TelemetryServer.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/Model.h"
@@ -33,8 +33,7 @@ namespace robotick
 		HeapVector<DataConnectionInfo> data_connections_all;
 		HeapVector<DataConnectionInfo*> data_connections_acquired;
 
-		HeapVector<RemoteEngineConnection> remote_engine_senders; // one sender per remote-engine we need to send data to
-		RemoteEngineConnection remote_engines_receiver;			  // one receiver in case any engines need to send data to us
+		RemoteEngineConnections remote_engine_connections;
 	};
 
 	Engine::Engine()
@@ -254,8 +253,8 @@ namespace robotick
 				inst.workload_descriptor->setup_fn(inst.get_ptr(*this));
 		}
 
-		setup_remote_engine_senders(model);
-		setup_remote_engines_receiver();
+		ROBOTICK_ASSERT(state->model != nullptr);
+		state->remote_engine_connections.setup(*this, *(state->model));
 
 		state->root_instance = root_instance;
 	}
@@ -318,7 +317,7 @@ namespace robotick
 			last_tick_time = now;
 
 			// update remote data-connections
-			tick_remote_engine_connections(tick_info);
+			state->remote_engine_connections.tick(tick_info);
 
 			// update local data-connections
 			for (const DataConnectionInfo* data_connection : state->data_connections_acquired)
@@ -345,91 +344,6 @@ namespace robotick
 		{
 			if (inst.workload_descriptor->stop_fn)
 				inst.workload_descriptor->stop_fn(inst.get_ptr(*this));
-		}
-	}
-
-	constexpr int DEFAULT_REMOTE_ENGINE_PORT = 7262;
-
-	void Engine::setup_remote_engines_receiver()
-	{
-		ROBOTICK_INFO("Setting up remote engines receiver...");
-
-		state->remote_engines_receiver.configure(
-			RemoteEngineConnection::ConnectionConfig{"", DEFAULT_REMOTE_ENGINE_PORT}, RemoteEngineConnection::Mode::Receiver);
-
-		state->remote_engines_receiver.set_field_binder(
-			[&](const char* path, RemoteEngineConnection::Field& out)
-			{
-				auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*this, path);
-				if (ptr == nullptr)
-				{
-					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engines_receiver() - unable to resolve field path: %s", path);
-				}
-
-				out.path = path;
-				out.recv_ptr = ptr;
-				out.size = size;
-				out.type_desc = field_desc->find_type_descriptor();
-				ROBOTICK_ASSERT(out.type_desc != nullptr);
-
-				return true;
-			});
-	}
-
-	void Engine::setup_remote_engine_senders(const Model& model)
-	{
-		const auto& remote_model_seeds = model.get_remote_models();
-		if (remote_model_seeds.size() == 0)
-		{
-			return;
-		}
-
-		ROBOTICK_INFO("Setting up remote engine senders...");
-
-		state->remote_engine_senders.initialize(remote_model_seeds.size());
-
-		uint32_t remote_engine_index = 0;
-
-		for (const RemoteModelSeed* remote_model_seed : remote_model_seeds)
-		{
-			ROBOTICK_ASSERT(remote_model_seed != nullptr);
-
-			if (remote_model_seed->remote_data_connection_seeds.size() == 0)
-			{
-				ROBOTICK_WARNING("Remote model '%s' has no remote data-connections - skipping adding remote_engine_sender for it",
-					remote_model_seed->model_name.c_str());
-
-				continue;
-			}
-
-			RemoteEngineConnection& remote_engine_connection = state->remote_engine_senders[remote_engine_index];
-			remote_engine_index++;
-
-			RemoteEngineConnection::ConnectionConfig config;
-			config.host = remote_model_seed->comms_channel.c_str();
-			config.port = DEFAULT_REMOTE_ENGINE_PORT;
-
-			remote_engine_connection.configure(config, RemoteEngineConnection::Mode::Sender);
-
-			for (const auto* remote_data_connection_seed : remote_model_seed->remote_data_connection_seeds)
-			{
-				const char* source_field_path = remote_data_connection_seed->source_field_path.c_str();
-
-				auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*this, source_field_path);
-				if (ptr == nullptr)
-				{
-					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engine_senders() - unable to resolve source field path: %s", source_field_path);
-				}
-
-				RemoteEngineConnection::Field remote_field;
-				remote_field.path = remote_data_connection_seed->dest_field_path.c_str();
-				remote_field.send_ptr = ptr;
-				remote_field.size = size;
-				remote_field.type_desc = field_desc->find_type_descriptor();
-				ROBOTICK_ASSERT(remote_field.type_desc != nullptr);
-
-				remote_engine_connection.register_field(remote_field);
-			}
 		}
 	}
 
@@ -555,21 +469,6 @@ namespace robotick
 				bind_blackboards_in_struct(instance, *workload_desc->inputs_desc, workload_desc->inputs_offset, start_offset);
 			if (workload_desc->outputs_desc)
 				bind_blackboards_in_struct(instance, *workload_desc->outputs_desc, workload_desc->outputs_offset, start_offset);
-		}
-	}
-
-	void Engine::tick_remote_engine_connections(const TickInfo& tick_info)
-	{
-		const bool enable_remote_engines_receiver = (state->remote_engine_senders.size() == 0); // placeholder for having config setting
-
-		if (enable_remote_engines_receiver)
-		{
-			state->remote_engines_receiver.tick(tick_info);
-		}
-
-		for (auto& remote_engine_sender : state->remote_engine_senders)
-		{
-			remote_engine_sender.tick(tick_info);
 		}
 	}
 
