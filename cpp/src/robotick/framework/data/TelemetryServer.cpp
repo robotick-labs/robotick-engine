@@ -60,6 +60,11 @@ namespace robotick
 					handle_get_workload_outputs(req, res);
 					return true;
 				}
+				else if (req.uri.equals("/api/telemetry/workload/output_png"))
+				{
+					handle_get_workload_output_png(req, res);
+					return true;
+				}
 
 				return false;
 			});
@@ -375,6 +380,177 @@ namespace robotick
 	void TelemetryServer::handle_get_workload_outputs(const WebRequest& req, WebResponse& res)
 	{
 		handle_get_workload_io(req, res, false);
+	}
+
+	void TelemetryServer::handle_get_workload_output_png(const WebRequest& req, WebResponse& res)
+	{
+		// --- Query params: name=<workload> & field=<outputs field id> ---
+		const char* workload_unique_name = req.find_query_param("name");
+		const char* field_id = req.find_query_param("field");
+
+		if (!workload_unique_name || !field_id)
+		{
+			res.body.set_from_string("{\"error\":\"missing query params: require name and field\"}");
+			res.status_code = 400;
+			res.content_type = "application/json";
+			return;
+		}
+
+		const WorkloadInstanceInfo* info = engine->find_instance_info(workload_unique_name);
+		if (!info)
+		{
+			res.body.set_from_string("{\"error\":\"workload not found\"}");
+			res.status_code = 404;
+			res.content_type = "application/json";
+			return;
+		}
+
+		const WorkloadDescriptor* desc = info->type->get_workload_desc();
+		const TypeDescriptor* outputs_desc = desc->outputs_desc;
+		const size_t outputs_offset = desc->outputs_offset;
+
+		if (!outputs_desc)
+		{
+			res.body.set_from_string("{\"error\":\"workload has no outputs\"}");
+			res.status_code = 404;
+			res.content_type = "application/json";
+			return;
+		}
+
+		WorkloadsBuffer& mirror = engine->get_workloads_buffer();
+
+		// --- Helpers for PNG validation/parsing ---
+		auto is_png_sig = [](const uint8_t* p) -> bool
+		{
+			static const uint8_t sig[8] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+			for (int i = 0; i < 8; i++)
+				if (p[i] != sig[i])
+					return false;
+			return true;
+		};
+		auto be32 = [](const uint8_t* p) -> uint32_t
+		{
+			return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | uint32_t(p[3]);
+		};
+
+		// We'll capture a pointer to the chosen field's memory and its *object* size
+		// (i.e., sizeof(FixedVector<...>)), then search within it for a PNG blob.
+		const void* field_obj_ptr = nullptr;
+		size_t field_obj_size = 0;
+		const TypeDescriptor* field_td = nullptr;
+
+		bool found = false;
+
+		WorkloadFieldsIterator::for_each_field_in_struct(*info,
+			outputs_desc,
+			outputs_offset,
+			mirror,
+			[&](const WorkloadFieldView& view)
+			{
+				if (found)
+					return; // already got it
+
+				// Build "dot" name if subfield is present
+				FixedString256 full_name;
+				if (view.subfield_info)
+					full_name.format("%s.%s", view.field_info->name.c_str(), view.subfield_info->name.c_str());
+				else
+					full_name = view.field_info->name.c_str();
+
+				// Match requested field id
+				if (!full_name.equals(field_id))
+					return;
+
+				// Resolve type + ptr
+				const TypeDescriptor* td = view.subfield_info ? view.subfield_info->find_type_descriptor() : view.field_info->find_type_descriptor();
+
+				if (!td || !view.field_ptr)
+					return;
+
+				// Ensure the pointer is inside our mirrored buffer
+				if (!mirror.contains_object(view.field_ptr, td->size))
+					return;
+
+				field_obj_ptr = view.field_ptr;
+				field_obj_size = td->size;
+				field_td = td;
+				found = true;
+			});
+
+		if (!found)
+		{
+			res.body.set_from_string("{\"error\":\"field not found in outputs or not a FixedVector\"}");
+			res.status_code = 404;
+			res.content_type = "application/json";
+			return;
+		}
+
+		// Now we have a snapshot of the field object bytes in our mirror buffer.
+		// Treat the object as a raw byte span and search within it for a PNG.
+		const uint8_t* obj = static_cast<const uint8_t*>(field_obj_ptr);
+		const size_t obj_size = field_obj_size;
+
+		// Search for PNG signature anywhere within the object
+		size_t png_start = SIZE_MAX;
+		for (size_t i = 0; i + 8 <= obj_size; ++i)
+		{
+			if (is_png_sig(obj + i))
+			{
+				png_start = i;
+				break;
+			}
+		}
+
+		if (png_start == SIZE_MAX)
+		{
+			res.body.set_from_string("{\"error\":\"no PNG signature found in vector\"}");
+			res.status_code = 422;
+			res.content_type = "application/json";
+			return;
+		}
+
+		// Minimal PNG parse to compute exact end (up to and incl. IEND chunk)
+		size_t cur = png_start + 8; // after signature
+		while (true)
+		{
+			// Need at least len(4) + type(4) + crc(4)
+			if (cur + 12 > obj_size)
+			{
+				res.body.set_from_string("{\"error\":\"truncated PNG data before IEND\"}");
+				res.status_code = 422;
+				res.content_type = "application/json";
+				return;
+			}
+
+			uint32_t chunk_len = be32(obj + cur);
+			const uint8_t* type = obj + cur + 4;
+
+			// Bounds: data + CRC
+			size_t next = cur + 4 /*len*/ + 4 /*type*/ + size_t(chunk_len) + 4 /*crc*/;
+			if (next > obj_size)
+			{
+				res.body.set_from_string("{\"error\":\"invalid PNG chunk length (out of bounds)\"}");
+				res.status_code = 422;
+				res.content_type = "application/json";
+				return;
+			}
+
+			// Check for IEND
+			if (type[0] == 'I' && type[1] == 'E' && type[2] == 'N' && type[3] == 'D')
+			{
+				size_t png_size = next - png_start;
+				// --- WRITE BINARY BODY ---
+				// Replace this with your actual "set raw bytes" call if different:
+				res.body.set(obj + png_start, png_size);
+				res.status_code = 200;
+				res.content_type = "image/png";
+				return;
+			}
+
+			cur = next; // advance to next chunk
+		}
+
+		// Should not reach here; the loop returns on IEND or errors.
 	}
 
 } // namespace robotick

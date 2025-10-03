@@ -20,6 +20,7 @@ namespace robotick
 		void handle_get_workload_config(const WebRequest& req, WebResponse& res);
 		void handle_get_workload_inputs(const WebRequest& req, WebResponse& res);
 		void handle_get_workload_outputs(const WebRequest& req, WebResponse& res);
+		void handle_get_workload_output_png(const WebRequest& req, WebResponse& res);
 
 		void handle_get_workload_io(const WebRequest& req, WebResponse& res, bool inputs);
 
