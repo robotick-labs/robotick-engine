@@ -40,28 +40,8 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Restore Docker image cache
-        id: docker-cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/docker-${{ matrix.platform }}-cache
-          key: docker-${{ matrix.platform }}-${{ matrix.platform == 'esp32' && 'idf-v5.4' || 'cpp-ubuntu-24.04' }}-v1
-          restore-keys: |
-            docker-${{ matrix.platform }}-
-
-      - name: Echo Docker cache-hit status
-        run: echo "Cache hit? ${{ steps.docker-cache.outputs.cache-hit }}"
-
-      - name: Load Docker image from cache
-        if: steps.docker-cache.outputs.cache-hit == 'true'
-        run: docker load -i "${{ runner.temp }}/docker-${{ matrix.platform }}-cache/image.tar"
-
-      - name: Pull and cache Docker image
-        if: steps.docker-cache.outputs.cache-hit != 'true'
-        run: |
-          docker pull ${{ matrix.docker_image }}
-          mkdir -p "${{ runner.temp }}/docker-${{ matrix.platform }}-cache"
-          docker save ${{ matrix.docker_image }} -o "${{ runner.temp }}/docker-${{ matrix.platform }}-cache/image.tar"
+      - name: Pull Docker image
+        run: docker pull ${{ matrix.docker_image }}
 
       - name: Run Build inside Docker
         run: |
