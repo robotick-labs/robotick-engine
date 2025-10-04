@@ -457,6 +457,16 @@ namespace robotick
 			}
 
 			uint32_t chunk_len = be32(obj + cur);
+
+			// Prevent integer overflow when computing next chunk position
+			if (chunk_len > obj_size - cur - 12)
+			{
+				res.body.set_from_string("{\"error\":\"invalid PNG chunk length\"}");
+				res.status_code = 422;
+				res.content_type = "application/json";
+				return;
+			}
+
 			const uint8_t* type = obj + cur + 4;
 			size_t next = cur + 4 + 4 + chunk_len + 4;
 
