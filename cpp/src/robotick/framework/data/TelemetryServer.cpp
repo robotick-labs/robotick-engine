@@ -470,14 +470,6 @@ namespace robotick
 			const uint8_t* type = obj + cur + 4;
 			size_t next = cur + 4 + 4 + chunk_len + 4;
 
-			if (next > obj_size)
-			{
-				res.body.set_from_string("{\"error\":\"invalid PNG chunk length\"}");
-				res.status_code = 422;
-				res.content_type = "application/json";
-				return;
-			}
-
 			if (type[0] == 'I' && type[1] == 'E' && type[2] == 'N' && type[3] == 'D')
 			{
 				size_t png_size = next - png_start;
