@@ -16,7 +16,8 @@ apt-get update -yq && apt-get install -y --no-install-recommends \
   catch2 \
   libsdl2-dev \
   libssl-dev \
-  libcurl4-openssl-dev
+  libcurl4-openssl-dev \
+  python3.12-dev
 
 apt-get clean
 rm -rf /var/lib/apt/lists/*
