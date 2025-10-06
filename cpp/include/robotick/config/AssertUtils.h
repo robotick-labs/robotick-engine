@@ -132,6 +132,15 @@ namespace robotick
 		ROBOTICK_INTERNAL_LOG("WARN", __VA_ARGS__);                                                                                                  \
 	} while (0)
 
+#define ROBOTICK_WARNING_IF(cond, ...)                                                                                                               \
+	do                                                                                                                                               \
+	{                                                                                                                                                \
+		if (!cond)                                                                                                                                   \
+			break;                                                                                                                                   \
+		ROBOTICK_BREAKPOINT();                                                                                                                       \
+		ROBOTICK_INTERNAL_LOG("WARN", __VA_ARGS__);                                                                                                  \
+	} while (0)
+
 #define ROBOTICK_WARNING_ONCE(...)                                                                                                                   \
 	do                                                                                                                                               \
 	{                                                                                                                                                \

@@ -17,8 +17,11 @@ namespace robotick
 		const WorkloadInstanceInfo* workload_info = nullptr;
 		const TypeDescriptor* struct_info = nullptr;
 		const FieldDescriptor* field_info = nullptr;
-		const FieldDescriptor* subfield_info = nullptr;
+		const FieldDescriptor* subfield_info = nullptr; // DEPRECATED - remove soon - use "for_each_field_in_struct_field()" instead
 		void* field_ptr = nullptr;
+
+		bool is_struct_field() const;
+		const StructDescriptor* get_field_struct_desc() const;
 	};
 
 	struct WorkloadFieldsIterator
@@ -30,6 +33,8 @@ namespace robotick
 			const size_t struct_offset,
 			WorkloadsBuffer& workloads_buffer,
 			std::function<void(const WorkloadFieldView&)> callback);
+
+		static void for_each_field_in_struct_field(const WorkloadFieldView& parent_field, std::function<void(const WorkloadFieldView&)> callback);
 
 		static void for_each_field_in_workload(const Engine& engine,
 			const WorkloadInstanceInfo& instance,

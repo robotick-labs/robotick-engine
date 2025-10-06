@@ -25,6 +25,7 @@
 #include "robotick/framework/TickInfo.h"
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/data/State.h"
+#include "robotick/framework/math/Quat.h"
 #include "robotick/framework/math/Vec2.h"
 #include "robotick/framework/math/Vec3.h"
 #include "robotick/framework/model/Model.h"

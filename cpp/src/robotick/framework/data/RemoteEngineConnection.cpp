@@ -264,7 +264,7 @@ namespace robotick
 
 		if (inet_pton(AF_INET, remote_ip.c_str(), &addr.sin_addr) != 1)
 		{
-			ROBOTICK_WARNING("Invalid IP address: %s", remote_ip.c_str());
+			ROBOTICK_WARNING_ONCE("Invalid IP address: %s", remote_ip.c_str());
 			close(socket_fd);
 			socket_fd = -1;
 			return;

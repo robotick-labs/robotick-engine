@@ -23,8 +23,10 @@ namespace robotick
 
 	void* FieldDescriptor::get_data_ptr(void* container_ptr) const
 	{
-		ROBOTICK_ASSERT_MSG(
-			this->offset_within_container != OFFSET_UNBOUND, "FieldDescriptor::get_data_ptr() - offset_within_container has not yet been bound");
+		ROBOTICK_ASSERT_MSG(this->offset_within_container != OFFSET_UNBOUND,
+			"FieldDescriptor::get_data_ptr() - offset_within_container has not yet been bound (field '%s' with type '%s')",
+			this->name.c_str(),
+			this->type_id.get_debug_name());
 		uint8_t* data_ptr = (uint8_t*)container_ptr + this->offset_within_container;
 		return data_ptr;
 	}

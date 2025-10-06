@@ -282,15 +282,113 @@ namespace robotick
 		res.content_type = "application/json";
 	}
 
-	static void emit_fields_as_json(WebResponseBodyBuffer& out,
-		const WorkloadInstanceInfo& info,
-		const TypeDescriptor* struct_desc,
-		size_t struct_offset,
-		WorkloadsBuffer& buffer)
+	// ---- Helper: JSON-escape a C-string into `out` (no STL, no exceptions)
+	static void json_escape_and_write(WebResponseBodyBuffer& out, const char* s)
+	{
+		out.append_from_string("\"");
+		for (const char* p = s; *p; ++p)
+		{
+			const char ch = *p;
+			switch (ch)
+			{
+			case '\"':
+				out.append_from_string("\\\"");
+				break;
+			case '\\':
+				out.append_from_string("\\\\");
+				break;
+			case '\b':
+				out.append_from_string("\\b");
+				break;
+			case '\f':
+				out.append_from_string("\\f");
+				break;
+			case '\n':
+				out.append_from_string("\\n");
+				break;
+			case '\r':
+				out.append_from_string("\\r");
+				break;
+			case '\t':
+				out.append_from_string("\\t");
+				break;
+			default:
+				if ((unsigned char)ch < 0x20)
+				{
+					// \u00XX
+					char buf[7];
+					const char* hex = "0123456789ABCDEF";
+					unsigned char v = (unsigned char)ch;
+					buf[0] = '\\';
+					buf[1] = 'u';
+					buf[2] = '0';
+					buf[3] = '0';
+					buf[4] = hex[(v >> 4) & 0xF];
+					buf[5] = hex[v & 0xF];
+					buf[6] = '\0';
+					out.append_from_string(buf);
+				}
+				else
+				{
+					char one[2] = {ch, '\0'};
+					out.append_from_string(one);
+				}
+				break;
+			}
+		}
+		out.append_from_string("\"");
+	}
+
+	// ---- Recursively emit a JSON object for a nested struct field (non-templated)
+	static void emit_struct_object_field(WebResponseBodyBuffer& out, WorkloadsBuffer& buffer, const WorkloadFieldView& parent)
 	{
 		out.append_from_string("{");
-
 		bool first = true;
+
+		WorkloadFieldsIterator::for_each_field_in_struct_field(parent,
+			[&](const WorkloadFieldView& view)
+			{
+				if (!first)
+					out.append_from_string(",");
+				first = false;
+
+				// Key
+				json_escape_and_write(out, view.field_info->name.c_str());
+				out.append_from_string(":");
+
+				if (view.is_struct_field())
+				{
+					// Recurse
+					emit_struct_object_field(out, buffer, view);
+				}
+				else
+				{
+					// Leaf via TypeDescriptor::to_string
+					const TypeDescriptor* td = view.field_info->find_type_descriptor();
+
+					FixedString256 value = "<invalid>";
+					if (td && td->to_string && view.field_ptr && buffer.contains_object(view.field_ptr, td->size))
+					{
+						if (!td->to_string(view.field_ptr, value.data, value.capacity()))
+							value.format("<%s>", td->name);
+					}
+					json_escape_and_write(out, value.c_str());
+				}
+			});
+
+		out.append_from_string("}");
+	}
+
+	// ---- Emit the top-level struct object (non-templated)
+	static void emit_struct_object_root(WebResponseBodyBuffer& out,
+		WorkloadsBuffer& buffer,
+		const WorkloadInstanceInfo& info,
+		const TypeDescriptor* struct_desc,
+		size_t struct_offset)
+	{
+		out.append_from_string("{");
+		bool first = true;
+
 		WorkloadFieldsIterator::for_each_field_in_struct(info,
 			struct_desc,
 			struct_offset,
@@ -301,29 +399,40 @@ namespace robotick
 					out.append_from_string(",");
 				first = false;
 
-				const char* subfield_separator = "";
-				const char* subfield_name = "";
-				if (view.subfield_info)
+				// Key
+				json_escape_and_write(out, view.field_info->name.c_str());
+				out.append_from_string(":");
+
+				if (view.is_struct_field())
 				{
-					subfield_separator = ".";
-					subfield_name = view.subfield_info->name.c_str();
+					emit_struct_object_field(out, buffer, view);
 				}
-
-				const TypeDescriptor* td = view.subfield_info ? view.subfield_info->find_type_descriptor() : view.field_info->find_type_descriptor();
-
-				FixedString256 value = "\"<invalid>\"";
-				if (td && view.field_ptr && buffer.contains_object(view.field_ptr, td->size))
+				else
 				{
-					if (!td->to_string(view.field_ptr, value.data, value.capacity()))
+					// Leaf via TypeDescriptor::to_string
+					const TypeDescriptor* td = view.field_info->find_type_descriptor();
+
+					FixedString256 value = "<invalid>";
+					if (td && td->to_string && view.field_ptr && buffer.contains_object(view.field_ptr, td->size))
 					{
-						value.format("<%s>", td->name);
+						if (!td->to_string(view.field_ptr, value.data, value.capacity()))
+							value.format("<%s>", td->name);
 					}
+					json_escape_and_write(out, value.c_str());
 				}
-
-				out.append_from_string_format("\"%s%s%s\":\"%s\"", view.field_info->name.c_str(), subfield_separator, subfield_name, value.c_str());
 			});
 
 		out.append_from_string("}");
+	}
+
+	// ---- Entry point
+	static void emit_fields_as_json(WebResponseBodyBuffer& out,
+		const WorkloadInstanceInfo& info,
+		const TypeDescriptor* struct_desc,
+		size_t struct_offset,
+		WorkloadsBuffer& buffer)
+	{
+		emit_struct_object_root(out, buffer, info, struct_desc, struct_offset);
 	}
 
 	void TelemetryServer::handle_get_workload_config(const WebRequest& req, WebResponse& res)

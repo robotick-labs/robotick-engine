@@ -58,6 +58,7 @@ namespace robotick
 	extern "C" void robotick_force_register_primitives();
 	extern "C" void robotick_force_register_fixed_vector_types();
 	extern "C" void robotick_force_register_vec3_types();
+	extern "C" void robotick_force_register_quat_types();
 
 	void Engine::load(const Model& model)
 	{
@@ -68,6 +69,7 @@ namespace robotick
 		robotick_force_register_primitives();
 		robotick_force_register_fixed_vector_types();
 		robotick_force_register_vec3_types();
+		robotick_force_register_quat_types();
 
 		if (!model.get_root_workload())
 			ROBOTICK_FATAL_EXIT("Model has no root workload");

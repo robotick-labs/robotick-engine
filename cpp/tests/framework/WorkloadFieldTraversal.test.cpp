@@ -186,56 +186,6 @@ namespace robotick::test
 			CHECK(found_fields.count("input_value") == 1);
 			CHECK(found_fields.count("output_value") == 1);
 		}
-
-		SECTION("Blackboard subfields correctly walked via input-wrapped Blackboard")
-		{
-			struct BBInputs
-			{
-				Blackboard blackboard;
-			};
-			ROBOTICK_REGISTER_STRUCT_BEGIN(BBInputs)
-			ROBOTICK_STRUCT_FIELD(BBInputs, Blackboard, blackboard)
-			ROBOTICK_REGISTER_STRUCT_END(BBInputs)
-
-			struct BBWorkload
-			{
-				BBInputs inputs;
-
-				FixedVector<FieldDescriptor, 2> blackboard_fields;
-
-				void pre_load()
-				{
-					blackboard_fields.fill();
-
-					blackboard_fields[0] = FieldDescriptor{"x", GET_TYPE_ID(int)};
-					blackboard_fields[1] = FieldDescriptor{"y", GET_TYPE_ID(double)};
-
-					inputs.blackboard.initialize_fields(ArrayView(blackboard_fields.begin(), blackboard_fields.size()));
-				}
-
-				void tick(const TickInfo&) {}
-			};
-			ROBOTICK_REGISTER_WORKLOAD(BBWorkload, void, BBInputs, void)
-
-			Model model;
-			WorkloadSeed& workload_seed = model.add("BBWorkload", "BB").set_tick_rate_hz(10.0f);
-			model.set_root_workload(workload_seed);
-
-			Engine engine;
-			engine.load(model);
-
-			std::set<std::string> seen_fields;
-			WorkloadFieldsIterator::for_each_workload_field(engine,
-				nullptr,
-				[&](const WorkloadFieldView& view)
-				{
-					if (view.subfield_info)
-						seen_fields.insert(view.subfield_info->name.c_str());
-				});
-
-			CHECK(seen_fields.count("x") == 1);
-			CHECK(seen_fields.count("y") == 1);
-		}
 	}
 
 } // namespace robotick::test

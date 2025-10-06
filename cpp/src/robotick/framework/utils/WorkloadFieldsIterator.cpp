@@ -52,36 +52,56 @@ namespace robotick
 		{
 			void* base_ptr = field_desc.get_data_ptr(workloads_buffer, instance, *struct_type, struct_offset);
 			if (!base_ptr)
+			{
 				continue;
-
-			const TypeDescriptor* field_type_desc = field_desc.find_type_descriptor();
-			if (!field_type_desc)
-				continue;
-
-			const StructDescriptor* sub_struct_desc = field_type_desc->get_struct_desc();
-			if (!sub_struct_desc)
-			{
-				if (const DynamicStructDescriptor* dyn_desc = field_type_desc->get_dynamic_struct_desc())
-				{
-					sub_struct_desc = dyn_desc->get_struct_descriptor(base_ptr);
-				}
 			}
 
-			if (sub_struct_desc)
-			{
-				for (const FieldDescriptor& sub_field : sub_struct_desc->fields)
-				{
-					void* sub_ptr = sub_field.get_data_ptr(base_ptr);
-					WorkloadFieldView view{&instance, struct_type, &field_desc, &sub_field, sub_ptr};
-					callback(view);
-				}
-			}
-			else
-			{
-				WorkloadFieldView view{&instance, struct_type, &field_desc, nullptr, base_ptr};
-				callback(view);
-			}
+			WorkloadFieldView view{&instance, struct_type, &field_desc, nullptr, base_ptr};
+			callback(view);
 		}
+	}
+
+	void WorkloadFieldsIterator::for_each_field_in_struct_field(
+		const WorkloadFieldView& parent_field, std::function<void(const WorkloadFieldView&)> callback)
+	{
+		const StructDescriptor* struct_desc = parent_field.get_field_struct_desc();
+		if (!struct_desc)
+			return;
+
+		for (const FieldDescriptor& field_desc : struct_desc->fields)
+		{
+			void* base_ptr = field_desc.get_data_ptr(parent_field.field_ptr);
+			if (!base_ptr)
+				continue;
+
+			WorkloadFieldView view{parent_field.workload_info, parent_field.field_info->find_type_descriptor(), &field_desc, nullptr, base_ptr};
+			callback(view);
+		}
+	}
+
+	const StructDescriptor* WorkloadFieldView::get_field_struct_desc() const
+	{
+		if (!field_info)
+			return nullptr;
+
+		const TypeDescriptor* field_type_desc = field_info->find_type_descriptor();
+		if (!field_type_desc)
+			return nullptr;
+
+		const StructDescriptor* sub_struct_desc = field_type_desc->get_struct_desc();
+		if (sub_struct_desc)
+			return sub_struct_desc;
+
+		const DynamicStructDescriptor* dyn_desc = field_type_desc->get_dynamic_struct_desc();
+		if (dyn_desc)
+			return dyn_desc->get_struct_descriptor(field_ptr);
+
+		return nullptr;
+	}
+
+	bool WorkloadFieldView::is_struct_field() const
+	{
+		return get_field_struct_desc() != nullptr;
 	}
 
 } // namespace robotick

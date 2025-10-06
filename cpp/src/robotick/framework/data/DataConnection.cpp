@@ -126,17 +126,26 @@ namespace robotick
 			while (*cursor)
 			{
 				if (!cur_struct)
+				{
+					ROBOTICK_WARNING("No current struct - remaining items: %s", cursor);
 					return false;
+				}
 
 				FixedString64 token = extract_next_token(cursor);
 				const FieldDescriptor* fld = cur_struct->find_field(token.c_str());
 				if (!fld)
+				{
+					ROBOTICK_WARNING("Could not find field named %s", token.c_str());
 					return false;
+				}
 
 				void* fld_ptr = fld->get_data_ptr(cur_ptr);
 				const TypeDescriptor* fld_type = fld->find_type_descriptor();
 				if (!fld_type)
+				{
+					ROBOTICK_WARNING("Could not find type for field named %s", token.c_str());
 					return false;
+				}
 
 				cur_ptr = fld_ptr;
 				cur_type = fld_type;
