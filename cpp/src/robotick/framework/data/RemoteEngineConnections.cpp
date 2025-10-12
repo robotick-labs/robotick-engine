@@ -6,7 +6,7 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/model/Model.h"
 
-#define ROBOTICK_REMOTE_ENGINE_CONNECTIONS_VERBOSE 1
+#define ROBOTICK_REMOTE_ENGINE_CONNECTIONS_VERBOSE 0
 
 namespace robotick
 {
