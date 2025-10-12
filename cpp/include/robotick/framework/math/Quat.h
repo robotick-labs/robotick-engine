@@ -150,9 +150,8 @@ namespace robotick
 
 		TDerived normalized() const
 		{
-			TDerived q(*this);
-			q.normalize();
-			return q;
+			TDerived q(this->w, this->x, this->y, this->z);
+			return q / q.length();
 		}
 
 		// Conjugate / inverse
