@@ -135,7 +135,6 @@ namespace robotick
 				const FieldDescriptor* fld = cur_struct->find_field(token.c_str());
 				if (!fld)
 				{
-					ROBOTICK_WARNING("Could not find field named %s", token.c_str());
 					return false;
 				}
 
@@ -270,8 +269,10 @@ namespace robotick
 		}
 	}
 
-	void DataConnectionUtils::apply_struct_field_values(
-		void* struct_ptr, const TypeDescriptor& struct_type_desc, const ArrayView<const FieldConfigEntry>& field_config_entries)
+	void DataConnectionUtils::apply_struct_field_values(void* struct_ptr,
+		const TypeDescriptor& struct_type_desc,
+		const ArrayView<const FieldConfigEntry>& field_config_entries,
+		const bool warnIfNotFound)
 	{
 		if (!struct_ptr)
 			ROBOTICK_FATAL_EXIT("Struct-ptr not provided");
@@ -293,7 +294,7 @@ namespace robotick
 
 			if (!resolve_nested_member(struct_ptr, &struct_type_desc, dotted, &target_ptr, &target_type, &target_field))
 			{
-				ROBOTICK_WARNING("Unable to find field '%s'", dotted);
+				ROBOTICK_WARNING_IF(warnIfNotFound, "Unable to find field '%s'", dotted);
 				continue;
 			}
 

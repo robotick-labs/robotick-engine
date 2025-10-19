@@ -137,13 +137,11 @@ namespace robotick
 			if (seed->config.size() > 0 && workload_desc->config_desc)
 			{
 				ROBOTICK_ASSERT(workload_desc->config_offset != OFFSET_UNBOUND);
-				DataConnectionUtils::apply_struct_field_values(ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config);
-			}
 
-			if (seed->inputs.size() > 0 && workload_desc->inputs_desc)
-			{
-				ROBOTICK_ASSERT(workload_desc->inputs_offset != OFFSET_UNBOUND);
-				DataConnectionUtils::apply_struct_field_values(ptr + workload_desc->inputs_offset, *workload_desc->inputs_desc, seed->inputs);
+				// don't warn on first pass - we may need to set some, preload a script to create blackboard, and then have final pass
+				const bool warnIfNotFound = false;
+				DataConnectionUtils::apply_struct_field_values(
+					ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config, warnIfNotFound);
 			}
 
 			if (workload_desc->pre_load_fn)
@@ -161,6 +159,32 @@ namespace robotick
 			size_t start = workloads_cursor;
 			workloads_cursor += blackboard_size;
 			bind_blackboards_for_instances(state->instances, start);
+		}
+
+		// post-blackboard-setup config pass:
+		for (size_t i = 0; i < seeds.size(); ++i)
+		{
+			const auto& seed = seeds[i];
+			const auto* workload_desc = state->instances[i].workload_descriptor;
+			uint8_t* ptr = buffer_ptr + state->instances[i].offset_in_workloads_buffer;
+
+			if (seed->config.size() > 0 && workload_desc->config_desc)
+			{
+				ROBOTICK_ASSERT(workload_desc->config_offset != OFFSET_UNBOUND);
+
+				const bool warnIfNotFound = true;
+				DataConnectionUtils::apply_struct_field_values(
+					ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config, warnIfNotFound);
+			}
+
+			if (seed->inputs.size() > 0 && workload_desc->inputs_desc)
+			{
+				ROBOTICK_ASSERT(workload_desc->inputs_offset != OFFSET_UNBOUND);
+
+				const bool warnIfNotFound = true;
+				DataConnectionUtils::apply_struct_field_values(
+					ptr + workload_desc->inputs_offset, *workload_desc->inputs_desc, seed->inputs, warnIfNotFound);
+			}
 		}
 
 		// handle load for each workload (we can multithread this in future, where platforms allow)
