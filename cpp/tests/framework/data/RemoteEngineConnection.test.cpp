@@ -26,7 +26,7 @@ static int wait_for_listen_port(RemoteEngineConnection& receiver, int max_attemp
 	return port; // 0 if failed
 }
 
-TEST_CASE("Integration/Framework/Data/RemoteEngineConnection (threadless)")
+TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 {
 	SECTION("Handshake and tick exchange", "[RemoteEngineConnection]")
 	{

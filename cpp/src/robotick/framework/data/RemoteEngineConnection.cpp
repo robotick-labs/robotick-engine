@@ -131,14 +131,14 @@ namespace robotick
 			ROBOTICK_INFO(
 				"%s[%s] [-> State::ReadyForHandshake] - socket-connection established, ready for handshake%s", color_start, mode_str, color_end);
 		}
-		else if (state == State::ReadyForFieldsRequest)
+		else if (state == State::AcknowledgeHandshake)
 		{
 			const bool show_always = false;
 			if (show_always || prev_state != State::ReadyForFields) // only show after connecting, to minimise spam
 			{
 				const char* field_data_str = is_receiver ? "send" : "receive";
 				ROBOTICK_INFO(
-					"%s[%s] [-> State::ReadyForFieldsRequest] - ready to %s fields-request!%s", color_start, mode_str, field_data_str, color_end);
+					"%s[%s] [-> State::AcknowledgeHandshake] - ready to %s handshake-ack!%s", color_start, mode_str, field_data_str, color_end);
 			}
 		}
 		else if (state == State::ReadyForFields)
@@ -228,9 +228,9 @@ namespace robotick
 		{
 			tick_ready_for_handshake();
 		}
-		if (state == State::ReadyForFieldsRequest)
+		if (state == State::AcknowledgeHandshake)
 		{
-			tick_ready_for_field_request();
+			tick_ready_for_handshake_ack();
 		}
 		if (state == State::ReadyForFields)
 		{
@@ -245,7 +245,7 @@ namespace robotick
 
 	bool RemoteEngineConnection::is_ready() const
 	{
-		return state == State::ReadyForFieldsRequest || state == State::ReadyForFields;
+		return state == State::AcknowledgeHandshake || state == State::ReadyForFields;
 	}
 
 	void RemoteEngineConnection::tick_disconnected_sender()
@@ -409,7 +409,7 @@ namespace robotick
 			in_progress_message.vacate(); // vacate ready for next user
 
 			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender handshake sent with %zu field(s)", fields.size());
-			set_state(State::ReadyForFieldsRequest);
+			set_state(State::AcknowledgeHandshake);
 		}
 	}
 
@@ -473,7 +473,7 @@ namespace robotick
 			in_progress_message.vacate(); // vacate ready for next user
 
 			ROBOTICK_INFO("Receiver handshake received. Bound %zu field(s) - total %zu (should be same value)", bound_count, fields.size());
-			set_state(State::ReadyForFieldsRequest);
+			set_state(State::AcknowledgeHandshake);
 		}
 	}
 
@@ -489,7 +489,7 @@ namespace robotick
 		}
 	}
 
-	void RemoteEngineConnection::tick_ready_for_field_request()
+	void RemoteEngineConnection::tick_ready_for_handshake_ack()
 	{
 		std::vector<uint8_t> ack;
 
@@ -519,7 +519,7 @@ namespace robotick
 		{
 			if (in_progress_message.is_vacant())
 			{
-				in_progress_message.begin_send((uint8_t)MessageType::FieldsRequest, nullptr, 0);
+				in_progress_message.begin_send((uint8_t)MessageType::HandshakeAck, nullptr, 0);
 			}
 
 			const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
@@ -568,8 +568,6 @@ namespace robotick
 		if (in_progress_message.is_completed())
 		{
 			in_progress_message.vacate(); // vacate ready for next user
-
-			set_state(State::ReadyForFieldsRequest);
 		}
 	}
 
@@ -582,16 +580,22 @@ namespace robotick
 			in_progress_message.begin_receive();
 		}
 
-		const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
-		if (tick_result == InProgressMessage::Result::ConnectionLost)
+		// keep pumping in_progress_message until it has nothing more to receive:
+		while (true)
 		{
-			ROBOTICK_WARNING("Connection lost receiving field-data from Sender");
-			disconnect();
-			return;
-		}
+			const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
+			if (tick_result == InProgressMessage::Result::ConnectionLost)
+			{
+				ROBOTICK_WARNING("Connection lost receiving field-data from Sender");
+				disconnect();
+				return;
+			}
 
-		if (in_progress_message.is_completed())
-		{
+			if (!in_progress_message.is_completed())
+			{
+				return;
+			}
+
 			auto [payload_data, payload_size] = in_progress_message.get_payload();
 
 			size_t offset_into_payload = 0;
@@ -622,10 +626,9 @@ namespace robotick
 				}
 			}
 
-			in_progress_message.vacate(); // vacate ready for next user
-
-			set_state(State::ReadyForFieldsRequest);
-		}
+			in_progress_message.vacate();		 // vacate ready for next user
+			in_progress_message.begin_receive(); // prep for next receive
+		};
 	}
 
 	void RemoteEngineConnection::tick_ready_for_fields()
