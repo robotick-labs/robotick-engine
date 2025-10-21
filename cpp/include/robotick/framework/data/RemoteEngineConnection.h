@@ -30,14 +30,14 @@ namespace robotick
 		{
 			Disconnected,
 			ReadyForHandshake,
-			AcknowledgeHandshake,
+			ReadyForFieldsRequest,
 			ReadyForFields
 		};
 
 		enum class MessageType : uint8_t
 		{
 			Subscribe = 1,
-			HandshakeAck = 2,
+			FieldsRequest = 2,
 			Fields = 3
 		};
 
@@ -101,7 +101,7 @@ namespace robotick
 		void receive_into_fields();
 
 		void tick_ready_for_handshake();
-		void tick_ready_for_handshake_ack();
+		void tick_ready_for_field_request();
 		void tick_ready_for_fields();
 
 		// things we set up once on startup:
