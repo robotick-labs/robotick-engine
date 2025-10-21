@@ -127,9 +127,6 @@ namespace robotick
 		int socket_fd = -1;
 		float time_sec_to_reconnect = 0.0f;
 
-		bool bootstrap_waiting_for_first_fields = false; // Receiver only
-		bool bootstrap_sent_first_fields = false;		 // Sender only
-
 		InProgressMessage in_progress_message;
 	};
 

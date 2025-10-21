@@ -436,7 +436,6 @@ namespace robotick
 
 			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender handshake sent with %zu field(s)", fields.size());
 			set_state(State::ReadyForFields);
-			bootstrap_sent_first_fields = false; // we haven't fired our first unprompted fields yet
 			// ^- send first fields message immediately without being asked - this (together with the receiver sending its first 'ready'
 			// 		message immediately too) will result in, if both engines running at same rate, field-updates being sent every tick.
 		}
@@ -512,8 +511,7 @@ namespace robotick
 				"Receiver handshake received. Bound %zu field(s) - total %zu (should be same value)",
 				bound_count,
 				fields.size());
-			set_state(State::ReadyForFieldsRequest);   // send first ready message immediately
-			bootstrap_waiting_for_first_fields = true; // keep issuing READY until first FIELDS arrives
+			set_state(State::ReadyForFieldsRequest); // send first ready message immediately
 		}
 	}
 
