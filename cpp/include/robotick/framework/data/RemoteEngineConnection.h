@@ -95,8 +95,8 @@ namespace robotick
 
 		void tick_disconnected_sender();
 		void tick_disconnected_receiver();
-		void tick_send_handshake();
-		void tick_receive_handshake_and_bind();
+		void tick_sender_send_handshake();
+		void tick_receiver_receive_handshake_and_bind();
 		void send_fields_as_message();
 		void receive_into_fields();
 
@@ -119,13 +119,16 @@ namespace robotick
 
 		BinderCallback binder;
 
-		// set on startup (register_field()) on Sender; on tick_receive_handshake_and_bind() on Receiver:
+		// set on startup (register_field()) on Sender; on tick_receiver_receive_handshake_and_bind() on Receiver:
 		std::vector<Field> fields;
 
 		// runtime values:
 		State state = State::Disconnected;
 		int socket_fd = -1;
 		float time_sec_to_reconnect = 0.0f;
+
+		bool bootstrap_waiting_for_first_fields = false; // Receiver only
+		bool bootstrap_sent_first_fields = false;		 // Sender only
 
 		InProgressMessage in_progress_message;
 	};
