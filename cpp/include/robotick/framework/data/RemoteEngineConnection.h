@@ -30,14 +30,14 @@ namespace robotick
 		{
 			Disconnected,
 			ReadyForHandshake,
-			AcknowledgeHandshake,
+			ReadyForFieldsRequest,
 			ReadyForFields
 		};
 
 		enum class MessageType : uint8_t
 		{
 			Subscribe = 1,
-			HandshakeAck = 2,
+			FieldsRequest = 2,
 			Fields = 3
 		};
 
@@ -95,13 +95,13 @@ namespace robotick
 
 		void tick_disconnected_sender();
 		void tick_disconnected_receiver();
-		void tick_send_handshake();
-		void tick_receive_handshake_and_bind();
+		void tick_sender_send_handshake();
+		void tick_receiver_receive_handshake_and_bind();
 		void send_fields_as_message();
 		void receive_into_fields();
 
 		void tick_ready_for_handshake();
-		void tick_ready_for_handshake_ack();
+		void tick_ready_for_field_request();
 		void tick_ready_for_fields();
 
 		// things we set up once on startup:
@@ -119,7 +119,7 @@ namespace robotick
 
 		BinderCallback binder;
 
-		// set on startup (register_field()) on Sender; on tick_receive_handshake_and_bind() on Receiver:
+		// set on startup (register_field()) on Sender; on tick_receiver_receive_handshake_and_bind() on Receiver:
 		std::vector<Field> fields;
 
 		// runtime values:

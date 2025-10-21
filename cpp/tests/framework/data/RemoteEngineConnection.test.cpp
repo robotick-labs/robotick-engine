@@ -63,6 +63,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
 			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
 			Thread::sleep_ms(20);
+
 			if (recv_value == target_value)
 				break;
 		}
