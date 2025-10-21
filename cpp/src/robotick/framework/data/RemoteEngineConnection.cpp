@@ -133,7 +133,7 @@ namespace robotick
 		}
 		else if (state == State::ReadyForFieldsRequest)
 		{
-			const bool show_always = true;
+			const bool show_always = false;
 			if (show_always || prev_state != State::ReadyForFields) // only show after connecting, to minimise spam
 			{
 				const char* field_data_str = is_receiver ? "send" : "receive";
@@ -143,7 +143,7 @@ namespace robotick
 		}
 		else if (state == State::ReadyForFields)
 		{
-			const bool show_always = true;
+			const bool show_always = false;
 			if (show_always)
 			{
 				const char* field_data_str = is_receiver ? "receive" : "send";
