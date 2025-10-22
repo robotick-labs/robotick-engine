@@ -84,10 +84,10 @@ namespace robotick
 
 		void disconnect();
 
-		bool has_basic_connection() const; // we have established a basic connection, but perhaps but yet completed handshake
+		[[nodiscard]] bool has_basic_connection() const; // we have established a basic connection, but perhaps but yet completed handshake
 
-		bool is_ready() const; // we have finished our handshake and ready for field-data exchange through out tick() method
-		uint16_t get_listen_port() const { return listen_port; }
+		[[nodiscard]] bool is_ready() const; // we have finished our handshake and ready for field-data exchange through out tick() method
+		[[nodiscard]] uint16_t get_listen_port() const { return listen_port; }
 
 	  private:
 		[[nodiscard]] State get_state() const { return state; };
@@ -95,15 +95,18 @@ namespace robotick
 
 		void tick_disconnected_sender();
 		void tick_disconnected_receiver();
-		void tick_sender_send_handshake(const TickInfo& tick_info);
-		void tick_receiver_receive_handshake(const TickInfo& tick_info);
-		void send_fields_as_message();
-		void receive_fields_as_message();
 
 		void tick_ready_for_handshake(const TickInfo& tick_info);
-		void tick_ready_for_field_request();
-		void tick_ready_for_fields();
+		void tick_sender_send_handshake(const TickInfo& tick_info);
+		void tick_receiver_receive_handshake(const TickInfo& tick_info);
 
+		void tick_send_fields_request();
+		void tick_receive_fields_request();
+
+		void tick_send_fields_as_message();
+		void tick_receive_fields_as_message();
+
+	  private:
 		// things we set up once on startup:
 		Mode mode = Mode::Sender;
 
@@ -129,7 +132,8 @@ namespace robotick
 
 		float mutual_tick_rate_hz = 0.0f; // gets set to minimum of receiver and sender engine's root tick-rate, on handshake
 
-		InProgressMessage in_progress_message;
+		InProgressMessage in_progress_message_in;  // seperate InProgressMessage's in case we need to send/receive...
+		InProgressMessage in_progress_message_out; // 	... both on same tick, while other is occupied.
 	};
 
 } // namespace robotick

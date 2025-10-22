@@ -229,16 +229,18 @@ namespace robotick
 			tick_ready_for_handshake(tick_info);
 		}
 
+		// TODO - make sense send a fields-message at mutual_tick_rate_hz - but once it's sent N in a row without a fields-request, it should pause
+		// (lets say N=2 for now, since in theory we should really hear back from receiver (fields-request) every tick that we send a packet)
 		if (mode == Mode::Sender)
 		{
 			// sender would expect to need to receive ready-message, then immediately send fields-data
 			if (state == State::ReadyForFieldsRequest)
 			{
-				tick_ready_for_field_request();
+				tick_receive_fields_request();
 			}
 			if (state == State::ReadyForFields)
 			{
-				tick_ready_for_fields();
+				tick_send_fields_as_message();
 			}
 		}
 		else
@@ -247,11 +249,11 @@ namespace robotick
 			// 	for next update
 			if (state == State::ReadyForFields)
 			{
-				tick_ready_for_fields();
+				tick_receive_fields_as_message();
 			}
 			if (state == State::ReadyForFieldsRequest)
 			{
-				tick_ready_for_field_request();
+				tick_send_fields_request();
 			}
 		}
 	}
@@ -390,7 +392,7 @@ namespace robotick
 								"RemoteEngineConnection::register_field()");
 		}
 
-		if (in_progress_message.is_vacant())
+		if (in_progress_message_out.is_vacant())
 		{
 			std::vector<uint8_t> payload;
 
@@ -419,13 +421,13 @@ namespace robotick
 				is_first_field = false;
 			}
 
-			in_progress_message.begin_send((uint8_t)MessageType::Subscribe, payload.data(), payload.size());
+			in_progress_message_out.begin_send((uint8_t)MessageType::Subscribe, payload.data(), payload.size());
 		}
 
 		// pump non-blocking
-		while (in_progress_message.is_occupied() && !in_progress_message.is_completed())
+		while (in_progress_message_out.is_occupied() && !in_progress_message_out.is_completed())
 		{
-			const InProgressMessage::Result r = in_progress_message.tick(socket_fd);
+			const InProgressMessage::Result r = in_progress_message_out.tick(socket_fd);
 			if (r == InProgressMessage::Result::ConnectionLost)
 			{
 				ROBOTICK_WARNING("Connection lost sending handshake from Sender");
@@ -438,9 +440,9 @@ namespace robotick
 			}
 		}
 
-		if (in_progress_message.is_completed())
+		if (in_progress_message_out.is_completed())
 		{
-			in_progress_message.vacate(); // vacate ready for next user
+			in_progress_message_out.vacate(); // vacate ready for next user
 
 			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender handshake sent with %zu field(s)", fields.size());
 			set_state(State::ReadyForFields);
@@ -461,15 +463,15 @@ namespace robotick
 			ROBOTICK_FATAL_EXIT("Receiver connection has no binder callback set before handshake");
 		}
 
-		if (in_progress_message.is_vacant())
+		if (in_progress_message_in.is_vacant())
 		{
-			in_progress_message.begin_receive();
+			in_progress_message_in.begin_receive();
 		}
 
 		// pump non-blocking
-		while (in_progress_message.is_occupied() && !in_progress_message.is_completed())
+		while (in_progress_message_in.is_occupied() && !in_progress_message_in.is_completed())
 		{
-			const InProgressMessage::Result r = in_progress_message.tick(socket_fd);
+			const InProgressMessage::Result r = in_progress_message_in.tick(socket_fd);
 			if (r == InProgressMessage::Result::ConnectionLost)
 			{
 				disconnect();
@@ -481,9 +483,9 @@ namespace robotick
 			}
 		}
 
-		if (in_progress_message.is_completed())
+		if (in_progress_message_in.is_completed())
 		{
-			auto [payload_data, payload_size] = in_progress_message.get_payload();
+			auto [payload_data, payload_size] = in_progress_message_in.get_payload();
 
 			const uint8_t* cursor = reinterpret_cast<const uint8_t*>(payload_data);
 			const uint8_t* end = cursor + payload_size;
@@ -547,7 +549,7 @@ namespace robotick
 				ROBOTICK_FATAL_EXIT("Failed to bind %zu fields - disconnecting", failed_count);
 			}
 
-			in_progress_message.vacate(); // ready for next message
+			in_progress_message_in.vacate(); // ready for next message
 
 			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE,
 				"Receiver handshake received. Bound %zu field(s) - total %zu (should be same value)",
@@ -570,103 +572,103 @@ namespace robotick
 		}
 	}
 
-	void RemoteEngineConnection::tick_ready_for_field_request()
+	void RemoteEngineConnection::tick_send_fields_request()
 	{
-		std::vector<uint8_t> ack;
+		ROBOTICK_ASSERT_MSG(mode == Mode::Receiver, "RemoteEngineConnection::tick_send_fields_request() should only be called in Mode::Receiver");
 
-		if (mode == Mode::Receiver)
+		// Send the FieldsRequest token + mutual tick-rate
+		if (in_progress_message_out.is_vacant())
 		{
-			// Send the FieldsRequest token + mutual tick-rate
-			if (in_progress_message.is_vacant())
+			float mutual_tick_rate = this->mutual_tick_rate_hz;
+			static_assert(sizeof(float) == 4, "Expected float to be 4 bytes");
+
+			std::vector<uint8_t> payload;
+			const uint8_t* p = reinterpret_cast<const uint8_t*>(&mutual_tick_rate);
+			payload.insert(payload.end(), p, p + sizeof(float));
+
+			in_progress_message_out.begin_send((uint8_t)MessageType::FieldsRequest, payload.data(), payload.size());
+		}
+
+		// enhanced pump
+		while (in_progress_message_out.is_occupied() && !in_progress_message_out.is_completed())
+		{
+			const InProgressMessage::Result tick_result = in_progress_message_out.tick(socket_fd);
+			if (tick_result == InProgressMessage::Result::ConnectionLost)
 			{
-				float mutual_tick_rate = this->mutual_tick_rate_hz;
-				static_assert(sizeof(float) == 4, "Expected float to be 4 bytes");
-
-				std::vector<uint8_t> payload;
-				const uint8_t* p = reinterpret_cast<const uint8_t*>(&mutual_tick_rate);
-				payload.insert(payload.end(), p, p + sizeof(float));
-
-				in_progress_message.begin_send((uint8_t)MessageType::FieldsRequest, payload.data(), payload.size());
+				ROBOTICK_WARNING("Connection lost sending field-request from Receiver");
+				disconnect();
+				return;
 			}
-
-			// enhanced pump
-			while (in_progress_message.is_occupied() && !in_progress_message.is_completed())
+			if (tick_result == InProgressMessage::Result::InProgress)
 			{
-				const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
-				if (tick_result == InProgressMessage::Result::ConnectionLost)
-				{
-					ROBOTICK_WARNING("Connection lost sending field-request from Receiver");
-					disconnect();
-					return;
-				}
-				if (tick_result == InProgressMessage::Result::InProgress)
-				{
-					break; // would block
-				}
-			}
-
-			if (in_progress_message.is_completed())
-			{
-				in_progress_message.vacate(); // vacate ready for next user
-				set_state(State::ReadyForFields);
+				break; // would block
 			}
 		}
-		else // Sender (receives the FieldsRequest message)
+
+		if (in_progress_message_out.is_completed())
 		{
-			if (in_progress_message.is_vacant())
-			{
-				in_progress_message.begin_receive();
-			}
-
-			while (in_progress_message.is_occupied() && !in_progress_message.is_completed())
-			{
-				const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
-				if (tick_result == InProgressMessage::Result::ConnectionLost)
-				{
-					ROBOTICK_WARNING("Connection lost receiving field-request from Receiver");
-					disconnect();
-					return;
-				}
-				if (tick_result == InProgressMessage::Result::InProgress)
-				{
-					break; // would block
-				}
-			}
-
-			if (in_progress_message.is_completed())
-			{
-				auto [payload_data, payload_size] = in_progress_message.get_payload();
-
-				float received_mutual_tick_rate_hz = 0.0f;
-				if (payload_size >= sizeof(float))
-				{
-					std::memcpy(&received_mutual_tick_rate_hz, payload_data, sizeof(float));
-					if (std::isfinite(received_mutual_tick_rate_hz) && received_mutual_tick_rate_hz > 0.0f)
-					{
-						ROBOTICK_INFO("Sender received mutual tick rate: %.2f Hz", received_mutual_tick_rate_hz);
-						this->mutual_tick_rate_hz = received_mutual_tick_rate_hz;
-					}
-					else
-					{
-						ROBOTICK_WARNING("Invalid mutual tick rate received");
-					}
-				}
-				else
-				{
-					ROBOTICK_WARNING("FieldsRequest missing mutual tick rate payload");
-				}
-
-				in_progress_message.vacate(); // vacate ready for next user
-				set_state(State::ReadyForFields);
-			}
+			in_progress_message_out.vacate(); // vacate ready for next user
+			set_state(State::ReadyForFields);
 		}
 	}
 
-	void RemoteEngineConnection::send_fields_as_message()
+	void RemoteEngineConnection::tick_receive_fields_request()
 	{
-		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::send_fields_as_message() should only be called in Mode::Sender");
+		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::tick_receive_fields_request() should only be called in Mode::Sender");
 
-		if (in_progress_message.is_vacant())
+		if (in_progress_message_in.is_vacant())
+		{
+			in_progress_message_in.begin_receive();
+		}
+
+		while (in_progress_message_in.is_occupied() && !in_progress_message_in.is_completed())
+		{
+			const InProgressMessage::Result tick_result = in_progress_message_in.tick(socket_fd);
+			if (tick_result == InProgressMessage::Result::ConnectionLost)
+			{
+				ROBOTICK_WARNING("Connection lost receiving field-request from Receiver");
+				disconnect();
+				return;
+			}
+			if (tick_result == InProgressMessage::Result::InProgress)
+			{
+				break; // would block
+			}
+		}
+
+		if (in_progress_message_in.is_completed())
+		{
+			auto [payload_data, payload_size] = in_progress_message_in.get_payload();
+
+			float received_mutual_tick_rate_hz = 0.0f;
+			if (payload_size >= sizeof(float))
+			{
+				std::memcpy(&received_mutual_tick_rate_hz, payload_data, sizeof(float));
+				if (std::isfinite(received_mutual_tick_rate_hz) && received_mutual_tick_rate_hz > 0.0f)
+				{
+					ROBOTICK_INFO("Sender received mutual tick rate: %.2f Hz", received_mutual_tick_rate_hz);
+					this->mutual_tick_rate_hz = received_mutual_tick_rate_hz;
+				}
+				else
+				{
+					ROBOTICK_WARNING("Invalid mutual tick rate received");
+				}
+			}
+			else
+			{
+				ROBOTICK_WARNING("FieldsRequest missing mutual tick rate payload");
+			}
+
+			in_progress_message_in.vacate(); // vacate ready for next user
+			set_state(State::ReadyForFields);
+		}
+	}
+
+	void RemoteEngineConnection::tick_send_fields_as_message()
+	{
+		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::tick_send_fields_as_message() should only be called in Mode::Sender");
+
+		if (in_progress_message_out.is_vacant())
 		{
 			std::vector<uint8_t> buffer;
 			for (const auto& field : fields)
@@ -677,10 +679,10 @@ namespace robotick
 				buffer.insert(buffer.end(), ptr, ptr + field.size);
 			}
 
-			in_progress_message.begin_send((uint8_t)MessageType::Fields, buffer.data(), buffer.size());
+			in_progress_message_out.begin_send((uint8_t)MessageType::Fields, buffer.data(), buffer.size());
 		}
 
-		const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
+		const InProgressMessage::Result tick_result = in_progress_message_out.tick(socket_fd);
 		if (tick_result == InProgressMessage::Result::ConnectionLost)
 		{
 			ROBOTICK_WARNING("Connection lost sending field-data from Sender");
@@ -688,24 +690,25 @@ namespace robotick
 			return;
 		}
 
-		if (in_progress_message.is_completed())
+		if (in_progress_message_out.is_completed())
 		{
-			in_progress_message.vacate(); // vacate ready for next user
+			in_progress_message_out.vacate(); // vacate ready for next user
 
 			set_state(State::ReadyForFieldsRequest);
 		}
 	}
 
-	void RemoteEngineConnection::receive_fields_as_message()
+	void RemoteEngineConnection::tick_receive_fields_as_message()
 	{
-		ROBOTICK_ASSERT_MSG(mode == Mode::Receiver, "RemoteEngineConnection::receive_fields_as_message() should only be called in Mode::Receiver");
+		ROBOTICK_ASSERT_MSG(
+			mode == Mode::Receiver, "RemoteEngineConnection::tick_receive_fields_as_message() should only be called in Mode::Receiver");
 
-		if (in_progress_message.is_vacant())
+		if (in_progress_message_in.is_vacant())
 		{
-			in_progress_message.begin_receive();
+			in_progress_message_in.begin_receive();
 		}
 
-		const InProgressMessage::Result tick_result = in_progress_message.tick(socket_fd);
+		const InProgressMessage::Result tick_result = in_progress_message_in.tick(socket_fd);
 		if (tick_result == InProgressMessage::Result::ConnectionLost)
 		{
 			ROBOTICK_WARNING("Connection lost receiving field-data from Sender");
@@ -713,22 +716,22 @@ namespace robotick
 			return;
 		}
 
-		if (!in_progress_message.is_completed())
+		if (!in_progress_message_in.is_completed())
 		{
 			// not finished yet (would block) — try again next tick
 			return;
 		}
 
 		// process message
-		auto [payload_data, payload_size] = in_progress_message.get_payload();
+		auto [payload_data, payload_size] = in_progress_message_in.get_payload();
 
 		size_t offset_into_payload = 0;
 		for (auto& field : fields)
 		{
 			if (offset_into_payload + field.size > payload_size)
 			{
-				ROBOTICK_FATAL_EXIT(
-					"RemoteEngineConnection::receive_fields_as_message() - buffer received is too small (%zu bytes) for all expected fields (%zu)",
+				ROBOTICK_FATAL_EXIT("RemoteEngineConnection::tick_receive_fields_as_message() - buffer received is too small (%zu bytes) for all "
+									"expected fields (%zu)",
 					payload_size,
 					(offset_into_payload + field.size));
 
@@ -750,42 +753,37 @@ namespace robotick
 			}
 		}
 
-		in_progress_message.vacate(); // vacate ready for next user
+		in_progress_message_in.vacate(); // vacate ready for next user
 
 		set_state(State::ReadyForFieldsRequest);
 	}
 
-	void RemoteEngineConnection::tick_ready_for_fields()
-	{
-		if (mode == Mode::Sender)
-		{
-			send_fields_as_message();
-		}
-		else
-		{
-			receive_fields_as_message();
-		}
-	}
-
 	void RemoteEngineConnection::disconnect()
 	{
-		// tick in_progress_message if occupied, to ensure we're not sending partial messages
-		constexpr int max_wait_ms = 500;
-		constexpr int tick_wait_ms = 10;
-		int total_wait_ms = 0;
-		while (socket_fd >= 0 && total_wait_ms <= max_wait_ms && in_progress_message.is_occupied() && !in_progress_message.is_completed())
+		// tick both in_progress_message's if occupied, to ensure we're not sending partial messages
+		InProgressMessage* in_progress_messages[] = {&in_progress_message_in, &in_progress_message_out};
+
+		for (InProgressMessage* in_progress_message_ptr : in_progress_messages)
 		{
-			InProgressMessage::Result result = in_progress_message.tick(socket_fd);
-			if (result == InProgressMessage::Result::ConnectionLost)
+			InProgressMessage& in_progress_message = *in_progress_message_ptr;
+
+			constexpr int max_wait_ms = 500;
+			constexpr int tick_wait_ms = 10;
+			int total_wait_ms = 0;
+			while (socket_fd >= 0 && total_wait_ms <= max_wait_ms && in_progress_message.is_occupied() && !in_progress_message.is_completed())
 			{
-				break;
+				InProgressMessage::Result result = in_progress_message.tick(socket_fd);
+				if (result == InProgressMessage::Result::ConnectionLost)
+				{
+					break;
+				}
+
+				Thread::sleep_ms(tick_wait_ms);
+				total_wait_ms += tick_wait_ms;
 			}
 
-			Thread::sleep_ms(tick_wait_ms);
-			total_wait_ms += tick_wait_ms;
+			in_progress_message.vacate();
 		}
-
-		in_progress_message.vacate();
 
 		if (socket_fd >= 0)
 			close(socket_fd);
