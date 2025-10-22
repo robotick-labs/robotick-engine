@@ -30,7 +30,6 @@ namespace robotick
 		{
 			Disconnected,
 			ReadyForHandshake,
-			ReadyForFieldsRequest,
 			ReadyForFields
 		};
 
@@ -100,11 +99,11 @@ namespace robotick
 		void tick_sender_send_handshake(const TickInfo& tick_info);
 		void tick_receiver_receive_handshake(const TickInfo& tick_info);
 
-		void tick_send_fields_request();
-		void tick_receive_fields_request();
+		void tick_send_fields_request(const bool allow_start_new);
+		bool tick_receive_fields_request();
 
-		void tick_send_fields_as_message();
-		void tick_receive_fields_as_message();
+		void tick_send_fields_as_message(const bool allow_start_new);
+		bool tick_receive_fields_as_message();
 
 	  private:
 		// things we set up once on startup:
@@ -131,6 +130,7 @@ namespace robotick
 		float time_sec_to_reconnect = 0.0f;
 
 		float mutual_tick_rate_hz = 0.0f; // gets set to minimum of receiver and sender engine's root tick-rate, on handshake
+		uint64_t ticks_until_next_send = 1;
 
 		InProgressMessage in_progress_message_in;  // seperate InProgressMessage's in case we need to send/receive...
 		InProgressMessage in_progress_message_out; // 	... both on same tick, while other is occupied.
