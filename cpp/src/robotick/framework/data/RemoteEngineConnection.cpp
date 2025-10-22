@@ -224,8 +224,6 @@ namespace robotick
 			tick_ready_for_handshake(tick_info);
 		}
 
-		// TODO - make sense send a fields-message at mutual_tick_rate_hz - but once it's sent N in a row without a fields-request, it should pause
-		// (lets say N=2 for now, since in theory we should really hear back from receiver (fields-request) every tick that we send a packet)
 		if (state == State::ReadyForFields)
 		{
 			if (mode == Mode::Sender)
@@ -401,17 +399,17 @@ namespace robotick
 		set_state(State::ReadyForHandshake);
 	}
 
-	uint32_t float_to_network_bytes(float value)
+	static inline uint32_t float_to_network_bytes(float value)
 	{
-		uint32_t as_int;
+		uint32_t as_int = 0;
 		std::memcpy(&as_int, &value, sizeof(float));
 		return htonl(as_int); // convert to network byte order (big-endian)
 	}
 
-	float network_bytes_to_float(uint32_t net_bytes)
+	static inline float network_bytes_to_float(uint32_t net_bytes)
 	{
 		uint32_t host_order = ntohl(net_bytes);
-		float value;
+		float value = 0.0f;
 		std::memcpy(&value, &host_order, sizeof(float));
 		return value;
 	}
@@ -687,7 +685,7 @@ namespace robotick
 			auto [payload_data, payload_size] = in_progress_message_in.get_payload();
 
 			float received_mutual_tick_rate_hz = 0.0f;
-			if (payload_size >= sizeof(float))
+			if (payload_size >= sizeof(uint32_t))
 			{
 				// Sender receives mutual tick-rate from the receiver here.
 				// This ensures we pace field sends appropriately, even if the sender runs faster.
