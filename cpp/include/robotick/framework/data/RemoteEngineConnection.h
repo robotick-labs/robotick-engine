@@ -95,12 +95,12 @@ namespace robotick
 
 		void tick_disconnected_sender();
 		void tick_disconnected_receiver();
-		void tick_sender_send_handshake();
-		void tick_receiver_receive_handshake_and_bind();
+		void tick_sender_send_handshake(const TickInfo& tick_info);
+		void tick_receiver_receive_handshake(const TickInfo& tick_info);
 		void send_fields_as_message();
-		void receive_into_fields();
+		void receive_fields_as_message();
 
-		void tick_ready_for_handshake();
+		void tick_ready_for_handshake(const TickInfo& tick_info);
 		void tick_ready_for_field_request();
 		void tick_ready_for_fields();
 
@@ -126,6 +126,8 @@ namespace robotick
 		State state = State::Disconnected;
 		int socket_fd = -1;
 		float time_sec_to_reconnect = 0.0f;
+
+		float mutual_tick_rate_hz = 0.0f; // gets set to minimum of receiver and sender engine's root tick-rate, on handshake
 
 		InProgressMessage in_progress_message;
 	};
