@@ -483,9 +483,9 @@ namespace robotick
 
 			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender handshake sent with %zu field(s)", fields.size());
 			set_state(State::ReadyForFields);
-			ticks_until_next_send = 1;
-			// ^- send first fields message immediately without being asked - this (together with the receiver sending its first 'ready'
-			// 		message immediately too) will result in, if both engines running at same rate, field-updates being sent every tick.
+
+			// Emit first fields-message immediately to establish mutual pacing promptly.
+			tick_send_fields_as_message(true);
 		}
 	}
 
@@ -527,7 +527,8 @@ namespace robotick
 			const uint8_t* end = cursor + payload_size;
 
 			// --- Parse float tick_rate (4 bytes) ---
-			if (payload_size < sizeof(float))
+			static_assert(sizeof(float) == 4, "Expected float to be 4 bytes");
+			if (payload_size < sizeof(uint32_t))
 			{
 				ROBOTICK_FATAL_EXIT("Handshake payload too small (%zu) to contain tick_rate", payload_size);
 			}
@@ -599,6 +600,9 @@ namespace robotick
 				fields.size());
 
 			set_state(State::ReadyForFields);
+
+			// Emit first READY immediately to establish mutual pacing promptly.
+			tick_send_fields_request(true);
 		}
 	}
 
