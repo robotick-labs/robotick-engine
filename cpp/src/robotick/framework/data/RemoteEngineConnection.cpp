@@ -515,7 +515,7 @@ namespace robotick
 			// --- Parse float tick_rate (4 bytes) ---
 			if (payload_size < sizeof(float))
 			{
-				ROBOTICK_FATAL_EXIT("Handshake payload too small (%lu) to contain tick_rate", payload_size);
+				ROBOTICK_FATAL_EXIT("Handshake payload too small (%zu) to contain tick_rate", payload_size);
 			}
 
 			float sender_tick_rate_hz = 0.0f;
