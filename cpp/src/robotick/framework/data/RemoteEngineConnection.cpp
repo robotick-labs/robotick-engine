@@ -5,6 +5,7 @@
 #include "robotick/api.h"
 #include "robotick/platform/Threading.h"
 
+#include <algorithm>
 #include <arpa/inet.h>
 #include <csignal> // For signal(), SIGPIPE, SIG_IGN
 #include <cstring>
@@ -242,7 +243,8 @@ namespace robotick
 				if (tick_receive_fields_request())
 				{
 					// start sending one now; and schedule another for "ticks_until_next_send" time
-					ticks_until_next_send = std::max((uint64_t)1, (uint64_t)(tick_info.tick_rate_hz / mutual_tick_rate_hz));
+					const float mr = (mutual_tick_rate_hz > 0.0f) ? mutual_tick_rate_hz : tick_info.tick_rate_hz;
+					ticks_until_next_send = std::max<uint64_t>(1, (uint64_t)std::floor(tick_info.tick_rate_hz / mr));
 					ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "ticks_until_next_send: %i", (int)ticks_until_next_send);
 					tick_send_fields_as_message(true);
 				}
@@ -399,6 +401,21 @@ namespace robotick
 		set_state(State::ReadyForHandshake);
 	}
 
+	uint32_t float_to_network_bytes(float value)
+	{
+		uint32_t as_int;
+		std::memcpy(&as_int, &value, sizeof(float));
+		return htonl(as_int); // convert to network byte order (big-endian)
+	}
+
+	float network_bytes_to_float(uint32_t net_bytes)
+	{
+		uint32_t host_order = ntohl(net_bytes);
+		float value;
+		std::memcpy(&value, &host_order, sizeof(float));
+		return value;
+	}
+
 	void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_info)
 	{
 		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::tick_sender_send_handshake() should only be called in Mode::Sender");
@@ -420,9 +437,10 @@ namespace robotick
 
 			const float local_sender_tick_rate_hz = tick_info.tick_rate_hz;
 			this->mutual_tick_rate_hz = local_sender_tick_rate_hz; // start off with our local tick-rate - this will get adjusted to mutual rate later
+			const uint32_t tick_rate_net = float_to_network_bytes(local_sender_tick_rate_hz);
 			payload.insert(payload.end(),
-				reinterpret_cast<const uint8_t*>(&local_sender_tick_rate_hz),
-				reinterpret_cast<const uint8_t*>(&local_sender_tick_rate_hz) + sizeof(local_sender_tick_rate_hz));
+				reinterpret_cast<const uint8_t*>(&tick_rate_net),
+				reinterpret_cast<const uint8_t*>(&tick_rate_net) + sizeof(tick_rate_net));
 
 			// add fields info:
 			bool is_first_field = true;
@@ -475,8 +493,6 @@ namespace robotick
 
 	void RemoteEngineConnection::tick_receiver_receive_handshake(const TickInfo& tick_info)
 	{
-		(void)tick_info;
-
 		ROBOTICK_ASSERT_MSG(
 			mode == Mode::Receiver, "RemoteEngineConnection::tick_receiver_receive_handshake() should only be called in Mode::Receiver");
 
@@ -518,9 +534,10 @@ namespace robotick
 				ROBOTICK_FATAL_EXIT("Handshake payload too small (%zu) to contain tick_rate", payload_size);
 			}
 
-			float sender_tick_rate_hz = 0.0f;
-			std::memcpy(&sender_tick_rate_hz, cursor, sizeof(float));
-			cursor += sizeof(float);
+			uint32_t tick_rate_net = 0;
+			std::memcpy(&tick_rate_net, cursor, sizeof(uint32_t));
+			float sender_tick_rate_hz = network_bytes_to_float(tick_rate_net);
+			cursor += sizeof(uint32_t);
 
 			// We've received the sender's tick-rate (Hz) and now compute the mutual rate.
 			// The receiver sends this mutual rate back to the sender with each field-request, locking both sides
@@ -610,8 +627,10 @@ namespace robotick
 			static_assert(sizeof(float) == 4, "Expected float to be 4 bytes");
 
 			std::vector<uint8_t> payload;
-			const uint8_t* p = reinterpret_cast<const uint8_t*>(&mutual_tick_rate);
-			payload.insert(payload.end(), p, p + sizeof(float));
+			uint32_t tick_rate_net = float_to_network_bytes(mutual_tick_rate);
+			payload.insert(payload.end(),
+				reinterpret_cast<const uint8_t*>(&tick_rate_net),
+				reinterpret_cast<const uint8_t*>(&tick_rate_net) + sizeof(tick_rate_net));
 
 			in_progress_message_out.begin_send((uint8_t)MessageType::FieldsRequest, payload.data(), payload.size());
 		}
@@ -674,7 +693,10 @@ namespace robotick
 				// This ensures we pace field sends appropriately, even if the sender runs faster.
 				// A safety measure to avoid overwhelming the receiver or clogging the pipe.
 
-				std::memcpy(&received_mutual_tick_rate_hz, payload_data, sizeof(float));
+				uint32_t tick_rate_net = 0;
+				std::memcpy(&tick_rate_net, payload_data, sizeof(uint32_t));
+				received_mutual_tick_rate_hz = network_bytes_to_float(tick_rate_net);
+
 				if (std::isfinite(received_mutual_tick_rate_hz) && received_mutual_tick_rate_hz > 0.0f)
 				{
 					ROBOTICK_INFO_IF(
