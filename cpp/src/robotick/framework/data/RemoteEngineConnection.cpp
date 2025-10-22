@@ -24,27 +24,36 @@
 //
 // RemoteEngineConnection — One-to-One Engine Data Link
 //
-// This class enables structured data exchange between two Robotick engines over TCP.
-// It handles:
-//   - Connection setup (handshake)
-//   - Field registration (sender-side)
-//   - Field binding (receiver-side)
-//   - Framed data transmission (via tick())
+// This class enables structured, rate-aware data exchange between two Robotick engines over TCP.
+// It supports real-time field updates with explicit pacing control and automatic synchronization.
+//
+// Responsibilities:
+//   - Connection setup and handshake
+//   - Field registration (Sender side)
+//   - Field binding (Receiver side)
+//   - Framed data transmission via `tick()` loop
+//   - Mutual tick-rate negotiation (prevents flooding or stalling)
+//
+// Protocol Overview:
+//   • One side acts as Sender, one as Receiver
+//   • Sender announces its tick-rate during handshake
+//   • Receiver replies with the mutual tick-rate (min of both) each fields-request
+//   • Thereafter:
+//       - Receiver sends READY (field-request) messages at mutual rate
+//       - Sender may transmit one or more FIELD messages per READY
+//       - Receiver consumes all incoming FIELDs before next READY
 //
 // Design Constraints:
-//   • Each instance connects **to or from a single remote engine**.
-//   • To support multiple peers, instantiate one sender or receiver per peer.
+//   • Each RemoteEngineConnection links exactly one sender to one receiver
+//   • To support multiple peers, instantiate multiple connections
+//   • No dynamic field mapping: all fields are fixed at startup
 //
-//   ➤ Sender: configure_sender(local_id, remote_id)
-//     - Connects to one remote receiver.
-//     - Sends a fixed set of fields.
+// Why this design?
+//   • No polling, no global clocks — just pacing via mutual tick-rate
+//   • Works even if sender runs faster than receiver (e.g. 500Hz → 30Hz)
+//   • Keeps latency low, avoids buffer overflows, enables debugging
+//   • All handshake and pacing logic happens inside `tick()`
 //
-//   ➤ Receiver: configure_receiver(local_id)
-//     - Listens for one remote sender.
-//     - Binds fields via a user-defined FieldBinder.
-//
-// This 1:1 design avoids multiplexing logic, simplifies routing, and ensures deterministic tick behavior.
-// Use the Engine or a higher-level orchestration layer to manage multiple RemoteEngineConnections.
 //
 // =================================================================================================
 
@@ -247,6 +256,10 @@ namespace robotick
 				bool any_received = false;
 				while (tick_receive_fields_as_message())
 				{
+					// Keep consuming all pending field messages before issuing a new FieldsRequest.
+					// This prevents stalling when senders burst multiple packets between ticks.
+					// Especially important if the sender is running at a higher tick-rate.
+
 					any_received = true;
 				}
 
@@ -400,7 +413,11 @@ namespace robotick
 		{
 			std::vector<uint8_t> payload;
 
-			// add tick-rate:
+			// The sender announces its local tick-rate (Hz) in the Subscribe message.
+			// The receiver will min() this with its own rate and echo the result
+			// in the first FieldsRequest — establishing a mutual tick-rate.
+			// This enables smooth pacing and avoids receiver overrun.
+
 			const float local_sender_tick_rate_hz = tick_info.tick_rate_hz;
 			this->mutual_tick_rate_hz = local_sender_tick_rate_hz; // start off with our local tick-rate - this will get adjusted to mutual rate later
 			payload.insert(payload.end(),
@@ -504,6 +521,10 @@ namespace robotick
 			float sender_tick_rate_hz = 0.0f;
 			std::memcpy(&sender_tick_rate_hz, cursor, sizeof(float));
 			cursor += sizeof(float);
+
+			// We've received the sender's tick-rate (Hz) and now compute the mutual rate.
+			// The receiver sends this mutual rate back to the sender with each field-request, locking both sides
+			// to a common pacing agreement for field updates.
 
 			const float local_receiver_tick_rate_hz = tick_info.tick_rate_hz;
 			this->mutual_tick_rate_hz = std::min(sender_tick_rate_hz, local_receiver_tick_rate_hz);
@@ -649,6 +670,10 @@ namespace robotick
 			float received_mutual_tick_rate_hz = 0.0f;
 			if (payload_size >= sizeof(float))
 			{
+				// Sender receives mutual tick-rate from the receiver here.
+				// This ensures we pace field sends appropriately, even if the sender runs faster.
+				// A safety measure to avoid overwhelming the receiver or clogging the pipe.
+
 				std::memcpy(&received_mutual_tick_rate_hz, payload_data, sizeof(float));
 				if (std::isfinite(received_mutual_tick_rate_hz) && received_mutual_tick_rate_hz > 0.0f)
 				{
