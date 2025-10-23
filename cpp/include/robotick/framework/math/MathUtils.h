@@ -20,6 +20,24 @@ namespace robotick
 		return a < b ? a : b;
 	}
 
+	template <typename T> inline T max(std::initializer_list<T> values)
+	{
+		T result = *values.begin();
+		for (T v : values)
+			if (v > result)
+				result = v;
+		return result;
+	}
+
+	template <typename T> inline T min(std::initializer_list<T> values)
+	{
+		T result = *values.begin();
+		for (T v : values)
+			if (v < result)
+				result = v;
+		return result;
+	}
+
 	template <typename T> inline T clamp(T v, T lo, T hi)
 	{
 		return v < lo ? lo : (v > hi ? hi : v);
