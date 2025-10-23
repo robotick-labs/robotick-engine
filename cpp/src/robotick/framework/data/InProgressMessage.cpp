@@ -22,7 +22,7 @@ namespace robotick
 	{
 		std::string preview;
 		size_t max_preview = 64;
-		size_t count = std::min(size, max_preview);
+		size_t count = min(size, max_preview);
 		for (size_t i = 0; i < count; ++i)
 		{
 			char c = static_cast<char>(data[i]);

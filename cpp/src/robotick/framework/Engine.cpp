@@ -89,7 +89,7 @@ namespace robotick
 			if (!workload_type)
 				ROBOTICK_FATAL_EXIT("Unknown workload type: %s", seed->type_id.get_debug_name());
 
-			const size_t align = std::max<size_t>(workload_type->alignment, alignof(std::max_align_t));
+			const size_t align = max<size_t>(workload_type->alignment, alignof(std::max_align_t));
 			workloads_cursor = (workloads_cursor + align - 1) & ~(align - 1);
 			offsets.push_back(workloads_cursor);
 			workloads_cursor += workload_type->size;

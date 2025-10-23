@@ -242,7 +242,7 @@ namespace robotick
 				{
 					// start sending one now; and schedule another for "ticks_until_next_send" time
 					const float mr = (mutual_tick_rate_hz > 0.0f) ? mutual_tick_rate_hz : tick_info.tick_rate_hz;
-					ticks_until_next_send = std::max<uint64_t>(1, (uint64_t)std::floor(tick_info.tick_rate_hz / mr));
+					ticks_until_next_send = max<uint64_t>(1, (uint64_t)std::floor(tick_info.tick_rate_hz / mr));
 					ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "ticks_until_next_send: %i", (int)ticks_until_next_send);
 					tick_send_fields_as_message(true);
 				}
@@ -543,7 +543,7 @@ namespace robotick
 			// to a common pacing agreement for field updates.
 
 			const float local_receiver_tick_rate_hz = tick_info.tick_rate_hz;
-			this->mutual_tick_rate_hz = std::min(sender_tick_rate_hz, local_receiver_tick_rate_hz);
+			this->mutual_tick_rate_hz = min(sender_tick_rate_hz, local_receiver_tick_rate_hz);
 
 			if (!std::isfinite(sender_tick_rate_hz) || sender_tick_rate_hz <= 0.0f)
 			{

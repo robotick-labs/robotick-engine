@@ -3,7 +3,7 @@
 
 #include "robotick/framework/utils/ConsoleTable.h"
 
-#include "robotick/api_base.h"
+#include "robotick/api.h"
 
 #include <algorithm>
 #include <charconv> // for std::from_chars
@@ -146,7 +146,7 @@ namespace robotick
 
 			size_t max_lines = 0;
 			for (auto& col : wrapped)
-				max_lines = std::max(max_lines, col.size());
+				max_lines = max(max_lines, col.size());
 
 			for (size_t line = 0; line < max_lines; ++line)
 			{

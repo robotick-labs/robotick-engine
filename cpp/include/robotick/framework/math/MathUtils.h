@@ -10,24 +10,24 @@
 
 namespace robotick
 {
-	inline float max(float a, float b)
+	template <typename T> inline T max(T a, T b)
 	{
 		return a > b ? a : b;
 	}
 
-	inline float min(float a, float b)
+	template <typename T> inline T min(T a, T b)
 	{
 		return a < b ? a : b;
 	}
 
-	inline float clamp(float v, float lo, float hi)
+	template <typename T> inline T clamp(T v, T lo, T hi)
 	{
 		return v < lo ? lo : (v > hi ? hi : v);
 	}
 
-	inline float clamp01(float v)
+	template <typename T> inline T clamp01(T v)
 	{
-		return clamp(v, 0.0f, 1.0f);
+		return clamp(v, T(0), T(1));
 	}
 
 	inline float lerp(float a, float b, float t)

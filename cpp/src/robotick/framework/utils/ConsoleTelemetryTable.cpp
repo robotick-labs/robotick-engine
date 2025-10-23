@@ -4,6 +4,8 @@
 #include "robotick/framework/utils/ConsoleTelemetryTable.h"
 #include "robotick/framework/utils/ConsoleTable.h"
 
+#include "robotick/api.h"
+
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
@@ -100,7 +102,7 @@ namespace robotick
 
 			size_t max_lines = 0;
 			for (const auto& col : wrapped_columns)
-				max_lines = std::max(max_lines, col.size());
+				max_lines = max(max_lines, col.size());
 
 			for (size_t i = 0; i < max_lines; ++i)
 			{

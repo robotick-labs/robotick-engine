@@ -128,7 +128,7 @@ namespace robotick
 
 				while (remaining > 0)
 				{
-					size_t chunk_size = std::min(remaining, kMaxChunkSize);
+					size_t chunk_size = min(remaining, kMaxChunkSize);
 					if (httpd_resp_send_chunk(req, data, chunk_size) != ESP_OK)
 					{
 						ROBOTICK_WARNING("WebServer - failed to send chunk");
@@ -161,7 +161,7 @@ namespace robotick
 	void WebServer::start(const char* name, uint16_t port, const char* /*unused*/, WebRequestHandler handler_in)
 	{
 		ROBOTICK_ASSERT_MSG(!is_running(), "WebServer '%s' already running", name);
-			
+
 		esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
 		if (!netif)
 		{
