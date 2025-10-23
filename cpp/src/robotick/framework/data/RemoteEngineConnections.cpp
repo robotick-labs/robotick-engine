@@ -139,11 +139,11 @@ namespace robotick
 			}
 		}
 
-		for (auto& r : dynamic_receivers)
-			r.tick(tick_info);
+		for (auto& dynamic_receiver : dynamic_receivers)
+			dynamic_receiver.tick(tick_info);
 
-		for (auto& s : senders)
-			s.tick(tick_info);
+		for (auto& sender : senders)
+			sender.tick(tick_info);
 	}
 
 } // namespace robotick

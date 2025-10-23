@@ -326,6 +326,7 @@ namespace robotick
 
 		TickInfo tick_info;
 		tick_info.workload_stats = &root_info.mutable_stats;
+		tick_info.tick_rate_hz = root_tick_rate_hz;
 
 		do
 		{
