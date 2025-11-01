@@ -79,17 +79,32 @@ namespace robotick
 		}
 
 		/**
-		 * @brief Set the buffer contents from a raw memory block
+		 * @brief Set the buffer contents from an array of elements.
 		 *
-		 * @param src Pointer to source data
-		 * @param len Number of bytes to copy
+		 * @param src Pointer to the source array of elements
+		 * @param len Number of elements to copy
 		 */
-		void set(const void* src, size_t len)
+		void set(const T* src, size_t len)
 		{
 			ROBOTICK_ASSERT(src != nullptr);
 			ROBOTICK_ASSERT(len <= capacity());
-			memcpy(data_buffer, src, len);
+			memcpy(data_buffer, src, len * sizeof(T));
 			count = len;
+		}
+
+		/**
+		 * @brief Set the buffer contents from a raw byte block.
+		 *
+		 * @param src Pointer to raw memory block
+		 * @param byte_count Number of bytes to copy (must be divisible by sizeof(T))
+		 */
+		void set_bytes(const void* src, size_t byte_count)
+		{
+			size_t element_count = byte_count / sizeof(T);
+			ROBOTICK_ASSERT(src != nullptr);
+			ROBOTICK_ASSERT(element_count <= capacity());
+			memcpy(data_buffer, src, byte_count);
+			count = element_count;
 		}
 
 		/**

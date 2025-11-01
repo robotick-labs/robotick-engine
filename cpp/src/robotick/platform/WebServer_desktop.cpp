@@ -84,7 +84,7 @@ namespace robotick
 		char buffer[1024];
 		int len = mg_read(conn, buffer, sizeof(buffer));
 		if (len > 0)
-			request.body.set(buffer, len);
+			request.body.set_bytes(buffer, len);
 
 		// Check if requested path exists as a file
 		{
