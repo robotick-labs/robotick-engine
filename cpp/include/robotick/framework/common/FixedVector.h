@@ -55,13 +55,13 @@ namespace robotick
 		constexpr bool full() const { return count == Capacity; }
 
 		/**
-		 * @brief Fills the vector to capacity, calling default constructor on any new elements
+		 * @brief Fills the vector to capacity, starting at current element
 		 */
-		void fill()
+		void fill(const T value = T{})
 		{
-			for (size_t i = count; i < Capacity; ++i)
+			for (size_t i = 0; i < Capacity; ++i)
 			{
-				data_buffer[i] = T{};
+				data_buffer[i] = value;
 			}
 
 			count = Capacity;
