@@ -7,6 +7,13 @@
 #include <stdlib.h>
 #include <string>
 
+#if defined(__linux__) || defined(__APPLE__)
+#include <cxxabi.h>
+#include <dlfcn.h>
+#include <execinfo.h>
+#include <unistd.h>
+#endif
+
 // =====================================================================
 // 🚨 BREAKPOINT + LOGGING
 // =====================================================================
@@ -43,6 +50,7 @@ inline const char* robotick_filename(const char* path)
 namespace robotick
 {
 #if defined(ROBOTICK_TEST_MODE)
+
 	class TestError : public std::exception
 	{
 	  public:
@@ -61,11 +69,67 @@ namespace robotick
 		fprintf(stderr, "\033[1;31m[ERROR] %s:%d (%s): %s\033[0m\n", robotick_filename(file), line, func, message);
 		throw TestError(message);
 	}
-#else
+
+#else // === normal (non‑test) mode ===
+
 	inline void report_error(const char* message, const char* file, int line, const char* func)
 	{
 		ROBOTICK_BREAKPOINT();
+
 		fprintf(stderr, "\033[1;31m[ERROR] %s:%d (%s): %s\033[0m\n", robotick_filename(file), line, func, message);
+
+#if defined(__linux__) || defined(__APPLE__)
+		void* callstack[64];
+		const int frames = backtrace(callstack, 64);
+
+		fprintf(stderr, "Callstack:\n");
+
+		for (int i = 1; i < frames; ++i) // skip report_error itself
+		{
+			Dl_info info{};
+			if (dladdr(callstack[i], &info) && info.dli_sname)
+			{
+				int status = 0;
+				const char* symname = info.dli_sname;
+				char* demangled = abi::__cxa_demangle(symname, nullptr, nullptr, &status);
+				const char* pretty = (status == 0 && demangled) ? demangled : symname;
+
+				// Print frame info
+				fprintf(stderr, "  [%02d] %s\n", i, pretty);
+
+				// Try to resolve file + line via addr2line
+				if (info.dli_fname)
+				{
+					char cmd[512];
+					snprintf(cmd, sizeof(cmd), "addr2line -e %s -f -p %p 2>/dev/null", info.dli_fname, callstack[i]);
+					FILE* fp = popen(cmd, "r");
+					if (fp)
+					{
+						char buf[512];
+						if (fgets(buf, sizeof(buf), fp))
+						{
+							// addr2line outputs: func (file:line)
+							size_t len = strlen(buf);
+							if (len && buf[len - 1] == '\n')
+								buf[len - 1] = 0;
+							fprintf(stderr, "        ↳ %s\n", buf);
+						}
+						pclose(fp);
+					}
+				}
+				if (demangled)
+					free(demangled);
+			}
+			else
+			{
+				fprintf(stderr, "  [%02d] (unresolved @ %p)\n", i, callstack[i]);
+			}
+		}
+#else
+		fprintf(stderr, "(Callstack not supported on this platform)\n");
+#endif
+
+		fflush(stderr);
 		exit(1);
 	}
 #endif

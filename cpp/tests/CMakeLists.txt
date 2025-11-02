@@ -44,14 +44,6 @@ endif()
 # Build test executable
 add_executable(robotick_engine_tests ${ROBOTICK_TEST_SOURCES})
 
-# AddressSanitizer (optional runtime debug support)
-# Uncomment to enable memory error detection during testing (impacts performance)
-# if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-#   message(STATUS "🔎 Enabling AddressSanitizer for robotick_engine_tests")
-#   target_compile_options(robotick_engine_tests PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-#   target_link_options(robotick_engine_tests PRIVATE -fsanitize=address)
-# endif()
-
 # Link against core framework and Catch2
 target_link_libraries(robotick_engine_tests
   PRIVATE
