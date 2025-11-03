@@ -42,7 +42,7 @@ namespace robotick
 		/**
 		 * @brief Returns the maximum capacity of the vector.
 		 */
-		constexpr size_t capacity() const { return Capacity; }
+		static constexpr size_t capacity() { return Capacity; }
 
 		/**
 		 * @brief Checks if the vector is empty.
