@@ -175,7 +175,8 @@ namespace robotick
 		 */
 		T& operator[](size_t index)
 		{
-			ROBOTICK_ASSERT(index < count);
+			ROBOTICK_ASSERT_MSG(index < Capacity, "Indexing beyond Capacity (non-const [] accessor)");
+			ROBOTICK_ASSERT_MSG(index < count, "Indexing beyond current size of %u (non-const [] accessor)", count);
 			return data_buffer[index];
 		}
 
@@ -184,7 +185,8 @@ namespace robotick
 		 */
 		const T& operator[](size_t index) const
 		{
-			ROBOTICK_ASSERT(index < count);
+			ROBOTICK_ASSERT_MSG(index < Capacity, "Indexing beyond Capacity (const [] accessor)");
+			ROBOTICK_ASSERT_MSG(index < count, "Indexing beyond current size of %u (const [] accessor)", count);
 			return data_buffer[index];
 		}
 
