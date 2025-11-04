@@ -273,7 +273,7 @@ namespace robotick
 		}
 
 		res.body.clear();
-		res.body.append_from_string_format("{\"self_ms\":%.2f,\"dt_ms\":%.2f,\"goal_ms\":%.1f}",
+		res.body.append_from_string_format("{\"self_ms\":%f,\"dt_ms\":%f,\"goal_ms\":%f}",
 			info->mutable_stats.get_last_tick_duration_ms(),
 			info->mutable_stats.get_last_time_delta_ms(),
 			(info->seed->tick_rate_hz > 0.0) ? (1000.0f / info->seed->tick_rate_hz) : -1.0f);
