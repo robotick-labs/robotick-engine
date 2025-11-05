@@ -25,6 +25,16 @@ namespace robotick
 	{
 	  public:
 		/**
+		 * @brief FixedVector constructor
+		 * @param initial_size The size to initialize the vector to (defaults to zero)
+		 */
+		FixedVector(const size_t initial_size = 0)
+		{
+			ROBOTICK_ASSERT_MSG((initial_size <= capacity()), "FixedVector::FixedVector() - initial_size exceeds capacity");
+			count = initial_size;
+		}
+
+		/**
 		 * @brief Sets the current size of the vector. Use with care.
 		 *        Caller must ensure the corresponding elements are initialized.
 		 */
@@ -74,7 +84,7 @@ namespace robotick
 		 */
 		void add(const T& value)
 		{
-			ROBOTICK_ASSERT(count < Capacity && "FixedVector overflow");
+			ROBOTICK_ASSERT_MSG(count < Capacity, "FixedVector::add() - overflow");
 			data_buffer[count++] = value;
 		}
 
