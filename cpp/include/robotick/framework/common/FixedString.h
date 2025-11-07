@@ -104,6 +104,24 @@ namespace robotick
 				data[0] = '\0';
 			}
 		}
+
+		template <typename... Args> void appendf(const char* fmt, Args&&... args)
+		{
+			const size_t current_len = strlen(data);
+			const size_t remaining = (N > current_len) ? N - current_len : 0;
+
+			if (remaining > 0)
+			{
+				const int written = std::snprintf(data + current_len, remaining, fmt, std::forward<Args>(args)...);
+
+				// If snprintf wrote something and didn't overflow, we're fine.
+				if (written < 0 || static_cast<size_t>(written) >= remaining)
+				{
+					// Truncate on error or overflow
+					data[N - 1] = '\0';
+				}
+			}
+		}
 	};
 
 	template <size_t N> inline size_t hash(const FixedString<N>& s)
