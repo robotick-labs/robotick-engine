@@ -64,8 +64,9 @@ namespace robotick
 		{
 		}
 
-		void set(bool value = true) { flag.store(value); }
-		bool is_set() const { return flag.load(); }
+		inline void set(bool value = true) { flag.store(value); }
+		inline void unset() { flag.store(false); }
+		inline bool is_set() const { return flag.load(); }
 
 	  private:
 		std::atomic<bool> flag{false};

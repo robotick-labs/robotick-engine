@@ -122,6 +122,26 @@ namespace robotick
 				}
 			}
 		}
+
+		void append(const char* text)
+		{
+			if (!text)
+			{
+				return;
+			}
+
+			const size_t current_len = strlen(data);
+			const size_t remaining = (N > current_len) ? N - current_len : 0;
+
+			if (remaining > 1)
+			{
+				const size_t text_len = strlen(text);
+				const size_t copy_len = (text_len < remaining - 1) ? text_len : remaining - 1;
+
+				memcpy(data + current_len, text, copy_len);
+				data[current_len + copy_len] = '\0';
+			}
+		}
 	};
 
 	template <size_t N> inline size_t hash(const FixedString<N>& s)
