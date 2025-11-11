@@ -115,6 +115,31 @@ namespace robotick
 			httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
 			httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 
+			// Add any custom headers
+			for (const auto& header : response.headers)
+			{
+				if (!header.empty())
+				{
+					const char* colon = std::strchr(header.c_str(), ':');
+					if (colon && colon != header.c_str())
+					{
+						const size_t key_len = static_cast<size_t>(colon - header.c_str());
+						const char* key = header.c_str();
+						const char* value = colon + 1;
+
+						// Skip leading space in value if present
+						while (*value == ' ')
+						{
+							value++;
+						}
+
+						char key_buf[256] = {};
+						std::memcpy(key_buf, key, std::min(key_len, sizeof(key_buf) - 1));
+						httpd_resp_set_hdr(req, key_buf, value);
+					}
+				}
+			}
+
 			static constexpr size_t kMaxChunkSize = 1024;
 
 			if (response.body.size() <= kMaxChunkSize)

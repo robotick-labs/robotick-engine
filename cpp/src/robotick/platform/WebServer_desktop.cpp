@@ -111,14 +111,27 @@ namespace robotick
 				"HTTP/1.1 %d OK\r\n"
 				"Access-Control-Allow-Origin: *\r\n"
 				"Access-Control-Allow-Headers: Content-Type\r\n"
-				"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+				"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n",
+				response.status_code);
+
+			// Write any custom headers stored in FixedVector
+			for (const auto& header : response.headers)
+			{
+				if (!header.empty())
+				{
+					mg_printf(conn, "%s\r\n", header.c_str());
+				}
+			}
+
+			// Final required headers
+			mg_printf(conn,
 				"Content-Type: %s\r\n"
 				"Content-Length: %zu\r\n"
 				"\r\n",
-				response.status_code,
 				response.content_type.c_str(),
 				response.body.size());
 
+			// Write response body
 			mg_write(conn, response.body.data(), response.body.size());
 
 			constexpr bool verbose_http = false;

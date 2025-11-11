@@ -21,8 +21,15 @@ namespace robotick
 		std::is_standard_layout<TypeName>::value, #TypeName " is not standard layout. Only standard layout types can be registered as primitives."); \
 	static_assert(std::is_trivially_copyable<TypeName>::value,                                                                                       \
 		#TypeName " is not trivially copyable. Only trivially copyable items can be registered as primitive types.");                                \
-	static constexpr ::robotick::TypeDescriptor s_type_desc_##TypeName = {                                                                           \
-		#TypeName, GET_TYPE_ID(TypeName), sizeof(TypeName), alignof(TypeName), ::robotick::TypeCategory::Primitive, {}, ToStringFn, FromStringFn};   \
+	static constexpr ::robotick::TypeDescriptor s_type_desc_##TypeName = {#TypeName,                                                                 \
+		GET_TYPE_ID(TypeName),                                                                                                                       \
+		sizeof(TypeName),                                                                                                                            \
+		alignof(TypeName),                                                                                                                           \
+		::robotick::TypeCategory::Primitive,                                                                                                         \
+		{},                                                                                                                                          \
+		ToStringFn,                                                                                                                                  \
+		FromStringFn,                                                                                                                                \
+		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_auto_register_##TypeName(s_type_desc_##TypeName);
 
 /// @brief Macros to register Structs:
@@ -46,6 +53,7 @@ namespace robotick
 		::robotick::TypeCategory::Struct,                                                                                                            \
 		{&s_struct_desc_##StructType},                                                                                                               \
 		nullptr,                                                                                                                                     \
+		nullptr,                                                                                                                                     \
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##StructType(s_type_desc_##StructType);
 
@@ -62,6 +70,7 @@ namespace robotick
 		alignof(TypeName),                                                                                                                           \
 		::robotick::TypeCategory::DynamicStruct,                                                                                                     \
 		{&s_dynamic_struct_desc_##TypeName},                                                                                                         \
+		nullptr,                                                                                                                                     \
 		nullptr,                                                                                                                                     \
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##TypeName(s_type_desc_##TypeName);
@@ -84,6 +93,7 @@ namespace robotick
 		alignof(WorkloadTypeName),                                                                                                                   \
 		::robotick::TypeCategory::Workload,                                                                                                          \
 		{&s_workload_desc_##WorkloadTypeName},                                                                                                       \
+		nullptr,                                                                                                                                     \
 		nullptr,                                                                                                                                     \
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##WorkloadTypeName(s_type_desc_##WorkloadTypeName);                                         \

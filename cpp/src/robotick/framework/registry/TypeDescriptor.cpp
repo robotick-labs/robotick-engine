@@ -18,7 +18,8 @@ namespace robotick
 		TypeCategory::Primitive,
 		{},		 // .workload_desc etc. unused for primitives
 		nullptr, // .to_string
-		nullptr	 // .from_string
+		nullptr, // .from_string
+		nullptr	 // meta
 	};
 
 	void* FieldDescriptor::get_data_ptr(void* container_ptr) const

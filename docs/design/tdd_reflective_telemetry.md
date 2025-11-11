@@ -7,7 +7,7 @@
 
 ## Summary
 
-**Reflective Telemetry** provides a compact, binary representation of live engine state in Robotick, accompanied by a runtime-generated schema registry that describes the layout, types, and semantic meaning of each field within every workload & child data-structure. This approach allows structured, efficient, and introspectable telemetry over local or remote links, without relying on fragile JSON marshalling or hardcoded formats.
+**Reflective Telemetry** provides a compact, binary representation of live engine state in Robotick, accompanied by a runtime-generated layout registry that describes the layout, types, and semantic meaning of each field within every workload & child data-structure. This approach allows structured, efficient, and introspectable telemetry over local or remote links, without relying on fragile JSON marshalling or hardcoded formats.
 
 ---
 
@@ -28,7 +28,7 @@
 - Already core part of the Robotick Engine - this is a flat binary buffer containing all workload `config`, `inputs`, and `outputs`.
 - Fixed offsets per field, no runtime packing — layout is statically known per-session.
 
-### 2. **Schema Registry**
+### 2. **Layout Registry**
 
 - Accompanies the buffer, served once per engine session.
 - Declares:
@@ -42,7 +42,7 @@
 ### 3. **Session Awareness**
 
 - Both Engine and Web UI sessions may restart independently.
-- Clients must re-fetch the schema if `engine_session_id` changes. This is reported in both the binary-buffer transmission headers and schema’s own metadata.
+- Clients must re-fetch the layout if `engine_session_id` changes. This is reported in both the binary-buffer transmission headers and layout’s own metadata.
 
 ### 4. **Semantic Tags**
 
@@ -54,7 +54,7 @@
 
 ---
 
-## Example Schema
+## Example Layout Info
 
 ```json
 {
@@ -116,7 +116,7 @@
 ### UI Testbed:
 
 - `/reflective/raw` returns full buffer (`application/octet-stream`)
-- `/reflective/schema` returns JSON schema registry
+- `/reflective/layout` returns JSON layout registry
 - `reflective_face_debug.html`:
   - Shows scalar fields
   - Renders PNG from buffer as live thumbnail
@@ -125,10 +125,10 @@
 
 ## Roadmap
 
-- [ ] Define schema registry and field type system
-- [ ] Implement `/reflective/raw` and `/reflective/schema` endpoints in Hub
+- [ ] Define layout registry and field type system
+- [ ] Implement `/reflective/raw` and `/reflective/layout` endpoints in Hub
 - [ ] Add workload registration support for `meta` tags
-- [ ] Build web client that can parse buffer using schema
+- [ ] Build web client that can parse buffer using layout
 - [ ] Verify live image display for `FaceDisplayWorkload`
 - [ ] Extend support to audio fields (`audio/pcm`, `sample-rate` tag, etc.)
 - [ ] Generalise tooling to support all workloads
@@ -137,7 +137,7 @@
 
 ## Future Directions
 
-- Binary schema support (e.g. for embedded JS parsers)
+- Binary layout support (e.g. for embedded JS parsers)
 - Streamed updates via WebSocket
 - Timeline-based recording and playback
 - Tooling to diff field values over time or between robots

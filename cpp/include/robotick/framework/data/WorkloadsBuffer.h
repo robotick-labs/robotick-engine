@@ -21,7 +21,11 @@ namespace robotick
 		RawBuffer() = default;
 		RawBuffer(RawBuffer&&) noexcept = default;
 
-		explicit RawBuffer(size_t size) : size(size) { allocate_aligned(size); }
+		explicit RawBuffer(size_t size)
+			: size(size)
+		{
+			allocate_aligned(size);
+		}
 
 		// delete all copy / move options - use create_mirror_from() instead
 		RawBuffer(const RawBuffer&) = delete;
@@ -123,6 +127,12 @@ namespace robotick
 	{
 	  public:
 		using RawBuffer::RawBuffer; // inherit base-class constructors
+
+		void set_size_used(const size_t value) { size_used = value; }
+		size_t get_size_used() const { return size_used; };
+
+	  private:
+		size_t size_used = 0;
 	};
 
 } // namespace robotick

@@ -36,11 +36,31 @@ namespace robotick
 		}
 	};
 
+	struct WebResponseCode
+	{
+		static constexpr int OK = 200;
+		static constexpr int Created = 201;
+		static constexpr int NoContent = 204;
+
+		static constexpr int BadRequest = 400;
+		static constexpr int Unauthorized = 401;
+		static constexpr int Forbidden = 403;
+		static constexpr int NotFound = 404;
+
+		static constexpr int MethodNotAllowed = 405;
+		static constexpr int Conflict = 409;
+
+		static constexpr int InternalServerError = 500;
+		static constexpr int NotImplemented = 501;
+		static constexpr int ServiceUnavailable = 503;
+	};
+
 	struct WebResponse
 	{
 		WebResponseBodyBuffer body;
 		FixedString32 content_type = "text/plain"; // Default
-		int status_code = 404;					   // Default: NotFound (intuituve - meaning it's not been handled)
+		FixedVector<FixedString256, 64> headers;
+		int status_code = WebResponseCode::NotFound; // Default: NotFound (intuituve - meaning it's not been handled)
 	};
 
 	using WebRequestHandler = std::function<bool(const WebRequest&, WebResponse&)>;

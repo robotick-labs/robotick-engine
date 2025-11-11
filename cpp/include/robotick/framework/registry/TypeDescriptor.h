@@ -149,6 +149,9 @@ namespace robotick
 		// Parses string and stores result in out_data.
 		FromStringFn from_string = nullptr;
 
+		// http-style metadata - e.g. "img/png" (optional)
+		StringView meta;
+
 		// --- misc helpers: ---
 		const WorkloadDescriptor* get_workload_desc() const
 		{

@@ -161,6 +161,9 @@ namespace robotick
 			bind_blackboards_for_instances(state->instances, start);
 		}
 
+		ROBOTICK_INFO("workloads_cursor: %zu", workloads_cursor);
+		state->workloads_buffer.set_size_used(workloads_cursor);
+
 		// post-blackboard-setup config pass:
 		for (size_t i = 0; i < seeds.size(); ++i)
 		{
@@ -377,6 +380,11 @@ namespace robotick
 	bool Engine::is_running() const
 	{
 		return state && state->is_running;
+	}
+
+	const char* Engine::get_model_name() const
+	{
+		return (state != nullptr && state->model != nullptr) ? state->model->get_model_name() : "model_not_set";
 	}
 
 	const WorkloadInstanceInfo* Engine::get_root_instance_info() const

@@ -197,7 +197,15 @@ namespace robotick
 	template <size_t N> static constexpr TypeDescriptor make_fixed_string_desc(const char* name)
 	{
 		using FS = FixedString<N>;
-		return {name, TypeId(name), sizeof(FS), alignof(FS), TypeCategory::Primitive, {}, &fixed_string_to_string<N>, &fixed_string_from_string<N>};
+		return {name,
+			TypeId(name),
+			sizeof(FS),
+			alignof(FS),
+			TypeCategory::Primitive,
+			{},
+			&fixed_string_to_string<N>,
+			&fixed_string_from_string<N>,
+			"text/plain"};
 	}
 
 #define REGISTER_FIXED_STRING(N)                                                                                                                     \

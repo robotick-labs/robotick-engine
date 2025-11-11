@@ -27,7 +27,6 @@ namespace robotick
 	  public: // main api accessors
 		Engine();
 		~Engine();
-
 		void load(const Model& model);
 
 		// The stop_flag must outlive this call. Do not pass temporaries.
@@ -36,6 +35,8 @@ namespace robotick
 		void run(const AtomicFlag&&) = delete; // cause compile-error if a temporary is used
 
 		bool is_running() const;
+
+		const char* get_model_name() const;
 
 	  public: // internal public accessors
 		const WorkloadInstanceInfo* get_root_instance_info() const;

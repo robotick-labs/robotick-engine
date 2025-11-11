@@ -108,11 +108,12 @@ namespace robotick
 		 * @param src Pointer to raw memory block
 		 * @param byte_count Number of bytes to copy (must be divisible by sizeof(T))
 		 */
-		void set_bytes(const void* src, size_t byte_count)
+		void set_bytes(const void* src, size_t const byte_count)
 		{
-			size_t element_count = byte_count / sizeof(T);
+			const size_t element_count = byte_count / sizeof(T);
 			ROBOTICK_ASSERT(src != nullptr);
-			ROBOTICK_ASSERT(element_count <= capacity());
+			ROBOTICK_ASSERT_MSG(
+				element_count <= capacity(), "Too many elements (%zu - %zu bytes) provided - capacity is %zu", element_count, byte_count, capacity());
 			memcpy(data_buffer, src, byte_count);
 			count = element_count;
 		}
