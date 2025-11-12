@@ -485,7 +485,7 @@ namespace robotick
 			if (field.type_id == GET_TYPE_ID(Blackboard))
 			{
 				Blackboard& blackboard = field.get_data<Blackboard>(state->workloads_buffer, instance, struct_type_desc, struct_offset);
-				blackboard.bind(blackboard_storage_offset);
+				blackboard.bind(state->workloads_buffer, blackboard_storage_offset);
 			}
 		}
 	}

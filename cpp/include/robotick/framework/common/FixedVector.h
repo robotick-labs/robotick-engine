@@ -128,7 +128,7 @@ namespace robotick
 		{
 			ROBOTICK_ASSERT(value != nullptr);
 
-			const size_t len = strlen(value) + 1; // include null terminator
+			const size_t len = strlen(value);
 			ROBOTICK_ASSERT(len <= capacity());
 
 			memcpy(data_buffer, value, len);

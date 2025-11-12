@@ -142,15 +142,7 @@ namespace robotick
 
 		TypeCategoryDesc type_category_desc{};
 
-		// Converts data to string form, writing to buffer. Null-terminated.
-		// Returns true if successful.
-		ToStringFn to_string = nullptr;
-
-		// Parses string and stores result in out_data.
-		FromStringFn from_string = nullptr;
-
-		// http-style metadata - e.g. "img/png" (optional)
-		StringView meta;
+		StringView meta; // http-style metadata - e.g. "img/png" (optional)
 
 		// --- misc helpers: ---
 		const WorkloadDescriptor* get_workload_desc() const
@@ -165,17 +157,8 @@ namespace robotick
 			return (type_category == TypeCategory::DynamicStruct ? type_category_desc.dynamic_struct_desc : nullptr);
 		}
 
-		// --- templated string helpers: ---
-
-		template <typename TData, typename TString> inline bool to_string_typed(const TData& value, TString& output) const
-		{
-			return to_string(&value, output.str(), output.capacity());
-		}
-
-		template <typename TData, typename TString> inline bool from_string_typed(const TString& input, TData& out_value) const
-		{
-			return from_string(input.c_str(), &out_value);
-		}
+		bool to_string(const void* value_ptr, char* out, size_t max_len) const;
+		bool from_string(const char* input, void* out_value) const;
 	};
 
 	extern const TypeDescriptor s_type_desc_void;

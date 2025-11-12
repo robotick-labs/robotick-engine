@@ -29,7 +29,7 @@ namespace robotick
 			blackboard_ptr->initialize_fields(fields);
 #
 			size_t datablock_offset = sizeof(Blackboard);
-			blackboard_ptr->bind(datablock_offset);
+			blackboard_ptr->bind(buffer, datablock_offset);
 
 			ROBOTICK_ASSERT_MSG(datablock_offset == total_size, "Datablock-offset pointer should have been incremented ready for next blackboard");
 

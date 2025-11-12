@@ -16,10 +16,8 @@ namespace robotick
 		0,
 		1,
 		TypeCategory::Primitive,
-		{},		 // .workload_desc etc. unused for primitives
-		nullptr, // .to_string
-		nullptr, // .from_string
-		nullptr	 // meta
+		{},		// .workload_desc etc. unused for primitives
+		nullptr // meta
 	};
 
 	void* FieldDescriptor::get_data_ptr(void* container_ptr) const
@@ -67,6 +65,134 @@ namespace robotick
 		}
 
 		return nullptr;
+	}
+
+	// to / from string functions - these are placeholder while I decide whether to generalise per-type, or otherwise
+	// (they used to be registered with the types, but it got rather messy, and only really appropriate to primitive types anyway)
+	// (currently used by (1) configuring workloads from yaml-config (2) mqtt i/o)
+
+	bool TypeDescriptor::to_string(const void* value_ptr, char* out, size_t max_len) const
+	{
+		if (!value_ptr || !out || max_len == 0)
+		{
+			return false;
+		}
+
+		if (name == "float")
+		{
+			return std::snprintf(out, max_len, "%g", *reinterpret_cast<const float*>(value_ptr)) > 0;
+		}
+		if (name == "double")
+		{
+			return std::snprintf(out, max_len, "%g", *reinterpret_cast<const double*>(value_ptr)) > 0;
+		}
+		if (name == "bool")
+		{
+			return std::snprintf(out, max_len, "%s", (*reinterpret_cast<const bool*>(value_ptr)) ? "true" : "false") > 0;
+		}
+		if (name == "int")
+		{
+			return std::snprintf(out, max_len, "%d", *reinterpret_cast<const int*>(value_ptr)) > 0;
+		}
+		if (name == "uint16_t")
+		{
+			return std::snprintf(out, max_len, "%u", *reinterpret_cast<const uint16_t*>(value_ptr)) > 0;
+		}
+		if (name == "uint32_t")
+		{
+			return std::snprintf(out, max_len, "%u", *reinterpret_cast<const uint32_t*>(value_ptr)) > 0;
+		}
+		if (meta == "text/plain")
+		{
+			const char* text = reinterpret_cast<const char*>(value_ptr);
+			const size_t len = ::strnlen(text, max_len);
+			std::memcpy(out, text, len);
+			if (len < max_len)
+			{
+				out[len] = '\0';
+			}
+			return true;
+		}
+
+		// fallback
+		return false;
+	}
+
+	inline bool case_insensitive_equals(const char* a, const char* b)
+	{
+		if (!a || !b)
+		{
+			return false;
+		}
+
+		while (*a && *b)
+		{
+			if (std::tolower(static_cast<unsigned char>(*a)) != std::tolower(static_cast<unsigned char>(*b)))
+			{
+				return false;
+			}
+			++a;
+			++b;
+		}
+
+		return *a == *b;
+	}
+
+	bool TypeDescriptor::from_string(const char* input, void* out_value) const
+	{
+		if (!input || !out_value)
+		{
+			ROBOTICK_FATAL_EXIT("!");
+			return false;
+		}
+
+		if (name == "float")
+		{
+			return std::sscanf(input, "%f", reinterpret_cast<float*>(out_value)) == 1;
+		}
+		if (name == "double")
+		{
+			return std::sscanf(input, "%lf", reinterpret_cast<double*>(out_value)) == 1;
+		}
+		if (name == "bool")
+		{
+			if ((std::strcmp(input, "1") == 0) || case_insensitive_equals(input, "true"))
+			{
+				*reinterpret_cast<bool*>(out_value) = true;
+			}
+			else if ((std::strcmp(input, "0") == 0) || case_insensitive_equals(input, "false"))
+			{
+				*reinterpret_cast<bool*>(out_value) = false;
+			}
+			else
+			{
+				ROBOTICK_FATAL_EXIT("Invalid boolean string: %s", input);
+				return false;
+			}
+
+			return true;
+		}
+		if (name == "int")
+		{
+			return std::sscanf(input, "%d", reinterpret_cast<int*>(out_value)) == 1;
+		}
+		if (name == "uint16_t")
+		{
+			return std::sscanf(input, "%hu", reinterpret_cast<uint16_t*>(out_value)) == 1;
+		}
+		if (name == "uint32_t")
+		{
+			return std::sscanf(input, "%u", reinterpret_cast<uint32_t*>(out_value)) == 1;
+		}
+		if (meta == "text/plain")
+		{
+			std::strncpy(reinterpret_cast<char*>(out_value), input, size);
+			return true;
+		}
+
+		// fallback
+		ROBOTICK_FATAL_EXIT("!");
+		return false;
 	}
 
 } // namespace robotick

@@ -86,7 +86,7 @@ namespace robotick
 		}
 
 	  public: // non-API accessors - used for setup and lower-level querying of Blackboard
-		void bind(size_t& datablock_offset);
+		void bind(const WorkloadsBuffer& workloads_buffer, size_t& datablock_offset_in_workloads_buffer);
 
 		const StructDescriptor& get_struct_descriptor() const { return info.struct_descriptor; };
 		const BlackboardInfo& get_info() const { return info; };

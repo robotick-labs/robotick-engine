@@ -131,6 +131,21 @@ namespace robotick
 		void set_size_used(const size_t value) { size_used = value; }
 		size_t get_size_used() const { return size_used; };
 
+		bool contains_object_used_space(const uint8_t* query_ptr, const size_t query_size) const
+		{
+			const uint8_t* buffer_start = raw_ptr();
+			const uint8_t* buffer_end = raw_ptr() + get_size_used();
+
+			// Object lies entirely inside the buffer, inclusive of the last byte.
+			// NB: Allow zero-sized objects while avoiding overflow.
+			return (query_ptr >= buffer_start) && (query_size <= get_size_used()) && (query_ptr + query_size <= buffer_end);
+		}
+
+		bool contains_object_used_space(const void* query_ptr, const size_t query_size) const
+		{
+			return contains_object_used_space(static_cast<const uint8_t*>(query_ptr), query_size);
+		}
+
 	  private:
 		size_t size_used = 0;
 	};
