@@ -111,7 +111,8 @@ namespace robotick
 				"HTTP/1.1 %d OK\r\n"
 				"Access-Control-Allow-Origin: *\r\n"
 				"Access-Control-Allow-Headers: Content-Type\r\n"
-				"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n",
+				"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+				"Access-Control-Expose-Headers: X-Robotick-Session-Id\r\n",
 				response.status_code);
 
 			// Write any custom headers stored in FixedVector

@@ -277,7 +277,7 @@ namespace robotick
 
 		// Attach the session ID as a custom response header
 		FixedString256 session_header;
-		session_header.format("X-Robotick-Session-ID:%s", get_session_id());
+		session_header.format("X-Robotick-Session-Id:%s", get_session_id());
 		res.headers.add(session_header);
 	}
 

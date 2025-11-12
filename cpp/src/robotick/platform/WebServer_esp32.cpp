@@ -114,6 +114,7 @@ namespace robotick
 			httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
 			httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
 			httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+			httpd_resp_set_hdr(req, "Access-Control-Expose-Headers", "X-Robotick-Session-Id");
 
 			// Add any custom headers
 			for (const auto& header : response.headers)
