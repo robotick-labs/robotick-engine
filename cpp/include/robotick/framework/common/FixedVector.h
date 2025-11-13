@@ -236,7 +236,7 @@ namespace robotick
 		 */
 		const T* data() const { return &data_buffer[0]; };
 
-	  private:
+	  public:
 		T data_buffer[Capacity]{}; ///< Underlying storage.
 		uint32_t count = 0;		   ///< Current number of elements.
 	};
@@ -250,5 +250,14 @@ namespace robotick
 	using FixedVector64k = FixedVector<uint8_t, 64 * 1024>;
 	using FixedVector128k = FixedVector<uint8_t, 128 * 1024>;
 	using FixedVector256k = FixedVector<uint8_t, 256 * 1024>;
+
+	// Reusable macro for registering a FixedVector<T, N> style struct
+	// 	usage: ROBOTICK_REGISTER_FIXED_VECTOR(MyVecType, element_type)
+
+#define ROBOTICK_REGISTER_FIXED_VECTOR(StructType, ElementType)                                                                                      \
+	ROBOTICK_REGISTER_STRUCT_BEGIN(StructType)                                                                                                       \
+	ROBOTICK_STRUCT_FIXED_ARRAY_FIELD(StructType, ElementType, StructType::capacity(), data_buffer)                                                  \
+	ROBOTICK_STRUCT_FIELD(StructType, uint32_t, count)                                                                                               \
+	ROBOTICK_REGISTER_STRUCT_END(StructType)
 
 } // namespace robotick

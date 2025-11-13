@@ -103,6 +103,7 @@ namespace robotick
 				hash.update_cstring(field.name.c_str());
 				hash.update(field.type_id.value);
 				hash.update(field.offset_within_container);
+				hash.update(field.element_count);
 			}
 		}
 
@@ -142,9 +143,9 @@ namespace robotick
 		type_json["alignment"] = type_desc->alignment;
 		type_json["type_category"] = type_desc->type_category;
 
-		if (!type_desc->meta.empty())
+		if (!type_desc->mime_type.empty())
 		{
-			type_json["meta"] = type_desc->meta.c_str();
+			type_json["mime_type"] = type_desc->mime_type.c_str();
 		}
 
 		const DynamicStructDescriptor* dynamic_struct_desc = type_desc->get_dynamic_struct_desc();
@@ -171,6 +172,7 @@ namespace robotick
 				field_json["name"] = field_desc.name;
 				field_json["offset_within_container"] = static_cast<int>(field_desc.offset_within_container);
 				field_json["type"] = get_type_name(*field_type, field_data_ptr);
+				field_json["element_count"] = static_cast<int>(field_desc.element_count);
 
 				type_json["fields"].push_back(field_json);
 

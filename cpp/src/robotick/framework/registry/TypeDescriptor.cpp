@@ -17,7 +17,7 @@ namespace robotick
 		1,
 		TypeCategory::Primitive,
 		{},		// .workload_desc etc. unused for primitives
-		nullptr // meta
+		nullptr // mime_type
 	};
 
 	void* FieldDescriptor::get_data_ptr(void* container_ptr) const
@@ -65,57 +65,6 @@ namespace robotick
 		}
 
 		return nullptr;
-	}
-
-	// to / from string functions - these are placeholder while I decide whether to generalise per-type, or otherwise
-	// (they used to be registered with the types, but it got rather messy, and only really appropriate to primitive types anyway)
-	// (currently used by (1) configuring workloads from yaml-config (2) mqtt i/o)
-
-	bool TypeDescriptor::to_string(const void* value_ptr, char* out, size_t max_len) const
-	{
-		if (!value_ptr || !out || max_len == 0)
-		{
-			return false;
-		}
-
-		if (name == "float")
-		{
-			return std::snprintf(out, max_len, "%g", *reinterpret_cast<const float*>(value_ptr)) > 0;
-		}
-		if (name == "double")
-		{
-			return std::snprintf(out, max_len, "%g", *reinterpret_cast<const double*>(value_ptr)) > 0;
-		}
-		if (name == "bool")
-		{
-			return std::snprintf(out, max_len, "%s", (*reinterpret_cast<const bool*>(value_ptr)) ? "true" : "false") > 0;
-		}
-		if (name == "int")
-		{
-			return std::snprintf(out, max_len, "%d", *reinterpret_cast<const int*>(value_ptr)) > 0;
-		}
-		if (name == "uint16_t")
-		{
-			return std::snprintf(out, max_len, "%u", *reinterpret_cast<const uint16_t*>(value_ptr)) > 0;
-		}
-		if (name == "uint32_t")
-		{
-			return std::snprintf(out, max_len, "%u", *reinterpret_cast<const uint32_t*>(value_ptr)) > 0;
-		}
-		if (meta == "text/plain")
-		{
-			const char* text = reinterpret_cast<const char*>(value_ptr);
-			const size_t len = ::strnlen(text, max_len);
-			std::memcpy(out, text, len);
-			if (len < max_len)
-			{
-				out[len] = '\0';
-			}
-			return true;
-		}
-
-		// fallback
-		return false;
 	}
 
 	inline bool case_insensitive_equals(const char* a, const char* b)
@@ -184,7 +133,7 @@ namespace robotick
 		{
 			return std::sscanf(input, "%u", reinterpret_cast<uint32_t*>(out_value)) == 1;
 		}
-		if (meta == "text/plain")
+		if (mime_type == "text/plain")
 		{
 			std::strncpy(reinterpret_cast<char*>(out_value), input, size);
 			return true;

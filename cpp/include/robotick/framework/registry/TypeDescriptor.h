@@ -30,6 +30,7 @@ namespace robotick
 		StringView name;
 		TypeId type_id;
 		size_t offset_within_container = OFFSET_UNBOUND;
+		size_t element_count = 1; // number of times our type repeats in each field (e.g. array[element_count])
 
 		const TypeDescriptor* find_type_descriptor() const;
 
@@ -142,7 +143,7 @@ namespace robotick
 
 		TypeCategoryDesc type_category_desc{};
 
-		StringView meta; // http-style metadata - e.g. "img/png" (optional)
+		StringView mime_type; // http-style metadata - e.g. "img/png" (optional)
 
 		// --- misc helpers: ---
 		const WorkloadDescriptor* get_workload_desc() const
@@ -157,7 +158,6 @@ namespace robotick
 			return (type_category == TypeCategory::DynamicStruct ? type_category_desc.dynamic_struct_desc : nullptr);
 		}
 
-		bool to_string(const void* value_ptr, char* out, size_t max_len) const;
 		bool from_string(const char* input, void* out_value) const;
 	};
 
