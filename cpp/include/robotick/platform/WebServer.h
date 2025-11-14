@@ -48,8 +48,27 @@ namespace robotick
 
 	struct WebResponse
 	{
+		friend class WebServer;
+
+	  public:
 		void* conn = nullptr; // platform-specific (mg_connection* or httpd_req_t*)
 
+	  public:
+		// header operations - do these first as needed (in order shown)
+		int get_status_code() const { return status_code; }
+		void set_status_code(int code);
+
+		void set_content_type(const char* type);
+		void add_header(const char* header_line);
+
+		// body operations - do either one of these after headers (just once)
+		void set_body(const void* data, size_t size);
+		void set_body_string(const char* text);
+
+		// calling of this is optional - it will otherwise get auto-called by WebServer code
+		void finish();
+
+	  protected:
 		enum class State
 		{
 			Start,
@@ -72,20 +91,6 @@ namespace robotick
 			if (state == State::Done)
 				ROBOTICK_FATAL_EXIT("WebResponse: body written after finish()");
 		}
-
-		// --- header operations ---
-		int get_status_code() const { return status_code; }
-		void set_status_code(int code);
-
-		void set_content_type(const char* type);
-		void add_header(const char* header_line);
-
-		// --- body operations ---
-		void set_body(const void* data, size_t size);
-		void set_body_string(const char* text);
-
-		// --- finalise body, used if handler did nothing else ---
-		void finish();
 
 	  private:
 		State state = State::Start;
