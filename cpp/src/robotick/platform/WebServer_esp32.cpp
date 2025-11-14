@@ -5,12 +5,7 @@
 
 #include <cstring>
 #include <esp_http_server.h>
-#include <esp_interface.h>
 #include <esp_log.h>
-#include <esp_netif.h>
-#include <esp_wifi.h>
-#include <lwip/ip4_addr.h>
-#include <lwip/netif.h>
 
 namespace robotick
 {
@@ -24,6 +19,201 @@ namespace robotick
 		httpd_handle_t server = nullptr;
 		WebRequestHandler handler = nullptr;
 	};
+
+	static void write_header(void* c, const char* key, const char* val)
+	{
+		httpd_req_t* req = static_cast<httpd_req_t*>(c);
+		httpd_resp_set_hdr(req, key, val);
+	}
+
+	static void write_raw(void* c, const void* data, size_t sz)
+	{
+		httpd_req_t* req = static_cast<httpd_req_t*>(c);
+		httpd_resp_send_chunk(req, (const char*)data, sz);
+	}
+
+	// -----------------------
+	// WebResponse ESP32 impl
+	// -----------------------
+
+	void WebResponse::set_status_code(int code)
+	{
+		ensure_headers_open();
+		status_code = code; // ESP32 doesn't send status until first body
+	}
+
+	void WebResponse::set_content_type(const char* type)
+	{
+		ensure_headers_open();
+		content_type = type; // stored until first body write
+	}
+
+	void WebResponse::add_header(const char* header_line)
+	{
+		ensure_headers_open();
+
+		// header_line: "X-Key: Value"
+		const char* colon = strchr(header_line, ':');
+		if (!colon)
+			ROBOTICK_FATAL_EXIT("Invalid header_line");
+
+		char key[128];
+		size_t klen = colon - header_line;
+		if (klen >= sizeof(key))
+			klen = sizeof(key) - 1;
+
+		memcpy(key, header_line, klen);
+		key[klen] = '\0';
+
+		const char* val = colon + 1;
+		while (*val == ' ')
+			val++;
+
+		write_header(conn, key, val);
+	}
+
+	void WebResponse::set_body(const void* data, size_t size)
+	{
+		ensure_body_allowed();
+
+		if (state == State::Start)
+		{
+			// first body write = finalize headers
+			httpd_req_t* req = static_cast<httpd_req_t*>(conn);
+
+			httpd_resp_set_status_code(req, (status_code == 200 ? "200 OK" : "200 OK")); // minimal
+			httpd_resp_set_type(req, content_type);
+
+			httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+			httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+			httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+			httpd_resp_set_hdr(req, "Access-Control-Expose-Headers", "X-Robotick-Session-Id");
+
+			state = State::BodyStreaming;
+		}
+		else if (state == State::HeadersOpen)
+		{
+			state = State::BodyStreaming;
+		}
+
+		write_raw(conn, data, size);
+	}
+
+	void WebResponse::set_body_string(const char* text)
+	{
+		set_body(text, strlen(text));
+	}
+
+	void WebResponse::finish()
+	{
+		if (state == State::Done)
+			return;
+
+		if (state == State::Start || state == State::HeadersOpen)
+		{
+			// Handler returned true but never sent a body.
+			// We must send proper headers first.
+			httpd_req_t* req = static_cast<httpd_req_t*>(conn);
+
+			httpd_resp_set_status(req, (status_code == 200 ? "200 OK" : "200 OK"));
+			httpd_resp_set_type(req, content_type);
+
+			httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+			httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+			httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+			httpd_resp_set_hdr(req, "Access-Control-Expose-Headers", "X-Robotick-Session-Id");
+
+			// Send an empty chunk as body
+			httpd_resp_send_chunk(req, "", 0);
+		}
+
+		// Terminate chunked response
+		httpd_resp_send_chunk(static_cast<httpd_req_t*>(conn), nullptr, 0);
+		state = State::Done;
+	}
+
+	// ------------------------------
+	// Main ESP32 request handler
+	// ------------------------------
+
+	static esp_err_t handler_fn(httpd_req_t* req)
+	{
+		WebServerImpl* s = static_cast<WebServerImpl*>(req->user_ctx);
+		if (!s || !s->handler)
+			return ESP_FAIL;
+
+		WebRequest r;
+		r.method = http_method_str((http_method)req->method);
+
+		// Parse URI
+		{
+			const char* full = req->uri;
+			const char* q = strchr(full, '?');
+			if (q)
+				r.uri = FixedString128(full, q - full);
+			else
+				r.uri = full;
+
+			if (q)
+			{
+				const char* qs = q + 1;
+				while (*qs)
+				{
+					// same parsing as desktop
+					while (*qs == '&')
+						++qs;
+					if (!*qs)
+						break;
+
+					FixedString32 k;
+					FixedString64 v;
+
+					// parse key
+					const char* ks = qs;
+					while (*qs && *qs != '=' && *qs != '&')
+						++qs;
+					k = FixedString32(ks, qs - ks);
+					if (*qs == '=')
+						++qs;
+
+					// parse val
+					const char* vs = qs;
+					while (*qs && *qs != '&')
+						++qs;
+					v = FixedString64(vs, qs - vs);
+
+					r.query_params.add({k, v});
+
+					if (*qs == '&')
+						++qs;
+				}
+			}
+		}
+
+		// Read body
+		if (req->content_len > 0 && req->content_len < r.body.capacity())
+		{
+			int got = httpd_req_recv(req, (char*)r.body.data(), req->content_len);
+			if (got > 0)
+				r.body.set_size(got);
+		}
+
+		WebResponse resp;
+		resp.conn = req;
+
+		if (s->handler(r, resp))
+		{
+			resp.finish();
+			return ESP_OK;
+		}
+		else
+		{
+			httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Not found");
+			return ESP_OK;
+		}
+	}
+
+	// ------------------------------
 
 	WebServer::WebServer()
 	{
@@ -42,218 +232,41 @@ namespace robotick
 		return static_cast<WebServerImpl*>(impl)->server != nullptr;
 	}
 
-	void parse_query_string(const char* qs, WebRequest& request)
+	void WebServer::start(const char* name, uint16_t port, const char*, WebRequestHandler handler_in)
 	{
-		if (!qs || *qs == '\0')
-			return;
+		WebServerImpl* s = static_cast<WebServerImpl*>(impl);
 
-		while (*qs && request.query_params.size() < request.query_params.capacity())
-		{
-			FixedString32 key;
-			FixedString64 value;
-
-			// Parse key
-			const char* key_start = qs;
-			while (*qs && *qs != '=' && *qs != '&')
-				++qs;
-			key = FixedString32(key_start, qs - key_start);
-
-			if (*qs == '=')
-				++qs;
-
-			// Parse value
-			const char* val_start = qs;
-			while (*qs && *qs != '&')
-				++qs;
-			value = FixedString64(val_start, qs - val_start);
-
-			request.query_params.add({key, value});
-
-			if (*qs == '&')
-				++qs;
-		}
-	}
-
-	static esp_err_t handle_http_request(httpd_req_t* req)
-	{
-		WebServerImpl* state = static_cast<WebServerImpl*>(req->user_ctx);
-		if (!state || !state->handler)
-			return ESP_FAIL;
-
-		WebRequest request;
-		WebResponse response;
-
-		request.method = http_method_str((http_method)req->method);
-
-		// parse the uri as needed:
-		{
-			const char* full_uri = req->uri;
-			const char* qs = strchr(full_uri, '?');
-
-			// Set clean URI (excluding query string)
-			if (qs)
-				request.uri = FixedString128(full_uri, qs - full_uri); // up to but not including '?'
-			else
-				request.uri = full_uri;
-
-			// Parse query string if present
-			if (qs)
-				parse_query_string(qs + 1, request); // skip '?'
-		}
-
-		if (req->method == HTTP_POST && req->content_len > 0 && req->content_len < request.body.capacity())
-		{
-			int read = httpd_req_recv(req, reinterpret_cast<char*>(request.body.data()), req->content_len);
-			if (read > 0)
-				request.body.set_size(static_cast<size_t>(read));
-		}
-
-		if (state->handler(request, response))
-		{
-			httpd_resp_set_type(req, response.content_type.c_str());
-			httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-			httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
-			httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-			httpd_resp_set_hdr(req, "Access-Control-Expose-Headers", "X-Robotick-Session-Id");
-
-			// Add any custom headers
-			for (const auto& header : response.headers)
-			{
-				if (!header.empty())
-				{
-					const char* colon = std::strchr(header.c_str(), ':');
-					if (colon && colon != header.c_str())
-					{
-						const size_t key_len = static_cast<size_t>(colon - header.c_str());
-						const char* key = header.c_str();
-						const char* value = colon + 1;
-
-						// Skip leading space in value if present
-						while (*value == ' ')
-						{
-							value++;
-						}
-
-						char key_buf[256] = {};
-						std::memcpy(key_buf, key, std::min(key_len, sizeof(key_buf) - 1));
-						httpd_resp_set_hdr(req, key_buf, value);
-					}
-				}
-			}
-
-			static constexpr size_t kMaxChunkSize = 1024;
-
-			if (response.body.size() <= kMaxChunkSize)
-			{
-				httpd_resp_send(req, reinterpret_cast<const char*>(response.body.data()), response.body.size());
-			}
-			else
-			{
-				const char* data = reinterpret_cast<const char*>(response.body.data());
-				size_t remaining = response.body.size();
-
-				while (remaining > 0)
-				{
-					size_t chunk_size = min(remaining, kMaxChunkSize);
-					if (httpd_resp_send_chunk(req, data, chunk_size) != ESP_OK)
-					{
-						ROBOTICK_WARNING("WebServer - failed to send chunk");
-						break;
-					}
-					data += chunk_size;
-					remaining -= chunk_size;
-				}
-				httpd_resp_send_chunk(req, nullptr, 0); // Finalize chunked transfer
-			}
-
-			constexpr bool verbose_http = false;
-			if (verbose_http || response.status_code >= 400)
-			{
-				ROBOTICK_INFO("WebServer - %s %s - response code %i (%i bytes)",
-					request.method.c_str(),
-					request.uri.c_str(),
-					response.status_code,
-					response.body.size());
-			}
-		}
-		else
-		{
-			httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Not found");
-		}
-
-		return ESP_OK;
-	}
-
-	void WebServer::start(const char* name, uint16_t port, const char* /*unused*/, WebRequestHandler handler_in)
-	{
-		ROBOTICK_ASSERT_MSG(!is_running(), "WebServer '%s' already running", name);
-
-		esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-		if (!netif)
-		{
-			ROBOTICK_WARNING("WebServer '%s' not started: netif not found (likely Wi-Fi not initialized yet)", name);
-			return;
-		}
-
-		esp_netif_ip_info_t ip_info;
-		if (esp_netif_get_ip_info(netif, &ip_info) != ESP_OK || ip_info.ip.addr == 0)
-		{
-			ROBOTICK_WARNING("WebServer '%s' not started: no valid IP yet (likely Wi-Fi not connected)", name);
-			return;
-		}
-
+		s->handler = handler_in;
 		server_name = name;
 
-		WebServerImpl* state = static_cast<WebServerImpl*>(impl);
-		state->handler = handler_in;
+		httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
+		cfg.server_port = port;
+		cfg.stack_size = 16384;
+		cfg.uri_match_fn = httpd_uri_match_wildcard;
 
-		httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-		config.stack_size = 16384; // Increase from default 4096 to 8KB
-		config.server_port = port;
-		config.uri_match_fn = httpd_uri_match_wildcard;
-
-		if (httpd_start(&state->server, &config) != ESP_OK)
+		if (httpd_start(&s->server, &cfg) != ESP_OK)
 		{
-			ROBOTICK_FATAL_EXIT("Failed to start ESP HTTP server '%s'", name);
+			ROBOTICK_FATAL_EXIT("Failed to start ESP32 WebServer");
 			return;
 		}
 
-		httpd_uri_t handler_def = {.uri = "/*", .method = HTTP_GET, .handler = handle_http_request, .user_ctx = state};
-		httpd_register_uri_handler(state->server, &handler_def);
+		httpd_uri_t def = {.uri = "/*", .method = HTTP_GET, .handler = handler_fn, .user_ctx = s};
+		httpd_register_uri_handler(s->server, &def);
 
-		handler_def.method = HTTP_POST;
-		httpd_register_uri_handler(state->server, &handler_def);
-
-		// report success, including our url
-		{
-			esp_netif_ip_info_t ip_info;
-			if (esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info) == ESP_OK)
-			{
-				ROBOTICK_INFO("WebServer '%s' serving at http://%d.%d.%d.%d:%u", name, IP2STR(&ip_info.ip), static_cast<unsigned int>(port));
-			}
-			else if (esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_AP_DEF"), &ip_info) == ESP_OK)
-			{
-				ROBOTICK_INFO(
-					"WebServer '%s' (AP mode) serving at http://%d.%d.%d.%d:%u", name, IP2STR(&ip_info.ip), static_cast<unsigned int>(port));
-			}
-			else
-			{
-				ROBOTICK_WARNING("WebServer '%s' started, but IP address is unknown", name);
-			}
-		}
+		def.method = HTTP_POST;
+		httpd_register_uri_handler(s->server, &def);
 	}
 
 	void WebServer::stop()
 	{
-		WebServerImpl* state = static_cast<WebServerImpl*>(impl);
-		if (!state->server)
+		WebServerImpl* s = static_cast<WebServerImpl*>(impl);
+		if (!s->server)
 			return;
 
-		httpd_stop(state->server);
-		state->server = nullptr;
-
-		ESP_LOGI(TAG, "WebServer stopped.");
+		httpd_stop(s->server);
+		s->server = nullptr;
 	}
+
 } // namespace robotick
 
-#endif // ROBOTICK_PLATFORM_ESP32
+#endif // ESP32

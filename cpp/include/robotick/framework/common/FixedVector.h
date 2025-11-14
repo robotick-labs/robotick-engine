@@ -119,69 +119,6 @@ namespace robotick
 		}
 
 		/**
-		 * @brief Set the buffer-contents and size to the specified string
-		 * (string-length plus null-terminator)
-		 *
-		 * @param value The string-value to set
-		 */
-		void set_from_string(const char* value)
-		{
-			ROBOTICK_ASSERT(value != nullptr);
-
-			const size_t len = strlen(value);
-			ROBOTICK_ASSERT(len <= capacity());
-
-			memcpy(data_buffer, value, len);
-			count = len;
-		}
-
-		/**
-		 * @brief Appends a null-terminated string to the buffer.
-		 *
-		 * The null terminator is not included. Returns false if the buffer would overflow.
-		 *
-		 * @param cstr The string to append.
-		 * @return true on success, false if the data would exceed capacity.
-		 */
-		bool append_from_string(const char* cstr)
-		{
-			if (!cstr)
-				return false;
-
-			size_t len = strlen(cstr);
-			if (count + len > capacity())
-				return false;
-
-			memcpy(data() + count, cstr, len);
-			count += len;
-			return true;
-		}
-
-		/**
-		 * @brief Appends formatted text to the buffer using printf-style syntax.
-		 *
-		 * Uses an internal 256-byte staging buffer. Returns false on formatting error or overflow.
-		 *
-		 * @param fmt The format string.
-		 * @param ... Format arguments.
-		 * @return true on success, false if the formatted string is too large or buffer would overflow.
-		 */
-		bool append_from_string_format(const char* fmt, ...)
-		{
-			va_list args;
-			va_start(args, fmt);
-			size_t available = capacity() - count;
-			int written = std::vsnprintf(reinterpret_cast<char*>(data() + count), available, fmt, args);
-			va_end(args);
-
-			if (written <= 0 || static_cast<size_t>(written) >= available)
-				return false;
-
-			count += static_cast<size_t>(written);
-			return true;
-		}
-
-		/**
 		 * @brief Returns a reference to the element at the given index.
 		 */
 		T& operator[](size_t index)

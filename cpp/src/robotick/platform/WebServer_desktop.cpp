@@ -6,7 +6,7 @@
 #include <civetweb.h>
 #include <cstdio>
 #include <cstring>
-#include <unistd.h> // for readlink
+#include <unistd.h>
 
 namespace robotick
 {
@@ -14,6 +14,150 @@ namespace robotick
 	{
 		mg_context* ctx = nullptr;
 	};
+
+	static void write_line(void* conn, const char* fmt, ...)
+	{
+		char buffer[512]; // stack, safe for ESP32 + desktop
+		va_list args;
+		va_start(args, fmt);
+		int len = vsnprintf(buffer, sizeof(buffer), fmt, args);
+		va_end(args);
+
+		if (len > 0)
+		{
+			// clamp to buffer size
+			if (static_cast<size_t>(len) > sizeof(buffer))
+				len = sizeof(buffer);
+
+			mg_write(static_cast<mg_connection*>(conn), buffer, len);
+		}
+	}
+
+	static void write_raw(void* conn, const void* data, size_t size)
+	{
+		mg_write(static_cast<mg_connection*>(conn), data, size);
+	}
+
+	// -------------------------------
+	// WebResponse streaming operations
+	// -------------------------------
+
+	static inline void write_status_and_cors(void* conn, int status_code)
+	{
+		write_line(conn,
+			"HTTP/1.1 %d OK\r\n"
+			"Access-Control-Allow-Origin: *\r\n"
+			"Access-Control-Allow-Headers: Content-Type\r\n"
+			"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+			"Access-Control-Expose-Headers: X-Robotick-Session-Id\r\n",
+			status_code);
+	}
+
+	void WebResponse::set_status_code(int code)
+	{
+		// header mutation after body is illegal
+		if (state == State::BodyStreaming || state == State::Done)
+		{
+			ROBOTICK_FATAL_EXIT("WebResponse: header call after body started");
+		}
+
+		// first-touch of headers? print status + CORS now
+		if (state == State::Start)
+		{
+			write_status_and_cors(conn, code);
+			state = State::HeadersOpen;
+		}
+
+		status_code = code;
+	}
+
+	void WebResponse::set_content_type(const char* type)
+	{
+		if (state == State::BodyStreaming || state == State::Done)
+		{
+			ROBOTICK_FATAL_EXIT("WebResponse: header call after body started");
+		}
+
+		if (state == State::Start)
+		{
+			write_status_and_cors(conn, status_code);
+			state = State::HeadersOpen;
+		}
+
+		content_type = type ? type : "text/plain";
+	}
+
+	void WebResponse::add_header(const char* header_line)
+	{
+		if (state == State::BodyStreaming || state == State::Done)
+		{
+			ROBOTICK_FATAL_EXIT("WebResponse: header call after body started");
+		}
+
+		if (state == State::Start)
+		{
+			write_status_and_cors(conn, status_code);
+			state = State::HeadersOpen;
+		}
+
+		if (header_line && *header_line)
+		{
+			write_line(conn, "%s\r\n", header_line);
+		}
+	}
+
+	void WebResponse::set_body(const void* data, size_t size)
+	{
+		ensure_body_allowed();
+
+		if (state == State::Start)
+		{
+			// First emission: status + CORS first
+			write_status_and_cors(conn, status_code);
+			state = State::HeadersOpen;
+		}
+
+		if (state == State::HeadersOpen)
+		{
+			// Close the header block with CT + CL and the CRLFCRLF
+			write_line(conn, "Content-Type: %s\r\n", content_type);
+			write_line(conn, "Content-Length: %zu\r\n", size);
+			write_line(conn, "\r\n");
+			state = State::BodyStreaming;
+		}
+		// else BodyStreaming → (strict) you could fatal here if multiple body writes are disallowed.
+
+		if (size > 0)
+		{
+			write_raw(conn, data, size);
+		}
+	}
+
+	void WebResponse::set_body_string(const char* text)
+	{
+		set_body(text, strlen(text));
+	}
+
+	void WebResponse::finish()
+	{
+		if (state == State::Done)
+			return;
+
+		if (state == State::Start || state == State::HeadersOpen)
+		{
+			write_line(conn,
+				"HTTP/1.1 %d OK\r\n"
+				"Content-Type: %s\r\n"
+				"Content-Length: 0\r\n"
+				"\r\n",
+				status_code,
+				content_type);
+		}
+
+		state = State::Done;
+	}
+
+	// -------------------------------------
 
 	WebServer::WebServer()
 	{
@@ -30,188 +174,136 @@ namespace robotick
 		return running;
 	}
 
-	void parse_query_string(const char* qs, WebRequest& request)
+	static void parse_query_string(const char* qs, WebRequest& req)
 	{
-		if (!qs || *qs == '\0')
+		if (!qs || !*qs)
 			return;
 
-		while (*qs && request.query_params.size() < request.query_params.capacity())
+		while (*qs && req.query_params.size() < req.query_params.capacity())
 		{
 			FixedString32 key;
-			FixedString64 value;
+			FixedString64 val;
 
-			// Parse key
-			const char* key_start = qs;
+			const char* k = qs;
 			while (*qs && *qs != '=' && *qs != '&')
 				++qs;
-			key = FixedString32(key_start, qs - key_start);
+			key = FixedString32(k, qs - k);
 
 			if (*qs == '=')
 				++qs;
 
-			// Parse value
-			const char* val_start = qs;
+			const char* v = qs;
 			while (*qs && *qs != '&')
 				++qs;
-			value = FixedString64(val_start, qs - val_start);
+			val = FixedString64(v, qs - v);
 
-			request.query_params.add({key, value});
+			req.query_params.add({key, val});
 
 			if (*qs == '&')
 				++qs;
 		}
 	}
 
-	int web_server_callback(struct mg_connection* conn, void* user_data)
+	// ------------------------------
+	// Main request handler
+	// ------------------------------
+
+	static int callback(struct mg_connection* c, void* userdata)
 	{
-		WebServer* self = static_cast<WebServer*>(user_data);
+		WebServer* self = static_cast<WebServer*>(userdata);
 		if (!self || !self->get_handler())
 			return 0;
 
-		WebRequest request;
-		const struct mg_request_info* req_info = mg_get_request_info(conn);
+		WebRequest req;
+		const mg_request_info* info = mg_get_request_info(c);
 
-		if (req_info->local_uri)
-			request.uri = req_info->local_uri;
-
-		if (req_info->request_method)
-			request.method = req_info->request_method;
-
-		if (req_info->query_string)
-			parse_query_string(req_info->query_string, request);
+		if (info->local_uri)
+			req.uri = info->local_uri;
+		if (info->request_method)
+			req.method = info->request_method;
+		if (info->query_string)
+			parse_query_string(info->query_string, req);
 
 		// Read body if present
 		char buffer[1024];
-		int len = mg_read(conn, buffer, sizeof(buffer));
+		int len = mg_read(c, buffer, sizeof(buffer));
 		if (len > 0)
-			request.body.set_bytes(buffer, len);
+			req.body.set_bytes(buffer, len);
 
-		// Check if requested path exists as a file
+		// File passthrough
 		{
-			FixedString512 file_path;
+			FixedString512 full_path;
+			const char* uri = req.uri.c_str();
+			if (uri[0] == '/')
+				uri++;
 
-			const char* uri_path = request.uri.c_str();
-			if (uri_path[0] == '/')
-				++uri_path;
+			full_path.format("%s/%s", self->get_document_root(), uri);
 
-			file_path.format("%s/%s", self->get_document_root(), uri_path);
-
-			FILE* f = std::fopen(file_path.c_str(), "rb");
+			FILE* f = std::fopen(full_path.c_str(), "rb");
 			if (f)
 			{
 				std::fclose(f);
-				return 0; // Let CivetWeb serve it
+				return 0;
 			}
 		}
 
-		WebResponse response;
-		if (self->get_handler()(request, response))
+		WebResponse resp;
+		resp.conn = c;
+
+		if (self->get_handler()(req, resp))
 		{
-			mg_printf(conn,
-				"HTTP/1.1 %d OK\r\n"
-				"Access-Control-Allow-Origin: *\r\n"
-				"Access-Control-Allow-Headers: Content-Type\r\n"
-				"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
-				"Access-Control-Expose-Headers: X-Robotick-Session-Id\r\n",
-				response.status_code);
-
-			// Write any custom headers stored in FixedVector
-			for (const auto& header : response.headers)
-			{
-				if (!header.empty())
-				{
-					mg_printf(conn, "%s\r\n", header.c_str());
-				}
-			}
-
-			// Final required headers
-			mg_printf(conn,
-				"Content-Type: %s\r\n"
-				"Content-Length: %zu\r\n"
-				"\r\n",
-				response.content_type.c_str(),
-				response.body.size());
-
-			// Write response body
-			mg_write(conn, response.body.data(), response.body.size());
-
-			constexpr bool verbose_http = false;
-			if (verbose_http || response.status_code >= 400)
-			{
-				ROBOTICK_INFO("WebServer - %s %s - response code %i (%i bytes)",
-					request.method.c_str(),
-					request.uri.c_str(),
-					response.status_code,
-					(int)response.body.size());
-			}
-
-			return response.status_code;
+			resp.finish();
+			return resp.get_status_code();
 		}
 
-		return 0; // fallback (not handled - let CivetWeb handle the request)
+		return 0;
 	}
 
-	void WebServer::start(const char* name, uint16_t port, const char* web_root_folder, WebRequestHandler handler_in)
+	// ------------------------------
+
+	void WebServer::start(const char* name, uint16_t port, const char* webroot, WebRequestHandler handler_in)
 	{
-		ROBOTICK_ASSERT_MSG(!running, "WebServer '%s' already started", name);
+		ROBOTICK_ASSERT_MSG(!running, "WebServer '%s' already running", name);
 
 		server_name = name;
-
 		handler = handler_in;
 
-		// Read path to running executable
-		char exe_path[512] = {};
-		ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
-		if (len < 0 || len >= static_cast<ssize_t>(sizeof(exe_path)))
-		{
-			ROBOTICK_FATAL_EXIT("Failed to read /proc/self/exe");
-			return;
-		}
-		exe_path[len] = '\0';
+		// Resolve executable path
+		char exepath[512] = {};
+		ssize_t len = readlink("/proc/self/exe", exepath, sizeof(exepath) - 1);
+		if (len < 0)
+			ROBOTICK_FATAL_EXIT("readlink failed");
+		exepath[len] = '\0';
 
-		// Truncate to parent directory
+		// Trim filename from path
 		for (ssize_t i = len - 1; i >= 0; --i)
-		{
-			if (exe_path[i] == '/')
+			if (exepath[i] == '/')
 			{
-				exe_path[i + 1] = '\0';
+				exepath[i + 1] = '\0';
 				break;
 			}
-		}
 
-		// Append web_root_folder to base dir
-		bool has_docroot = (web_root_folder && web_root_folder[0] != '\0');
-		if (has_docroot)
-		{
-			document_root.format("%s%s", exe_path, web_root_folder);
-		}
+		if (webroot && *webroot)
+			document_root.format("%s%s", exepath, webroot);
 		else
-		{
 			document_root.clear();
-		}
 
-		char port_str[16];
-		std::snprintf(port_str, sizeof(port_str), "%u", static_cast<unsigned int>(port));
+		char portstr[16];
+		snprintf(portstr, sizeof(portstr), "%u", (unsigned)port);
 
-		const char* options_with_docroot[] = {
-			"listening_ports", port_str, "document_root", document_root.c_str(), "enable_directory_listing", "no", nullptr, nullptr};
-		const char* options_no_docroot[] = {"listening_ports", port_str, "enable_directory_listing", "no", nullptr, nullptr};
-		const char** options = has_docroot ? options_with_docroot : options_no_docroot;
+		const char* opt_with[] = {"listening_ports", portstr, "document_root", document_root.c_str(), "enable_directory_listing", "no", nullptr};
 
-		impl->ctx = mg_start(nullptr, nullptr, options);
-		if (!impl->ctx)
-		{
-			ROBOTICK_FATAL_EXIT("WebServer '%s' failed to start CivetWeb on port %u", name, static_cast<unsigned int>(port));
-			return;
-		}
+		const char* opt_no[] = {"listening_ports", portstr, "enable_directory_listing", "no", nullptr};
 
-		mg_set_request_handler(impl->ctx, "/", &web_server_callback, this);
+		const char** opts = (webroot && *webroot) ? opt_with : opt_no;
+
+		WebServerImpl* s = static_cast<WebServerImpl*>(impl);
+		s->ctx = mg_start(nullptr, nullptr, opts);
+		if (!s->ctx)
+			ROBOTICK_FATAL_EXIT("Failed to start WebServer");
+
+		mg_set_request_handler(s->ctx, "/", callback, this);
 		running = true;
-
-		ROBOTICK_INFO("WebServer '%s' serving from '%s' at http://localhost:%u",
-			name,
-			has_docroot ? document_root.c_str() : "<no files>",
-			static_cast<unsigned int>(port));
 	}
 
 	void WebServer::stop()
@@ -219,12 +311,13 @@ namespace robotick
 		if (!running)
 			return;
 
-		mg_stop(impl->ctx);
-		impl->ctx = nullptr;
-		running = false;
+		WebServerImpl* s = static_cast<WebServerImpl*>(impl);
+		mg_stop(s->ctx);
+		s->ctx = nullptr;
 
-		ROBOTICK_INFO("WebServer stopped.");
+		running = false;
 	}
+
 } // namespace robotick
 
-#endif // ROBOTICK_PLATFORM_DESKTOP
+#endif // #if defined(ROBOTICK_PLATFORM_DESKTOP)

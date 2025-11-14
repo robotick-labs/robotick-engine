@@ -37,20 +37,20 @@ namespace robotick
 			{
 				if (!req.method.equals("GET"))
 				{
-					res.status_code = 404;
-					return true;
+					return false; // not handled
 				}
 
 				if (!engine)
 				{
-					res.body.set_from_string("{\"error\":\"no engine available\"}");
-					res.status_code = 500;
+					res.set_content_type("text/plain");
+					res.set_status_code(WebResponseCode::InternalServerError);
+					res.set_body_string("{\"error\":\"no engine available\"}");
 					return true;
 				}
 
 				if (req.uri.equals("/api/telemetry/health"))
 				{
-					res.status_code = WebResponseCode::OK;
+					res.set_status_code(WebResponseCode::OK);
 					return true;
 				}
 				else if (req.uri.equals("/api/telemetry/workloads_buffer/layout"))
@@ -268,24 +268,26 @@ namespace robotick
 				return a["name"].get<std::string>() < b["name"].get<std::string>();
 			});
 
+		res.set_status_code(WebResponseCode::OK);
+		res.set_content_type("application/json");
+
 		std::string out_str = layout_json.dump(2); // Pretty print
-		res.body.set_from_string(out_str.c_str());
-		res.status_code = WebResponseCode::OK;
-		res.content_type = "application/json";
+		res.set_body_string(out_str.c_str());
 	}
 
 	void TelemetryServer::handle_get_workloads_buffer_raw(const WebRequest& /*req*/, WebResponse& res)
 	{
 		const WorkloadsBuffer& workloads_buffer = engine->get_workloads_buffer();
 
-		res.body.set_bytes(workloads_buffer.raw_ptr(), workloads_buffer.get_size_used());
-		res.status_code = WebResponseCode::OK;
-		res.content_type = "application/octet-stream";
+		res.set_status_code(WebResponseCode::OK);
+		res.set_content_type("application/octet-stream");
 
 		// Attach the session ID as a custom response header
 		FixedString256 session_header;
 		session_header.format("X-Robotick-Session-Id:%s", get_session_id());
-		res.headers.add(session_header);
+		res.add_header(session_header.c_str());
+
+		res.set_body(workloads_buffer.raw_ptr(), workloads_buffer.get_size_used());
 	}
 
 } // namespace robotick
