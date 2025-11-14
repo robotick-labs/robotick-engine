@@ -53,11 +53,6 @@ namespace robotick
 					res.status_code = WebResponseCode::OK;
 					return true;
 				}
-				else if (req.uri.equals("/api/telemetry/workload/stats"))
-				{
-					handle_get_workload_stats(req, res);
-					return true;
-				}
 				else if (req.uri.equals("/api/telemetry/workloads_buffer/layout"))
 				{
 					handle_get_workloads_buffer_layout(req, res);
@@ -215,8 +210,13 @@ namespace robotick
 		nlohmann::ordered_json layout_json;
 		layout_json["engine_session_id"] = get_session_id();
 		layout_json["buffer_size_used"] = workloads_buffer.get_size_used();
+		layout_json["workload_stats"] = nlohmann::ordered_json::array();
 		layout_json["workloads"] = nlohmann::ordered_json::array();
 		layout_json["types"] = nlohmann::ordered_json::array();
+
+		// lookup type for workload-stats
+		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
+		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
 
 		for (const WorkloadInstanceInfo& workload_instance_info : instances)
 		{
@@ -244,6 +244,12 @@ namespace robotick
 			emit_struct_info(layout_json, workload_json, workloads_buffer, workload_ptr, "config", desc->config_desc, desc->config_offset);
 			emit_struct_info(layout_json, workload_json, workloads_buffer, workload_ptr, "inputs", desc->inputs_desc, desc->inputs_offset);
 			emit_struct_info(layout_json, workload_json, workloads_buffer, workload_ptr, "outputs", desc->outputs_desc, desc->outputs_offset);
+
+			// emits stats info:
+			workload_json["stats_offset_within_container"] =
+				static_cast<int>((uint8_t*)workload_instance_info.workload_stats - workloads_buffer.raw_ptr());
+
+			emit_type_info(layout_json, workloads_buffer, workload_instance_info.workload_stats, workload_stats_type);
 
 			layout_json["workloads"].push_back(workload_json);
 		}
@@ -281,27 +287,6 @@ namespace robotick
 		FixedString256 session_header;
 		session_header.format("X-Robotick-Session-Id:%s", get_session_id());
 		res.headers.add(session_header);
-	}
-
-	void TelemetryServer::handle_get_workload_stats(const WebRequest& req, WebResponse& res)
-	{
-		const char* workload_unique_name = req.find_query_param("name");
-		const WorkloadInstanceInfo* info = workload_unique_name != nullptr ? engine->find_instance_info(workload_unique_name) : nullptr;
-		if (!info)
-		{
-			res.body.set_from_string("{\"error\":\"not found\"}");
-			res.status_code = 404;
-			return;
-		}
-
-		res.body.clear();
-		res.body.append_from_string_format("{\"self_ms\":%f,\"dt_ms\":%f,\"goal_ms\":%f}",
-			info->mutable_stats.get_last_tick_duration_ms(),
-			info->mutable_stats.get_last_time_delta_ms(),
-			(info->seed->tick_rate_hz > 0.0) ? (1000.0f / info->seed->tick_rate_hz) : -1.0f);
-
-		res.status_code = WebResponseCode::OK;
-		res.content_type = "application/json";
 	}
 
 } // namespace robotick

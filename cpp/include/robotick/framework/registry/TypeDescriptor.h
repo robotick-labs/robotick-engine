@@ -158,6 +158,7 @@ namespace robotick
 			return (type_category == TypeCategory::DynamicStruct ? type_category_desc.dynamic_struct_desc : nullptr);
 		}
 
+		bool to_string(const void* value, char* output_buffer, size_t output_buffer_size) const;
 		bool from_string(const char* input, void* out_value) const;
 	};
 

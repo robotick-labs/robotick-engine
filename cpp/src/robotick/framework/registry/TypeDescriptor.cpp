@@ -144,4 +144,88 @@ namespace robotick
 		return false;
 	}
 
+	bool TypeDescriptor::to_string(const void* value, char* output_buffer, size_t output_buffer_size) const
+	{
+		if (!value || !output_buffer || output_buffer_size == 0)
+		{
+			ROBOTICK_FATAL_EXIT("Invalid arguments to to_string()");
+			return false;
+		}
+
+		// Ensure the output buffer is always null-terminated
+		output_buffer[0] = '\0';
+
+		if (name == "float")
+		{
+			const float v = *reinterpret_cast<const float*>(value);
+			const int written = std::snprintf(output_buffer, output_buffer_size, "%g", v);
+			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+		}
+
+		if (name == "double")
+		{
+			const double v = *reinterpret_cast<const double*>(value);
+			const int written = std::snprintf(output_buffer, output_buffer_size, "%g", v);
+			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+		}
+
+		if (name == "bool")
+		{
+			const bool v = *reinterpret_cast<const bool*>(value);
+			const char* s = v ? "true" : "false";
+			const size_t len = std::strlen(s);
+
+			if (len + 1 > output_buffer_size)
+			{
+				ROBOTICK_FATAL_EXIT("Output buffer too small for boolean string");
+				return false;
+			}
+
+			std::memcpy(output_buffer, s, len + 1);
+			return true;
+		}
+
+		if (name == "int")
+		{
+			const int v = *reinterpret_cast<const int*>(value);
+			const int written = std::snprintf(output_buffer, output_buffer_size, "%d", v);
+			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+		}
+
+		if (name == "uint16_t")
+		{
+			const uint16_t v = *reinterpret_cast<const uint16_t*>(value);
+			const int written = std::snprintf(output_buffer, output_buffer_size, "%hu", v);
+			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+		}
+
+		if (name == "uint32_t")
+		{
+			const uint32_t v = *reinterpret_cast<const uint32_t*>(value);
+			const int written = std::snprintf(output_buffer, output_buffer_size, "%u", v);
+			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+		}
+
+		if (mime_type == "text/plain")
+		{
+			// Plain text: copy value (char buffer of size `this->size`) into output buffer
+			const char* src = reinterpret_cast<const char*>(value);
+			const size_t len = std::strlen(src);
+
+			if (len + 1 > output_buffer_size)
+			{
+				ROBOTICK_FATAL_EXIT("Output buffer too small for text/plain field");
+				return false;
+			}
+
+			std::memcpy(output_buffer, src, len);
+			output_buffer[len] = '\0';
+			return true;
+		}
+
+		// fallback — unsupported
+		ROBOTICK_FATAL_EXIT("to_string() not implemented for type '%s'", name.c_str());
+		return false;
+	}
+
 } // namespace robotick
