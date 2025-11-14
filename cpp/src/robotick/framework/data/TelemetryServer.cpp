@@ -22,8 +22,7 @@ namespace robotick
 		uint64_t raw = std::chrono::steady_clock::now().time_since_epoch().count(); // 64-bit timestamp
 		session_id.format("%016llX-%s", static_cast<unsigned long long>(raw), model_name);
 #else
-		uint32_t raw = 0xDEADBEEF;
-		session_id.format("%08X-%s", raw, model_name);
+		session_id.format("12345-%s", model_name);
 #endif
 	}
 
