@@ -210,7 +210,6 @@ namespace robotick
 		nlohmann::ordered_json layout_json;
 		layout_json["engine_session_id"] = get_session_id();
 		layout_json["buffer_size_used"] = workloads_buffer.get_size_used();
-		layout_json["workload_stats"] = nlohmann::ordered_json::array();
 		layout_json["workloads"] = nlohmann::ordered_json::array();
 		layout_json["types"] = nlohmann::ordered_json::array();
 
