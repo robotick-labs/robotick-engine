@@ -8,6 +8,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <fstream>
+#include <unistd.h>
+
 namespace robotick
 {
 	static void build_session_id(const char* model_name, FixedString64& session_id)
@@ -202,6 +205,21 @@ namespace robotick
 		emit_type_info(layout_json, workloads_buffer, data_ptr, struct_desc);
 	}
 
+	static size_t get_process_memory_used()
+	{
+		long rss_pages = 0;
+		std::ifstream statm("/proc/self/statm");
+		long total_pages = 0;
+
+		if (statm >> total_pages >> rss_pages)
+		{
+			long page_size = sysconf(_SC_PAGESIZE);
+			return static_cast<size_t>(rss_pages) * page_size;
+		}
+
+		return 0;
+	}
+
 	void TelemetryServer::handle_get_workloads_buffer_layout(const WebRequest& /*req*/, WebResponse& res)
 	{
 		WorkloadsBuffer& workloads_buffer = engine->get_workloads_buffer();
@@ -209,7 +227,8 @@ namespace robotick
 
 		nlohmann::ordered_json layout_json;
 		layout_json["engine_session_id"] = get_session_id();
-		layout_json["buffer_size_used"] = workloads_buffer.get_size_used();
+		layout_json["workloads_buffer_size_used"] = workloads_buffer.get_size_used();
+		layout_json["process_memory_used"] = get_process_memory_used();
 		layout_json["workloads"] = nlohmann::ordered_json::array();
 		layout_json["types"] = nlohmann::ordered_json::array();
 
