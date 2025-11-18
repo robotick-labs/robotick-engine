@@ -115,7 +115,7 @@ namespace robotick
 			}
 			else
 			{
-				ROBOTICK_FATAL_EXIT("Invalid boolean string: %s", input);
+				ROBOTICK_FATAL_EXIT("Invalid boolean string: '%s'", input);
 				return false;
 			}
 
