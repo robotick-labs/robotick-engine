@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: make-feature-branch-from [base-branch] <feature-name>
+
+Creates a fresh feature/<feature-name> branch reset to the specified base and
+force-pushes it to the remote. If the base branch is omitted, it defaults to
+'main'.
+
+Examples:
+  make-feature-branch-from dev my-awesome-widget
+  make-feature-branch-from main fixes/hammer-time
+EOF
+  exit 1
+}
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  usage
+fi
+
+BASE="main"
+FEATURE=""
+
+if [ $# -eq 1 ]; then
+  FEATURE="$1"
+elif [ $# -eq 2 ]; then
+  BASE="$1"
+  FEATURE="$2"
+else
+  usage
+fi
+
+FEATURE_NAME="feature/${FEATURE}"
+
+echo "👉 Switching to ${BASE}..."
+git fetch origin "${BASE}"
+git checkout "${BASE}"
+git reset --hard "origin/${BASE}"
+
+if git show-ref --verify --quiet "refs/heads/${FEATURE_NAME}"; then
+  echo "🧹 Deleting local branch '${FEATURE_NAME}'..."
+  git branch -D "${FEATURE_NAME}"
+fi
+
+echo "🌱 Creating fresh branch '${FEATURE_NAME}' from ${BASE}..."
+git checkout -b "${FEATURE_NAME}"
+
+echo "🚀 Force pushing to origin (overwrites remote branch if it exists)..."
+git push -u origin "${FEATURE_NAME}" --force-with-lease
+
+echo "✅ Done! Branch '${FEATURE_NAME}' is now reset to match ${BASE}."
