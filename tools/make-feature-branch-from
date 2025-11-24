@@ -12,6 +12,8 @@ force-pushes it to the remote. If the base branch is omitted, it defaults to
 Examples:
   make-feature-branch-from dev my-awesome-widget
   make-feature-branch-from main fixes/hammer-time
+  mcfeet dev my-awesome-widget
+  mcfeet main fixes/hammer-time
 EOF
   exit 1
 }
