@@ -7,7 +7,7 @@
 // exceptions, and platform-specific behaviors that fight our contiguous-buffer
 // design. Platform shims (Threading, networking, host tooling) may opt-in by
 // defining ROBOTICK_ALLOW_STD before including this file; everywhere else, any
-// attempt to use std:: will trigger a compile error once this header is wired
+// attempt to use std:: in robotick:: code will trigger a compile error once this header is wired
 // into the common prelude.
 
 namespace robotick
