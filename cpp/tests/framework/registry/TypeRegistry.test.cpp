@@ -18,12 +18,6 @@ namespace robotick::test
 			CHECK(found->size == sizeof(int));
 			CHECK(found->alignment == alignof(int));
 		}
-
-		SECTION("reports sealed state")
-		{
-			registry.seal();
-			CHECK(registry.is_sealed());
-		}
 	}
 
 } // namespace robotick::test

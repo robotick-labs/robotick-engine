@@ -7,6 +7,7 @@
 #include <memory>
 #include <new>
 #include <type_traits>
+#include <utility>
 
 namespace robotick
 {
@@ -26,11 +27,26 @@ namespace robotick
 			"State<T>: Type too large for inline storage; use StatePtr<T> instead. "
 			"MaxReasonableInlineStateSize = 5120 bytes");
 
-		// Trick: produce more helpful size info using a constexpr check
-		static constexpr bool size_okay = sizeof(T) <= MaxReasonableInlineStateSize;
-
 	  public:
 		State() { new (&storage) T(); }
+		State(const State&) = delete;
+		State& operator=(const State&) = delete;
+
+		State(State&& other) noexcept(std::is_nothrow_move_constructible<T>::value)
+		{
+			new (&storage) T(std::move(other.get()));
+		}
+
+		State& operator=(State&& other) noexcept(std::is_nothrow_move_constructible<T>::value)
+		{
+			if (this != &other)
+			{
+				get().~T();
+				new (&storage) T(std::move(other.get()));
+			}
+			return *this;
+		}
+
 		~State() { get().~T(); }
 
 		T* operator->() { return &get(); }

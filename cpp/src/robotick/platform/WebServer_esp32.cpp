@@ -66,28 +66,27 @@ namespace robotick
 		content_type = type ? type : "text/plain";
 	}
 
-	void WebResponse::add_header(const char* header_line)
+void WebResponse::add_header(const char* header_line)
+{
+	if (state == State::BodyStreaming || state == State::Done)
 	{
-		if (state == State::BodyStreaming || state == State::Done)
-		{
-			ROBOTICK_FATAL_EXIT("WebResponse: header call after body started");
-		}
+		ROBOTICK_FATAL_EXIT("WebResponse: header call after body started");
+	}
 
-		ensure_headers_open();
+	httpd_req_t* req = static_cast<httpd_req_t*>(conn);
 
-		// Status + CORS must be printed before the first header
-		httpd_req_t* req = static_cast<httpd_req_t*>(conn);
+	if (state == State::Start)
+	{
+		write_status_and_cors(req, status_code);
+		state = State::HeadersOpen;
+	}
 
-		if (state == State::Start)
-		{
-			write_status_and_cors(req, status_code);
-			state = State::HeadersOpen;
-		}
+	ensure_headers_open();
 
-		if (header_line && *header_line)
-		{
-			// Add raw header line
-			// ESP-IDF requires key:value form
+	if (header_line && *header_line)
+	{
+		// Add raw header line
+		// ESP-IDF requires key:value form
 			const char* colon = strchr(header_line, ':');
 			if (!colon)
 			{
@@ -282,14 +281,13 @@ WebServer::~WebServer()
 			ROBOTICK_FATAL_EXIT("Failed to start ESP32 WebServer");
 		}
 
-		httpd_uri_t uri_all = {.uri = "/*", .method = HTTP_GET, .handler = esp32_handler, .user_ctx = this};
-		httpd_register_uri_handler(s->handle, &uri_all);
+		httpd_uri_t get_uri = {.uri = "/*", .method = HTTP_GET, .handler = esp32_handler, .user_ctx = this};
+		httpd_uri_t post_uri = {.uri = "/*", .method = HTTP_POST, .handler = esp32_handler, .user_ctx = this};
+		httpd_uri_t options_uri = {.uri = "/*", .method = HTTP_OPTIONS, .handler = esp32_handler, .user_ctx = this};
 
-		uri_all.method = HTTP_POST;
-		httpd_register_uri_handler(s->handle, &uri_all);
-
-		uri_all.method = HTTP_OPTIONS;
-		httpd_register_uri_handler(s->handle, &uri_all);
+		httpd_register_uri_handler(s->handle, &get_uri);
+		httpd_register_uri_handler(s->handle, &post_uri);
+		httpd_register_uri_handler(s->handle, &options_uri);
 
 		running = true;
 	}

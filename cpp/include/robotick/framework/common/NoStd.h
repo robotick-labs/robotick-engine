@@ -10,6 +10,8 @@
 // attempt to use std:: will trigger a compile error once this header is wired
 // into the common prelude.
 
+namespace robotick
+{
 #if !defined(ROBOTICK_ALLOW_STD)
 #if !defined(ROBOTICK_STD_FORBIDDEN)
 #define ROBOTICK_STD_FORBIDDEN 1
@@ -17,3 +19,4 @@
 #define std ROBOTICK_STD_USAGE_BANNED__SEE_robotick_framework_common_NoStd_h
 #endif
 #endif
+} // namespace robotick

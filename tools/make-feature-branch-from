@@ -35,6 +35,11 @@ else
   usage
 fi
 
+if [ -z "${FEATURE}" ]; then
+  echo "❌ Error: feature name is required." >&2
+  usage
+fi
+
 if [[ "${FEATURE}" == *"/"* ]]; then
   FEATURE_NAME="${FEATURE}"
 else

@@ -52,6 +52,7 @@ namespace robotick
 		template <typename T> void update(const T& value)
 		{
 			static_assert(!std::is_pointer<T>::value, "Hash32::update<T> must not be instantiated with pointer types");
+			static_assert(std::is_trivially_copyable<T>::value, "Hash32::update<T> requires trivially copyable types");
 			update(&value, sizeof(T));
 		}
 
