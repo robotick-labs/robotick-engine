@@ -11,6 +11,22 @@
 namespace robotick
 {
 
+	namespace
+	{
+		size_t count_char(const char* begin, char ch)
+		{
+			size_t count = 0;
+			for (const char* cur = begin; *cur != '\0'; ++cur)
+			{
+				if (*cur == ch)
+				{
+					count++;
+				}
+			}
+			return count;
+		}
+	} // namespace
+
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 	WorkloadSeed& Model::add()
@@ -241,7 +257,7 @@ namespace robotick
 			}
 
 			// Ensure valid source path format (at least 3 tokens: workload.outputs.field)
-			if (std::count(source, source + strlen(source), '.') < 2)
+			if (count_char(source, '.') < 2)
 			{
 				ROBOTICK_FATAL_EXIT("Data connection error: malformed source field path '%s'. Expected format: workload.outputs.field", source);
 			}
@@ -253,7 +269,7 @@ namespace robotick
 			}
 
 			// Ensure valid destination path format (at least 3 tokens: workload.inputs.field)
-			if (std::count(dest, dest + strlen(dest), '.') < 2)
+			if (count_char(dest, '.') < 2)
 			{
 				ROBOTICK_FATAL_EXIT("Data connection error: malformed destination field path '%s'. Expected format: workload.inputs.field", dest);
 			}
