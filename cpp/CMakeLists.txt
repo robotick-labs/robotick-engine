@@ -6,24 +6,24 @@
 cmake_minimum_required(VERSION 3.16)
 
 # ============================
-# ✅ Detect Platform Macros
+# Detect Platform Macros
 # ============================
 
 set(PLATFORM_DETECTED FALSE)
 
 if (DEFINED ROBOTICK_PLATFORM_LINUX)
-    message(STATUS "✅ Platform: ROBOTICK_PLATFORM_LINUX")
+    message(STATUS "Platform: ROBOTICK_PLATFORM_LINUX")
     set(PLATFORM_DETECTED TRUE)
     add_compile_definitions(ROBOTICK_PLATFORM_LINUX)
 endif()
 
 if (DEFINED ROBOTICK_PLATFORM_ESP32)
-    message(STATUS "✅ Platform: ROBOTICK_PLATFORM_ESP32")
+    message(STATUS "Platform: ROBOTICK_PLATFORM_ESP32")
     set(PLATFORM_DETECTED TRUE)
 endif()
 
 if (DEFINED ROBOTICK_PLATFORM_DESKTOP)
-    message(STATUS "✅ Platform: ROBOTICK_PLATFORM_DESKTOP")
+    message(STATUS "Platform: ROBOTICK_PLATFORM_DESKTOP")
     set(PLATFORM_DETECTED TRUE)
     add_compile_definitions(ROBOTICK_PLATFORM_DESKTOP)
 endif()
@@ -33,7 +33,7 @@ if (NOT PLATFORM_DETECTED)
 endif()
 
 # ============================
-# ✅ Project-wide Settings
+# Project-wide Settings
 # ============================
 
 if (NOT DEFINED ROBOTICK_PLATFORM_ESP32)
@@ -47,7 +47,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang
 endif()
 
 # ============================
-# ✅ Source Discovery
+# Source Discovery
 # ============================
 
 file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
@@ -55,10 +55,10 @@ file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
 )
 
 list(LENGTH ALL_CPP_SOURCES ALL_CPP_SOURCES_COUNT)
-message(STATUS "📦 ALL_CPP_SOURCES: ${ALL_CPP_SOURCES_COUNT}")
+message(STATUS "ALL_CPP_SOURCES: ${ALL_CPP_SOURCES_COUNT}")
 
 # ============================
-# ✅ Dependencies
+# Dependencies
 # ============================
 
 add_subdirectory(lib/json)
@@ -69,7 +69,7 @@ target_include_directories(civetweb PUBLIC lib/civetweb/include)
 target_compile_definitions(civetweb PRIVATE NO_SSL)
 
 # ============================
-# ✅ Shared Library: robotick-engine
+# Shared Library: robotick-engine
 # ============================
 
 add_library(robotick-engine SHARED ${ALL_CPP_SOURCES})
@@ -86,8 +86,9 @@ target_link_libraries(robotick-engine PUBLIC
     nlohmann_json::nlohmann_json
 )
 
-if (DEFINED ROBOTICK_PLATFORM_LINUX)
+if (DEFINED ROBOTICK_PLATFORM_LINUX OR DEFINED ROBOTICK_PLATFORM_DESKTOP)
     find_package(SDL2 REQUIRED)
+    target_include_directories(robotick-engine PRIVATE ${CMAKE_CURRENT_LIST_DIR}/lib/civetweb/include)
     target_link_libraries(robotick-engine PRIVATE civetweb SDL2::SDL2)
 endif()
 
@@ -104,7 +105,7 @@ if (DEFINED ROBOTICK_PLATFORM_ESP32)
 endif()
 
 # ============================
-# ✅ Static Library: robotick-engine-static
+# Static Library: robotick-engine-static
 # ============================
 
 add_library(robotick-engine-static STATIC ${ALL_CPP_SOURCES})
@@ -120,16 +121,20 @@ target_link_libraries(robotick-engine-static PUBLIC
     nlohmann_json::nlohmann_json
 )
 
-if (DEFINED ROBOTICK_PLATFORM_LINUX)
+if (DEFINED ROBOTICK_PLATFORM_LINUX OR DEFINED ROBOTICK_PLATFORM_DESKTOP)
+    target_include_directories(robotick-engine-static PRIVATE ${CMAKE_CURRENT_LIST_DIR}/lib/civetweb/include)
     target_link_libraries(robotick-engine-static PRIVATE civetweb SDL2::SDL2)
 endif()
 
 # ============================
-# ✅ Unit Tests via Catch2
+# Unit Tests via Catch2
 # ============================
 
 if (ROBOTICK_BUILD_TESTS)
-    message(STATUS "✅ ROBOTICK_BUILD_TESTS - ON")
+    message(STATUS "ROBOTICK_BUILD_TESTS - ON")
+
+    # Enable dynamic model heap helpers during test builds so Model::add() helpers are available.
+    add_compile_definitions(ROBOTICK_ENABLE_MODEL_HEAP)
 
     enable_testing()
     add_subdirectory(tests)
@@ -142,7 +147,7 @@ if (ROBOTICK_BUILD_TESTS)
 
     add_test(NAME robotick_engine_tests
              COMMAND robotick_engine_tests
-             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/cpp/tests)
+             WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 else()
-    message(STATUS "❌ ROBOTICK_BUILD_TESTS - OFF")
+    message(STATUS "ROBOTICK_BUILD_TESTS - OFF")
 endif()

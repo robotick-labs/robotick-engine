@@ -23,6 +23,8 @@ namespace robotick
 	class Thread
 	{
 	  public:
+		using ThreadId = uintptr_t;
+
 		using EntryPoint = void (*)(void*);
 
 		Thread() = default;
@@ -39,6 +41,7 @@ namespace robotick
 		bool is_joinable() const;
 		void join();
 
+		static ThreadId get_current_thread_id();
 		static void yield();
 		static void sleep_ms(uint32_t ms);
 		static void hybrid_sleep_until(std::chrono::steady_clock::time_point target_time);

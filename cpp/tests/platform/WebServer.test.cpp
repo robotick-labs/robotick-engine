@@ -1,4 +1,3 @@
-
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,9 +13,11 @@
 
 using namespace robotick;
 
+// ----------------------------------------------------------
+// Curl helpers
+// ----------------------------------------------------------
 namespace
 {
-
 	std::string http_post(const std::string& url, const std::string& body)
 	{
 		CURL* curl = curl_easy_init();
@@ -25,22 +26,22 @@ namespace
 			return result;
 
 		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2);
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, body.size());
 		curl_easy_setopt(
 			curl,
 			CURLOPT_WRITEFUNCTION,
-			+[](char* ptr, size_t size, size_t nmemb, void* userdata) -> size_t
+			+[](char* ptr, size_t sz, size_t nm, void* ud) -> size_t
 			{
-				auto& out = *reinterpret_cast<std::string*>(userdata);
-				out.append(ptr, size * nmemb);
-				return size * nmemb;
+				auto& out = *reinterpret_cast<std::string*>(ud);
+				out.append(ptr, sz * nm);
+				return sz * nm;
 			});
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
 
 		curl_easy_perform(curl);
-
+		curl_easy_cleanup(curl);
 		return result;
 	}
 
@@ -52,88 +53,164 @@ namespace
 			return result;
 
 		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2);
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
 		curl_easy_setopt(
 			curl,
 			CURLOPT_WRITEFUNCTION,
-			+[](char* ptr, size_t size, size_t nmemb, void* userdata) -> size_t
+			+[](char* ptr, size_t sz, size_t nm, void* ud) -> size_t
 			{
-				auto& out = *reinterpret_cast<std::string*>(userdata);
-				out.append(ptr, size * nmemb);
-				return size * nmemb;
+				auto& out = *reinterpret_cast<std::string*>(ud);
+				out.append(ptr, sz * nm);
+				return sz * nm;
 			});
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
 
 		curl_easy_perform(curl);
-
+		curl_easy_cleanup(curl);
 		return result;
 	}
 
 	void wait_for(std::atomic<bool>& flag, int timeout_ms = 500)
 	{
-		const int sleep_step_ms = 10;
+		constexpr int step = 10;
 		int waited = 0;
 		while (!flag && waited < timeout_ms)
 		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(sleep_step_ms));
-			waited += sleep_step_ms;
+			std::this_thread::sleep_for(std::chrono::milliseconds(step));
+			waited += step;
 		}
 	}
 
+	// ------------------------------------------------------
+	// Simple RAII test server wrapper
+	// ------------------------------------------------------
+	struct ScopedTestServer
+	{
+		WebServer server;
+		uint16_t port = 0;
+
+		ScopedTestServer(const char* name, uint16_t port_in, const char* docroot, WebRequestHandler handler)
+			: port(port_in)
+		{
+			server.start(name, port, docroot, handler);
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
+
+		~ScopedTestServer() { server.stop(); }
+
+		std::string url(const char* path) const { return "http://localhost:" + std::to_string(port) + path; }
+	};
+
 } // namespace
 
-TEST_CASE("Unit/Platform/WebServer/WebServer serves static file and fallback handler", "[WebServer]")
+// =======================================================================================
+// FINAL TEST SUITE
+// =======================================================================================
+TEST_CASE("Unit/Platform/WebServer")
 {
-	std::atomic<bool> fallback_called{false};
-	std::string last_method;
-	std::string last_body;
-
-	WebServer server;
-	server.start("Test",
-		8089,
-		"data/remote_control_interface_web",
-		[&](const WebRequest& request, WebResponse& response)
-		{
-			fallback_called = true;
-			last_method = request.method;
-			last_body = (const char*)request.body.begin();
-
-			std::string body_string = std::string("Custom: ") + std::string(request.uri);
-			response.body.set_from_string(body_string.c_str());
-			response.content_type = "text/plain";
-			return true; // handled
-		});
-
-	std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Give server time to bind
-
-	SECTION("Serves index.html")
+	// -----------------------------------------------------------------------------------
+	// 1. Serving static file
+	// -----------------------------------------------------------------------------------
+	SECTION("Serves index.html from document root")
 	{
-		std::string response = http_get("http://localhost:8089/index.html");
+		ScopedTestServer S("StaticTest",
+			8101,
+			"data/remote_control_interface_web",
+			[](const WebRequest&, WebResponse&)
+			{
+				return false;
+			});
 
-		ROBOTICK_INFO("Response was: '%s'", response.c_str());
-
-		REQUIRE(response.find("Hello Test Page") != std::string::npos);
+		std::string body = http_get(S.url("/index.html").c_str());
+		REQUIRE(body.find("Hello Test Page") != std::string::npos);
 	}
 
-	SECTION("Fallback handler is called for missing path with GET")
+	// -----------------------------------------------------------------------------------
+	// 2. Function-based GET
+	// -----------------------------------------------------------------------------------
+	SECTION("Function-based handler GET")
 	{
-		std::string response = http_get("http://localhost:8089/does_not_exist");
-		wait_for(fallback_called);
-		REQUIRE(fallback_called);
-		REQUIRE(response.find("Custom: /does_not_exist") != std::string::npos);
-		REQUIRE(last_method == "GET");
+		std::atomic<bool> called{false};
+		std::string method;
+		std::string last_uri;
+
+		ScopedTestServer S("Function-based GET",
+			8102,
+			nullptr,
+			[&](const WebRequest& req, WebResponse& resp)
+			{
+				called.store(true);
+				method = req.method.c_str();
+				last_uri = req.uri.c_str();
+
+				resp.set_content_type("text/plain");
+				std::string body = "Custom: " + last_uri;
+				resp.set_body_string(body.c_str());
+				return true;
+			});
+
+		std::string body = http_get(S.url("/does_not_exist").c_str());
+
+		wait_for(called);
+
+		REQUIRE(called.load());
+		REQUIRE(method == "GET");
+		REQUIRE(body.find("Custom: /does_not_exist") != std::string::npos);
 	}
 
-	SECTION("Fallback handler is called for POST with body")
+	// -----------------------------------------------------------------------------------
+	// 3. Function-based POST with body
+	// -----------------------------------------------------------------------------------
+	SECTION("Function-based handler POST with body")
 	{
-		fallback_called = false;
-		std::string response = http_post("http://localhost:8089/api/submit", "hello=world");
-		wait_for(fallback_called);
-		REQUIRE(fallback_called);
-		REQUIRE(response.find("Custom: /api/submit") != std::string::npos);
-		REQUIRE(last_method == "POST");
-		REQUIRE(last_body == "hello=world");
+		std::atomic<bool> called{false};
+		std::string method;
+		std::string posted;
+
+		ScopedTestServer S("Function-based POST",
+			8103,
+			nullptr,
+			[&](const WebRequest& req, WebResponse& resp)
+			{
+				called.store(true);
+				method = req.method.c_str();
+				if (req.body.size() > 0)
+					posted.assign((const char*)req.body.begin(), req.body.size());
+
+				resp.set_content_type("text/plain");
+				std::string body = std::string("POST: ") + req.uri.c_str();
+				resp.set_body_string(body.c_str());
+				return true;
+			});
+
+		std::string body = http_post(S.url("/api/x").c_str(), "hello=world");
+		wait_for(called);
+
+		REQUIRE(called.load());
+		REQUIRE(method == "POST");
+		REQUIRE(posted == "hello=world");
+		REQUIRE(body.find("POST: /api/x") != std::string::npos);
 	}
 
-	server.stop();
+	// ===================================================================================
+	// 4. Pure streaming contract: ordering violations must ROBOTICK_ERROR
+	// ===================================================================================
+
+	SECTION("Handler returns true but sets no body -> empty 200 OK")
+	{
+		ScopedTestServer S("NoBody",
+			8104,
+			nullptr,
+			[](const WebRequest&, WebResponse&)
+			{
+				// Return true but do not send body.
+				return true;
+			});
+
+		std::string body = http_get(S.url("/x").c_str());
+
+		// Should NOT be fatal.
+		// Should return valid HTTP 200 with empty body.
+		REQUIRE(body.size() == 0);
+	}
 }

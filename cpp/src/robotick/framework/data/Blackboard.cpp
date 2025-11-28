@@ -5,6 +5,7 @@
 
 #include "robotick/api_base.h"
 #include "robotick/framework/common/ArrayView.h"
+#include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/TypeMacros.h"
 
 namespace robotick
@@ -34,9 +35,13 @@ namespace robotick
 		return (value + alignment - 1) & ~(alignment - 1);
 	}
 
-	static size_t compute_and_apply_layout(FieldDescriptor* fields, const size_t field_count, const size_t start_offset, const bool write_offsets)
+	static size_t compute_and_apply_layout(const size_t blackboard_offset_in_workloads_buffer,
+		FieldDescriptor* fields,
+		const size_t field_count,
+		const size_t start_offset_in_workloads_buffer,
+		const bool write_offsets)
 	{
-		size_t current_offset = start_offset;
+		size_t current_offset_in_workloads_buffer = start_offset_in_workloads_buffer;
 
 		for (size_t i = 0; i < field_count; ++i)
 		{
@@ -44,17 +49,17 @@ namespace robotick
 			const TypeDescriptor* type = field.find_type_descriptor();
 			ROBOTICK_ASSERT_MSG(type != nullptr, "Field has no type descriptor");
 
-			current_offset = align_up(current_offset, type->alignment);
+			current_offset_in_workloads_buffer = align_up(current_offset_in_workloads_buffer, type->alignment);
 
 			if (write_offsets)
 			{
-				field.offset_within_container = current_offset;
+				field.offset_within_container = current_offset_in_workloads_buffer - blackboard_offset_in_workloads_buffer;
 			}
 
-			current_offset += type->size;
+			current_offset_in_workloads_buffer += type->size;
 		}
 
-		return current_offset;
+		return current_offset_in_workloads_buffer;
 	}
 
 	void Blackboard::compute_total_datablock_size()
@@ -63,16 +68,21 @@ namespace robotick
 		const bool write_offsets = false;
 
 		info.total_datablock_size =
-			compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
+			compute_and_apply_layout(0, info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
 	}
 
-	void Blackboard::bind(size_t& datablock_offset)
+	void Blackboard::bind(const WorkloadsBuffer& workloads_buffer, size_t& datablock_offset_in_workloads_buffer)
 	{
-		const size_t start_offset = datablock_offset;
+		const size_t blackboard_offset_in_workloads_buffer = (uint8_t*)this - workloads_buffer.raw_ptr();
+
+		const size_t start_offset_in_workloads_buffer = datablock_offset_in_workloads_buffer;
 		const bool write_offsets = true;
 
-		datablock_offset =
-			compute_and_apply_layout(info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
+		datablock_offset_in_workloads_buffer = compute_and_apply_layout(blackboard_offset_in_workloads_buffer,
+			info.struct_descriptor.fields.data_ptr(),
+			info.struct_descriptor.fields.size(),
+			start_offset_in_workloads_buffer,
+			write_offsets);
 	}
 
 	const FieldDescriptor* Blackboard::find_field(const char* field_name) const

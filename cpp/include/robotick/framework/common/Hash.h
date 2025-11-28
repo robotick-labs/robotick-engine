@@ -3,6 +3,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <type_traits>
 
 namespace robotick
 {
@@ -25,4 +27,43 @@ namespace robotick
 		}
 		return hash;
 	}
+
+	/**
+	 * @brief FNV-1a 32-bit streaming hasher. Use for layout identity / checksums.
+	 *        Zero heap, platform-stable, safe for structs, types, offsets.
+	 */
+	struct Hash32
+	{
+		static constexpr uint32_t offset_basis = 2166136261u;
+		static constexpr uint32_t prime = 16777619u;
+
+		uint32_t state = offset_basis;
+
+		void update(const void* data, size_t size)
+		{
+			const uint8_t* bytes = static_cast<const uint8_t*>(data);
+			for (size_t i = 0; i < size; ++i)
+			{
+				state ^= bytes[i];
+				state *= prime;
+			}
+		}
+
+		template <typename T> void update(const T& value)
+		{
+			static_assert(!std::is_pointer<T>::value, "Hash32::update<T> must not be instantiated with pointer types");
+			static_assert(std::is_trivially_copyable<T>::value, "Hash32::update<T> requires trivially copyable types");
+			update(&value, sizeof(T));
+		}
+
+		void update_cstring(const char* str)
+		{
+			if (str)
+			{
+				update(str, std::strlen(str));
+			}
+		}
+
+		uint32_t final() const { return state; }
+	};
 } // namespace robotick

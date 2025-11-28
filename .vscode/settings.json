@@ -133,6 +133,7 @@
     "cfenv": "cpp",
     "strstream": "cpp",
     "source_location": "cpp",
-    "shared_mutex": "cpp"
+    "shared_mutex": "cpp",
+    "stdfloat": "cpp"
   }
 }

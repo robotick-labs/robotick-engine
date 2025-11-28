@@ -15,20 +15,25 @@ namespace robotick
 	};
 } // namespace robotick
 
-/// @brief Macro to register Primitives:
-#define ROBOTICK_REGISTER_PRIMITIVE(TypeName, ToStringFn, FromStringFn)                                                                              \
+/// @brief Macro to register Primitives with associated mime_type (e.g. "text/plain", "image/png"):
+#define ROBOTICK_REGISTER_PRIMITIVE_WITH_MIME_TYPE(TypeName, MimeType)                                                                               \
 	static_assert(                                                                                                                                   \
 		std::is_standard_layout<TypeName>::value, #TypeName " is not standard layout. Only standard layout types can be registered as primitives."); \
 	static_assert(std::is_trivially_copyable<TypeName>::value,                                                                                       \
 		#TypeName " is not trivially copyable. Only trivially copyable items can be registered as primitive types.");                                \
 	static constexpr ::robotick::TypeDescriptor s_type_desc_##TypeName = {                                                                           \
-		#TypeName, GET_TYPE_ID(TypeName), sizeof(TypeName), alignof(TypeName), ::robotick::TypeCategory::Primitive, {}, ToStringFn, FromStringFn};   \
+		#TypeName, GET_TYPE_ID(TypeName), sizeof(TypeName), alignof(TypeName), ::robotick::TypeCategory::Primitive, {}, MimeType};                   \
 	static const ::robotick::AutoRegisterType s_auto_register_##TypeName(s_type_desc_##TypeName);
+
+/// @brief Macro to register Primitives (no mime_type needed):
+#define ROBOTICK_REGISTER_PRIMITIVE(TypeName) ROBOTICK_REGISTER_PRIMITIVE_WITH_MIME_TYPE(TypeName, nullptr)
 
 /// @brief Macros to register Structs:
 #define ROBOTICK_REGISTER_STRUCT_BEGIN(StructType) static ::robotick::FieldDescriptor s_fields_##StructType[] = {
 
-#define ROBOTICK_STRUCT_FIELD(StructType, FieldType, FieldName) {#FieldName, GET_TYPE_ID(FieldType), offsetof(StructType, FieldName)},
+#define ROBOTICK_STRUCT_FIELD(StructType, FieldType, FieldName) {#FieldName, GET_TYPE_ID(FieldType), offsetof(StructType, FieldName), 1},
+#define ROBOTICK_STRUCT_FIXED_ARRAY_FIELD(StructType, FieldType, FieldCount, FieldName)                                                              \
+	{#FieldName, GET_TYPE_ID(FieldType), offsetof(StructType, FieldName), FieldCount},
 
 #define ROBOTICK_REGISTER_STRUCT_END(StructType)                                                                                                     \
 	}                                                                                                                                                \
@@ -45,7 +50,6 @@ namespace robotick
 		alignof(StructType),                                                                                                                         \
 		::robotick::TypeCategory::Struct,                                                                                                            \
 		{&s_struct_desc_##StructType},                                                                                                               \
-		nullptr,                                                                                                                                     \
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##StructType(s_type_desc_##StructType);
 
@@ -62,7 +66,6 @@ namespace robotick
 		alignof(TypeName),                                                                                                                           \
 		::robotick::TypeCategory::DynamicStruct,                                                                                                     \
 		{&s_dynamic_struct_desc_##TypeName},                                                                                                         \
-		nullptr,                                                                                                                                     \
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##TypeName(s_type_desc_##TypeName);
 
@@ -84,7 +87,6 @@ namespace robotick
 		alignof(WorkloadTypeName),                                                                                                                   \
 		::robotick::TypeCategory::Workload,                                                                                                          \
 		{&s_workload_desc_##WorkloadTypeName},                                                                                                       \
-		nullptr,                                                                                                                                     \
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##WorkloadTypeName(s_type_desc_##WorkloadTypeName);                                         \
 	volatile bool g_##WorkloadTypeName##_NoDeadStrip = false;                                                                                        \
@@ -107,3 +109,4 @@ namespace robotick
 #define ROBOTICK_KEEP_WORKLOAD(WorkloadTypeName)                                                                                                     \
 	extern volatile bool g_##WorkloadTypeName##_NoDeadStrip;                                                                                         \
 	g_##WorkloadTypeName##_NoDeadStrip = true;
+;

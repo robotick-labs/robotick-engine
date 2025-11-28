@@ -216,7 +216,7 @@ namespace robotick
 			if (*path_cursor != '\0')
 				ROBOTICK_FATAL_EXIT("Too many path components in: %s", path);
 
-			ROBOTICK_ASSERT(workloads_buffer.contains_object(ptr, size) && "Resolved field must be within workloads_buffer");
+			ROBOTICK_ASSERT(workloads_buffer.contains_object_used_space(ptr, size) && "Resolved field must be within workloads_buffer");
 
 			return ResolvedField{workload, ptr, type, size};
 		}

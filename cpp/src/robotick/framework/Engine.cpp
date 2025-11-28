@@ -60,16 +60,28 @@ namespace robotick
 	extern "C" void robotick_force_register_vec3_types();
 	extern "C" void robotick_force_register_quat_types();
 
+	void align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	{
+		const size_t align = max<size_t>(type.alignment, alignof(std::max_align_t));
+		workloads_cursor = (workloads_cursor + align - 1) & ~(align - 1);
+	}
+
+	void increment_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	{
+		workloads_cursor += type.size;
+	}
+
 	void Engine::load(const Model& model)
 	{
 		// initialize the host-system
 		System::initialize();
 
-		// ensure out standard types don't get pruned by the linker:
+		// ensure our standard types don't get pruned by the linker, and then seal the registry:
 		robotick_force_register_primitives();
 		robotick_force_register_fixed_vector_types();
 		robotick_force_register_vec3_types();
 		robotick_force_register_quat_types();
+		TypeRegistry::get().seal();
 
 		if (!model.get_root_workload())
 			ROBOTICK_FATAL_EXIT("Model has no root workload");
@@ -80,48 +92,66 @@ namespace robotick
 		state->model = &model;
 
 		// compute how big we need our workloads-buffer to be:
+		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
+		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
+
 		const auto& seeds = model.get_workload_seeds();
-		size_t workloads_cursor = 0;
-		std::vector<size_t> offsets;
+		size_t total_size = 0;
 		for (const WorkloadSeed* seed : seeds)
 		{
 			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
-			if (!workload_type)
-				ROBOTICK_FATAL_EXIT("Unknown workload type: %s", seed->type_id.get_debug_name());
+			ROBOTICK_ASSERT_MSG(workload_type, "Unknown workload type: %s", seed->type_id.get_debug_name());
 
-			const size_t align = max<size_t>(workload_type->alignment, alignof(std::max_align_t));
-			workloads_cursor = (workloads_cursor + align - 1) & ~(align - 1);
-			offsets.push_back(workloads_cursor);
-			workloads_cursor += workload_type->size;
+			align_workloads_cursor_for_type(*workload_stats_type, total_size);
+			increment_workloads_cursor_for_type(*workload_stats_type, total_size);
+
+			align_workloads_cursor_for_type(*workload_type, total_size);
+			increment_workloads_cursor_for_type(*workload_type, total_size);
 		}
 
 		// create our workloads-buffer, workload-instances info, and construct each workload:
-		const size_t total_size = workloads_cursor;
 		state->workloads_buffer = WorkloadsBuffer(total_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
+
+		size_t workloads_cursor = 0;
 		uint8_t* buffer_ptr = state->workloads_buffer.raw_ptr();
 		state->instances.initialize(seeds.size());
 
 		for (size_t i = 0; i < seeds.size(); ++i)
 		{
 			const auto* seed = seeds[i];
+
 			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
+			ROBOTICK_ASSERT_MSG(workload_type, "Unknown workload type: %s", seed->type_id.get_debug_name());
 
 			const auto* workload_desc = workload_type->get_workload_desc();
 			ROBOTICK_ASSERT(workload_desc != nullptr);
 
-			uint8_t* ptr = buffer_ptr + offsets[i];
+			align_workloads_cursor_for_type(*workload_stats_type, workloads_cursor);
+			const size_t stats_offset = workloads_cursor;
+			increment_workloads_cursor_for_type(*workload_stats_type, workloads_cursor);
+
+			align_workloads_cursor_for_type(*workload_type, workloads_cursor);
+			const size_t instance_offset = workloads_cursor;
+			increment_workloads_cursor_for_type(*workload_type, workloads_cursor);
+
+			uint8_t* workload_stats_ptr = buffer_ptr + stats_offset;
+			uint8_t* workload_ptr = buffer_ptr + instance_offset;
 
 			WorkloadInstanceInfo& workload_instance_info = state->instances[i];
-			workload_instance_info.offset_in_workloads_buffer = offsets[i];
+			workload_instance_info.offset_in_workloads_buffer = instance_offset;
 			workload_instance_info.type = workload_type;
 			workload_instance_info.workload_descriptor = workload_desc;
 			workload_instance_info.seed = seed;
+			workload_instance_info.workload_stats = new (static_cast<void*>(workload_stats_ptr)) WorkloadInstanceStats{};
+			workload_instance_info.workload_stats->tick_rate_hz = seed->tick_rate_hz;
 
 			// add it to our map for quick lookup by name
 			state->instances_by_unique_name.insert(seed->unique_name.c_str(), &workload_instance_info);
 
 			if (workload_desc->construct_fn)
-				workload_desc->construct_fn(ptr);
+			{
+				workload_desc->construct_fn(workload_ptr);
+			}
 		}
 
 		// handle pre-load for each workload (we can multithread this in future, where platforms allow)
@@ -160,6 +190,9 @@ namespace robotick
 			workloads_cursor += blackboard_size;
 			bind_blackboards_for_instances(state->instances, start);
 		}
+
+		ROBOTICK_INFO("workloads_cursor: %zu", workloads_cursor);
+		state->workloads_buffer.set_size_used(workloads_cursor);
 
 		// post-blackboard-setup config pass:
 		for (size_t i = 0; i < seeds.size(); ++i)
@@ -325,7 +358,7 @@ namespace robotick
 		auto next_tick_time = engine_start_time;
 
 		TickInfo tick_info;
-		tick_info.workload_stats = &root_info.mutable_stats;
+		tick_info.workload_stats = root_info.workload_stats;
 		tick_info.tick_rate_hz = root_tick_rate_hz;
 
 		do
@@ -357,8 +390,8 @@ namespace robotick
 			root_tick_fn(root_ptr, tick_info);
 
 			const auto now_post = std::chrono::steady_clock::now();
-			root_info.mutable_stats.last_tick_duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now_post - now).count();
-			root_info.mutable_stats.last_time_delta_ns = ns_since_last;
+			root_info.workload_stats->last_tick_duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now_post - now).count();
+			root_info.workload_stats->last_time_delta_ns = ns_since_last;
 
 			next_tick_time += child_tick_interval;
 			Thread::hybrid_sleep_until(next_tick_time);
@@ -377,6 +410,11 @@ namespace robotick
 	bool Engine::is_running() const
 	{
 		return state && state->is_running;
+	}
+
+	const char* Engine::get_model_name() const
+	{
+		return (state != nullptr && state->model != nullptr) ? state->model->get_model_name() : "model_not_set";
 	}
 
 	const WorkloadInstanceInfo* Engine::get_root_instance_info() const
@@ -477,7 +515,7 @@ namespace robotick
 			if (field.type_id == GET_TYPE_ID(Blackboard))
 			{
 				Blackboard& blackboard = field.get_data<Blackboard>(state->workloads_buffer, instance, struct_type_desc, struct_offset);
-				blackboard.bind(blackboard_storage_offset);
+				blackboard.bind(state->workloads_buffer, blackboard_storage_offset);
 			}
 		}
 	}

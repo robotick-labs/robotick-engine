@@ -18,8 +18,9 @@ namespace robotick
 
 	struct WorkloadInstanceStats
 	{
-		uint32_t last_tick_duration_ns{0}; // (uint32_t can store up to 4.29s of nanoseconds - should be fine for these deltas)
-		uint32_t last_time_delta_ns{0};
+		uint32_t last_tick_duration_ns = 0; // (uint32_t can store up to 4.29s of nanoseconds - should be fine for these deltas)
+		uint32_t last_time_delta_ns = 0;
+		float tick_rate_hz = 0.0f;
 
 		float get_last_tick_duration_sec() const { return (float)last_tick_duration_ns * 1e-9f; }
 		float get_last_time_delta_sec() const { return (float)last_time_delta_ns * 1e-9f; }
@@ -41,8 +42,6 @@ namespace robotick
 
 		HeapVector<const WorkloadInstanceInfo*> children;
 
-		// mutable state:
-		mutable WorkloadInstanceStats mutable_stats;
-		// ^- mutable so we can set it during ticking, even when WorkloadInstanceInfo is const - e.g. for stats
+		WorkloadInstanceStats* workload_stats = nullptr;
 	};
 } // namespace robotick

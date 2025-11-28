@@ -54,6 +54,7 @@ message(STATUS "📦 CORE_SOURCES: ${CORE_COUNT}  |  PYTHON_SOURCES: ${PYTHON_CO
 set(srcs ${CORE_SOURCES})
 set(include_dirs
     ${CMAKE_CURRENT_LIST_DIR}/include
+    ${CMAKE_CURRENT_LIST_DIR}/lib/json/single_include
 )
 
 message(STATUS "🧐 Included sources:")

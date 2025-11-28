@@ -108,76 +108,14 @@ namespace robotick
 		 * @param src Pointer to raw memory block
 		 * @param byte_count Number of bytes to copy (must be divisible by sizeof(T))
 		 */
-		void set_bytes(const void* src, size_t byte_count)
+		void set_bytes(const void* src, size_t const byte_count)
 		{
-			size_t element_count = byte_count / sizeof(T);
+			const size_t element_count = byte_count / sizeof(T);
 			ROBOTICK_ASSERT(src != nullptr);
-			ROBOTICK_ASSERT(element_count <= capacity());
+			ROBOTICK_ASSERT_MSG(
+				element_count <= capacity(), "Too many elements (%zu - %zu bytes) provided - capacity is %zu", element_count, byte_count, capacity());
 			memcpy(data_buffer, src, byte_count);
 			count = element_count;
-		}
-
-		/**
-		 * @brief Set the buffer-contents and size to the specified string
-		 * (string-length plus null-terminator)
-		 *
-		 * @param value The string-value to set
-		 */
-		void set_from_string(const char* value)
-		{
-			ROBOTICK_ASSERT(value != nullptr);
-
-			const size_t len = strlen(value) + 1; // include null terminator
-			ROBOTICK_ASSERT(len <= capacity());
-
-			memcpy(data_buffer, value, len);
-			count = len;
-		}
-
-		/**
-		 * @brief Appends a null-terminated string to the buffer.
-		 *
-		 * The null terminator is not included. Returns false if the buffer would overflow.
-		 *
-		 * @param cstr The string to append.
-		 * @return true on success, false if the data would exceed capacity.
-		 */
-		bool append_from_string(const char* cstr)
-		{
-			if (!cstr)
-				return false;
-
-			size_t len = strlen(cstr);
-			if (count + len > capacity())
-				return false;
-
-			memcpy(data() + count, cstr, len);
-			count += len;
-			return true;
-		}
-
-		/**
-		 * @brief Appends formatted text to the buffer using printf-style syntax.
-		 *
-		 * Uses an internal 256-byte staging buffer. Returns false on formatting error or overflow.
-		 *
-		 * @param fmt The format string.
-		 * @param ... Format arguments.
-		 * @return true on success, false if the formatted string is too large or buffer would overflow.
-		 */
-		bool append_from_string_format(const char* fmt, ...)
-		{
-			va_list args;
-			va_start(args, fmt);
-			size_t available = capacity() - count;
-			int written = std::vsnprintf(reinterpret_cast<char*>(data() + count), available, fmt, args);
-			va_end(args);
-
-			if (written <= 0 || static_cast<size_t>(written) >= available)
-				return false;
-
-			count += static_cast<size_t>(written);
-			return true;
 		}
 
 		/**
@@ -186,7 +124,8 @@ namespace robotick
 		T& operator[](size_t index)
 		{
 			ROBOTICK_ASSERT_MSG(index < Capacity, "Indexing beyond Capacity (non-const [] accessor)");
-			ROBOTICK_ASSERT_MSG(index < count, "Indexing beyond current size of %u (non-const [] accessor)", count);
+			ROBOTICK_ASSERT_MSG(
+				index < count, "Indexing beyond current size of %zu (non-const [] accessor)", static_cast<size_t>(count));
 			return data_buffer[index];
 		}
 
@@ -196,7 +135,7 @@ namespace robotick
 		const T& operator[](size_t index) const
 		{
 			ROBOTICK_ASSERT_MSG(index < Capacity, "Indexing beyond Capacity (const [] accessor)");
-			ROBOTICK_ASSERT_MSG(index < count, "Indexing beyond current size of %u (const [] accessor)", count);
+			ROBOTICK_ASSERT_MSG(index < count, "Indexing beyond current size of %zu (const [] accessor)", static_cast<size_t>(count));
 			return data_buffer[index];
 		}
 
@@ -235,7 +174,7 @@ namespace robotick
 		 */
 		const T* data() const { return &data_buffer[0]; };
 
-	  private:
+	  public:
 		T data_buffer[Capacity]{}; ///< Underlying storage.
 		uint32_t count = 0;		   ///< Current number of elements.
 	};
@@ -249,5 +188,14 @@ namespace robotick
 	using FixedVector64k = FixedVector<uint8_t, 64 * 1024>;
 	using FixedVector128k = FixedVector<uint8_t, 128 * 1024>;
 	using FixedVector256k = FixedVector<uint8_t, 256 * 1024>;
+
+	// Reusable macro for registering a FixedVector<T, N> style struct
+	// 	usage: ROBOTICK_REGISTER_FIXED_VECTOR(MyVecType, element_type)
+
+#define ROBOTICK_REGISTER_FIXED_VECTOR(StructType, ElementType)                                                                                      \
+	ROBOTICK_REGISTER_STRUCT_BEGIN(StructType)                                                                                                       \
+	ROBOTICK_STRUCT_FIXED_ARRAY_FIELD(StructType, ElementType, StructType::capacity(), data_buffer)                                                  \
+	ROBOTICK_STRUCT_FIELD(StructType, uint32_t, count)                                                                                               \
+	ROBOTICK_REGISTER_STRUCT_END(StructType)
 
 } // namespace robotick

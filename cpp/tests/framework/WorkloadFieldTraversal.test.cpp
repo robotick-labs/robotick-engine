@@ -76,7 +76,7 @@ namespace robotick::test
 					const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
 					// Verify pointer lies within workloads buffer
-					CHECK(workloads_buf.contains_object(field_ptr, view.field_info->find_type_descriptor()->size));
+					CHECK(workloads_buf.contains_object_used_space(field_ptr, view.field_info->find_type_descriptor()->size));
 
 					if (view.field_info->name == "input_value")
 					{
@@ -106,10 +106,12 @@ namespace robotick::test
 			// const auto& original = engine.get_all_instance_info();
 			const auto& original_buf = engine.get_workloads_buffer();
 
-			WorkloadsBuffer mirror_buf(original_buf.get_size());
-			std::memcpy(mirror_buf.raw_ptr(), original_buf.raw_ptr(), original_buf.get_size());
+			WorkloadsBuffer mirror_buf(original_buf.get_size_used());
+			std::memcpy(mirror_buf.raw_ptr(), original_buf.raw_ptr(), original_buf.get_size_used());
 
-			auto* mirror_workload = reinterpret_cast<SimpleWorkload*>(mirror_buf.raw_ptr());
+			const auto& inst = engine.get_all_instance_info()[0];
+			auto* mirror_workload = reinterpret_cast<SimpleWorkload*>(mirror_buf.raw_ptr() + inst.offset_in_workloads_buffer);
+
 			mirror_workload->inputs.input_value = 99;
 			mirror_workload->outputs.output_value = 888;
 
