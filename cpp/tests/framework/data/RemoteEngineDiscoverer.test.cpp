@@ -1,6 +1,6 @@
 #include "robotick/framework/data/RemoteEngineDiscoverer.h"
 #include "robotick/api.h"
-#include "robotick/platform/Threading.h"
+#include "robotick/platform/Thread.h"
 
 #include <atomic>
 #include <catch2/catch_all.hpp>

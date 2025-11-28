@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include <chrono>
 #include <cstring>
 
 namespace robotick
@@ -95,16 +96,14 @@ namespace robotick
 		taskYIELD(); // explicit, zero-latency yield
 	}
 
-	inline void Thread::hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
+	inline void Thread::hybrid_sleep_until(Clock::time_point target_time)
 	{
-		using namespace std::chrono;
-
 		constexpr auto coarse_threshold_us = 2000; // 2 ms
 		constexpr int watchdog_yield_interval = 500;
 		int spin_counter = 0;
 
 		// Convert target_time to absolute time in microseconds
-		int64_t target_us = duration_cast<microseconds>(target_time.time_since_epoch()).count();
+		int64_t target_us = std::chrono::duration_cast<std::chrono::microseconds>(target_time.time_since_epoch()).count();
 
 		// esp_task_wdt_reset();
 

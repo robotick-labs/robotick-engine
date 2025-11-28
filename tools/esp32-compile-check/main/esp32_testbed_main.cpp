@@ -4,7 +4,7 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/platform/EntryPoint.h"
 #include "robotick/platform/NetworkManager.h"
-#include "robotick/platform/Threading.h"
+#include "robotick/platform/Atomic.h"
 
 #include <M5Unified.h>
 

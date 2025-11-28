@@ -7,3 +7,4 @@ build/*
 cpp/build/*
 .venv
 tools/esp32-compile-check/platforms/
+/scratch/

@@ -11,6 +11,11 @@
 #include <string>
 #include <thread>
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 using namespace robotick;
 
 // ----------------------------------------------------------
@@ -18,6 +23,45 @@ using namespace robotick;
 // ----------------------------------------------------------
 namespace
 {
+	std::atomic<uint16_t> g_webserver_port_counter{50000};
+
+	uint16_t find_free_port()
+	{
+		int sock = ::socket(AF_INET, SOCK_STREAM, 0);
+		if (sock < 0)
+			return 0;
+
+		sockaddr_in addr{};
+		addr.sin_family = AF_INET;
+		addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		addr.sin_port = 0;
+
+		if (::bind(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
+		{
+			::close(sock);
+			return 0;
+		}
+
+		socklen_t addr_len = sizeof(addr);
+		if (::getsockname(sock, reinterpret_cast<sockaddr*>(&addr), &addr_len) != 0)
+		{
+			::close(sock);
+			return 0;
+		}
+
+		uint16_t port = ntohs(addr.sin_port);
+		::close(sock);
+		return port;
+	}
+
+	uint16_t allocate_test_port()
+	{
+		uint16_t port = find_free_port();
+		if (port != 0)
+			return port;
+		return g_webserver_port_counter.fetch_add(1);
+	}
+
 	std::string http_post(const std::string& url, const std::string& body)
 	{
 		CURL* curl = curl_easy_init();
@@ -114,7 +158,7 @@ TEST_CASE("Unit/Platform/WebServer")
 	SECTION("Serves index.html from document root")
 	{
 		ScopedTestServer S("StaticTest",
-			8101,
+			allocate_test_port(),
 			"data/remote_control_interface_web",
 			[](const WebRequest&, WebResponse&)
 			{
@@ -135,7 +179,7 @@ TEST_CASE("Unit/Platform/WebServer")
 		std::string last_uri;
 
 		ScopedTestServer S("Function-based GET",
-			8102,
+			allocate_test_port(),
 			nullptr,
 			[&](const WebRequest& req, WebResponse& resp)
 			{
@@ -168,7 +212,7 @@ TEST_CASE("Unit/Platform/WebServer")
 		std::string posted;
 
 		ScopedTestServer S("Function-based POST",
-			8103,
+			allocate_test_port(),
 			nullptr,
 			[&](const WebRequest& req, WebResponse& resp)
 			{
@@ -199,7 +243,7 @@ TEST_CASE("Unit/Platform/WebServer")
 	SECTION("Handler returns true but sets no body -> empty 200 OK")
 	{
 		ScopedTestServer S("NoBody",
-			8104,
+			allocate_test_port(),
 			nullptr,
 			[](const WebRequest&, WebResponse&)
 			{

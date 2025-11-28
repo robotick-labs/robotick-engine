@@ -63,25 +63,25 @@ namespace robotick
 		std::this_thread::yield();
 	}
 
-	inline void Thread::hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
+inline void Thread::hybrid_sleep_until(Clock::time_point target_time)
+{
+	using namespace std::chrono_literals;
+	constexpr auto coarse_margin = 2ms;
+	constexpr auto coarse_step = 500us;
+	constexpr int fine_spin_iters = 20;
+
+	auto now = Clock::now();
+	while (now + coarse_margin < target_time)
 	{
-		using namespace std::chrono_literals;
-		constexpr auto coarse_margin = 2ms;
-		constexpr auto coarse_step = 500us;
-		constexpr int fine_spin_iters = 20;
+		std::this_thread::sleep_for(coarse_step);
+		now = Clock::now();
+	}
 
-		auto now = std::chrono::steady_clock::now();
-		while (now + coarse_margin < target_time)
+	while (Clock::now() < target_time)
+	{
+		for (volatile int i = 0; i < fine_spin_iters; ++i)
 		{
-			std::this_thread::sleep_for(coarse_step);
-			now = std::chrono::steady_clock::now();
 		}
-
-		while (std::chrono::steady_clock::now() < target_time)
-		{
-			for (volatile int i = 0; i < fine_spin_iters; ++i)
-			{
-			}
 		}
 	}
 

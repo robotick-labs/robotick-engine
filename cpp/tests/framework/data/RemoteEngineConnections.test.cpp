@@ -3,7 +3,8 @@
 
 #include "robotick/framework/data/RemoteEngineConnections.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/platform/Threading.h"
+#include "robotick/platform/Atomic.h"
+#include "robotick/platform/Thread.h"
 
 #include <catch2/catch_all.hpp>
 #include <thread>

@@ -13,7 +13,9 @@
 #include "robotick/framework/utils/TypeId.h"
 #include "robotick/platform/PlatformEvents.h"
 #include "robotick/platform/System.h"
-#include "robotick/platform/Threading.h"
+#include "robotick/platform/Atomic.h"
+#include "robotick/platform/Clock.h"
+#include "robotick/platform/Thread.h"
 #include "robotick/platform/WebServer.h"
 
 namespace robotick
@@ -348,10 +350,8 @@ namespace robotick
 
 		state->is_running = true;
 
-		const auto child_tick_interval_sec = std::chrono::duration<float>(1.0f / root_tick_rate_hz);
-		const auto child_tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(child_tick_interval_sec);
-
-		const auto engine_start_time = std::chrono::steady_clock::now() - child_tick_interval;
+		const auto child_tick_interval = Clock::from_seconds(1.0f / root_tick_rate_hz);
+		const auto engine_start_time = Clock::now() - child_tick_interval;
 		// ^- subtract tick-interval so initial delta is from tick-interval
 
 		auto last_tick_time = engine_start_time;
@@ -363,9 +363,9 @@ namespace robotick
 
 		do
 		{
-			const auto now = std::chrono::steady_clock::now();
-			const auto ns_since_start = std::chrono::duration_cast<std::chrono::nanoseconds>(now - engine_start_time).count();
-			const auto ns_since_last = std::chrono::duration_cast<std::chrono::nanoseconds>(now - last_tick_time).count();
+			const auto now = Clock::now();
+			const auto ns_since_start = Clock::to_nanoseconds(now - engine_start_time).count();
+			const auto ns_since_last = Clock::to_nanoseconds(now - last_tick_time).count();
 
 			static const float s_1_nanosecond_sec = 1e-9F;
 
@@ -389,8 +389,8 @@ namespace robotick
 
 			root_tick_fn(root_ptr, tick_info);
 
-			const auto now_post = std::chrono::steady_clock::now();
-			root_info.workload_stats->last_tick_duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now_post - now).count();
+			const auto now_post = Clock::now();
+			root_info.workload_stats->last_tick_duration_ns = Clock::to_nanoseconds(now_post - now).count();
 			root_info.workload_stats->last_time_delta_ns = ns_since_last;
 
 			next_tick_time += child_tick_interval;

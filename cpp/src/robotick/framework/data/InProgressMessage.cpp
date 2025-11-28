@@ -5,7 +5,6 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/data/MessageHeader.h"
-#include "robotick/platform/Threading.h"
 
 #include <errno.h>
 #include <string>
