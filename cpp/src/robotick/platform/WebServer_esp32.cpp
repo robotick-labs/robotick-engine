@@ -169,9 +169,17 @@ void WebResponse::add_header(const char* header_line)
 
 		WebRequest r;
 
-		// URI
-		if (req->uri)
-			r.uri = req->uri;
+		const char* full_uri = req->uri;
+		const char* query_start = strchr(full_uri, '?');
+
+		if (query_start)
+		{
+			r.uri = FixedString128(full_uri, query_start - full_uri);
+		}
+		else
+		{
+			r.uri = full_uri;
+		}
 
 		// Method
 		if (req->method == HTTP_GET)
@@ -184,11 +192,9 @@ void WebResponse::add_header(const char* header_line)
 			r.method = "OTHER";
 
 		// Query string parsing
-		char* qs = strchr(req->uri, '?');
-		if (qs)
+		if (query_start)
 		{
-			*qs = '\0';
-			qs++;
+			const char* qs = query_start + 1;
 			while (*qs && r.query_params.size() < r.query_params.capacity())
 			{
 				FixedString32 key;
