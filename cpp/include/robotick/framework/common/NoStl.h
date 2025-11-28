@@ -15,8 +15,8 @@ namespace robotick
 #if !defined(ROBOTICK_ALLOW_STD)
 #if !defined(ROBOTICK_STD_FORBIDDEN)
 #define ROBOTICK_STD_FORBIDDEN 1
-#define ROBOTICK_STD_USAGE_BANNED__SEE_robotick_framework_common_NoStd_h
-#define std ROBOTICK_STD_USAGE_BANNED__SEE_robotick_framework_common_NoStd_h
+#define ROBOTICK_STD_USAGE_BANNED__SEE_robotick_framework_common_NoStl_h
+#define std ROBOTICK_STD_USAGE_BANNED__SEE_robotick_framework_common_NoStl_h
 #endif
 #endif
 } // namespace robotick
