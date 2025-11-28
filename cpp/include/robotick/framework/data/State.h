@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <new>
 #include <type_traits>
 
@@ -22,14 +23,11 @@ namespace robotick
 		static_assert(std::is_default_constructible<T>::value, "State<T> requires T to be default-constructible");
 
 		static_assert(sizeof(T) <= MaxReasonableInlineStateSize,
-			"State<T>: Type too large for inline storage.\n"
-			"Use StatePtr<T> instead.\n"
-			"sizeof(T) = " __FILE__); // dummy to ensure compile fail; message below improves
+			"State<T>: Type too large for inline storage; use StatePtr<T> instead. "
+			"MaxReasonableInlineStateSize = 5120 bytes");
 
 		// Trick: produce more helpful size info using a constexpr check
-		static constexpr bool size_okay = sizeof(T) <= MaxReasonableInlineStateSize || (throw "State<T>: Type too large for inline storage. "
-																							  "sizeof(T) exceeds 5KB threshold.",
-																						   false);
+		static constexpr bool size_okay = sizeof(T) <= MaxReasonableInlineStateSize;
 
 	  public:
 		State() { new (&storage) T(); }
@@ -61,16 +59,16 @@ namespace robotick
 			"sizeof(T) = ??? (<=5KB threshold)");
 
 	  public:
-		StatePtr() { ptr = new T(); }
+		StatePtr() : ptr(std::make_unique<T>()) {}
+		~StatePtr() = default;
 
-		~StatePtr()
-		{
-			delete ptr;
-			ptr = nullptr;
-		}
+		StatePtr(const StatePtr&) = delete;
+		StatePtr& operator=(const StatePtr&) = delete;
+		StatePtr(StatePtr&&) noexcept = default;
+		StatePtr& operator=(StatePtr&&) noexcept = default;
 
-		T* operator->() { return ptr; }
-		const T* operator->() const { return ptr; }
+		T* operator->() { return ptr.get(); }
+		const T* operator->() const { return ptr.get(); }
 
 		operator T&() { return *ptr; }
 		operator const T&() const { return *ptr; }
@@ -79,7 +77,7 @@ namespace robotick
 		const T& get() const { return *ptr; }
 
 	  private:
-		T* ptr = nullptr;
+		std::unique_ptr<T> ptr;
 	};
 
 } // namespace robotick

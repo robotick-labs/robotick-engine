@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <type_traits>
 
 namespace robotick
 {
@@ -48,7 +49,11 @@ namespace robotick
 			}
 		}
 
-		template <typename T> void update(const T& value) { update(&value, sizeof(T)); }
+		template <typename T> void update(const T& value)
+		{
+			static_assert(!std::is_pointer<T>::value, "Hash32::update<T> must not be instantiated with pointer types");
+			update(&value, sizeof(T));
+		}
 
 		void update_cstring(const char* str)
 		{
