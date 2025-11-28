@@ -4,6 +4,7 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/data/InProgressMessage.h"
 
 #include <cstdint>
@@ -123,6 +124,11 @@ namespace robotick
 
 		// set on startup (register_field()) on Sender; on tick_receiver_receive_handshake_and_bind() on Receiver:
 		std::vector<Field> fields;
+		HeapVector<uint8_t> handshake_buffer;
+		HeapVector<uint8_t> field_payload_buffer;
+		size_t handshake_path_total_length = 0;
+		size_t handshake_payload_capacity = sizeof(uint32_t);
+		size_t field_payload_capacity = 0;
 
 		// runtime values:
 		State state = State::Disconnected;
@@ -134,6 +140,8 @@ namespace robotick
 
 		InProgressMessage in_progress_message_in;  // seperate InProgressMessage's in case we need to send/receive...
 		InProgressMessage in_progress_message_out; // 	... both on same tick, while other is occupied.
+		uint8_t* init_handshake_buffer();
+		uint8_t* init_field_payload_buffer();
 	};
 
 } // namespace robotick
