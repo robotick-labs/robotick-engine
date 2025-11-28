@@ -6,6 +6,8 @@
 #include "robotick/platform/Thread.h"
 
 #include <algorithm>
+#include <cmath>
+#include <utility>
 #include <arpa/inet.h>
 #include <csignal> // For signal(), SIGPIPE, SIG_IGN
 #include <cstring>
@@ -662,13 +664,11 @@ void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_inf
 			float mutual_tick_rate = this->mutual_tick_rate_hz;
 			static_assert(sizeof(float) == 4, "Expected float to be 4 bytes");
 
-			std::vector<uint8_t> payload;
 			uint32_t tick_rate_net = float_to_network_bytes(mutual_tick_rate);
-			payload.insert(payload.end(),
-				reinterpret_cast<const uint8_t*>(&tick_rate_net),
-				reinterpret_cast<const uint8_t*>(&tick_rate_net) + sizeof(tick_rate_net));
+			uint8_t payload[sizeof(tick_rate_net)];
+			::memcpy(payload, &tick_rate_net, sizeof(tick_rate_net));
 
-			in_progress_message_out.begin_send((uint8_t)MessageType::FieldsRequest, payload.data(), payload.size());
+			in_progress_message_out.begin_send((uint8_t)MessageType::FieldsRequest, payload, sizeof(payload));
 		}
 
 		// enhanced pump

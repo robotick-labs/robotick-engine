@@ -2,13 +2,16 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
+#include "robotick/framework/common/StringView.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <fstream>
+#include <string>
 #include <unistd.h>
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
@@ -92,10 +95,10 @@ namespace robotick
 		return false;
 	}
 
-	static std::string make_blackboard_type_name(const DynamicStructDescriptor& desc, void* data_ptr)
-	{
-		const StructDescriptor* struct_desc = desc.get_struct_descriptor(data_ptr);
-		robotick::Hash32 hash;
+static FixedString64 make_blackboard_type_name(const DynamicStructDescriptor& desc, void* data_ptr)
+{
+	const StructDescriptor* struct_desc = desc.get_struct_descriptor(data_ptr);
+	robotick::Hash32 hash;
 
 		if (struct_desc)
 		{
@@ -108,35 +111,47 @@ namespace robotick
 			}
 		}
 
-		char buffer[64];
-		std::snprintf(buffer, sizeof(buffer), "Blackboard_%08X", static_cast<unsigned int>(hash.final()));
-		return std::string(buffer);
+	FixedString64 type_name;
+	type_name.format("Blackboard_%08X", static_cast<unsigned int>(hash.final()));
+	return type_name;
+}
+
+static FixedString256 get_type_name(const TypeDescriptor& type_desc, void* data_ptr)
+{
+	const DynamicStructDescriptor* dynamic_struct_desc = type_desc.get_dynamic_struct_desc();
+	if (dynamic_struct_desc)
+	{
+		const FixedString64 blackboard_name = make_blackboard_type_name(*dynamic_struct_desc, data_ptr);
+		FixedString256 type_name;
+		type_name = blackboard_name.c_str();
+		return type_name;
 	}
 
-	static std::string get_type_name(const TypeDescriptor& type_desc, void* data_ptr)
+	FixedString256 type_name;
+	if (!type_desc.name.empty())
 	{
-		const DynamicStructDescriptor* dynamic_struct_desc = type_desc.get_dynamic_struct_desc();
-		if (dynamic_struct_desc)
-		{
-			return make_blackboard_type_name(*dynamic_struct_desc, data_ptr);
-		}
+		type_name = type_desc.name.c_str();
+	}
+	else
+	{
+		type_name = "unknown";
+	}
+	return type_name;
+}
 
-		return type_desc.name.c_str();
+static void emit_type_info(
+	nlohmann::ordered_json& layout_json, const WorkloadsBuffer& workloads_buffer, void* data_ptr, const TypeDescriptor* type_desc)
+{
+	if (!type_desc)
+	{
+		return;
 	}
 
-	static void emit_type_info(
-		nlohmann::ordered_json& layout_json, const WorkloadsBuffer& workloads_buffer, void* data_ptr, const TypeDescriptor* type_desc)
+	const FixedString256 type_name = get_type_name(*type_desc, data_ptr);
+	if (type_already_emitted(layout_json, type_name.c_str()))
 	{
-		if (!type_desc)
-		{
-			return;
-		}
-
-		const std::string type_name = get_type_name(*type_desc, data_ptr);
-		if (type_already_emitted(layout_json, type_name.c_str()))
-		{
-			return;
-		}
+		return;
+	}
 
 		nlohmann::ordered_json type_json;
 		type_json["name"] = type_name.c_str();
@@ -287,7 +302,9 @@ namespace robotick
 			layout_json["types"].end(),
 			[](const nlohmann::ordered_json& a, const nlohmann::ordered_json& b)
 			{
-				return a["name"].get<std::string>() < b["name"].get<std::string>();
+				const auto& a_name = a["name"].get_ref<const std::string&>();
+				const auto& b_name = b["name"].get_ref<const std::string&>();
+				return StringView(a_name.c_str()) < StringView(b_name.c_str());
 			});
 
 		res.set_status_code(WebResponseCode::OK);
