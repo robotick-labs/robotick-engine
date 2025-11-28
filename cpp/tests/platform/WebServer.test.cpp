@@ -43,7 +43,7 @@ namespace
 			const size_t to_copy = (count < space) ? count : space;
 			if (to_copy > 0)
 			{
-				std::memcpy(data + len, src, to_copy);
+				::memcpy(data + len, src, to_copy);
 				len += to_copy;
 				data[len] = '\0';
 			}
@@ -97,7 +97,7 @@ namespace
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
-		curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, body ? std::strlen(body) : 0);
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, body ? ::strlen(body) : 0);
 		curl_easy_setopt(
 			curl,
 			CURLOPT_WRITEFUNCTION,
@@ -171,7 +171,7 @@ namespace
 
 		void url(char* out, size_t out_size, const char* path) const
 		{
-			std::snprintf(out, out_size, "http://localhost:%u%s", (unsigned)port, path);
+			::snprintf(out, out_size, "http://localhost:%u%s", (unsigned)port, path);
 		}
 	};
 
@@ -198,7 +198,7 @@ TEST_CASE("Unit/Platform/WebServer")
 		char url[128];
 		S.url(url, sizeof(url), "/index.html");
 		TextBuffer body = http_get(url);
-		REQUIRE(std::strstr(body.data, "Hello Test Page") != nullptr);
+		REQUIRE(::strstr(body.data, "Hello Test Page") != nullptr);
 	}
 
 	// -----------------------------------------------------------------------------------
@@ -236,9 +236,9 @@ TEST_CASE("Unit/Platform/WebServer")
 		wait_for(called);
 
 		REQUIRE(called);
-		REQUIRE(std::strcmp(method.data, "GET") == 0);
-		REQUIRE(std::strcmp(last_uri.data, "/does_not_exist") == 0);
-		REQUIRE(std::strstr(body.data, "Custom: /does_not_exist") != nullptr);
+		REQUIRE(::strcmp(method.data, "GET") == 0);
+		REQUIRE(::strcmp(last_uri.data, "/does_not_exist") == 0);
+		REQUIRE(::strstr(body.data, "Custom: /does_not_exist") != nullptr);
 	}
 
 	// -----------------------------------------------------------------------------------
@@ -278,9 +278,9 @@ TEST_CASE("Unit/Platform/WebServer")
 		wait_for(called);
 
 		REQUIRE(called);
-		REQUIRE(std::strcmp(method.data, "POST") == 0);
-		REQUIRE(std::strcmp(posted.data, "hello=world") == 0);
-		REQUIRE(std::strstr(body.data, "POST: /api/x") != nullptr);
+		REQUIRE(::strcmp(method.data, "POST") == 0);
+		REQUIRE(::strcmp(posted.data, "hello=world") == 0);
+		REQUIRE(::strstr(body.data, "POST: /api/x") != nullptr);
 	}
 
 	// ===================================================================================
