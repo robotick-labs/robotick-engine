@@ -11,6 +11,10 @@
 #include <fstream>
 #include <unistd.h>
 
+#if defined(ROBOTICK_PLATFORM_ESP32)
+#include <esp_random.h>
+#endif
+
 namespace robotick
 {
 	static void build_session_id(const char* model_name, FixedString64& session_id)
@@ -105,7 +109,7 @@ namespace robotick
 		}
 
 		char buffer[64];
-		std::snprintf(buffer, sizeof(buffer), "Blackboard_%08X", hash.final());
+		std::snprintf(buffer, sizeof(buffer), "Blackboard_%08X", static_cast<unsigned int>(hash.final()));
 		return std::string(buffer);
 	}
 
