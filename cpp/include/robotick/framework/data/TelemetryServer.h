@@ -13,7 +13,7 @@ namespace robotick
 		void start(const Engine& engine, const uint16_t telemetry_port);
 		void stop();
 
-		const char* get_session_id() { return session_id.c_str(); }
+		const char* get_session_id() const { return session_id.c_str(); }
 
 	  protected:
 		void handle_get_home_page(const WebRequest&, WebResponse& res);

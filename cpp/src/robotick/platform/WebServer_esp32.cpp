@@ -247,15 +247,17 @@ namespace robotick
 	//  WebServer lifecycle
 	// ----------------------------------------
 
-	WebServer::WebServer()
-	{
-		impl = new WebServerImpl();
-	}
+WebServer::WebServer()
+{
+	impl = new WebServerImpl();
+}
 
-	WebServer::~WebServer()
-	{
-		stop();
-	}
+WebServer::~WebServer()
+{
+	stop();
+	delete static_cast<WebServerImpl*>(impl);
+	impl = nullptr;
+}
 
 	bool WebServer::is_running() const
 	{

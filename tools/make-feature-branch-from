@@ -3,17 +3,18 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: make-feature-branch-from [base-branch] <feature-name>
+Usage: make-feature-branch-from [base-branch] <branch-name>
 
-Creates a fresh feature/<feature-name> branch reset to the specified base and
-force-pushes it to the remote. If the base branch is omitted, it defaults to
+Creates a fresh branch reset to the specified base and force-pushes it to the
+remote. If <branch-name> contains '/', it is used as-is; otherwise the branch is
+named feature/<branch-name>. If the base branch is omitted, it defaults to
 'main'.
 
 Examples:
   make-feature-branch-from dev my-awesome-widget
-  make-feature-branch-from main fixes/hammer-time
-  mcfeet dev my-awesome-widget
-  mcfeet main fixes/hammer-time
+  make-feature-branch-from main feature/fixes/hammer-time
+  mcfeet dev shipping/widget-123
+  mcfeet main ui-polish
 EOF
   exit 1
 }
@@ -34,11 +35,21 @@ else
   usage
 fi
 
-FEATURE_NAME="feature/${FEATURE}"
+if [[ "${FEATURE}" == *"/"* ]]; then
+  FEATURE_NAME="${FEATURE}"
+else
+  FEATURE_NAME="feature/${FEATURE}"
+fi
 
 echo "👉 Switching to ${BASE}..."
 git fetch origin "${BASE}"
 git checkout "${BASE}"
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "❌ Aborting: working tree has uncommitted changes. Please commit, stash, or discard them before running this script."
+  exit 1
+fi
+
 git reset --hard "origin/${BASE}"
 
 if git show-ref --verify --quiet "refs/heads/${FEATURE_NAME}"; then
