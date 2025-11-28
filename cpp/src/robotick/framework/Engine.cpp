@@ -76,11 +76,12 @@ namespace robotick
 		// initialize the host-system
 		System::initialize();
 
-		// ensure out standard types don't get pruned by the linker:
+		// ensure our standard types don't get pruned by the linker, and then seal the registry:
 		robotick_force_register_primitives();
 		robotick_force_register_fixed_vector_types();
 		robotick_force_register_vec3_types();
 		robotick_force_register_quat_types();
+		TypeRegistry::get().seal();
 
 		if (!model.get_root_workload())
 			ROBOTICK_FATAL_EXIT("Model has no root workload");

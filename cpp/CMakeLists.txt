@@ -86,8 +86,9 @@ target_link_libraries(robotick-engine PUBLIC
     nlohmann_json::nlohmann_json
 )
 
-if (DEFINED ROBOTICK_PLATFORM_LINUX)
+if (DEFINED ROBOTICK_PLATFORM_LINUX OR DEFINED ROBOTICK_PLATFORM_DESKTOP)
     find_package(SDL2 REQUIRED)
+    target_include_directories(robotick-engine PRIVATE ${CMAKE_CURRENT_LIST_DIR}/lib/civetweb/include)
     target_link_libraries(robotick-engine PRIVATE civetweb SDL2::SDL2)
 endif()
 
@@ -120,7 +121,8 @@ target_link_libraries(robotick-engine-static PUBLIC
     nlohmann_json::nlohmann_json
 )
 
-if (DEFINED ROBOTICK_PLATFORM_LINUX)
+if (DEFINED ROBOTICK_PLATFORM_LINUX OR DEFINED ROBOTICK_PLATFORM_DESKTOP)
+    target_include_directories(robotick-engine-static PRIVATE ${CMAKE_CURRENT_LIST_DIR}/lib/civetweb/include)
     target_link_libraries(robotick-engine-static PRIVATE civetweb SDL2::SDL2)
 endif()
 
@@ -130,6 +132,9 @@ endif()
 
 if (ROBOTICK_BUILD_TESTS)
     message(STATUS "ROBOTICK_BUILD_TESTS - ON")
+
+    # Enable dynamic model heap helpers during test builds so Model::add() helpers are available.
+    add_compile_definitions(ROBOTICK_ENABLE_MODEL_HEAP)
 
     enable_testing()
     add_subdirectory(tests)
@@ -142,7 +147,7 @@ if (ROBOTICK_BUILD_TESTS)
 
     add_test(NAME robotick_engine_tests
              COMMAND robotick_engine_tests
-             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/cpp/tests)
+             WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 else()
     message(STATUS "ROBOTICK_BUILD_TESTS - OFF")
 endif()

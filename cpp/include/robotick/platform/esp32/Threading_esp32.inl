@@ -130,4 +130,9 @@ namespace robotick
 		}
 	}
 
+	inline Thread::ThreadId Thread::get_current_thread_id()
+	{
+		return reinterpret_cast<ThreadId>(xTaskGetCurrentTaskHandle());
+	}
+
 } // namespace robotick

@@ -133,4 +133,15 @@ namespace robotick
 #endif
 	}
 
+	inline Thread::ThreadId Thread::get_current_thread_id()
+	{
+#if defined(_WIN32)
+		return static_cast<ThreadId>(GetCurrentThreadId());
+#elif defined(__linux__)
+		return reinterpret_cast<ThreadId>(pthread_self());
+#else
+		return 0;
+#endif
+	}
+
 } // namespace robotick
