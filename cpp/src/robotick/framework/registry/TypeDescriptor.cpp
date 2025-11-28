@@ -131,7 +131,14 @@ namespace robotick
 		}
 		if (name == "uint32_t")
 		{
-			return std::sscanf(input, "%u", reinterpret_cast<uint32_t*>(out_value)) == 1;
+			unsigned long parsed = 0;
+			const int read = std::sscanf(input, "%lu", &parsed);
+			if (read == 1)
+			{
+				*reinterpret_cast<uint32_t*>(out_value) = static_cast<uint32_t>(parsed);
+				return true;
+			}
+			return false;
 		}
 		if (mime_type == "text/plain")
 		{
@@ -202,7 +209,7 @@ namespace robotick
 		if (name == "uint32_t")
 		{
 			const uint32_t v = *reinterpret_cast<const uint32_t*>(value);
-			const int written = std::snprintf(output_buffer, output_buffer_size, "%u", v);
+			const int written = std::snprintf(output_buffer, output_buffer_size, "%lu", static_cast<unsigned long>(v));
 			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
 		}
 
