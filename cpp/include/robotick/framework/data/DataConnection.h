@@ -58,7 +58,7 @@ namespace robotick
 			ROBOTICK_ASSERT(source_ptr != dest_ptr && "Source and destination pointers are the same - this should have been caught in fixup");
 
 			// If aliasing is possible, use std::memmove instead.
-			std::memcpy(dest_ptr, source_ptr, size);
+			::memcpy(dest_ptr, source_ptr, size);
 		}
 	};
 

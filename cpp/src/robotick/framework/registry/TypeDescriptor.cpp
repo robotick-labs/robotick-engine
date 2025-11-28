@@ -188,7 +188,7 @@ namespace robotick
 				return false;
 			}
 
-			std::memcpy(output_buffer, s, len + 1);
+			::memcpy(output_buffer, s, len + 1);
 			return true;
 		}
 
@@ -225,7 +225,7 @@ namespace robotick
 				return false;
 			}
 
-			std::memcpy(output_buffer, src, len);
+			::memcpy(output_buffer, src, len);
 			output_buffer[len] = '\0';
 			return true;
 		}

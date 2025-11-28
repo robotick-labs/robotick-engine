@@ -47,7 +47,7 @@ namespace robotick
 
 		static_assert(sizeof(MAGIC) == sizeof(header.magic));
 
-		std::memcpy(header.magic, MAGIC, sizeof(MAGIC));
+		::memcpy(header.magic, MAGIC, sizeof(MAGIC));
 		header.version = VERSION;
 		header.type = message_type;
 		header.payload_len = static_cast<uint32_t>(data_size);
@@ -58,7 +58,7 @@ namespace robotick
 
 		if (data_ptr != nullptr && data_size > 0)
 		{
-			std::memcpy(buffer.data() + sizeof(MessageHeader), data_ptr, data_size);
+			::memcpy(buffer.data() + sizeof(MessageHeader), data_ptr, data_size);
 		}
 
 		cursor = 0;
