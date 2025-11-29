@@ -19,9 +19,6 @@
 #include <cstddef>
 #include <cstring>
 #include <stdexcept>
-#include <string>
-#include <typeindex>
-#include <vector>
 
 namespace robotick
 {

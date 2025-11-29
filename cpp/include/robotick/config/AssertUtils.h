@@ -1,10 +1,9 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/common/NoStl.h"
+#include "robotick/framework/common/StdApproved.h"
 #include "robotick/framework/common/StringUtils.h"
 
-#include <functional>
 #include <stdio.h>
 #include <stdlib.h>
 

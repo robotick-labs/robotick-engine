@@ -8,10 +8,6 @@
 #include "robotick/framework/common/Map.h"
 #include "robotick/framework/utils/TypeId.h"
 
-#include <atomic>
-#include <memory>
-#include <string>
-
 namespace robotick
 {
 	class AtomicFlag;
