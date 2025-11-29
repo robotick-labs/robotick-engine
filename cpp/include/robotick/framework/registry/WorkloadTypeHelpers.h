@@ -3,99 +3,98 @@
 
 #pragma once
 
+#include "robotick/framework/common/TypeTraits.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeRegistry.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <cstddef>
-#include <type_traits>
-#include <vector>
 
 namespace robotick::registry
 {
 
 	// --- Method traits ---
 
-	template <typename T, typename = void> struct has_set_children : std::false_type
+	template <typename T, typename = void> struct has_set_children : FalseType<>
 	{
 	};
 	template <typename T>
 	struct has_set_children<T,
-		std::void_t<decltype(std::declval<T>().set_children(
-			std::declval<const HeapVector<const WorkloadInstanceInfo*>&>(), std::declval<HeapVector<DataConnectionInfo>&>()))>> : std::true_type
+		void_t<decltype(declval<T>().set_children(declval<const HeapVector<const WorkloadInstanceInfo*>&>(),
+			declval<HeapVector<DataConnectionInfo>&>()))>> : TrueType<>
 	{
 	};
 
-	template <typename T, typename = void> struct has_set_engine : std::false_type
+	template <typename T, typename = void> struct has_set_engine : FalseType<>
 	{
 	};
 	template <typename T>
-	struct has_set_engine<T, std::void_t<decltype(std::declval<T>().set_engine(std::declval<const Engine&>()))>> : std::true_type
+	struct has_set_engine<T, void_t<decltype(declval<T>().set_engine(declval<const Engine&>()))>> : TrueType<>
 	{
 	};
 
-	template <typename T, typename = void> struct has_pre_load : std::false_type
+	template <typename T, typename = void> struct has_pre_load : FalseType<>
 	{
 	};
-	template <typename T> struct has_pre_load<T, std::void_t<decltype(std::declval<T>().pre_load())>> : std::true_type
-	{
-	};
-
-	template <typename T, typename = void> struct has_load : std::false_type
-	{
-	};
-	template <typename T> struct has_load<T, std::void_t<decltype(std::declval<T>().load())>> : std::true_type
+	template <typename T> struct has_pre_load<T, void_t<decltype(declval<T>().pre_load())>> : TrueType<>
 	{
 	};
 
-	template <typename T, typename = void> struct has_setup : std::false_type
+	template <typename T, typename = void> struct has_load : FalseType<>
 	{
 	};
-	template <typename T> struct has_setup<T, std::void_t<decltype(std::declval<T>().setup())>> : std::true_type
-	{
-	};
-
-	template <typename T, typename = void> struct has_start : std::false_type
-	{
-	};
-	template <typename T> struct has_start<T, std::void_t<decltype(std::declval<T>().start(std::declval<float>()))>> : std::true_type
+	template <typename T> struct has_load<T, void_t<decltype(declval<T>().load())>> : TrueType<>
 	{
 	};
 
-	template <typename T, typename = void> struct has_tick : std::false_type
+	template <typename T, typename = void> struct has_setup : FalseType<>
 	{
 	};
-	template <typename T> struct has_tick<T, std::void_t<decltype(std::declval<T>().tick(std::declval<const TickInfo&>()))>> : std::true_type
+	template <typename T> struct has_setup<T, void_t<decltype(declval<T>().setup())>> : TrueType<>
 	{
 	};
 
-	template <typename T, typename = void> struct has_stop : std::false_type
+	template <typename T, typename = void> struct has_start : FalseType<>
 	{
 	};
-	template <typename T> struct has_stop<T, std::void_t<decltype(std::declval<T>().stop())>> : std::true_type
+	template <typename T> struct has_start<T, void_t<decltype(declval<T>().start(declval<float>()))>> : TrueType<>
+	{
+	};
+
+	template <typename T, typename = void> struct has_tick : FalseType<>
+	{
+	};
+	template <typename T> struct has_tick<T, void_t<decltype(declval<T>().tick(declval<const TickInfo&>()))>> : TrueType<>
+	{
+	};
+
+	template <typename T, typename = void> struct has_stop : FalseType<>
+	{
+	};
+	template <typename T> struct has_stop<T, void_t<decltype(declval<T>().stop())>> : TrueType<>
 	{
 	};
 
 	// --- Member traits ---
 
-	template <typename T, typename = void> struct has_member_config : std::false_type
+	template <typename T, typename = void> struct has_member_config : FalseType<>
 	{
 	};
-	template <typename T> struct has_member_config<T, std::void_t<decltype(std::declval<T>().config)>> : std::true_type
-	{
-	};
-
-	template <typename T, typename = void> struct has_member_inputs : std::false_type
-	{
-	};
-	template <typename T> struct has_member_inputs<T, std::void_t<decltype(std::declval<T>().inputs)>> : std::true_type
+	template <typename T> struct has_member_config<T, void_t<decltype(declval<T>().config)>> : TrueType<>
 	{
 	};
 
-	template <typename T, typename = void> struct has_member_outputs : std::false_type
+	template <typename T, typename = void> struct has_member_inputs : FalseType<>
 	{
 	};
-	template <typename T> struct has_member_outputs<T, std::void_t<decltype(std::declval<T>().outputs)>> : std::true_type
+	template <typename T> struct has_member_inputs<T, void_t<decltype(declval<T>().inputs)>> : TrueType<>
+	{
+	};
+
+	template <typename T, typename = void> struct has_member_outputs : FalseType<>
+	{
+	};
+	template <typename T> struct has_member_outputs<T, void_t<decltype(declval<T>().outputs)>> : TrueType<>
 	{
 	};
 
@@ -107,7 +106,7 @@ namespace robotick::registry
 	};
 	template <typename T> struct config_type<T, true>
 	{
-		using type = std::remove_reference_t<decltype(std::declval<T>().config)>;
+		using type = remove_reference_t<decltype(declval<T>().config)>;
 	};
 
 	template <typename T, bool Present = has_member_inputs<T>::value> struct inputs_type
@@ -116,7 +115,7 @@ namespace robotick::registry
 	};
 	template <typename T> struct inputs_type<T, true>
 	{
-		using type = std::remove_reference_t<decltype(std::declval<T>().inputs)>;
+		using type = remove_reference_t<decltype(declval<T>().inputs)>;
 	};
 
 	template <typename T, bool Present = has_member_outputs<T>::value> struct outputs_type
@@ -125,7 +124,7 @@ namespace robotick::registry
 	};
 	template <typename T> struct outputs_type<T, true>
 	{
-		using type = std::remove_reference_t<decltype(std::declval<T>().outputs)>;
+		using type = remove_reference_t<decltype(declval<T>().outputs)>;
 	};
 
 	template <typename T> using config_t = typename config_type<T>::type;

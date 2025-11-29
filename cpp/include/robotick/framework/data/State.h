@@ -4,10 +4,10 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 #include <new>
-#include <type_traits>
-#include <utility>
+
+#include "robotick/framework/common/Memory.h"
+#include "robotick/framework/common/TypeTraits.h"
 
 namespace robotick
 {
@@ -21,7 +21,7 @@ namespace robotick
 	//------------------------------------------------------------------------------
 	template <typename T> class State
 	{
-		static_assert(std::is_default_constructible<T>::value, "State<T> requires T to be default-constructible");
+		static_assert(is_default_constructible_v<T>, "State<T> requires T to be default-constructible");
 
 		static_assert(sizeof(T) <= MaxReasonableInlineStateSize,
 			"State<T>: Type too large for inline storage; use StatePtr<T> instead. "
@@ -32,17 +32,14 @@ namespace robotick
 		State(const State&) = delete;
 		State& operator=(const State&) = delete;
 
-		State(State&& other) noexcept(std::is_nothrow_move_constructible<T>::value)
-		{
-			new (&storage) T(std::move(other.get()));
-		}
+		State(State&& other) noexcept(is_nothrow_move_constructible_v<T>) { new (&storage) T(robotick::move(other.get())); }
 
-		State& operator=(State&& other) noexcept(std::is_nothrow_move_constructible<T>::value)
+		State& operator=(State&& other) noexcept(is_nothrow_move_constructible_v<T>)
 		{
 			if (this != &other)
 			{
 				get().~T();
-				new (&storage) T(std::move(other.get()));
+				new (&storage) T(robotick::move(other.get()));
 			}
 			return *this;
 		}
@@ -62,12 +59,12 @@ namespace robotick
 		alignas(T) uint8_t storage[sizeof(T)];
 	};
 
-	//------------------------------------------------------------------------------
-	// StatePtr<T> - pointer-based alternative for large states
-	//------------------------------------------------------------------------------
+	//---------------------------------------------------------------------------------------------------
+	// StatePtr<T> - pointer-based alternative for large states (allocated on heap once on startup)
+	//---------------------------------------------------------------------------------------------------
 	template <typename T> class StatePtr
 	{
-		static_assert(std::is_default_constructible<T>::value, "StatePtr<T> requires T to be default-constructible");
+		static_assert(is_default_constructible_v<T>, "StatePtr<T> requires T to be default-constructible");
 
 		static_assert(sizeof(T) > MaxReasonableInlineStateSize,
 			"StatePtr<T>: Type small enough for inline storage. "
@@ -75,16 +72,34 @@ namespace robotick
 			"sizeof(T) = ??? (<=5KB threshold)");
 
 	  public:
-		StatePtr() : ptr(std::make_unique<T>()) {}
-		~StatePtr() = default;
+		StatePtr()
+			: ptr(new T())
+		{
+		}
+		~StatePtr() { delete ptr; }
 
 		StatePtr(const StatePtr&) = delete;
 		StatePtr& operator=(const StatePtr&) = delete;
-		StatePtr(StatePtr&&) noexcept = default;
-		StatePtr& operator=(StatePtr&&) noexcept = default;
 
-		T* operator->() { return ptr.get(); }
-		const T* operator->() const { return ptr.get(); }
+		StatePtr(StatePtr&& other) noexcept
+			: ptr(other.ptr)
+		{
+			other.ptr = nullptr;
+		}
+
+		StatePtr& operator=(StatePtr&& other) noexcept
+		{
+			if (this != &other)
+			{
+				delete ptr;
+				ptr = other.ptr;
+				other.ptr = nullptr;
+			}
+			return *this;
+		}
+
+		T* operator->() { return ptr; }
+		const T* operator->() const { return ptr; }
 
 		operator T&() { return *ptr; }
 		operator const T&() const { return *ptr; }
@@ -93,7 +108,7 @@ namespace robotick
 		const T& get() const { return *ptr; }
 
 	  private:
-		std::unique_ptr<T> ptr;
+		T* ptr = nullptr;
 	};
 
 } // namespace robotick

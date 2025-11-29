@@ -8,6 +8,8 @@
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/utils/TypeId.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
+#include "robotick/framework/common/FixedVector.h"
+#include "robotick/framework/common/StringUtils.h"
 
 #include <catch2/catch_all.hpp>
 
@@ -107,7 +109,7 @@ namespace robotick::test
 			const auto& original_buf = engine.get_workloads_buffer();
 
 			WorkloadsBuffer mirror_buf(original_buf.get_size_used());
-			std::memcpy(mirror_buf.raw_ptr(), original_buf.raw_ptr(), original_buf.get_size_used());
+			::memcpy(mirror_buf.raw_ptr(), original_buf.raw_ptr(), original_buf.get_size_used());
 
 			const auto& inst = engine.get_all_instance_info()[0];
 			auto* mirror_workload = reinterpret_cast<SimpleWorkload*>(mirror_buf.raw_ptr() + inst.offset_in_workloads_buffer);
@@ -153,16 +155,26 @@ namespace robotick::test
 			Engine engine;
 			engine.load(model);
 
-			std::vector<std::string> seen_names;
+			FixedVector<FixedString64, 16> seen_names;
 			WorkloadFieldsIterator::for_each_workload(engine,
 				[&](const WorkloadInstanceInfo& info)
 				{
-					seen_names.push_back(std::string(info.seed->unique_name.c_str()));
+					FixedString64 copied_name(info.seed->unique_name.c_str());
+					seen_names.add(copied_name);
 				});
 
 			REQUIRE(seen_names.size() == 2);
-			CHECK_THAT(seen_names, Catch::Matchers::Contains("W1"));
-			CHECK_THAT(seen_names, Catch::Matchers::Contains("W2"));
+			bool has_w1 = false;
+			bool has_w2 = false;
+			for (const auto& name : seen_names)
+			{
+				if (string_equals(name.c_str(), "W1"))
+					has_w1 = true;
+				if (string_equals(name.c_str(), "W2"))
+					has_w2 = true;
+			}
+			CHECK(has_w1);
+			CHECK(has_w2);
 		}
 
 		SECTION("for_each_field_in_workload walks individual workload fields")
@@ -176,17 +188,21 @@ namespace robotick::test
 
 			const auto& info = engine.get_all_instance_info()[0];
 
-			std::set<std::string> found_fields;
+			int input_hits = 0;
+			int output_hits = 0;
 			WorkloadFieldsIterator::for_each_field_in_workload(engine,
 				info,
 				nullptr,
 				[&](const WorkloadFieldView& view)
 				{
-					found_fields.insert(view.field_info->name.c_str());
+					if (string_equals(view.field_info->name.c_str(), "input_value"))
+						++input_hits;
+					if (string_equals(view.field_info->name.c_str(), "output_value"))
+						++output_hits;
 				});
 
-			CHECK(found_fields.count("input_value") == 1);
-			CHECK(found_fields.count("output_value") == 1);
+			CHECK(input_hits == 1);
+			CHECK(output_hits == 1);
 		}
 	}
 

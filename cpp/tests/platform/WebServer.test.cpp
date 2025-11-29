@@ -1,15 +1,15 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/platform/WebServer.h"
 #include "robotick/api.h"
+#include "robotick/platform/Thread.h"
+#include "robotick/platform/WebServer.h"
 
-#include <atomic>
 #include <catch2/catch_all.hpp>
-#include <chrono>
 #include <curl/curl.h>
-#include <string>
-#include <thread>
+
+#include <cstdio>
+#include <cstring>
 
 using namespace robotick;
 
@@ -18,25 +18,53 @@ using namespace robotick;
 // ----------------------------------------------------------
 namespace
 {
-	std::string http_post(const std::string& url, const std::string& body)
+struct TextBuffer
+	{
+		char data[4096] = {};
+		size_t len = 0;
+
+		void clear()
+		{
+			len = 0;
+			data[0] = '\0';
+		}
+
+		void append(const char* src, size_t count)
+		{
+			if (!src || count == 0)
+				return;
+			const size_t cap = sizeof(data) - 1;
+			const size_t space = (len < cap) ? (cap - len) : 0;
+			const size_t to_copy = (count < space) ? count : space;
+			if (to_copy > 0)
+			{
+				::memcpy(data + len, src, to_copy);
+				len += to_copy;
+				data[len] = '\0';
+			}
+		}
+	};
+
+	TextBuffer http_post(const char* url, const char* body)
 	{
 		CURL* curl = curl_easy_init();
-		std::string result;
+		TextBuffer result;
 		if (!curl)
 			return result;
 
-		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+		curl_easy_setopt(curl, CURLOPT_URL, url);
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
-		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
-		curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, body.size());
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, body ? ::strlen(body) : 0);
 		curl_easy_setopt(
 			curl,
 			CURLOPT_WRITEFUNCTION,
 			+[](char* ptr, size_t sz, size_t nm, void* ud) -> size_t
 			{
-				auto& out = *reinterpret_cast<std::string*>(ud);
-				out.append(ptr, sz * nm);
-				return sz * nm;
+				auto& out = *reinterpret_cast<TextBuffer*>(ud);
+				const size_t bytes = sz * nm;
+				out.append(ptr, bytes);
+				return bytes;
 			});
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
 
@@ -45,23 +73,24 @@ namespace
 		return result;
 	}
 
-	std::string http_get(const std::string& url)
+	TextBuffer http_get(const char* url)
 	{
 		CURL* curl = curl_easy_init();
-		std::string result;
+		TextBuffer result;
 		if (!curl)
 			return result;
 
-		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+		curl_easy_setopt(curl, CURLOPT_URL, url);
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
 		curl_easy_setopt(
 			curl,
 			CURLOPT_WRITEFUNCTION,
 			+[](char* ptr, size_t sz, size_t nm, void* ud) -> size_t
 			{
-				auto& out = *reinterpret_cast<std::string*>(ud);
-				out.append(ptr, sz * nm);
-				return sz * nm;
+				auto& out = *reinterpret_cast<TextBuffer*>(ud);
+				const size_t bytes = sz * nm;
+				out.append(ptr, bytes);
+				return bytes;
 			});
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
 
@@ -70,13 +99,13 @@ namespace
 		return result;
 	}
 
-	void wait_for(std::atomic<bool>& flag, int timeout_ms = 500)
+	void wait_for(volatile bool& flag, int timeout_ms = 500)
 	{
 		constexpr int step = 10;
 		int waited = 0;
 		while (!flag && waited < timeout_ms)
 		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(step));
+			Thread::sleep_ms(step);
 			waited += step;
 		}
 	}
@@ -89,16 +118,20 @@ namespace
 		WebServer server;
 		uint16_t port = 0;
 
-		ScopedTestServer(const char* name, uint16_t port_in, const char* docroot, WebRequestHandler handler)
-			: port(port_in)
+		ScopedTestServer(const char* name, const char* docroot, WebRequestHandler handler)
 		{
-			server.start(name, port, docroot, handler);
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			server.start(name, 0, docroot, handler);
+			Thread::sleep_ms(100);
+			port = server.get_bound_port();
+			REQUIRE(port != 0);
 		}
 
 		~ScopedTestServer() { server.stop(); }
 
-		std::string url(const char* path) const { return "http://localhost:" + std::to_string(port) + path; }
+		void url(char* out, size_t out_size, const char* path) const
+		{
+			::snprintf(out, out_size, "http://localhost:%u%s", (unsigned)port, path);
+		}
 	};
 
 } // namespace
@@ -114,15 +147,16 @@ TEST_CASE("Unit/Platform/WebServer")
 	SECTION("Serves index.html from document root")
 	{
 		ScopedTestServer S("StaticTest",
-			8101,
 			"data/remote_control_interface_web",
 			[](const WebRequest&, WebResponse&)
 			{
 				return false;
 			});
 
-		std::string body = http_get(S.url("/index.html").c_str());
-		REQUIRE(body.find("Hello Test Page") != std::string::npos);
+		char url[128];
+		S.url(url, sizeof(url), "/index.html");
+		TextBuffer body = http_get(url);
+		REQUIRE(::strstr(body.data, "Hello Test Page") != nullptr);
 	}
 
 	// -----------------------------------------------------------------------------------
@@ -130,32 +164,38 @@ TEST_CASE("Unit/Platform/WebServer")
 	// -----------------------------------------------------------------------------------
 	SECTION("Function-based handler GET")
 	{
-		std::atomic<bool> called{false};
-		std::string method;
-		std::string last_uri;
+		volatile bool called = false;
+		TextBuffer method;
+		TextBuffer last_uri;
 
 		ScopedTestServer S("Function-based GET",
-			8102,
 			nullptr,
 			[&](const WebRequest& req, WebResponse& resp)
 			{
-				called.store(true);
-				method = req.method.c_str();
-				last_uri = req.uri.c_str();
+				called = true;
+				method.clear();
+				last_uri.clear();
+				method.append(req.method.c_str(), req.method.length());
+				last_uri.append(req.uri.c_str(), req.uri.length());
 
 				resp.set_content_type("text/plain");
-				std::string body = "Custom: " + last_uri;
-				resp.set_body_string(body.c_str());
+				TextBuffer body;
+				body.append("Custom: ", 8);
+				body.append(last_uri.data, last_uri.len);
+				resp.set_body_string(body.data);
 				return true;
 			});
 
-		std::string body = http_get(S.url("/does_not_exist").c_str());
+		char url[128];
+		S.url(url, sizeof(url), "/does_not_exist");
+		TextBuffer body = http_get(url);
 
 		wait_for(called);
 
-		REQUIRE(called.load());
-		REQUIRE(method == "GET");
-		REQUIRE(body.find("Custom: /does_not_exist") != std::string::npos);
+		REQUIRE(called);
+		REQUIRE(::strcmp(method.data, "GET") == 0);
+		REQUIRE(::strcmp(last_uri.data, "/does_not_exist") == 0);
+		REQUIRE(::strstr(body.data, "Custom: /does_not_exist") != nullptr);
 	}
 
 	// -----------------------------------------------------------------------------------
@@ -163,33 +203,40 @@ TEST_CASE("Unit/Platform/WebServer")
 	// -----------------------------------------------------------------------------------
 	SECTION("Function-based handler POST with body")
 	{
-		std::atomic<bool> called{false};
-		std::string method;
-		std::string posted;
+		volatile bool called = false;
+		TextBuffer method;
+		TextBuffer posted;
 
 		ScopedTestServer S("Function-based POST",
-			8103,
 			nullptr,
 			[&](const WebRequest& req, WebResponse& resp)
 			{
-				called.store(true);
-				method = req.method.c_str();
+				called = true;
+				method.clear();
+				method.append(req.method.c_str(), req.method.length());
 				if (req.body.size() > 0)
-					posted.assign((const char*)req.body.begin(), req.body.size());
+				{
+					posted.clear();
+					posted.append(reinterpret_cast<const char*>(req.body.begin()), req.body.size());
+				}
 
 				resp.set_content_type("text/plain");
-				std::string body = std::string("POST: ") + req.uri.c_str();
-				resp.set_body_string(body.c_str());
+				TextBuffer body;
+				body.append("POST: ", 6);
+				body.append(req.uri.c_str(), req.uri.length());
+				resp.set_body_string(body.data);
 				return true;
 			});
 
-		std::string body = http_post(S.url("/api/x").c_str(), "hello=world");
+		char url[128];
+		S.url(url, sizeof(url), "/api/x");
+		TextBuffer body = http_post(url, "hello=world");
 		wait_for(called);
 
-		REQUIRE(called.load());
-		REQUIRE(method == "POST");
-		REQUIRE(posted == "hello=world");
-		REQUIRE(body.find("POST: /api/x") != std::string::npos);
+		REQUIRE(called);
+		REQUIRE(::strcmp(method.data, "POST") == 0);
+		REQUIRE(::strcmp(posted.data, "hello=world") == 0);
+		REQUIRE(::strstr(body.data, "POST: /api/x") != nullptr);
 	}
 
 	// ===================================================================================
@@ -199,7 +246,6 @@ TEST_CASE("Unit/Platform/WebServer")
 	SECTION("Handler returns true but sets no body -> empty 200 OK")
 	{
 		ScopedTestServer S("NoBody",
-			8104,
 			nullptr,
 			[](const WebRequest&, WebResponse&)
 			{
@@ -207,10 +253,12 @@ TEST_CASE("Unit/Platform/WebServer")
 				return true;
 			});
 
-		std::string body = http_get(S.url("/x").c_str());
+		char url[128];
+		S.url(url, sizeof(url), "/x");
+		TextBuffer body = http_get(url);
 
 		// Should NOT be fatal.
 		// Should return valid HTTP 200 with empty body.
-		REQUIRE(body.size() == 0);
+		REQUIRE(body.len == 0);
 	}
 }

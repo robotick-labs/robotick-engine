@@ -1,6 +1,8 @@
 #pragma once
 
-#include <functional>
+#include "robotick/framework/common/Function.h"
+#include "robotick/framework/common/Memory.h"
+
 #include <typeindex>
 
 namespace robotick
@@ -26,23 +28,23 @@ namespace robotick
 
 	struct WorkloadFieldsIterator
 	{
-		static void for_each_workload(const Engine& engine, std::function<void(const WorkloadInstanceInfo&)> callback);
+		static void for_each_workload(const Engine& engine, Function<void(const WorkloadInstanceInfo&)> callback);
 
 		static void for_each_field_in_struct(const WorkloadInstanceInfo& instance,
 			const TypeDescriptor* struct_type,
 			const size_t struct_offset,
 			WorkloadsBuffer& workloads_buffer,
-			std::function<void(const WorkloadFieldView&)> callback);
+			Function<void(const WorkloadFieldView&)> callback);
 
-		static void for_each_field_in_struct_field(const WorkloadFieldView& parent_field, std::function<void(const WorkloadFieldView&)> callback);
+		static void for_each_field_in_struct_field(const WorkloadFieldView& parent_field, Function<void(const WorkloadFieldView&)> callback);
 
 		static void for_each_field_in_workload(const Engine& engine,
 			const WorkloadInstanceInfo& instance,
 			WorkloadsBuffer* workloads_override,
-			std::function<void(const WorkloadFieldView&)> callback);
+			Function<void(const WorkloadFieldView&)> callback);
 
 		static inline void for_each_workload_field(
-			const Engine& engine, WorkloadsBuffer* workloads_override, std::function<void(const WorkloadFieldView&)> callback)
+			const Engine& engine, WorkloadsBuffer* workloads_override, Function<void(const WorkloadFieldView&)> callback)
 		{
 			for_each_workload(engine,
 				[&](const WorkloadInstanceInfo& instance)
@@ -51,9 +53,9 @@ namespace robotick
 				});
 		}
 
-		static inline void for_each_workload_field(const Engine& engine, std::function<void(const WorkloadFieldView&)> callback)
+		static inline void for_each_workload_field(const Engine& engine, Function<void(const WorkloadFieldView&)> callback)
 		{
-			for_each_workload_field(engine, nullptr, std::move(callback));
+			for_each_workload_field(engine, nullptr, robotick::move(callback));
 		}
 	};
 } // namespace robotick

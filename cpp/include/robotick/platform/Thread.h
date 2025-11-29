@@ -4,19 +4,8 @@
 #pragma once
 
 #include "robotick/api_base.h"
-
-#include <atomic>
-#include <chrono>
-#include <cstdint>
-#include <string>
-
-#if defined(ROBOTICK_PLATFORM_ESP32)
-#include "esp_idf_version.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/portmacro.h"
-#else
+#include "robotick/platform/Clock.h"
 #include <thread>
-#endif
 
 namespace robotick
 {
@@ -28,7 +17,7 @@ namespace robotick
 		using EntryPoint = void (*)(void*);
 
 		Thread() = default;
-		Thread(EntryPoint fn, void* arg, const std::string& name = "", int core = -1, int stack_size = 12288, int priority = 1);
+		Thread(EntryPoint fn, void* arg, const char* name = "", int core = -1, int stack_size = 12288, int priority = 1);
 		~Thread();
 
 		Thread(const Thread&) = delete;
@@ -44,10 +33,10 @@ namespace robotick
 		static ThreadId get_current_thread_id();
 		static void yield();
 		static void sleep_ms(uint32_t ms);
-		static void hybrid_sleep_until(std::chrono::steady_clock::time_point target_time);
+		static void hybrid_sleep_until(Clock::time_point target_time);
 
 	  protected:
-		static void set_name(const std::string& name);
+		static void set_name(const char* name);
 		static void set_priority_high();
 		static void set_affinity(int core);
 
@@ -55,33 +44,17 @@ namespace robotick
 #if defined(ROBOTICK_PLATFORM_ESP32)
 		void* handle = nullptr;
 #else
-		std::thread thread;
+		std_approved::thread thread;
 #endif
-	};
-
-	class AtomicFlag
-	{
-	  public:
-		explicit AtomicFlag(bool initial = false)
-			: flag(initial)
-		{
-		}
-
-		inline void set(bool value = true) { flag.store(value); }
-		inline void unset() { flag.store(false); }
-		inline bool is_set() const { return flag.load(); }
-
-	  private:
-		std::atomic<bool> flag{false};
 	};
 
 } // namespace robotick
 
 // Platform-specific implementation
 #if defined(ROBOTICK_PLATFORM_ESP32)
-#include "robotick/platform/esp32/Threading_esp32.inl"
+#include "robotick/platform/esp32/Thread_esp32.inl"
 #elif defined(ROBOTICK_PLATFORM_DESKTOP)
-#include "robotick/platform/desktop/Threading_desktop.inl"
+#include "robotick/platform/desktop/Thread_desktop.inl"
 #else
 #error "No Threading implementation for this platform – define a platform macro or add a generic fallback"
 #endif

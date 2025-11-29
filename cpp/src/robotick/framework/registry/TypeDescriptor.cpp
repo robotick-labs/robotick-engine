@@ -7,6 +7,7 @@
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/TypeRegistry.h"
+#include <cstring>
 
 namespace robotick
 {
@@ -76,7 +77,7 @@ namespace robotick
 
 		while (*a && *b)
 		{
-			if (std::tolower(static_cast<unsigned char>(*a)) != std::tolower(static_cast<unsigned char>(*b)))
+			if (::tolower(static_cast<unsigned char>(*a)) != ::tolower(static_cast<unsigned char>(*b)))
 			{
 				return false;
 			}
@@ -87,35 +88,43 @@ namespace robotick
 		return *a == *b;
 	}
 
+	static size_t limited_strlen(const char* str, size_t max_length)
+	{
+		size_t len = 0;
+		while (len < max_length && str[len])
+		{
+			++len;
+		}
+		return len;
+	}
+
 	bool TypeDescriptor::from_string(const char* input, void* out_value) const
 	{
 		if (!input || !out_value)
 		{
-			ROBOTICK_FATAL_EXIT("!");
 			return false;
 		}
 
 		if (name == "float")
 		{
-			return std::sscanf(input, "%f", reinterpret_cast<float*>(out_value)) == 1;
+			return ::sscanf(input, "%f", reinterpret_cast<float*>(out_value)) == 1;
 		}
 		if (name == "double")
 		{
-			return std::sscanf(input, "%lf", reinterpret_cast<double*>(out_value)) == 1;
+			return ::sscanf(input, "%lf", reinterpret_cast<double*>(out_value)) == 1;
 		}
 		if (name == "bool")
 		{
-			if ((std::strcmp(input, "1") == 0) || case_insensitive_equals(input, "true"))
+			if ((::strcmp(input, "1") == 0) || case_insensitive_equals(input, "true"))
 			{
 				*reinterpret_cast<bool*>(out_value) = true;
 			}
-			else if ((std::strcmp(input, "0") == 0) || case_insensitive_equals(input, "false"))
+			else if ((::strcmp(input, "0") == 0) || case_insensitive_equals(input, "false"))
 			{
 				*reinterpret_cast<bool*>(out_value) = false;
 			}
 			else
 			{
-				ROBOTICK_FATAL_EXIT("Invalid boolean string: '%s'", input);
 				return false;
 			}
 
@@ -123,16 +132,16 @@ namespace robotick
 		}
 		if (name == "int")
 		{
-			return std::sscanf(input, "%d", reinterpret_cast<int*>(out_value)) == 1;
+			return ::sscanf(input, "%d", reinterpret_cast<int*>(out_value)) == 1;
 		}
 		if (name == "uint16_t")
 		{
-			return std::sscanf(input, "%hu", reinterpret_cast<uint16_t*>(out_value)) == 1;
+			return ::sscanf(input, "%hu", reinterpret_cast<uint16_t*>(out_value)) == 1;
 		}
 		if (name == "uint32_t")
 		{
 			unsigned long parsed = 0;
-			const int read = std::sscanf(input, "%lu", &parsed);
+			const int read = ::sscanf(input, "%lu", &parsed);
 			if (read == 1)
 			{
 				*reinterpret_cast<uint32_t*>(out_value) = static_cast<uint32_t>(parsed);
@@ -142,12 +151,22 @@ namespace robotick
 		}
 		if (mime_type == "text/plain")
 		{
-			std::strncpy(reinterpret_cast<char*>(out_value), input, size);
+			if (size == 0)
+				return false;
+
+			char* dest = reinterpret_cast<char*>(out_value);
+			const size_t max_copy = size - 1;
+			const size_t actual_len = limited_strlen(input, max_copy);
+
+			::memcpy(dest, input, actual_len);
+			dest[actual_len] = '\0';
+			for (size_t i = actual_len + 1; i < size; ++i)
+				dest[i] = '\0';
+
 			return true;
 		}
 
 		// fallback
-		ROBOTICK_FATAL_EXIT("!");
 		return false;
 	}
 
@@ -159,79 +178,104 @@ namespace robotick
 			return false;
 		}
 
-		// Ensure the output buffer is always null-terminated
-		output_buffer[0] = '\0';
+		// Zero the output buffer before formatting
+		::memset(output_buffer, 0, output_buffer_size);
 
 		if (name == "float")
 		{
 			const float v = *reinterpret_cast<const float*>(value);
-			const int written = std::snprintf(output_buffer, output_buffer_size, "%g", v);
-			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+			const int written = ::snprintf(output_buffer, output_buffer_size, "%g", v);
+			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+			{
+				::memset(output_buffer, 0, output_buffer_size);
+				return false;
+			}
+			return true;
 		}
 
 		if (name == "double")
 		{
 			const double v = *reinterpret_cast<const double*>(value);
-			const int written = std::snprintf(output_buffer, output_buffer_size, "%g", v);
-			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+			const int written = ::snprintf(output_buffer, output_buffer_size, "%g", v);
+			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+			{
+				::memset(output_buffer, 0, output_buffer_size);
+				return false;
+			}
+			return true;
 		}
 
 		if (name == "bool")
 		{
 			const bool v = *reinterpret_cast<const bool*>(value);
 			const char* s = v ? "true" : "false";
-			const size_t len = std::strlen(s);
+			const size_t len = ::strlen(s);
 
 			if (len + 1 > output_buffer_size)
 			{
-				ROBOTICK_FATAL_EXIT("Output buffer too small for boolean string");
 				return false;
 			}
 
-			std::memcpy(output_buffer, s, len + 1);
+			::memcpy(output_buffer, s, len + 1);
 			return true;
 		}
 
 		if (name == "int")
 		{
 			const int v = *reinterpret_cast<const int*>(value);
-			const int written = std::snprintf(output_buffer, output_buffer_size, "%d", v);
-			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+			const int written = ::snprintf(output_buffer, output_buffer_size, "%d", v);
+			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+			{
+				::memset(output_buffer, 0, output_buffer_size);
+				return false;
+			}
+			return true;
 		}
 
 		if (name == "uint16_t")
 		{
 			const uint16_t v = *reinterpret_cast<const uint16_t*>(value);
-			const int written = std::snprintf(output_buffer, output_buffer_size, "%hu", v);
-			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+			const int written = ::snprintf(output_buffer, output_buffer_size, "%hu", v);
+			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+			{
+				::memset(output_buffer, 0, output_buffer_size);
+				return false;
+			}
+			return true;
 		}
 
 		if (name == "uint32_t")
 		{
 			const uint32_t v = *reinterpret_cast<const uint32_t*>(value);
-			const int written = std::snprintf(output_buffer, output_buffer_size, "%lu", static_cast<unsigned long>(v));
-			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+			const int written = ::snprintf(output_buffer, output_buffer_size, "%lu", static_cast<unsigned long>(v));
+			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+			{
+				::memset(output_buffer, 0, output_buffer_size);
+				return false;
+			}
+			return true;
 		}
 
 		if (mime_type == "text/plain")
 		{
-			// Plain text: copy value (char buffer of size `this->size`) into output buffer
+			if (size == 0 || output_buffer_size == 0)
+				return false;
+
 			const char* src = reinterpret_cast<const char*>(value);
-			const size_t len = std::strlen(src);
+			const size_t max_value_len = size - 1;
+			const size_t len = limited_strlen(src, max_value_len);
 
 			if (len + 1 > output_buffer_size)
 			{
-				ROBOTICK_FATAL_EXIT("Output buffer too small for text/plain field");
 				return false;
 			}
 
-			std::memcpy(output_buffer, src, len);
+			::memcpy(output_buffer, src, len);
 			output_buffer[len] = '\0';
 			return true;
 		}
 
 		// fallback — unsupported
-		ROBOTICK_FATAL_EXIT("to_string() not implemented for type '%s'", name.c_str());
 		return false;
 	}
 

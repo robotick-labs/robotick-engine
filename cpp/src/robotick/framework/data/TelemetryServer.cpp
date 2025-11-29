@@ -2,13 +2,15 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/WorkloadInstanceInfo.h"
+#include "robotick/framework/common/StringView.h"
+#include "robotick/framework/common/Algorithm.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
+#include "robotick/platform/Clock.h"
 
 #include <nlohmann/json.hpp>
 
-#include <fstream>
+#include <cstdio>
 #include <unistd.h>
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
@@ -17,13 +19,20 @@
 
 namespace robotick
 {
+
+	TelemetryServer::~TelemetryServer()
+	{
+		stop();
+	}
+
 	static void build_session_id(const char* model_name, FixedString64& session_id)
 	{
 #if defined(ROBOTICK_PLATFORM_ESP32)
 		uint32_t raw = esp_random(); // 32-bit hardware RNG
 		session_id.format("%08X-%s", raw, model_name);
 #elif defined(ROBOTICK_PLATFORM_DESKTOP)
-		uint64_t raw = std::chrono::steady_clock::now().time_since_epoch().count(); // 64-bit timestamp
+		const uint64_t raw =
+			static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count()); // 64-bit timestamp
 		session_id.format("%016llX-%s", static_cast<unsigned long long>(raw), model_name);
 #else
 		session_id.format("12345-%s", model_name);
@@ -92,7 +101,7 @@ namespace robotick
 		return false;
 	}
 
-	static std::string make_blackboard_type_name(const DynamicStructDescriptor& desc, void* data_ptr)
+	static FixedString64 make_blackboard_type_name(const DynamicStructDescriptor& desc, void* data_ptr)
 	{
 		const StructDescriptor* struct_desc = desc.get_struct_descriptor(data_ptr);
 		robotick::Hash32 hash;
@@ -108,20 +117,32 @@ namespace robotick
 			}
 		}
 
-		char buffer[64];
-		std::snprintf(buffer, sizeof(buffer), "Blackboard_%08X", static_cast<unsigned int>(hash.final()));
-		return std::string(buffer);
+		FixedString64 type_name;
+		type_name.format("Blackboard_%08X", static_cast<unsigned int>(hash.final()));
+		return type_name;
 	}
 
-	static std::string get_type_name(const TypeDescriptor& type_desc, void* data_ptr)
+	static FixedString256 get_type_name(const TypeDescriptor& type_desc, void* data_ptr)
 	{
 		const DynamicStructDescriptor* dynamic_struct_desc = type_desc.get_dynamic_struct_desc();
 		if (dynamic_struct_desc)
 		{
-			return make_blackboard_type_name(*dynamic_struct_desc, data_ptr);
+			const FixedString64 blackboard_name = make_blackboard_type_name(*dynamic_struct_desc, data_ptr);
+			FixedString256 type_name;
+			type_name = blackboard_name.c_str();
+			return type_name;
 		}
 
-		return type_desc.name.c_str();
+		FixedString256 type_name;
+		if (!type_desc.name.empty())
+		{
+			type_name = type_desc.name.c_str();
+		}
+		else
+		{
+			type_name = "unknown";
+		}
+		return type_name;
 	}
 
 	static void emit_type_info(
@@ -132,7 +153,7 @@ namespace robotick
 			return;
 		}
 
-		const std::string type_name = get_type_name(*type_desc, data_ptr);
+		const FixedString256 type_name = get_type_name(*type_desc, data_ptr);
 		if (type_already_emitted(layout_json, type_name.c_str()))
 		{
 			return;
@@ -211,13 +232,18 @@ namespace robotick
 	static size_t get_process_memory_used()
 	{
 		long rss_pages = 0;
-		std::ifstream statm("/proc/self/statm");
 		long total_pages = 0;
+		FILE* statm = ::fopen("/proc/self/statm", "r");
 
-		if (statm >> total_pages >> rss_pages)
+		if (statm)
 		{
-			long page_size = sysconf(_SC_PAGESIZE);
-			return static_cast<size_t>(rss_pages) * page_size;
+			if (::fscanf(statm, "%ld %ld", &total_pages, &rss_pages) == 2)
+			{
+				const long page_size = ::sysconf(_SC_PAGESIZE);
+				::fclose(statm);
+				return static_cast<size_t>(rss_pages) * page_size;
+			}
+			::fclose(statm);
 		}
 
 		return 0;
@@ -276,24 +302,26 @@ namespace robotick
 		}
 
 		// sort workloads by offset (so we're seeing them in true memory-layout order)
-		std::sort(layout_json["workloads"].begin(),
+		robotick::sort(layout_json["workloads"].begin(),
 			layout_json["workloads"].end(),
 			[](const nlohmann::ordered_json& a, const nlohmann::ordered_json& b)
 			{
 				return a["offset_within_container"].get<int>() < b["offset_within_container"].get<int>();
 			});
 
-		std::sort(layout_json["types"].begin(),
+		robotick::sort(layout_json["types"].begin(),
 			layout_json["types"].end(),
 			[](const nlohmann::ordered_json& a, const nlohmann::ordered_json& b)
 			{
-				return a["name"].get<std::string>() < b["name"].get<std::string>();
+				const auto& a_name = a["name"].get_ref<const nlohmann::ordered_json::string_t&>();
+				const auto& b_name = b["name"].get_ref<const nlohmann::ordered_json::string_t&>();
+				return StringView(a_name.c_str()) < StringView(b_name.c_str());
 			});
 
 		res.set_status_code(WebResponseCode::OK);
 		res.set_content_type("application/json");
 
-		std::string out_str = layout_json.dump(2); // Pretty print
+		auto out_str = layout_json.dump(2); // Pretty print
 		res.set_body_string(out_str.c_str());
 	}
 

@@ -8,6 +8,8 @@
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/TypeMacros.h"
 
+#include <limits>
+
 namespace robotick
 {
 	const StructDescriptor* Blackboard::resolve_descriptor(const void* instance)
@@ -30,9 +32,29 @@ namespace robotick
 		compute_total_datablock_size();
 	}
 
-	inline size_t align_up(size_t value, size_t alignment)
+	static bool safe_add(size_t lhs, size_t rhs, size_t& out)
 	{
-		return (value + alignment - 1) & ~(alignment - 1);
+		constexpr size_t max_size = std::numeric_limits<size_t>::max();
+		if (rhs > max_size - lhs)
+			return false;
+		out = lhs + rhs;
+		return true;
+	}
+
+	static bool safe_align(size_t value, size_t alignment, size_t& out)
+	{
+		if (alignment == 0)
+			return false;
+		size_t remainder = value % alignment;
+		size_t aligned = value;
+		if (remainder != 0)
+		{
+			size_t delta = alignment - remainder;
+			if (!safe_add(aligned, delta, aligned))
+				return false;
+		}
+		out = aligned;
+		return true;
 	}
 
 	static size_t compute_and_apply_layout(const size_t blackboard_offset_in_workloads_buffer,
@@ -49,14 +71,27 @@ namespace robotick
 			const TypeDescriptor* type = field.find_type_descriptor();
 			ROBOTICK_ASSERT_MSG(type != nullptr, "Field has no type descriptor");
 
-			current_offset_in_workloads_buffer = align_up(current_offset_in_workloads_buffer, type->alignment);
+			size_t aligned_offset = 0;
+			if (!safe_align(current_offset_in_workloads_buffer, type->alignment, aligned_offset))
+				ROBOTICK_FATAL_EXIT("Field '%s' uses invalid alignment (%zu) for type '%s'", field.name.c_str(), type->alignment, type->name.c_str());
+			current_offset_in_workloads_buffer = aligned_offset;
 
 			if (write_offsets)
 			{
+				if (current_offset_in_workloads_buffer < blackboard_offset_in_workloads_buffer)
+				{
+					ROBOTICK_FATAL_EXIT("Field '%s' offset underflows (current=%zu < blackboard=%zu)", field.name.c_str(), current_offset_in_workloads_buffer, blackboard_offset_in_workloads_buffer);
+				}
 				field.offset_within_container = current_offset_in_workloads_buffer - blackboard_offset_in_workloads_buffer;
 			}
 
-			current_offset_in_workloads_buffer += type->size;
+			if (type->size == 0)
+				ROBOTICK_FATAL_EXIT("Field '%s' references zero-sized type '%s'", field.name.c_str(), type->name.c_str());
+
+			size_t next_offset = 0;
+			if (!safe_add(current_offset_in_workloads_buffer, type->size, next_offset))
+				ROBOTICK_FATAL_EXIT("Field '%s' layout overflow for type '%s'", field.name.c_str(), type->name.c_str());
+			current_offset_in_workloads_buffer = next_offset;
 		}
 
 		return current_offset_in_workloads_buffer;

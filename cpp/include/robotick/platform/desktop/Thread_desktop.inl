@@ -1,9 +1,12 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/StdApproved.h"
+
 #include <atomic>
 #include <chrono>
-#include <string>
+#include <cwchar>
 #include <thread>
 
 #if defined(_WIN32)
@@ -16,11 +19,11 @@
 namespace robotick
 {
 
-	inline Thread::Thread(EntryPoint fn, void* arg, const std::string& name, int core, int /*stack_size*/, int /*priority*/)
+	inline Thread::Thread(EntryPoint fn, void* arg, const char* name, int core, int /*stack_size*/, int /*priority*/)
 		: thread(
-			  [fn, arg, name, core]()
+			  [fn, arg, safe_name = FixedString64(name ? name : ""), core]()
 			  {
-				  Thread::set_name(name);
+				  Thread::set_name(safe_name.c_str());
 				  if (core >= 0)
 				  {
 					  Thread::set_affinity(core);
@@ -55,29 +58,29 @@ namespace robotick
 
 	inline void Thread::sleep_ms(uint32_t ms)
 	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+		std_approved::this_thread::sleep_for(std_approved::chrono::milliseconds(ms));
 	}
 
 	inline void Thread::yield()
 	{
-		std::this_thread::yield();
+		std_approved::this_thread::yield();
 	}
 
-	inline void Thread::hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
+	inline void Thread::hybrid_sleep_until(Clock::time_point target_time)
 	{
-		using namespace std::chrono_literals;
+		using namespace std_approved::chrono_literals;
 		constexpr auto coarse_margin = 2ms;
 		constexpr auto coarse_step = 500us;
 		constexpr int fine_spin_iters = 20;
 
-		auto now = std::chrono::steady_clock::now();
+		auto now = Clock::now();
 		while (now + coarse_margin < target_time)
 		{
-			std::this_thread::sleep_for(coarse_step);
-			now = std::chrono::steady_clock::now();
+			std_approved::this_thread::sleep_for(coarse_step);
+			now = Clock::now();
 		}
 
-		while (std::chrono::steady_clock::now() < target_time)
+		while (Clock::now() < target_time)
 		{
 			for (volatile int i = 0; i < fine_spin_iters; ++i)
 			{
@@ -85,13 +88,20 @@ namespace robotick
 		}
 	}
 
-	inline void Thread::set_name(const std::string& name)
+	inline void Thread::set_name(const char* name)
 	{
 #if defined(_WIN32)
-		std::wstring wname(name.begin(), name.end());
-		SetThreadDescription(GetCurrentThread(), wname.c_str());
+		wchar_t buffer[64];
+		if (!name)
+			name = "";
+		int written = MultiByteToWideChar(CP_UTF8, 0, name, -1, buffer, static_cast<int>(sizeof(buffer) / sizeof(buffer[0])));
+		if (written <= 0)
+		{
+			buffer[0] = L'\0';
+		}
+		SetThreadDescription(GetCurrentThread(), buffer);
 #elif defined(__linux__)
-		pthread_setname_np(pthread_self(), name.c_str());
+		pthread_setname_np(pthread_self(), name ? name : "");
 #endif
 	}
 

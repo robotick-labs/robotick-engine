@@ -7,14 +7,19 @@
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/DataConnectionSeed.h"
+#include "robotick/framework/common/StringUtils.h"
 #include "robotick/framework/model/WorkloadSeed.h"
 
 namespace robotick
 {
 	struct DataConnectionHelpers
 	{
-		static const TypeDescriptor* get_struct_entry(const WorkloadInstanceInfo& instance, const std::string& section, size_t& out_offset)
+		static const TypeDescriptor* get_struct_entry(const WorkloadInstanceInfo& instance, const char* section, size_t& out_offset)
 		{
+			if (!section)
+			{
+				ROBOTICK_FATAL_EXIT("Invalid section: null");
+			}
 			const TypeDescriptor* type = instance.type;
 			if (!type)
 			{
@@ -29,24 +34,24 @@ namespace robotick
 
 			const TypeDescriptor* result = nullptr;
 
-			if (section == "inputs" && workload_desc->inputs_desc != nullptr)
+			if (string_equals(section, "inputs") && workload_desc->inputs_desc != nullptr)
 			{
 				out_offset = workload_desc->inputs_offset;
 				result = workload_desc->inputs_desc;
 			}
-			else if (section == "outputs" && workload_desc->outputs_desc != nullptr)
+			else if (string_equals(section, "outputs") && workload_desc->outputs_desc != nullptr)
 			{
 				out_offset = workload_desc->outputs_offset;
 				result = workload_desc->outputs_desc;
 			}
-			else if (section == "config" && workload_desc->config_desc != nullptr)
+			else if (string_equals(section, "config") && workload_desc->config_desc != nullptr)
 			{
 				out_offset = workload_desc->config_offset;
 				result = workload_desc->config_desc;
 			}
 			else
 			{
-				ROBOTICK_FATAL_EXIT("Invalid section: %s", section.c_str());
+				ROBOTICK_FATAL_EXIT("Invalid section: %s", section);
 			}
 
 			ROBOTICK_ASSERT((result == nullptr || out_offset != OFFSET_UNBOUND) && "StructRegistryEntry with unbound offset should not exist");
@@ -309,7 +314,7 @@ namespace robotick
 		}
 	}
 
-	std::tuple<void*, size_t, const FieldDescriptor*> DataConnectionUtils::find_field_info(const Engine& engine, const char* path)
+		FieldInfo DataConnectionUtils::find_field_info(const Engine& engine, const char* path)
 	{
 		const WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
 		const Map<const char*, WorkloadInstanceInfo*>& instances = engine.get_all_instance_info_map();
@@ -370,7 +375,7 @@ namespace robotick
 				++path_cursor;
 		}
 
-		return {base_ptr, size, field};
+		return FieldInfo{base_ptr, size, field};
 	}
 
 } // namespace robotick

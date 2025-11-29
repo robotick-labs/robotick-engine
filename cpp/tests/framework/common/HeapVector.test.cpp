@@ -42,7 +42,7 @@ namespace robotick::test
 			a[0] = 100;
 			a[1] = 200;
 
-			HeapVector<int> b = std::move(a);
+			HeapVector<int> b(static_cast<HeapVector<int>&&>(a));
 			REQUIRE(b.size() == 2);
 			CHECK(b[0] == 100);
 			CHECK(b[1] == 200);

@@ -4,9 +4,9 @@
 #pragma once
 
 #include "robotick/api_base.h"
-#include <cstddef> // size_t
-#include <new>	   // placement new
-#include <utility> // std::move, std::swap
+
+#include <cstddef>
+#include <new>
 
 namespace robotick
 {

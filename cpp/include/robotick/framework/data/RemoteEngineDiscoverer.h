@@ -4,7 +4,7 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
-#include <functional>
+#include "robotick/framework/common/Function.h"
 
 struct sockaddr_in;
 
@@ -23,11 +23,11 @@ namespace robotick
 		};
 
 		// Callback fired on sender when a receiver responds to our discovery broadcast
-		using OnRemoteModelDiscovered = std::function<void(const PeerInfo&)>;
+		using OnRemoteModelDiscovered = Function<void(const PeerInfo&)>;
 
 		// Callback fired on receiver when a discovery request arrives from a remote model
 		// Should populate the dynamic receiver port to use when replying
-		using OnIncomingConnectionRequested = std::function<void(const char* source_model_id, uint16_t& rec_port_id)>;
+		using OnIncomingConnectionRequested = Function<void(const char* source_model_id, uint16_t& rec_port_id)>;
 
 		RemoteEngineDiscoverer();
 		~RemoteEngineDiscoverer();
@@ -44,6 +44,8 @@ namespace robotick
 
 		// Reset state and resume periodic broadcasts
 		void reset_discovery();
+
+		void shutdown();
 
 	  protected:
 		void init_send_socket();

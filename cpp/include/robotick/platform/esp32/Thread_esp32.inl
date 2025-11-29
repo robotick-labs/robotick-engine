@@ -7,7 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include <cstring>
+#include <cstdint>
 
 namespace robotick
 {
@@ -29,18 +29,19 @@ namespace robotick
 		}
 	} // namespace
 
-	inline Thread::Thread(EntryPoint fn, void* arg, const std::string& name, int core, int stack_size, int priority)
+	inline Thread::Thread(EntryPoint fn, void* arg, const char* name, int core, int stack_size, int priority)
 	{
 		auto* ctx = new TaskContext{fn, arg};
 		BaseType_t result;
+		const char* task_name = (name && name[0]) ? name : "robotick-task";
 
 		if (core >= 0)
 		{
-			result = xTaskCreatePinnedToCore(task_entry, name.c_str(), stack_size, ctx, priority, reinterpret_cast<TaskHandle_t*>(&handle), core);
+			result = xTaskCreatePinnedToCore(task_entry, task_name, stack_size, ctx, priority, reinterpret_cast<TaskHandle_t*>(&handle), core);
 		}
 		else
 		{
-			result = xTaskCreate(task_entry, name.c_str(), stack_size, ctx, priority, reinterpret_cast<TaskHandle_t*>(&handle));
+			result = xTaskCreate(task_entry, task_name, stack_size, ctx, priority, reinterpret_cast<TaskHandle_t*>(&handle));
 		}
 
 		if (result != pdPASS)
@@ -75,7 +76,7 @@ namespace robotick
 		vTaskDelay(pdMS_TO_TICKS(ms));
 	}
 
-	inline void Thread::set_name(const std::string&)
+	inline void Thread::set_name(const char*)
 	{
 		// Optional: could use vTaskSetTaskName if needed
 	}
@@ -95,16 +96,16 @@ namespace robotick
 		taskYIELD(); // explicit, zero-latency yield
 	}
 
-	inline void Thread::hybrid_sleep_until(std::chrono::steady_clock::time_point target_time)
+	inline void Thread::hybrid_sleep_until(Clock::time_point target_time)
 	{
-		using namespace std::chrono;
-
 		constexpr auto coarse_threshold_us = 2000; // 2 ms
 		constexpr int watchdog_yield_interval = 500;
 		int spin_counter = 0;
 
 		// Convert target_time to absolute time in microseconds
-		int64_t target_us = duration_cast<microseconds>(target_time.time_since_epoch()).count();
+		const Clock::duration duration_until = target_time.time_since_epoch();
+		const Clock::nanoseconds target_ns = Clock::to_nanoseconds(duration_until);
+		int64_t target_us = target_ns.count() / 1000;
 
 		// esp_task_wdt_reset();
 

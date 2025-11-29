@@ -3,9 +3,12 @@
 #include "robotick/api.h"
 #include "robotick/platform/WebServer.h"
 
+#include <arpa/inet.h>
 #include <civetweb.h>
 #include <cstdio>
 #include <cstring>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 namespace robotick
@@ -239,10 +242,10 @@ namespace robotick
 
 			full_path.format("%s/%s", self->get_document_root(), uri);
 
-			FILE* f = std::fopen(full_path.c_str(), "rb");
+			FILE* f = ::fopen(full_path.c_str(), "rb");
 			if (f)
 			{
-				std::fclose(f);
+				::fclose(f);
 				return 0;
 			}
 		}
@@ -264,18 +267,14 @@ namespace robotick
 	void WebServer::start(const char* name, uint16_t port, const char* webroot, WebRequestHandler handler_in)
 	{
 		ROBOTICK_ASSERT_MSG(!running, "WebServer '%s' already running", name);
+		// Passing port 0 delegates to CivetWeb/the OS to bind an available port deterministically.
 
-		server_name = name;
-		handler = handler_in;
-
-		// Resolve executable path
 		char exepath[512] = {};
 		ssize_t len = readlink("/proc/self/exe", exepath, sizeof(exepath) - 1);
 		if (len < 0)
 			ROBOTICK_FATAL_EXIT("readlink failed");
 		exepath[len] = '\0';
 
-		// Trim filename from path
 		for (ssize_t i = len - 1; i >= 0; --i)
 			if (exepath[i] == '/')
 			{
@@ -283,26 +282,38 @@ namespace robotick
 				break;
 			}
 
+		FixedString512 doc_root_candidate;
 		if (webroot && *webroot)
-			document_root.format("%s%s", exepath, webroot);
-		else
-			document_root.clear();
+			doc_root_candidate.format("%s%s", exepath, webroot);
+
+		WebServerImpl* s = static_cast<WebServerImpl*>(impl);
 
 		char portstr[16];
 		snprintf(portstr, sizeof(portstr), "%u", (unsigned)port);
 
-		const char* opt_with[] = {"listening_ports", portstr, "document_root", document_root.c_str(), "enable_directory_listing", "no", nullptr};
-
+		const char* opt_with[] = {"listening_ports", portstr, "document_root", doc_root_candidate.c_str(), "enable_directory_listing", "no", nullptr};
 		const char* opt_no[] = {"listening_ports", portstr, "enable_directory_listing", "no", nullptr};
+		const char** opts = doc_root_candidate.empty() ? opt_no : opt_with;
 
-		const char** opts = (webroot && *webroot) ? opt_with : opt_no;
-
-		WebServerImpl* s = static_cast<WebServerImpl*>(impl);
 		s->ctx = mg_start(nullptr, nullptr, opts);
 		if (!s->ctx)
-			ROBOTICK_FATAL_EXIT("Failed to start WebServer");
+		{
+			ROBOTICK_FATAL_EXIT("Failed to start WebServer '%s' on port %u", name, (unsigned)port);
+		}
+
+		mg_server_port ports[1];
+		if (mg_get_server_ports(s->ctx, 1, ports) <= 0 || ports[0].port == 0)
+		{
+			mg_stop(s->ctx);
+			s->ctx = nullptr;
+			ROBOTICK_FATAL_EXIT("Failed to determine bound port for WebServer '%s'", name);
+		}
+		bound_port = static_cast<uint16_t>(ports[0].port);
 
 		mg_set_request_handler(s->ctx, "/", callback, this);
+		handler = handler_in;
+		server_name = name;
+		document_root = doc_root_candidate.c_str();
 		running = true;
 	}
 
@@ -316,6 +327,10 @@ namespace robotick
 		s->ctx = nullptr;
 
 		running = false;
+		bound_port = 0;
+		handler = nullptr;
+		server_name.clear();
+		document_root.clear();
 	}
 
 } // namespace robotick

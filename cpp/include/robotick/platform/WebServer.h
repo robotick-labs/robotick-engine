@@ -1,8 +1,10 @@
 #pragma once
 
 #include "robotick/api.h"
+
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/common/FixedVector.h"
+#include "robotick/framework/common/Function.h"
 #include "robotick/framework/common/Pair.h"
 
 #include <cstdint>
@@ -99,7 +101,7 @@ namespace robotick
 		const char* content_type = "text/plain";
 	};
 
-	using WebRequestHandler = std::function<bool(const WebRequest&, WebResponse&)>;
+	using WebRequestHandler = Function<bool(const WebRequest&, WebResponse&)>;
 
 	struct WebServerImpl;
 
@@ -110,19 +112,19 @@ namespace robotick
 		~WebServer();
 
 		void start(const char* name, uint16_t port, const char* web_root_folder = nullptr, WebRequestHandler handler = nullptr);
-
 		void stop();
 		bool is_running() const;
 
 		WebRequestHandler get_handler() const { return handler; }
 		const char* get_server_name() const { return server_name.c_str(); }
 		const char* get_document_root() const { return document_root.c_str(); }
+		uint16_t get_bound_port() const { return bound_port; }
 
 	  private:
 		WebServerImpl* impl = nullptr;
 		bool running = false;
 		WebRequestHandler handler = nullptr;
-
+		uint16_t bound_port = 0;
 		FixedString32 server_name;
 		FixedString512 document_root;
 	};

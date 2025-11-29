@@ -4,13 +4,12 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/Function.h"
+#include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/data/InProgressMessage.h"
 
 #include <cstdint>
-#include <functional>
-#include <string>
 #include <utility>
-#include <vector>
 
 namespace robotick
 {
@@ -56,14 +55,14 @@ namespace robotick
 
 		struct Field
 		{
-			FixedString64 path;
+			FixedString512 path;
 			const void* send_ptr = nullptr;
 			void* recv_ptr = nullptr;
 			size_t size = 0;
 			const TypeDescriptor* type_desc = nullptr;
 		};
 
-		using BinderCallback = std::function<bool(const char* path, Field& out_field)>;
+		using BinderCallback = Function<bool(const char* path, Field& out_field)>;
 
 		RemoteEngineConnection() = default;
 		~RemoteEngineConnection() noexcept { disconnect(); }
@@ -92,6 +91,9 @@ namespace robotick
 		[[nodiscard]] State get_state() const { return state; };
 		void set_state(const State state);
 
+		size_t write_handshake_payload(uint32_t tick_rate_net, size_t offset, uint8_t* dst, size_t max_len) const;
+		size_t write_fields_payload(size_t offset, uint8_t* dst, size_t max_len) const;
+
 		void tick_disconnected_sender();
 		void tick_disconnected_receiver();
 
@@ -104,6 +106,7 @@ namespace robotick
 
 		void tick_send_fields_as_message(const bool allow_start_new);
 		bool tick_receive_fields_as_message();
+		void add_field(const Field& field, bool update_handshake_stats);
 
 	  private:
 		// things we set up once on startup:
@@ -122,7 +125,11 @@ namespace robotick
 		BinderCallback binder;
 
 		// set on startup (register_field()) on Sender; on tick_receiver_receive_handshake_and_bind() on Receiver:
-		std::vector<Field> fields;
+		HeapVector<Field> fields;
+		size_t field_count = 0;
+		size_t handshake_path_total_length = 0;
+		size_t handshake_payload_capacity = sizeof(uint32_t);
+		size_t field_payload_capacity = 0;
 
 		// runtime values:
 		State state = State::Disconnected;
@@ -134,6 +141,35 @@ namespace robotick
 
 		InProgressMessage in_progress_message_in;  // seperate InProgressMessage's in case we need to send/receive...
 		InProgressMessage in_progress_message_out; // 	... both on same tick, while other is occupied.
+
+		// Persist incremental parsing across non-blocking recv for the handshake payload (tick-rate + paths)
+		struct HandshakeReceiveState
+		{
+			uint8_t tick_rate_bytes[4]{};
+			size_t tick_rate_bytes_received = 0;
+			float sender_tick_rate_hz = 0.0f;
+			FixedString512 current_path;
+			size_t current_path_length = 0;
+			size_t payload_bytes_consumed = 0;
+			size_t bound_count = 0;
+			size_t failed_count = 0;
+		} handshake_receive_state;
+
+		// Track streamed field payload placement across ticks while receiving field data
+		struct FieldReceiveState
+		{
+			size_t field_index = 0;
+			size_t offset_in_field = 0;
+			size_t total_bytes_received = 0;
+		} field_receive_state;
+
+		// Capture mutual tick-rate bytes from FieldsRequest across partial reads
+		struct TickRateReceiveState
+		{
+			uint8_t tick_rate_bytes[4]{};
+			size_t tick_rate_bytes_received = 0;
+			float tick_rate_hz = 0.0f;
+		} fields_request_receive_state;
 	};
 
 } // namespace robotick

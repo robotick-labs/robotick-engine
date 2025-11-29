@@ -18,6 +18,18 @@
 
 From bare-metal microcontrollers like the STM32 and ESP32 to Raspberry Pi, desktop systems, and edge-AI devices like NVIDIA Jetson (arm64), Robotick delivers real-time precision where it counts, and excellent performance everywhere else - without sacrificing ease of use or flexibility.
 
+### 🧱 Zero-allocation policy
+
+The engine core avoids heap-bearing `std::` containers entirely: approved STL headers are wrapped by `robotick::StdApproved` (defined in `cpp/include/robotick/framework/common/StdApproved.h`), while deterministic structures rely on native types like `FixedString` and `HeapVector` (each defined in their own headers) plus explicit placement-new logic. Platform/CLI layers can still use STL where needed, but the contiguous-engine runtime stays heap-free so ESP32/MCU targets see consistent timings.
+
+### 🧭 Callback contract
+
+`start_fn`, `tick_fn`, and `stop_fn` are invoked inside the core loop where exceptions are not allowed, so workloads must catch and log their own exceptions before returning. If a workload wraps a third-party API that can throw, the workload should capture the exception, emit a warning via `ROBOTICK_WARNING` (or ROBOTICK_FATAL_EXIT it can't be handled elegantly), and then cleanly return so the engine can continue ticking. We keep the engine exception-free for MCU determinism.
+
+### 🕸️ Web Server startup
+
+`WebServer::start` now fatally exits if it cannot bind the requested port, making port conflicts immediately visible. Passing `port = 0` lets the OS pick an available port, so automated tests/tools can avoid busy sockets and then query `get_bound_port()` once the server runs.
+
 ---
 
 ## 🚀 What is Robotick?
@@ -40,6 +52,7 @@ Built for early learners and industry professionals alike, Robotick is simple en
 ### 🧩 Modular Workloads
 
 Each unit of logic is a workload - a small, testable module with clearly defined inputs, outputs, and config:
+
 ```cpp
 struct HelloWorkload {
     HelloConfig config;
@@ -49,6 +62,9 @@ struct HelloWorkload {
     void tick(const TickInfo& tick_info);
 };
 ```
+
+ROBOTICK_REGISTER_WORKLOAD(HelloWorkload, HelloConfig, HelloInputs, HelloOutputs)
+
 Reflection macros make every field visible and usable for config, scripting, or telemetry.
 
 ### 🔁 Real-Time Engine

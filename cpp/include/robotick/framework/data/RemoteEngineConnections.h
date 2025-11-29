@@ -20,11 +20,15 @@ namespace robotick
 	  public:
 		RemoteEngineConnections() = default;
 		RemoteEngineConnections(const RemoteEngineConnections&) = delete;
-		RemoteEngineConnections& operator=(const RemoteEngineConnections&) = delete;
 		RemoteEngineConnections(RemoteEngineConnections&&) noexcept = default;
+
+		~RemoteEngineConnections();
+
+		RemoteEngineConnections& operator=(const RemoteEngineConnections&) = delete;
 		RemoteEngineConnections& operator=(RemoteEngineConnections&&) noexcept = default;
 
 		void setup(Engine& engine, const Model& model);
+		void stop();
 		void tick(const TickInfo& tick_info);
 
 	  private:

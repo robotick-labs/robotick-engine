@@ -10,7 +10,7 @@
 namespace robotick
 {
 
-	void WorkloadFieldsIterator::for_each_workload(const Engine& engine, std::function<void(const WorkloadInstanceInfo&)> callback)
+	void WorkloadFieldsIterator::for_each_workload(const Engine& engine, Function<void(const WorkloadInstanceInfo&)> callback)
 	{
 		for (const WorkloadInstanceInfo& instance : engine.get_all_instance_info())
 		{
@@ -21,7 +21,7 @@ namespace robotick
 	void WorkloadFieldsIterator::for_each_field_in_workload(const Engine& engine,
 		const WorkloadInstanceInfo& instance,
 		WorkloadsBuffer* workloads_override,
-		std::function<void(const WorkloadFieldView&)> callback)
+		Function<void(const WorkloadFieldView&)> callback)
 	{
 		auto& workloads_buffer = workloads_override ? *workloads_override : engine.get_workloads_buffer();
 
@@ -40,7 +40,7 @@ namespace robotick
 		const TypeDescriptor* struct_type,
 		const size_t struct_offset,
 		WorkloadsBuffer& workloads_buffer,
-		std::function<void(const WorkloadFieldView&)> callback)
+		Function<void(const WorkloadFieldView&)> callback)
 	{
 		if (!struct_type)
 			return;
@@ -62,7 +62,7 @@ namespace robotick
 	}
 
 	void WorkloadFieldsIterator::for_each_field_in_struct_field(
-		const WorkloadFieldView& parent_field, std::function<void(const WorkloadFieldView&)> callback)
+		const WorkloadFieldView& parent_field, Function<void(const WorkloadFieldView&)> callback)
 	{
 		const StructDescriptor* struct_desc = parent_field.get_field_struct_desc();
 		if (!struct_desc)

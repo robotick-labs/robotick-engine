@@ -19,9 +19,6 @@
 #include <cstddef>
 #include <cstring>
 #include <stdexcept>
-#include <string>
-#include <typeindex>
-#include <vector>
 
 namespace robotick
 {
@@ -57,9 +54,15 @@ namespace robotick
 			ROBOTICK_ASSERT(source_ptr != nullptr && dest_ptr != nullptr && size > 0);
 			ROBOTICK_ASSERT(source_ptr != dest_ptr && "Source and destination pointers are the same - this should have been caught in fixup");
 
-			// If aliasing is possible, use std::memmove instead.
-			std::memcpy(dest_ptr, source_ptr, size);
+			::memcpy(dest_ptr, source_ptr, size);
 		}
+	};
+
+	struct FieldInfo
+	{
+		void* ptr = nullptr;
+		size_t size = 0;
+		const FieldDescriptor* descriptor = nullptr;
 	};
 
 	using FieldConfigEntry = Pair<StringView, StringView>;
@@ -80,7 +83,7 @@ namespace robotick
 			const bool warnIfNotFound = true);
 
 		/// @brief Given a dot-separated field path (e.g. "MyWorkload.outputs.x"), returns the raw pointer, size in bytes, and field-descriptor
-		static std::tuple<void*, size_t, const FieldDescriptor*> find_field_info(const Engine& engine, const char* path);
+		static FieldInfo find_field_info(const Engine& engine, const char* path);
 	};
 
 } // namespace robotick

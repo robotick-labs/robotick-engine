@@ -51,7 +51,7 @@ namespace robotick
 			return strcmp(data, other) == 0;
 		}
 
-		/** @brief Lexicographic comparison (for use in std::map, etc.) */
+		/** @brief Lexicographic comparison (for use in maps, etc.) */
 		bool operator<(const StringView& other) const noexcept
 		{
 			if (!data && !other.data)

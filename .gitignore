@@ -6,3 +6,5 @@ build/*
 *.log
 cpp/build/*
 .venv
+tools/esp32-compile-check/platforms/
+/scratch/
