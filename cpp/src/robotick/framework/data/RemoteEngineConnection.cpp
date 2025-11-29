@@ -4,6 +4,7 @@
 #include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/api.h"
 #include "robotick/framework/concurrency/Thread.h"
+#include "robotick/framework/math/IsFinite.h"
 
 #include <arpa/inet.h>
 #include <cmath>
@@ -568,13 +569,13 @@ namespace robotick
 			this->mutual_tick_rate_hz = local_sender_tick_rate_hz; // start off with our local tick-rate - this will get adjusted to mutual rate later
 			const uint32_t tick_rate_net = float_to_network_bytes(local_sender_tick_rate_hz);
 
-		for (size_t i = 0; i < field_count; ++i)
-		{
-			const auto& field = fields[i];
-			if (field.path.contains('\n'))
+			for (size_t i = 0; i < field_count; ++i)
 			{
-				ROBOTICK_FATAL_EXIT("Field path contains newline character - this will break handshake data: %s", field.path.c_str());
-			}
+				const auto& field = fields[i];
+				if (field.path.contains('\n'))
+				{
+					ROBOTICK_FATAL_EXIT("Field path contains newline character - this will break handshake data: %s", field.path.c_str());
+				}
 			}
 
 			auto writer = [this, tick_rate_net](size_t offset, uint8_t* dst, size_t max_len) -> size_t
@@ -729,8 +730,7 @@ namespace robotick
 			{
 				if (handshake_receive_state.current_path_length >= handshake_receive_state.current_path.capacity())
 				{
-					ROBOTICK_FATAL_EXIT("Field path too long (%zu chars): exceeds handshake buffer",
-						handshake_receive_state.current_path_length);
+					ROBOTICK_FATAL_EXIT("Field path too long (%zu chars): exceeds handshake buffer", handshake_receive_state.current_path_length);
 				}
 
 				handshake_receive_state.current_path.data[handshake_receive_state.current_path_length] = '\0';
@@ -760,7 +760,7 @@ namespace robotick
 
 			const float sender_tick_rate_hz = handshake_receive_state.sender_tick_rate_hz;
 
-			if (!::isfinite(sender_tick_rate_hz) || sender_tick_rate_hz <= 0.0f)
+			if (!robotick::isfinite(sender_tick_rate_hz) || sender_tick_rate_hz <= 0.0f)
 			{
 				ROBOTICK_FATAL_EXIT("Invalid sender tick rate: %f", sender_tick_rate_hz);
 			}
@@ -907,7 +907,7 @@ namespace robotick
 				received_mutual_tick_rate_hz = 0.0f;
 			}
 
-			if (::isfinite(received_mutual_tick_rate_hz) && received_mutual_tick_rate_hz > 0.0f)
+			if (robotick::isfinite(received_mutual_tick_rate_hz) && received_mutual_tick_rate_hz > 0.0f)
 			{
 				ROBOTICK_INFO_IF(
 					ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender received mutual tick rate: %.2f Hz", received_mutual_tick_rate_hz);
