@@ -1,9 +1,9 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/common/Memory.h"
 #include "robotick/framework/data/RemoteEngineDiscoverer.h"
 #include "robotick/api.h"
+#include "robotick/framework/memory/Memory.h"
 
 #include <arpa/inet.h>
 #include <cstring>

@@ -1,7 +1,7 @@
 #include "robotick/framework/data/RemoteEngineDiscoverer.h"
 #include "robotick/api.h"
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/common/StringUtils.h"
+#include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/strings/StringUtils.h"
 #include "robotick/platform/Atomic.h"
 #include "robotick/platform/Thread.h"
 

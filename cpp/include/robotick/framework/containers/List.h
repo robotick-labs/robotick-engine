@@ -36,7 +36,10 @@ namespace robotick
 		class Iterator
 		{
 		  public:
-			Iterator(Node* ptr) : current(ptr) {}
+			Iterator(Node* ptr)
+				: current(ptr)
+			{
+			}
 			T& operator*() const { return current->value; }
 			T* operator->() const { return &current->value; }
 			Iterator& operator++()

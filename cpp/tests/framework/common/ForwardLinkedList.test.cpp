@@ -1,7 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/common/ForwardLinkedList.h"
+#include "robotick/framework/containers/ForwardLinkedList.h"
 #include <catch2/catch_all.hpp>
 
 namespace robotick::test
@@ -11,7 +11,10 @@ namespace robotick::test
 		int value = 0;
 		TestItem* next_entry = nullptr;
 
-		explicit TestItem(int v) : value(v) {}
+		explicit TestItem(int v)
+			: value(v)
+		{
+		}
 	};
 
 	TEST_CASE("Unit/Framework/Common/ForwardLinkedList")

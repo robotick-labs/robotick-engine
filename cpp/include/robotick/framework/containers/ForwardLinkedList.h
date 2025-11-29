@@ -27,7 +27,10 @@ namespace robotick
 
 		struct Iterator
 		{
-			explicit Iterator(T* ptr) : current(ptr) {}
+			explicit Iterator(T* ptr)
+				: current(ptr)
+			{
+			}
 
 			T& operator*() const { return *current; }
 			T* operator->() const { return current; }

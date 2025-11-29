@@ -4,7 +4,7 @@
 #pragma once
 
 #include "robotick/api_base.h"
-#include "robotick/framework/common/InitializerList.h"
+#include "robotick/framework/utility/InitializerList.h"
 
 #include <float.h> // FLT_EPSILON, DBL_EPSILON
 #include <math.h>  // sqrtf, sqrt

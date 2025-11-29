@@ -1,7 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/common/FixedVector.h"
+#include "robotick/framework/containers/FixedVector.h"
 #include <catch2/catch_all.hpp>
 
 namespace robotick::test

@@ -2,9 +2,9 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/common/StringView.h"
-#include "robotick/framework/common/Algorithm.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
+#include "robotick/framework/strings/StringView.h"
+#include "robotick/framework/utility/Algorithm.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 #include "robotick/platform/Clock.h"
 
@@ -31,8 +31,7 @@ namespace robotick
 		uint32_t raw = esp_random(); // 32-bit hardware RNG
 		session_id.format("%08X-%s", raw, model_name);
 #elif defined(ROBOTICK_PLATFORM_DESKTOP)
-		const uint64_t raw =
-			static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count()); // 64-bit timestamp
+		const uint64_t raw = static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count()); // 64-bit timestamp
 		session_id.format("%016llX-%s", static_cast<unsigned long long>(raw), model_name);
 #else
 		session_id.format("12345-%s", model_name);

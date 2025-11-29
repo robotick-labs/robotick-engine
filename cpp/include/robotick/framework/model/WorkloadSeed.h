@@ -5,15 +5,15 @@
 
 #include "robotick/api.h"
 
-#include "robotick/framework/common/ArrayView.h"
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/common/Pair.h"
-#include "robotick/framework/common/StringView.h"
+#include "robotick/framework/containers/ArrayView.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/registry/TypeRegistry.h"
+#include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/strings/StringView.h"
+#include "robotick/framework/utility/Pair.h"
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
-#include "robotick/framework/common/HeapVector.h"
+#include "robotick/framework/memory/HeapVector.h"
 #endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 namespace robotick

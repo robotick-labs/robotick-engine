@@ -1,8 +1,8 @@
 // Copyright Robotick Labs
 #pragma once
 
-#include "robotick/framework/common/Hash.h"
-#include "robotick/framework/common/Memory.h"
+#include "robotick/framework/memory/Memory.h"
+#include "robotick/framework/utility/Hash.h"
 
 #include <cstdio>
 #include <stddef.h>

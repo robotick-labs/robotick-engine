@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "robotick/framework/common/FixedVector.h"
-#include "robotick/framework/common/Hash.h"
-#include "robotick/framework/common/List.h"
+#include "robotick/framework/containers/FixedVector.h"
+#include "robotick/framework/containers/List.h"
+#include "robotick/framework/utility/Hash.h"
 
 #include <string.h> // for strcmp
 

@@ -7,8 +7,8 @@
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/DataConnectionSeed.h"
-#include "robotick/framework/common/StringUtils.h"
 #include "robotick/framework/model/WorkloadSeed.h"
+#include "robotick/framework/strings/StringUtils.h"
 
 namespace robotick
 {
@@ -314,7 +314,7 @@ namespace robotick
 		}
 	}
 
-		FieldInfo DataConnectionUtils::find_field_info(const Engine& engine, const char* path)
+	FieldInfo DataConnectionUtils::find_field_info(const Engine& engine, const char* path)
 	{
 		const WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
 		const Map<const char*, WorkloadInstanceInfo*>& instances = engine.get_all_instance_info_map();

@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/config/AssertUtils.h"
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/common/HeapVector.h"
-#include "robotick/framework/common/StringUtils.h"
-#include "robotick/framework/common/StringView.h"
+#include "robotick/framework/memory/HeapVector.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeRegistry.h"
+#include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/strings/StringUtils.h"
+#include "robotick/framework/strings/StringView.h"
 #include <catch2/catch_all.hpp>
 #include <cstring>
 
@@ -67,18 +67,18 @@ namespace robotick::test
 			for (auto desc : registered_types)
 			{
 				REQUIRE(desc != nullptr);
-			bool name_unique = true;
-			const char* name_cstr = desc->name.c_str();
-			for (size_t i = 0; i < name_count; ++i)
-			{
-				if (seen_names[i] == name_cstr)
+				bool name_unique = true;
+				const char* name_cstr = desc->name.c_str();
+				for (size_t i = 0; i < name_count; ++i)
 				{
-					name_unique = false;
-					break;
+					if (seen_names[i] == name_cstr)
+					{
+						name_unique = false;
+						break;
+					}
 				}
-			}
-			REQUIRE(name_unique);
-			seen_names[name_count++] = desc->name.c_str();
+				REQUIRE(name_unique);
+				seen_names[name_count++] = desc->name.c_str();
 
 				bool id_unique = true;
 				for (size_t j = 0; j < id_count; ++j)
@@ -201,26 +201,13 @@ namespace robotick::test
 			alias_name.format("RegistryDuplicateAlias_%zu", primary_idx);
 
 			const TypeDescriptor s_duplicate_primary{
-				StringView(primary_name.c_str()),
-				TypeId(primary_name.c_str()),
-				sizeof(int),
-				alignof(int),
-				TypeCategory::Primitive,
-				{},
-				nullptr};
+				StringView(primary_name.c_str()), TypeId(primary_name.c_str()), sizeof(int), alignof(int), TypeCategory::Primitive, {}, nullptr};
 			TypeRegistry::get().register_type(s_duplicate_primary);
 
 			const TypeDescriptor s_duplicate_secondary{
-				StringView(alias_name.c_str()),
-				TypeId(primary_name.c_str()),
-				sizeof(int),
-				alignof(int),
-				TypeCategory::Primitive,
-				{},
-				nullptr};
+				StringView(alias_name.c_str()), TypeId(primary_name.c_str()), sizeof(int), alignof(int), TypeCategory::Primitive, {}, nullptr};
 			ROBOTICK_REQUIRE_ERROR_MSG(
-				TypeRegistry::get().register_type(s_duplicate_secondary),
-				"TypeRegistry::register_type() - cannot have multiple types with same id");
+				TypeRegistry::get().register_type(s_duplicate_secondary), "TypeRegistry::register_type() - cannot have multiple types with same id");
 		}
 	}
 } // namespace robotick::test

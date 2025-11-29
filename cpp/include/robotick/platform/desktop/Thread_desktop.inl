@@ -1,8 +1,8 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/common/StdApproved.h"
+#include "robotick/framework/memory/StdApproved.h"
+#include "robotick/framework/strings/FixedString.h"
 
 #include <atomic>
 #include <chrono>

@@ -1,7 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/strings/FixedString.h"
 #include <catch2/catch_all.hpp>
 
 namespace robotick::test

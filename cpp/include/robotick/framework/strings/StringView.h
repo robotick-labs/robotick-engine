@@ -1,7 +1,7 @@
 // Copyright Robotick Labs
 #pragma once
 
-#include "robotick/framework/common/Hash.h"
+#include "robotick/framework/utility/Hash.h"
 
 #include <stddef.h>
 #include <string.h>

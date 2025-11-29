@@ -1,7 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/common/List.h"
+#include "robotick/framework/containers/List.h"
 #include <catch2/catch_all.hpp>
 
 namespace robotick::test
@@ -53,7 +53,10 @@ namespace robotick::test
 			struct MoveOnly
 			{
 				int value;
-				MoveOnly(int v) : value(v) {}
+				MoveOnly(int v)
+					: value(v)
+				{
+				}
 				MoveOnly(MoveOnly&&) = default;
 				MoveOnly& operator=(MoveOnly&&) = default;
 				MoveOnly(const MoveOnly&) = delete;

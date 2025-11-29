@@ -4,7 +4,7 @@
 #include "robotick/framework/data/Blackboard.h"
 
 #include "robotick/api_base.h"
-#include "robotick/framework/common/ArrayView.h"
+#include "robotick/framework/containers/ArrayView.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/TypeMacros.h"
 
@@ -80,7 +80,10 @@ namespace robotick
 			{
 				if (current_offset_in_workloads_buffer < blackboard_offset_in_workloads_buffer)
 				{
-					ROBOTICK_FATAL_EXIT("Field '%s' offset underflows (current=%zu < blackboard=%zu)", field.name.c_str(), current_offset_in_workloads_buffer, blackboard_offset_in_workloads_buffer);
+					ROBOTICK_FATAL_EXIT("Field '%s' offset underflows (current=%zu < blackboard=%zu)",
+						field.name.c_str(),
+						current_offset_in_workloads_buffer,
+						blackboard_offset_in_workloads_buffer);
 				}
 				field.offset_within_container = current_offset_in_workloads_buffer - blackboard_offset_in_workloads_buffer;
 			}

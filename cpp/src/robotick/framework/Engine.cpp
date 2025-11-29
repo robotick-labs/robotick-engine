@@ -18,19 +18,7 @@
 #include "robotick/platform/Thread.h"
 #include "robotick/platform/WebServer.h"
 
-#include <climits>
 #include <cstddef>
-
-namespace
-{
-	namespace detail
-	{
-		static inline uint32_t clamp_to_uint32(uint64_t value)
-		{
-			return (value > UINT32_MAX) ? UINT32_MAX : static_cast<uint32_t>(value);
-		}
-	} // namespace detail
-}
 
 namespace robotick
 {
@@ -95,14 +83,14 @@ namespace robotick
 	}
 
 	// Ensure the cursor respects the max alignment of the upcoming type so every allocation remains well-aligned.
-		static bool align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
-		{
-			const size_t alignment = max_align_for_type(type.alignment);
-			// This should never fail, since max_align_for_type clamps to at least alignof(max_align_t),
-			// but we keep the division defensive to protect the cursor from bad alignments.
-			if (alignment == 0)
-				return false;
-			size_t remainder = workloads_cursor % alignment;
+	static bool align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	{
+		const size_t alignment = max_align_for_type(type.alignment);
+		// This should never fail, since max_align_for_type clamps to at least alignof(max_align_t),
+		// but we keep the division defensive to protect the cursor from bad alignments.
+		if (alignment == 0)
+			return false;
+		size_t remainder = workloads_cursor % alignment;
 		if (remainder != 0)
 		{
 			size_t delta = alignment - remainder;

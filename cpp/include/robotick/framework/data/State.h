@@ -6,8 +6,8 @@
 #include <cstdint>
 #include <new>
 
-#include "robotick/framework/common/Memory.h"
-#include "robotick/framework/common/TypeTraits.h"
+#include "robotick/framework/memory/Memory.h"
+#include "robotick/framework/utility/TypeTraits.h"
 
 namespace robotick
 {

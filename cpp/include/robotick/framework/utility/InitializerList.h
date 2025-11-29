@@ -3,12 +3,11 @@
 
 #pragma once
 
-#include "robotick/framework/common/StdApproved.h"
+#include "robotick/framework/memory/StdApproved.h"
 
 #include <initializer_list>
 
 namespace robotick
 {
-	template <typename T>
-	using initializer_list = std_approved::initializer_list<T>;
+	template <typename T> using initializer_list = std_approved::initializer_list<T>;
 } // namespace robotick

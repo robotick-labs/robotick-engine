@@ -6,7 +6,7 @@
 #include "robotick/api_base.h"
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
-#include "robotick/framework/common/HeapVector.h"
+#include "robotick/framework/memory/HeapVector.h"
 #endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 #include <cstddef> // size_t

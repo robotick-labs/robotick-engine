@@ -6,9 +6,18 @@
 #include "robotick/api_base.h"
 
 #include <chrono>
+#include <cstdint>
 
 namespace robotick
 {
+	namespace detail
+	{
+		inline uint32_t clamp_to_uint32(uint64_t value)
+		{
+			return (value > UINT32_MAX) ? UINT32_MAX : static_cast<uint32_t>(value);
+		}
+	} // namespace detail
+
 	struct Clock
 	{
 		using SteadyClock = std_approved::chrono::steady_clock;

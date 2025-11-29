@@ -4,10 +4,10 @@
 #pragma once
 
 #include "robotick/api_base.h"
-#include "robotick/framework/common/StringView.h"
+#include "robotick/framework/strings/StringView.h"
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
-#include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/strings/FixedString.h"
 #endif
 
 namespace robotick

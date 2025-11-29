@@ -13,7 +13,11 @@ namespace robotick
 
 		constexpr Pair() = default;
 
-		constexpr Pair(const TFirst& a, const TSecond& b) : first(a), second(b) {}
+		constexpr Pair(const TFirst& a, const TSecond& b)
+			: first(a)
+			, second(b)
+		{
+		}
 
 		constexpr bool operator<(const Pair& other) const { return first < other.first || (!(other.first < first) && second < other.second); }
 

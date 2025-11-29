@@ -2,10 +2,10 @@
 
 #include "robotick/api.h"
 
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/common/FixedVector.h"
-#include "robotick/framework/common/Function.h"
-#include "robotick/framework/common/Pair.h"
+#include "robotick/framework/containers/FixedVector.h"
+#include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/utility/Function.h"
+#include "robotick/framework/utility/Pair.h"
 
 #include <cstdint>
 

@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "robotick/framework/common/TypeTraits.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/WorkloadTypeHelpers.h"
+#include "robotick/framework/utility/TypeTraits.h"
 
 namespace robotick
 {

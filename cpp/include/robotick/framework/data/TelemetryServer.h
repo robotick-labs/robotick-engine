@@ -1,6 +1,6 @@
 #pragma once
 
-#include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/strings/FixedString.h"
 #include "robotick/platform/WebServer.h"
 
 namespace robotick

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "robotick/framework/common/StdApproved.h"
+#include "robotick/framework/memory/StdApproved.h"
 #include <functional>
 
 namespace robotick

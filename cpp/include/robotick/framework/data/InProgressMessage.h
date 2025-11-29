@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "robotick/framework/common/Function.h"
 #include "robotick/framework/data/MessageHeader.h"
+#include "robotick/framework/utility/Function.h"
 
 #include <cstdint>
 #include <cstring>

@@ -1,10 +1,10 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeMacros.h"
 #include "robotick/framework/registry/TypeRegistry.h"
+#include "robotick/framework/strings/FixedString.h"
 
 #include <cstdio>
 #include <ctype.h>

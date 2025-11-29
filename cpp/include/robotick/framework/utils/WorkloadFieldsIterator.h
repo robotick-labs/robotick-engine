@@ -1,7 +1,7 @@
 #pragma once
 
-#include "robotick/framework/common/Function.h"
-#include "robotick/framework/common/Memory.h"
+#include "robotick/framework/memory/Memory.h"
+#include "robotick/framework/utility/Function.h"
 
 #include <typeindex>
 

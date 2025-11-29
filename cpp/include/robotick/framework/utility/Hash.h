@@ -1,10 +1,10 @@
 // Copyright Robotick Labs
 #pragma once
 
+#include "robotick/framework/utility/TypeTraits.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include "robotick/framework/common/TypeTraits.h"
 
 namespace robotick
 {

@@ -3,10 +3,10 @@
 
 #pragma once
 
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/common/Function.h"
-#include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/data/InProgressMessage.h"
+#include "robotick/framework/memory/HeapVector.h"
+#include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/utility/Function.h"
 
 #include <cstdint>
 #include <utility>

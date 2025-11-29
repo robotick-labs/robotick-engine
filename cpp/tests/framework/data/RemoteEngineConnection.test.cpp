@@ -3,9 +3,9 @@
 
 #include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/api.h"
-#include "robotick/framework/common/FixedVector.h"
-#include "robotick/framework/common/HeapVector.h"
-#include "robotick/framework/common/StringUtils.h"
+#include "robotick/framework/containers/FixedVector.h"
+#include "robotick/framework/memory/HeapVector.h"
+#include "robotick/framework/strings/StringUtils.h"
 #include "robotick/platform/Thread.h"
 
 #include <catch2/catch_all.hpp>
