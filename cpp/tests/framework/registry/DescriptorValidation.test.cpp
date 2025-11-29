@@ -14,7 +14,7 @@ namespace robotick::test
 {
 	namespace
 	{
-		static const TypeDescriptor s_zero_align_desc{
+		const TypeDescriptor s_zero_align_desc{
 			StringView("ZeroAlignDescriptor"),
 			TypeId("ZeroAlignDescriptor"),
 			sizeof(int),
@@ -22,9 +22,9 @@ namespace robotick::test
 			TypeCategory::Primitive,
 			{},
 			nullptr};
-		static const AutoRegisterType s_zero_align_reg(s_zero_align_desc);
+		const AutoRegisterType s_zero_align_reg(s_zero_align_desc);
 
-		static const TypeDescriptor s_zero_size_desc{
+		const TypeDescriptor s_zero_size_desc{
 			StringView("ZeroSizeDescriptor"),
 			TypeId("ZeroSizeDescriptor"),
 			0,
@@ -32,7 +32,7 @@ namespace robotick::test
 			TypeCategory::Primitive,
 			{},
 			nullptr};
-		static const AutoRegisterType s_zero_size_reg(s_zero_size_desc);
+		const AutoRegisterType s_zero_size_reg(s_zero_size_desc);
 	} // namespace
 
 	TEST_CASE("Unit/Framework/Registry/DescriptorValidation")

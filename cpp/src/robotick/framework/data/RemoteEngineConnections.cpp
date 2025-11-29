@@ -49,6 +49,7 @@ namespace robotick
 						out.size = field_info.size;
 						ROBOTICK_ASSERT(field_info.descriptor != nullptr);
 						out.type_desc = field_info.descriptor->find_type_descriptor();
+						ROBOTICK_ASSERT(out.type_desc != nullptr);
 						return true;
 					});
 

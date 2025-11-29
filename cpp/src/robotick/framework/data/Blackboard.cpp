@@ -78,6 +78,10 @@ namespace robotick
 
 			if (write_offsets)
 			{
+				if (current_offset_in_workloads_buffer < blackboard_offset_in_workloads_buffer)
+				{
+					ROBOTICK_FATAL_EXIT("Field '%s' offset underflows (current=%zu < blackboard=%zu)", field.name.c_str(), current_offset_in_workloads_buffer, blackboard_offset_in_workloads_buffer);
+				}
 				field.offset_within_container = current_offset_in_workloads_buffer - blackboard_offset_in_workloads_buffer;
 			}
 

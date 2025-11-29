@@ -5,6 +5,7 @@
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/platform/Atomic.h"
 #include "robotick/platform/Thread.h"
+#include "robotick/config/AssertUtils.h"
 
 #include <arpa/inet.h>
 #include <atomic>
@@ -16,6 +17,27 @@
 
 namespace robotick::test
 {
+	namespace
+	{
+		struct ThreadJoiner
+		{
+			explicit ThreadJoiner(std::thread& t)
+				: thread(t)
+			{
+			}
+
+			~ThreadJoiner()
+			{
+				if (thread.joinable())
+				{
+					thread.join();
+				}
+			}
+
+		  private:
+			std::thread& thread;
+		};
+	}
 	struct TestSequencedGroupWorkload
 	{
 	};
@@ -24,7 +46,11 @@ namespace robotick::test
 
 	struct OverrunWorkload
 	{
-		void tick(const TickInfo&) { Thread::sleep_ms(10); }
+		void tick(const TickInfo& tick_info)
+		{
+			(void)tick_info;
+			Thread::sleep_ms(10);
+		}
 	};
 
 	ROBOTICK_REGISTER_WORKLOAD(OverrunWorkload)
@@ -97,6 +123,8 @@ namespace robotick::test
 
 		const uint16_t port = ntohs(addr.sin_port);
 		::close(sock);
+		// NOTE: this is still vulnerable to a TOCTOU race—the port is released before the Engine binds, so another
+		// process could grab it. We accept occasional flake on busy hosts, or keep extending the search loop if needed.
 		return port;
 	}
 
@@ -108,6 +136,7 @@ namespace robotick::test
 			if (port != 0)
 				return port;
 		}
+		ROBOTICK_FATAL_EXIT("Engine test: no free telemetry port found after 3 attempts");
 		return 0;
 	}
 
@@ -230,10 +259,10 @@ namespace robotick::test
 				{
 					engine.run(stop_after_next_tick_flag);
 				});
+			ThreadJoiner runner_joiner(runner);
 
 			Thread::sleep_ms(50);
 			stop_after_next_tick_flag.set();
-			runner.join();
 
 			const WorkloadInstanceInfo* root_info = engine.get_root_instance_info();
 			REQUIRE(root_info != nullptr);
@@ -258,10 +287,10 @@ namespace robotick::test
 
 				AtomicFlag stop_flag{false};
 				std::thread runner([&]() { engine.run(stop_flag); });
+				ThreadJoiner runner_joiner(runner);
 
 				Thread::sleep_ms(30);
 				stop_flag.set();
-				runner.join();
 			};
 
 			run_engine_once(telemetry_port);

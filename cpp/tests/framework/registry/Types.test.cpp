@@ -67,17 +67,18 @@ namespace robotick::test
 			for (auto desc : registered_types)
 			{
 				REQUIRE(desc != nullptr);
-				bool name_unique = true;
-				for (size_t i = 0; i < name_count; ++i)
+			bool name_unique = true;
+			const char* name_cstr = desc->name.c_str();
+			for (size_t i = 0; i < name_count; ++i)
+			{
+				if (seen_names[i] == name_cstr)
 				{
-					if (string_equals(seen_names[i].c_str(), desc->name.c_str()))
-					{
-						name_unique = false;
-						break;
-					}
+					name_unique = false;
+					break;
 				}
-				REQUIRE(name_unique);
-				seen_names[name_count++] = desc->name.c_str();
+			}
+			REQUIRE(name_unique);
+			seen_names[name_count++] = desc->name.c_str();
 
 				bool id_unique = true;
 				for (size_t j = 0; j < id_count; ++j)
@@ -188,15 +189,35 @@ namespace robotick::test
 
 		SECTION("TypeRegistry rejects duplicate ids")
 		{
-			static const TypeDescriptor s_duplicate_primary{StringView("RegistryDuplicate"), TypeId("RegistryDuplicate"), sizeof(int), alignof(int), TypeCategory::Primitive, {}, nullptr};
-			static bool primary_registered = false;
-			if (!primary_registered)
-			{
-				TypeRegistry::get().register_type(s_duplicate_primary);
-				primary_registered = true;
-			}
+			static FixedString64 persistent_names[32];
+			static size_t persistent_count = 0;
+			const size_t primary_idx = persistent_count++;
+			const size_t alias_idx = persistent_count++;
+			ROBOTICK_ASSERT(primary_idx < 32 && alias_idx < 32);
 
-			static const TypeDescriptor s_duplicate_secondary{StringView("RegistryDuplicateAlias"), TypeId("RegistryDuplicate"), sizeof(int), alignof(int), TypeCategory::Primitive, {}, nullptr};
+			FixedString64& primary_name = persistent_names[primary_idx];
+			FixedString64& alias_name = persistent_names[alias_idx];
+			primary_name.format("RegistryDuplicate_%zu", primary_idx);
+			alias_name.format("RegistryDuplicateAlias_%zu", primary_idx);
+
+			const TypeDescriptor s_duplicate_primary{
+				StringView(primary_name.c_str()),
+				TypeId(primary_name.c_str()),
+				sizeof(int),
+				alignof(int),
+				TypeCategory::Primitive,
+				{},
+				nullptr};
+			TypeRegistry::get().register_type(s_duplicate_primary);
+
+			const TypeDescriptor s_duplicate_secondary{
+				StringView(alias_name.c_str()),
+				TypeId(primary_name.c_str()),
+				sizeof(int),
+				alignof(int),
+				TypeCategory::Primitive,
+				{},
+				nullptr};
 			ROBOTICK_REQUIRE_ERROR_MSG(
 				TypeRegistry::get().register_type(s_duplicate_secondary),
 				"TypeRegistry::register_type() - cannot have multiple types with same id");

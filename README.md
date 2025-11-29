@@ -20,7 +20,7 @@ From bare-metal microcontrollers like the STM32 and ESP32 to Raspberry Pi, deskt
 
 ### 🧱 Zero-allocation policy
 
-The engine core avoids heap-bearing `std::` containers entirely: every allocator-friendly helper is routed through `robotick::StdApproved` (defined in `cpp/include/robotick/framework/common/StdApproved.h`), while deterministic structures (buffers, callbacks, registry) rely on `FixedString`, `HeapVector`, and explicit placement-new logic. Platform/CLI layers can still use STL where needed, but the contiguous-engine runtime stays heap-free so ESP32/MCU targets see consistent timings.
+The engine core avoids heap-bearing `std::` containers entirely: approved STL headers are wrapped by `robotick::StdApproved` (defined in `cpp/include/robotick/framework/common/StdApproved.h`), while deterministic structures rely on native types like `FixedString` and `HeapVector` (each defined in their own headers) plus explicit placement-new logic. Platform/CLI layers can still use STL where needed, but the contiguous-engine runtime stays heap-free so ESP32/MCU targets see consistent timings.
 
 ### 🧭 Callback contract
 
@@ -62,6 +62,8 @@ struct HelloWorkload {
     void tick(const TickInfo& tick_info);
 };
 ```
+
+ROBOTICK_REGISTER_WORKLOAD(HelloWorkload, HelloConfig, HelloInputs, HelloOutputs)
 
 Reflection macros make every field visible and usable for config, scripting, or telemetry.
 

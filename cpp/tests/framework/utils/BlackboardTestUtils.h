@@ -12,6 +12,12 @@ namespace robotick
 
 	struct BlackboardBuffer
 	{
+		BlackboardBuffer() = default;
+		BlackboardBuffer(const BlackboardBuffer&) = delete;
+		BlackboardBuffer& operator=(const BlackboardBuffer&) = delete;
+		BlackboardBuffer(BlackboardBuffer&&) = default;
+		BlackboardBuffer& operator=(BlackboardBuffer&&) = default;
+
 		WorkloadsBuffer buffer;
 		Blackboard* blackboard = nullptr;
 	};

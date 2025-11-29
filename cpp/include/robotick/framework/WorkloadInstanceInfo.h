@@ -18,14 +18,6 @@ namespace robotick
 	struct WorkloadsBuffer;
 	struct WorkloadDescriptor;
 
-	namespace detail
-	{
-		static inline uint32_t clamp_to_uint32(uint64_t value)
-		{
-			return (value > UINT32_MAX) ? UINT32_MAX : static_cast<uint32_t>(value);
-		}
-	} // namespace detail
-
 	using TickDurationWindow = FixedVector<uint32_t, 64>;
 
 	struct WorkloadInstanceStats
@@ -40,17 +32,17 @@ namespace robotick
 
 		void record_tick_duration_ns(uint32_t duration_ns, uint32_t budget_ns);
 
-		const TickDurationWindow& get_duration_window() const { return duration_window; }
-		size_t get_duration_window_index() const { return window_index; }
-		size_t get_duration_window_count() const { return duration_window.size(); }
-
 		float get_last_tick_duration_sec() const { return (float)last_tick_duration_ns * 1e-9f; }
 		float get_last_time_delta_sec() const { return (float)last_time_delta_ns * 1e-9f; }
 
 		float get_last_tick_duration_ms() const { return (float)last_tick_duration_ns * 1e-6f; }
 		float get_last_time_delta_ms() const { return (float)last_time_delta_ns * 1e-6f; }
 
+	private:
 		// Internal sliding-window instrumentation (not part of the public API):
+		const TickDurationWindow& get_duration_window() const { return duration_window; }
+		uint32_t get_duration_window_index() const { return window_index; }
+		size_t get_duration_window_count() const { return duration_window.size(); }
 	};
 
 	struct WorkloadInstanceInfo
