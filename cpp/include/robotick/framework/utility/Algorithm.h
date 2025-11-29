@@ -18,4 +18,9 @@ namespace robotick
 	{
 		std_approved::sort(first, last);
 	}
+
+	template <typename It, typename T> inline void fill(It first, It last, const T& value)
+	{
+		std_approved::fill(first, last, value);
+	}
 } // namespace robotick

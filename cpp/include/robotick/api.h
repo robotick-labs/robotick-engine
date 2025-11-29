@@ -32,3 +32,4 @@
 #include "robotick/framework/registry/TypeMacros.h"
 #include "robotick/framework/registry/TypeRegistry.h"
 #include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/strings/StringView.h"
