@@ -110,4 +110,12 @@ namespace robotick
 		std::atomic<T> value;
 	};
 
+	// Lightweight wrappers around std::atomic_thread_fence so call sites do not pull in <atomic> directly.
+	// These belong in Atomic.h (rather than Thread.h) because they relate to memory ordering, not scheduling.
+	inline void thread_fence(std::memory_order order) { std::atomic_thread_fence(order); }
+
+	inline void thread_fence_release() { std::atomic_thread_fence(std::memory_order_release); }
+
+	inline void thread_fence_acquire() { std::atomic_thread_fence(std::memory_order_acquire); }
+
 } // namespace robotick

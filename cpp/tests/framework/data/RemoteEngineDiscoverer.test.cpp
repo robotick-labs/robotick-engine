@@ -1,8 +1,7 @@
 #include "robotick/framework/data/RemoteEngineDiscoverer.h"
 #include "robotick/api.h"
+#include "robotick/platform/Atomic.h"
 #include "robotick/platform/Thread.h"
-
-#include <atomic>
 #include <catch2/catch_all.hpp>
 #include <string>
 
@@ -15,9 +14,9 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		const char* model_to_find = "target-model";
 		const char* sender_model = "sender-model";
 
-		std::atomic<bool> requested{false};
-		std::atomic<bool> discovered{false};
-		std::atomic<bool> correct_info{false};
+		AtomicValue<bool> requested(false);
+		AtomicValue<bool> discovered(false);
+		AtomicValue<bool> correct_info(false);
 
 		RemoteEngineDiscoverer sender;
 		RemoteEngineDiscoverer receiver;
@@ -28,33 +27,33 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		receiver.set_on_incoming_connection_requested(
 			[&](const char* source_id, uint16_t& port_out)
 			{
-				requested = true;
+				requested.store(true);
 				REQUIRE(std::string(source_id) == sender_model);
 				port_out = 7263;
 			});
 		sender.set_on_remote_model_discovered(
 			[&](const RemoteEngineDiscoverer::PeerInfo& info)
 			{
-				discovered = true;
+				discovered.store(true);
 				if (info.model_id == model_to_find && info.port == 7263)
-					correct_info = true;
+					correct_info.store(true);
 			});
 
-		for (int i = 0; i < 200 && !discovered; ++i) // 2 second timeout for CI stability
+		for (int i = 0; i < 200 && !discovered.load(); ++i) // 2 second timeout for CI stability
 		{
 			sender.tick(TICK_INFO_FIRST_10MS_100HZ);
 			receiver.tick(TICK_INFO_FIRST_10MS_100HZ);
 			Thread::sleep_ms(10);
 		}
 
-		REQUIRE(requested);
-		REQUIRE(discovered);
-		REQUIRE(correct_info);
+		REQUIRE(requested.load());
+		REQUIRE(discovered.load());
+		REQUIRE(correct_info.load());
 	}
 
 	SECTION("No response if model name doesn't match")
 	{
-		std::atomic<bool> called{false};
+		AtomicValue<bool> called(false);
 
 		RemoteEngineDiscoverer receiver;
 		RemoteEngineDiscoverer sender;
@@ -70,7 +69,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		sender.set_on_remote_model_discovered(
 			[&](const auto&)
 			{
-				called = true;
+				called.store(true);
 			});
 
 		// Tick for timeout period - should NOT trigger callback
@@ -79,11 +78,11 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 			receiver.tick(TICK_INFO_FIRST_10MS_100HZ);
 			sender.tick(TICK_INFO_FIRST_10MS_100HZ);
 			Thread::sleep_ms(10);
-			if (called)
+			if (called.load())
 				break; // Early exit if unexpectedly called
 		}
 
-		REQUIRE_FALSE(called);
+		REQUIRE_FALSE(called.load());
 	}
 
 	SECTION("Two models mutually discover with correct info")
@@ -93,8 +92,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		constexpr int port_a = 11111;
 		constexpr int port_b = 22222;
 
-		std::atomic<bool> a_discovered{false}, b_discovered{false};
-		std::atomic<bool> a_correct{false}, b_correct{false};
+		AtomicValue<bool> a_discovered(false), b_discovered(false);
+		AtomicValue<bool> a_correct(false), b_correct(false);
 
 		RemoteEngineDiscoverer recv_a, send_a;
 		RemoteEngineDiscoverer recv_b, send_b;
@@ -120,19 +119,19 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		send_a.set_on_remote_model_discovered(
 			[&](const auto& info)
 			{
-				a_discovered = true;
+				a_discovered.store(true);
 				if (info.model_id == model_b && info.port == port_b)
-					a_correct = true;
+					a_correct.store(true);
 			});
 		send_b.set_on_remote_model_discovered(
 			[&](const auto& info)
 			{
-				b_discovered = true;
+				b_discovered.store(true);
 				if (info.model_id == model_a && info.port == port_a)
-					b_correct = true;
+					b_correct.store(true);
 			});
 
-		for (int i = 0; i < 200 && (!a_discovered || !b_discovered); ++i)
+		for (int i = 0; i < 200 && (!a_discovered.load() || !b_discovered.load()); ++i)
 		{
 			recv_a.tick(TICK_INFO_FIRST_10MS_100HZ);
 			send_a.tick(TICK_INFO_FIRST_10MS_100HZ);
@@ -141,10 +140,10 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 			Thread::sleep_ms(5);
 		}
 
-		REQUIRE(a_discovered);
-		REQUIRE(b_discovered);
-		REQUIRE(a_correct);
-		REQUIRE(b_correct);
+		REQUIRE(a_discovered.load());
+		REQUIRE(b_discovered.load());
+		REQUIRE(a_correct.load());
+		REQUIRE(b_correct.load());
 	}
 
 	SECTION("Reset allows rediscovery (with verification)")
@@ -153,7 +152,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		const char* model_peer = "omega";
 		constexpr uint16_t reply_port = 30303;
 
-		std::atomic<int> discovery_count{0};
+		AtomicValue<int> discovery_count(0);
 
 		RemoteEngineDiscoverer recv;
 		RemoteEngineDiscoverer send;
@@ -175,7 +174,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 				discovery_count++;
 			});
 
-		for (int i = 0; i < 200 && discovery_count < 1; ++i)
+		for (int i = 0; i < 200 && discovery_count.load() < 1; ++i)
 		{
 			recv.tick(TICK_INFO_FIRST_10MS_100HZ);
 			send.tick(TICK_INFO_FIRST_10MS_100HZ);
@@ -184,13 +183,13 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 
 		send.reset_discovery();
 
-		for (int i = 0; i < 200 && discovery_count < 2; ++i)
+		for (int i = 0; i < 200 && discovery_count.load() < 2; ++i)
 		{
 			recv.tick(TICK_INFO_FIRST_10MS_100HZ);
 			send.tick(TICK_INFO_FIRST_10MS_100HZ);
 			Thread::sleep_ms(5);
 		}
 
-		REQUIRE(discovery_count >= 2);
+		REQUIRE(discovery_count.load() >= 2);
 	}
 }

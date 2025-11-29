@@ -387,7 +387,8 @@ namespace robotick
 				data_connection->do_data_copy();
 			}
 
-			std::atomic_thread_fence(std::memory_order_release);
+			// Ensure all published data writes are visible before workloads read them (cross-thread barrier via Atomic helpers)
+			thread_fence_release();
 
 			root_tick_fn(root_ptr, tick_info);
 
