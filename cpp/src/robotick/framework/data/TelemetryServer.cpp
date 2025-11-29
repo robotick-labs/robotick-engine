@@ -19,6 +19,12 @@
 
 namespace robotick
 {
+
+	TelemetryServer::~TelemetryServer()
+	{
+		stop();
+	}
+
 	static void build_session_id(const char* model_name, FixedString64& session_id)
 	{
 #if defined(ROBOTICK_PLATFORM_ESP32)

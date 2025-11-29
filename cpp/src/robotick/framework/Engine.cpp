@@ -49,6 +49,7 @@ namespace robotick
 	Engine::~Engine()
 	{
 		state->telemetry_server.stop();
+		state->remote_engine_connections.stop();
 
 		for (auto& instance : state->instances)
 		{
@@ -462,6 +463,7 @@ namespace robotick
 				inst.workload_descriptor->stop_fn(inst.get_ptr(*this));
 		}
 
+		state->remote_engine_connections.stop();
 		state->telemetry_server.stop();
 	}
 

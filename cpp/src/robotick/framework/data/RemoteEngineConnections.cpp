@@ -11,6 +11,11 @@
 namespace robotick
 {
 
+	RemoteEngineConnections::~RemoteEngineConnections()
+	{
+		stop();
+	}
+
 	void RemoteEngineConnections::setup(Engine& in_engine, const Model& model)
 	{
 		const bool log_verbose = ROBOTICK_REMOTE_ENGINE_CONNECTIONS_VERBOSE == 1;
@@ -123,6 +128,20 @@ namespace robotick
 		}
 
 		ROBOTICK_INFO_IF(log_verbose, "[REC::setup] Finished setup");
+	}
+
+	void RemoteEngineConnections::stop()
+	{
+		for (auto& sender : senders)
+			sender.disconnect();
+
+		for (auto& dynamic_receiver : dynamic_receivers)
+			dynamic_receiver.disconnect();
+
+		for (auto& discoverer_sender : discoverer_senders)
+			discoverer_sender.shutdown();
+
+		discoverer_receiver.shutdown();
 	}
 
 	void RemoteEngineConnections::tick(const TickInfo& tick_info)

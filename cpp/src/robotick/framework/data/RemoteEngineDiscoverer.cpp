@@ -34,6 +34,31 @@ namespace robotick
 			close(send_fd);
 	}
 
+	void RemoteEngineDiscoverer::shutdown()
+	{
+		if (recv_fd >= 0)
+		{
+			close(recv_fd);
+			recv_fd = -1;
+		}
+
+		if (send_fd >= 0)
+		{
+			close(send_fd);
+			send_fd = -1;
+		}
+
+		if (reply_fd >= 0)
+		{
+			close(reply_fd);
+			reply_fd = -1;
+		}
+
+		status = DiscoveryStatus::ReadyToBroadcast;
+		time_sec_to_broadcast = 0.0f;
+		listen_port = 0;
+	}
+
 	void RemoteEngineDiscoverer::initialize_sender(const char* my_model_name, const char* target_model_name)
 	{
 		mode = DiscoveryMode::Sender;

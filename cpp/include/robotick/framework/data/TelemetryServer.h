@@ -10,6 +10,9 @@ namespace robotick
 	class TelemetryServer
 	{
 	  public:
+		TelemetryServer() = default;
+		~TelemetryServer();
+
 		void start(const Engine& engine, const uint16_t telemetry_port);
 		void stop();
 

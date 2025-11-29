@@ -45,6 +45,8 @@ namespace robotick
 		// Reset state and resume periodic broadcasts
 		void reset_discovery();
 
+		void shutdown();
+
 	  protected:
 		void init_send_socket();
 		void init_recv_socket();
