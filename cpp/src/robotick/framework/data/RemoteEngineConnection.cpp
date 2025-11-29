@@ -5,19 +5,15 @@
 #include "robotick/api.h"
 #include "robotick/platform/Thread.h"
 
-#include <algorithm>
-#include <cmath>
-#include <utility>
 #include <arpa/inet.h>
+#include <cmath>
 #include <csignal> // For signal(), SIGPIPE, SIG_IGN
 #include <cstring>
 #include <fcntl.h>
-#include <mutex>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <unordered_map>
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
 #include "esp_netif.h"
@@ -67,6 +63,17 @@ namespace robotick
 	namespace
 	{
 		constexpr float RECONNECT_ATTEMPT_INTERVAL_SEC = 0.01f;
+		constexpr size_t MAX_REMOTE_FIELDS = 128;
+
+		template <typename T> inline T rtk_min(const T a, const T b)
+		{
+			return (a < b) ? a : b;
+		}
+
+		template <typename T> inline T rtk_max(const T a, const T b)
+		{
+			return (a > b) ? a : b;
+		}
 
 		bool is_network_stack_ready()
 		{
@@ -181,11 +188,7 @@ namespace robotick
 	{
 		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::register_field() should only be called in Mode::Sender");
 
-		fields.push_back(field);
-		handshake_path_total_length += field.path.length();
-		field_payload_capacity += field.size;
-		const size_t separator_count = fields.size() > 0 ? fields.size() - 1 : 0;
-		handshake_payload_capacity = sizeof(uint32_t) + handshake_path_total_length + separator_count;
+		add_field(field, true);
 	}
 
 	// set_field_binder() should be called on all receiver connections - giving each a means of mapping (via its BinderCallback)
@@ -194,7 +197,7 @@ namespace robotick
 	{
 		ROBOTICK_ASSERT_MSG(mode == Mode::Receiver, "RemoteEngineConnection::set_field_binder() should only be called in Mode::Receiver");
 
-		binder = std::move(binder_callback);
+		binder = binder_callback;
 	}
 
 	void RemoteEngineConnection::tick(const TickInfo& tick_info)
@@ -248,7 +251,7 @@ namespace robotick
 				{
 					// start sending one now; and schedule another for "ticks_until_next_send" time
 					const float mr = (mutual_tick_rate_hz > 0.0f) ? mutual_tick_rate_hz : tick_info.tick_rate_hz;
-					ticks_until_next_send = max<uint64_t>(1, (uint64_t)std::floor(tick_info.tick_rate_hz / mr));
+					ticks_until_next_send = rtk_max<uint64_t>(1, (uint64_t)::floor(tick_info.tick_rate_hz / mr));
 					ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "ticks_until_next_send: %i", (int)ticks_until_next_send);
 					tick_send_fields_as_message(true);
 				}
@@ -405,89 +408,182 @@ namespace robotick
 		set_state(State::ReadyForHandshake);
 	}
 
-static inline uint32_t float_to_network_bytes(float value)
-{
-	uint32_t as_int = 0;
-	::memcpy(&as_int, &value, sizeof(float));
-	return htonl(as_int); // convert to network byte order (big-endian)
-}
-
-static inline float network_bytes_to_float(uint32_t net_bytes)
-{
-	uint32_t host_order = ntohl(net_bytes);
-	float value = 0.0f;
-	::memcpy(&value, &host_order, sizeof(float));
-	return value;
-}
-
-	uint8_t* RemoteEngineConnection::init_handshake_buffer()
+	static inline uint32_t float_to_network_bytes(float value)
 	{
-		ROBOTICK_ASSERT_MSG(handshake_payload_capacity > 0, "Handshake payload capacity must be positive");
-		if (handshake_buffer.empty())
+		uint32_t as_int = 0;
+		::memcpy(&as_int, &value, sizeof(float));
+		return htonl(as_int); // convert to network byte order (big-endian)
+	}
+
+	static inline float network_bytes_to_float(uint32_t net_bytes)
+	{
+		uint32_t host_order = ntohl(net_bytes);
+		float value = 0.0f;
+		::memcpy(&value, &host_order, sizeof(float));
+		return value;
+	}
+
+	void RemoteEngineConnection::add_field(const Field& field, bool update_handshake_stats)
+	{
+		if (fields.size() == 0)
 		{
-			handshake_buffer.initialize(handshake_payload_capacity);
+			fields.initialize(MAX_REMOTE_FIELDS);
 		}
-		return handshake_buffer.data();
-	}
 
-	uint8_t* RemoteEngineConnection::init_field_payload_buffer()
-	{
-		ROBOTICK_ASSERT_MSG(field_payload_capacity > 0, "Field payload capacity must be positive");
-		if (field_payload_buffer.empty())
+		if (field_count >= fields.size())
 		{
-			field_payload_buffer.initialize(field_payload_capacity);
+			ROBOTICK_FATAL_EXIT("RemoteEngineConnection exceeded max fields capacity (%zu)", fields.size());
 		}
-		return field_payload_buffer.data();
-	}
 
-void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_info)
-{
-	ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::tick_sender_send_handshake() should only be called in Mode::Sender");
+		fields[field_count] = field;
+		field_count += 1;
+		field_payload_capacity += field.size;
 
-	if (fields.size() == 0)
-	{
-		ROBOTICK_FATAL_EXIT("RemoteEngineConnection::tick_sender_send_handshake() being called with no prior call(s) to "
-							"RemoteEngineConnection::register_field()");
-	}
-
-	if (in_progress_message_out.is_vacant())
-	{
-		uint8_t* payload = init_handshake_buffer();
-		size_t payload_length = 0;
-
-		// The sender announces its local tick-rate (Hz) in the Subscribe message.
-		// The receiver will min() this with its own rate and echo the result
-		// in the first FieldsRequest — establishing a mutual tick-rate.
-		// This enables smooth pacing and avoids receiver overrun.
-
-		const float local_sender_tick_rate_hz = tick_info.tick_rate_hz;
-		this->mutual_tick_rate_hz = local_sender_tick_rate_hz; // start off with our local tick-rate - this will get adjusted to mutual rate later
-		const uint32_t tick_rate_net = float_to_network_bytes(local_sender_tick_rate_hz);
-		::memcpy(payload + payload_length, &tick_rate_net, sizeof(tick_rate_net));
-		payload_length += sizeof(tick_rate_net);
-
-		// add fields info:
-		bool is_first_field = true;
-		for (const auto& field : fields)
+		if (update_handshake_stats)
 		{
+			handshake_path_total_length += field.path.length();
+			const size_t separator_count = (field_count > 0) ? (field_count - 1) : 0;
+			handshake_payload_capacity = sizeof(uint32_t) + handshake_path_total_length + separator_count;
+		}
+	}
+
+	size_t RemoteEngineConnection::write_handshake_payload(uint32_t tick_rate_net, size_t offset, uint8_t* dst, size_t max_len) const
+	{
+		const uint8_t tick_bytes[sizeof(uint32_t)] = {static_cast<uint8_t>(tick_rate_net >> 24),
+			static_cast<uint8_t>((tick_rate_net >> 16) & 0xFF),
+			static_cast<uint8_t>((tick_rate_net >> 8) & 0xFF),
+			static_cast<uint8_t>(tick_rate_net & 0xFF)};
+
+		size_t written = 0;
+		size_t cursor = offset;
+
+		if (cursor < sizeof(tick_bytes))
+		{
+			const size_t take = rtk_min(max_len, sizeof(tick_bytes) - cursor);
+			memcpy(dst, tick_bytes + cursor, take);
+			written += take;
+			cursor += take;
+		}
+
+		if (written == max_len)
+			return written;
+
+		if (cursor < sizeof(tick_bytes))
+			return written;
+
+		size_t paths_offset = cursor - sizeof(tick_bytes);
+		size_t remaining = max_len - written;
+		size_t skip = paths_offset;
+
+		for (size_t i = 0; i < field_count && remaining > 0; ++i)
+		{
+			const auto& field = fields[i];
+			const size_t path_len = field.path.length();
+
+			if (skip >= path_len)
+			{
+				skip -= path_len;
+			}
+			else
+			{
+				const size_t take = rtk_min(path_len - skip, remaining);
+				memcpy(dst + written, field.path.data + skip, take);
+				written += take;
+				remaining -= take;
+				skip = 0;
+			}
+
+			if (remaining == 0)
+				break;
+
+			if (i + 1 < field_count)
+			{
+				if (skip > 0)
+				{
+					skip -= 1;
+				}
+				else
+				{
+					dst[written++] = '\n';
+					remaining -= 1;
+				}
+			}
+		}
+
+		return written;
+	}
+
+	size_t RemoteEngineConnection::write_fields_payload(size_t offset, uint8_t* dst, size_t max_len) const
+	{
+		size_t written = 0;
+		size_t skip = offset;
+
+		for (size_t i = 0; i < field_count; ++i)
+		{
+			const auto& field = fields[i];
+			const uint8_t* src = reinterpret_cast<const uint8_t*>(field.send_ptr);
+			if (skip >= field.size)
+			{
+				skip -= field.size;
+				continue;
+			}
+
+			const size_t take = rtk_min(field.size - skip, max_len - written);
+			if (src)
+			{
+				memcpy(dst + written, src + skip, take);
+			}
+			else
+			{
+				memset(dst + written, 0, take);
+			}
+			written += take;
+			skip = 0;
+
+			if (written >= max_len)
+				break;
+		}
+
+		return written;
+	}
+
+	void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_info)
+	{
+		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::tick_sender_send_handshake() should only be called in Mode::Sender");
+
+		if (field_count == 0)
+		{
+			ROBOTICK_FATAL_EXIT("RemoteEngineConnection::tick_sender_send_handshake() being called with no prior call(s) to "
+								"RemoteEngineConnection::register_field()");
+		}
+
+		if (in_progress_message_out.is_vacant())
+		{
+			// The sender announces its local tick-rate (Hz) in the Subscribe message.
+			// The receiver will min() this with its own rate and echo the result
+			// in the first FieldsRequest — establishing a mutual tick-rate.
+			// This enables smooth pacing and avoids receiver overrun.
+
+			const float local_sender_tick_rate_hz = tick_info.tick_rate_hz;
+			this->mutual_tick_rate_hz = local_sender_tick_rate_hz; // start off with our local tick-rate - this will get adjusted to mutual rate later
+			const uint32_t tick_rate_net = float_to_network_bytes(local_sender_tick_rate_hz);
+
+		for (size_t i = 0; i < field_count; ++i)
+		{
+			const auto& field = fields[i];
 			if (field.path.contains('\n'))
 			{
 				ROBOTICK_FATAL_EXIT("Field path contains newline character - this will break handshake data: %s", field.path.c_str());
 			}
-
-			if (!is_first_field)
-			{
-				payload[payload_length++] = '\n';
 			}
-			size_t path_len = field.path.length();
-			::memcpy(payload + payload_length, field.path.data, path_len);
-			payload_length += path_len;
 
-			is_first_field = false;
+			auto writer = [this, tick_rate_net](size_t offset, uint8_t* dst, size_t max_len) -> size_t
+			{
+				return write_handshake_payload(tick_rate_net, offset, dst, max_len);
+			};
+
+			in_progress_message_out.begin_send((uint8_t)MessageType::Subscribe, handshake_payload_capacity, writer);
 		}
-
-		in_progress_message_out.begin_send((uint8_t)MessageType::Subscribe, payload, payload_length);
-	}
 
 		// pump non-blocking
 		while (in_progress_message_out.is_occupied() && !in_progress_message_out.is_completed())
@@ -509,7 +605,7 @@ void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_inf
 		{
 			in_progress_message_out.vacate(); // vacate ready for next user
 
-			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender handshake sent with %zu field(s)", fields.size());
+			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender handshake sent with %zu field(s)", field_count);
 			set_state(State::ReadyForFields);
 
 			// Emit first fields-message immediately to establish mutual pacing promptly.
@@ -529,7 +625,80 @@ void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_inf
 
 		if (in_progress_message_in.is_vacant())
 		{
-			in_progress_message_in.begin_receive();
+			handshake_receive_state = {};
+			field_count = 0;
+			field_payload_capacity = 0;
+			handshake_path_total_length = 0;
+
+			auto reader = [this](const uint8_t* data, size_t len)
+			{
+				size_t consumed = 0;
+				handshake_receive_state.payload_bytes_consumed += len;
+
+				auto flush_current_path = [this]()
+				{
+					if (handshake_receive_state.current_path_length == 0)
+						return;
+
+					if (handshake_receive_state.current_path_length >= handshake_receive_state.current_path.capacity())
+					{
+						ROBOTICK_FATAL_EXIT("Field path too long (%zu chars): exceeds handshake buffer", handshake_receive_state.current_path_length);
+					}
+
+					handshake_receive_state.current_path.data[handshake_receive_state.current_path_length] = '\0';
+
+					Field field;
+					if (!binder(handshake_receive_state.current_path.c_str(), field))
+					{
+						ROBOTICK_WARNING("Failed to bind field: %s", handshake_receive_state.current_path.c_str());
+						handshake_receive_state.failed_count++;
+					}
+					else
+					{
+						add_field(field, false);
+						handshake_receive_state.bound_count++;
+					}
+
+					handshake_receive_state.current_path_length = 0;
+					handshake_receive_state.current_path.data[0] = '\0';
+				};
+
+				// First 4 bytes are tick-rate
+				while (handshake_receive_state.tick_rate_bytes_received < sizeof(uint32_t) && consumed < len)
+				{
+					handshake_receive_state.tick_rate_bytes[handshake_receive_state.tick_rate_bytes_received++] = data[consumed++];
+
+					if (handshake_receive_state.tick_rate_bytes_received == sizeof(uint32_t))
+					{
+						uint32_t tick_rate_net = 0;
+						memcpy(&tick_rate_net, handshake_receive_state.tick_rate_bytes, sizeof(uint32_t));
+						handshake_receive_state.sender_tick_rate_hz = network_bytes_to_float(tick_rate_net);
+					}
+				}
+
+				// Remainder is newline-separated field paths
+				while (consumed < len)
+				{
+					const char c = static_cast<char>(data[consumed++]);
+					if (c == '\n')
+					{
+						flush_current_path();
+						continue;
+					}
+
+					if (handshake_receive_state.current_path_length + 1 >= handshake_receive_state.current_path.capacity())
+					{
+						ROBOTICK_FATAL_EXIT(
+							"Field path too long (%zu chars): exceeds handshake buffer", handshake_receive_state.current_path_length + 1);
+					}
+
+					handshake_receive_state.current_path.data[handshake_receive_state.current_path_length++] = c;
+				}
+
+				// Trailing path flushed after full payload.
+			};
+
+			in_progress_message_in.begin_receive(reader);
 		}
 
 		// pump non-blocking
@@ -549,82 +718,53 @@ void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_inf
 
 		if (in_progress_message_in.is_completed())
 		{
-			auto [payload_data, payload_size] = in_progress_message_in.get_payload();
-
-			const uint8_t* cursor = reinterpret_cast<const uint8_t*>(payload_data);
-			const uint8_t* end = cursor + payload_size;
-
-			// --- Parse float tick_rate (4 bytes) ---
-			static_assert(sizeof(float) == 4, "Expected float to be 4 bytes");
-			if (payload_size < sizeof(uint32_t))
+			const size_t expected_tick_bytes = sizeof(uint32_t);
+			if (handshake_receive_state.tick_rate_bytes_received < expected_tick_bytes)
 			{
-				ROBOTICK_FATAL_EXIT("Handshake payload too small (%zu) to contain tick_rate", payload_size);
+				ROBOTICK_FATAL_EXIT("Handshake payload too small to contain tick_rate");
 			}
 
-			uint32_t tick_rate_net = 0;
-				::memcpy(&tick_rate_net, cursor, sizeof(uint32_t));
-			float sender_tick_rate_hz = network_bytes_to_float(tick_rate_net);
-			cursor += sizeof(uint32_t);
+			// Flush final path if no trailing newline
+			if (handshake_receive_state.current_path_length > 0)
+			{
+				Field field;
+				if (!binder(handshake_receive_state.current_path.c_str(), field))
+				{
+					ROBOTICK_WARNING("Failed to bind field: %s", handshake_receive_state.current_path.c_str());
+					handshake_receive_state.failed_count++;
+				}
+				else
+				{
+					add_field(field, false);
+					handshake_receive_state.bound_count++;
+				}
+				handshake_receive_state.current_path_length = 0;
+				handshake_receive_state.current_path.data[0] = '\0';
+			}
 
-			// We've received the sender's tick-rate (Hz) and now compute the mutual rate.
-			// The receiver sends this mutual rate back to the sender with each field-request, locking both sides
-			// to a common pacing agreement for field updates.
+			const size_t reported_payload = in_progress_message_in.payload_length();
+			const size_t actual_payload = handshake_receive_state.payload_bytes_consumed;
+			if (reported_payload != actual_payload)
+			{
+				ROBOTICK_FATAL_EXIT(
+					"Handshake payload length mismatch: header reports %zu bytes but processed %zu", reported_payload, actual_payload);
+			}
 
-			const float local_receiver_tick_rate_hz = tick_info.tick_rate_hz;
-			this->mutual_tick_rate_hz = min(sender_tick_rate_hz, local_receiver_tick_rate_hz);
+			const float sender_tick_rate_hz = handshake_receive_state.sender_tick_rate_hz;
 
-			if (!std::isfinite(sender_tick_rate_hz) || sender_tick_rate_hz <= 0.0f)
+			if (!::isfinite(sender_tick_rate_hz) || sender_tick_rate_hz <= 0.0f)
 			{
 				ROBOTICK_FATAL_EXIT("Invalid sender tick rate: %f", sender_tick_rate_hz);
 			}
 
+			const float local_receiver_tick_rate_hz = tick_info.tick_rate_hz;
+			this->mutual_tick_rate_hz = rtk_min(sender_tick_rate_hz, local_receiver_tick_rate_hz);
+
 			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender tick rate: %.2f Hz", sender_tick_rate_hz);
 
-			// --- Parse newline-separated field paths from remaining bytes ---
-			size_t bound_count = 0;
-			size_t failed_count = 0;
-
-			const char* field_data = reinterpret_cast<const char*>(cursor);
-			const char* field_end = reinterpret_cast<const char*>(end);
-
-			const char* line_start = field_data;
-
-			for (const char* p = line_start; p <= field_end; ++p)
+			if (handshake_receive_state.failed_count > 0)
 			{
-				// Accept '\n' or end-of-buffer as delimiter
-				if (p == field_end || *p == '\n')
-				{
-					size_t line_length = static_cast<size_t>(p - line_start);
-					if (line_length > 0)
-					{
-						if (line_length >= FixedString512().capacity())
-						{
-							ROBOTICK_FATAL_EXIT("Field path too long (%zu chars): exceeds handshake buffer", line_length);
-						}
-
-						FixedString512 path;
-						memcpy(path.data, line_start, line_length);
-						path.data[line_length] = '\0';
-
-						Field field;
-						if (!binder(path.c_str(), field))
-						{
-							ROBOTICK_WARNING("Failed to bind field: %s", path.c_str());
-							failed_count++;
-						}
-						else
-						{
-							fields.push_back(field);
-							bound_count++;
-						}
-					}
-					line_start = p + 1;
-				}
-			}
-
-			if (failed_count > 0)
-			{
-				ROBOTICK_FATAL_EXIT("Failed to bind %zu fields - disconnecting", failed_count);
+				ROBOTICK_FATAL_EXIT("Failed to bind %zu fields - disconnecting", handshake_receive_state.failed_count);
 			}
 
 			in_progress_message_in.vacate(); // ready for next message
@@ -632,8 +772,8 @@ void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_inf
 			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE,
 				"Receiver handshake received. Mutual tick-rate set to %.1f Hz. Bound %zu field(s) - total %zu (should be same value)",
 				mutual_tick_rate_hz,
-				bound_count,
-				fields.size());
+				handshake_receive_state.bound_count,
+				field_count);
 
 			set_state(State::ReadyForFields);
 
@@ -665,10 +805,23 @@ void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_inf
 			static_assert(sizeof(float) == 4, "Expected float to be 4 bytes");
 
 			uint32_t tick_rate_net = float_to_network_bytes(mutual_tick_rate);
-			uint8_t payload[sizeof(tick_rate_net)];
-			::memcpy(payload, &tick_rate_net, sizeof(tick_rate_net));
 
-			in_progress_message_out.begin_send((uint8_t)MessageType::FieldsRequest, payload, sizeof(payload));
+			auto writer = [tick_rate_net](size_t offset, uint8_t* dst, size_t max_len) -> size_t
+			{
+				const uint8_t bytes[sizeof(uint32_t)] = {static_cast<uint8_t>(tick_rate_net >> 24),
+					static_cast<uint8_t>((tick_rate_net >> 16) & 0xFF),
+					static_cast<uint8_t>((tick_rate_net >> 8) & 0xFF),
+					static_cast<uint8_t>(tick_rate_net & 0xFF)};
+
+				if (offset >= sizeof(bytes) || max_len == 0)
+					return 0;
+
+				const size_t take = rtk_min(max_len, sizeof(bytes) - offset);
+				memcpy(dst, bytes + offset, take);
+				return take;
+			};
+
+			in_progress_message_out.begin_send((uint8_t)MessageType::FieldsRequest, sizeof(uint32_t), writer);
 		}
 
 		// enhanced pump
@@ -700,7 +853,25 @@ void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_inf
 
 		if (in_progress_message_in.is_vacant())
 		{
-			in_progress_message_in.begin_receive();
+			fields_request_receive_state = {};
+
+			auto reader = [this](const uint8_t* data, size_t len)
+			{
+				size_t cursor = 0;
+				while (fields_request_receive_state.tick_rate_bytes_received < sizeof(uint32_t) && cursor < len)
+				{
+					fields_request_receive_state.tick_rate_bytes[fields_request_receive_state.tick_rate_bytes_received++] = data[cursor++];
+
+					if (fields_request_receive_state.tick_rate_bytes_received == sizeof(uint32_t))
+					{
+						uint32_t tick_rate_net = 0;
+						memcpy(&tick_rate_net, fields_request_receive_state.tick_rate_bytes, sizeof(uint32_t));
+						fields_request_receive_state.tick_rate_hz = network_bytes_to_float(tick_rate_net);
+					}
+				}
+			};
+
+			in_progress_message_in.begin_receive(reader);
 		}
 
 		while (in_progress_message_in.is_occupied() && !in_progress_message_in.is_completed())
@@ -720,33 +891,23 @@ void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_inf
 
 		if (in_progress_message_in.is_completed())
 		{
-			auto [payload_data, payload_size] = in_progress_message_in.get_payload();
+			float received_mutual_tick_rate_hz = fields_request_receive_state.tick_rate_hz;
 
-			float received_mutual_tick_rate_hz = 0.0f;
-			if (payload_size >= sizeof(uint32_t))
+			if (fields_request_receive_state.tick_rate_bytes_received < sizeof(uint32_t))
 			{
-				// Sender receives mutual tick-rate from the receiver here.
-				// This ensures we pace field sends appropriately, even if the sender runs faster.
-				// A safety measure to avoid overwhelming the receiver or clogging the pipe.
+				ROBOTICK_WARNING("FieldsRequest missing mutual tick rate payload");
+				received_mutual_tick_rate_hz = 0.0f;
+			}
 
-				uint32_t tick_rate_net = 0;
-				::memcpy(&tick_rate_net, payload_data, sizeof(uint32_t));
-				received_mutual_tick_rate_hz = network_bytes_to_float(tick_rate_net);
-
-				if (std::isfinite(received_mutual_tick_rate_hz) && received_mutual_tick_rate_hz > 0.0f)
-				{
-					ROBOTICK_INFO_IF(
-						ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender received mutual tick rate: %.2f Hz", received_mutual_tick_rate_hz);
-					this->mutual_tick_rate_hz = received_mutual_tick_rate_hz;
-				}
-				else
-				{
-					ROBOTICK_WARNING("Invalid mutual tick rate received");
-				}
+			if (::isfinite(received_mutual_tick_rate_hz) && received_mutual_tick_rate_hz > 0.0f)
+			{
+				ROBOTICK_INFO_IF(
+					ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender received mutual tick rate: %.2f Hz", received_mutual_tick_rate_hz);
+				this->mutual_tick_rate_hz = received_mutual_tick_rate_hz;
 			}
 			else
 			{
-				ROBOTICK_WARNING("FieldsRequest missing mutual tick rate payload");
+				ROBOTICK_WARNING("Invalid mutual tick rate received");
 			}
 
 			in_progress_message_in.vacate(); // vacate ready for next user
@@ -756,26 +917,19 @@ void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_inf
 		return false;
 	}
 
-void RemoteEngineConnection::tick_send_fields_as_message(const bool allow_start_new)
-{
-	ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::tick_send_fields_as_message() should only be called in Mode::Sender");
-
-	if (allow_start_new && in_progress_message_out.is_vacant())
+	void RemoteEngineConnection::tick_send_fields_as_message(const bool allow_start_new)
 	{
-		uint8_t* buffer = init_field_payload_buffer();
-		size_t buffer_index = 0;
-		for (const auto& field : fields)
+		ROBOTICK_ASSERT_MSG(mode == Mode::Sender, "RemoteEngineConnection::tick_send_fields_as_message() should only be called in Mode::Sender");
+
+		if (allow_start_new && in_progress_message_out.is_vacant())
 		{
-			const uint8_t* ptr = reinterpret_cast<const uint8_t*>(field.send_ptr);
-			if (!ptr || field.size == 0)
-				continue;
+			auto writer = [this](size_t offset, uint8_t* dst, size_t max_len) -> size_t
+			{
+				return write_fields_payload(offset, dst, max_len);
+			};
 
-			memcpy(buffer + buffer_index, ptr, field.size);
-			buffer_index += field.size;
+			in_progress_message_out.begin_send((uint8_t)MessageType::Fields, field_payload_capacity, writer);
 		}
-
-		in_progress_message_out.begin_send((uint8_t)MessageType::Fields, buffer, buffer_index);
-	}
 
 		const InProgressMessage::Result tick_result = in_progress_message_out.tick(socket_fd);
 		if (tick_result == InProgressMessage::Result::ConnectionLost)
@@ -798,7 +952,43 @@ void RemoteEngineConnection::tick_send_fields_as_message(const bool allow_start_
 
 		if (in_progress_message_in.is_vacant())
 		{
-			in_progress_message_in.begin_receive();
+			field_receive_state = {};
+
+			auto reader = [this](const uint8_t* data, size_t len)
+			{
+				size_t cursor = 0;
+
+				while (cursor < len && field_receive_state.field_index < field_count)
+				{
+					auto& field = fields[field_receive_state.field_index];
+					if (!field.recv_ptr)
+					{
+						ROBOTICK_FATAL_EXIT("Receiver field '%s' has null recv_ptr", field.path.c_str());
+					}
+
+					const size_t remaining_in_field = field.size - field_receive_state.offset_in_field;
+					const size_t take = rtk_min(remaining_in_field, len - cursor);
+
+					::memcpy(static_cast<uint8_t*>(field.recv_ptr) + field_receive_state.offset_in_field, data + cursor, take);
+
+					cursor += take;
+					field_receive_state.offset_in_field += take;
+					field_receive_state.total_bytes_received += take;
+
+					if (field_receive_state.offset_in_field == field.size)
+					{
+						field_receive_state.field_index++;
+						field_receive_state.offset_in_field = 0;
+					}
+				}
+
+				if (cursor < len)
+				{
+					ROBOTICK_FATAL_EXIT("RemoteEngineConnection::tick_receive_fields_as_message() - received more data than expected");
+				}
+			};
+
+			in_progress_message_in.begin_receive(reader);
 		}
 
 		const InProgressMessage::Result tick_result = in_progress_message_in.tick(socket_fd);
@@ -815,35 +1005,22 @@ void RemoteEngineConnection::tick_send_fields_as_message(const bool allow_start_
 			return false;
 		}
 
-		// process message
-		auto [payload_data, payload_size] = in_progress_message_in.get_payload();
+		// validate sizes
+		const size_t expected_bytes = field_payload_capacity;
+		const size_t reported_bytes = in_progress_message_in.payload_length();
 
-		size_t offset_into_payload = 0;
-		for (auto& field : fields)
+		if (reported_bytes != expected_bytes)
 		{
-			if (offset_into_payload + field.size > payload_size)
-			{
-				ROBOTICK_FATAL_EXIT("RemoteEngineConnection::tick_receive_fields_as_message() - buffer received is too small (%zu bytes) for all "
-									"expected fields (%zu)",
-					payload_size,
-					(offset_into_payload + field.size));
+			ROBOTICK_FATAL_EXIT("RemoteEngineConnection::tick_receive_fields_as_message() - payload header reports %zu bytes but expected %zu",
+				reported_bytes,
+				expected_bytes);
+		}
 
-				break;
-			}
-
-			if (!field.recv_ptr)
-			{
-				ROBOTICK_FATAL_EXIT("Receiver field '%s' has null recv_ptr", field.path.c_str());
-			}
-
-			::memcpy(field.recv_ptr, payload_data + offset_into_payload, field.size);
-			offset_into_payload += field.size;
-
-			static bool s_enable_debug_info = false;
-			if (s_enable_debug_info)
-			{
-				ROBOTICK_INFO("Successfully written %zu bytes into field '%s'", field.size, field.path.c_str());
-			}
+		if (field_receive_state.total_bytes_received != expected_bytes)
+		{
+			ROBOTICK_FATAL_EXIT("RemoteEngineConnection::tick_receive_fields_as_message() - received %zu bytes but expected %zu",
+				field_receive_state.total_bytes_received,
+				expected_bytes);
 		}
 
 		in_progress_message_in.vacate(); // vacate ready for next user
@@ -886,7 +1063,8 @@ void RemoteEngineConnection::tick_send_fields_as_message(const bool allow_start_
 		if (mode == Mode::Receiver)
 		{
 			// receiver gets told what fields to use by sender, on handshake.  We should therefore clear then whenever we disconnect
-			fields.clear();
+			field_count = 0;
+			field_payload_capacity = 0;
 		}
 
 		set_state(State::Disconnected);

@@ -45,6 +45,8 @@ namespace robotick
 
 	Engine::~Engine()
 	{
+		state->telemetry_server.stop();
+
 		for (auto& instance : state->instances)
 		{
 			if (instance.workload_descriptor->destruct_fn)
@@ -405,6 +407,8 @@ namespace robotick
 			if (inst.workload_descriptor->stop_fn)
 				inst.workload_descriptor->stop_fn(inst.get_ptr(*this));
 		}
+
+		state->telemetry_server.stop();
 	}
 
 	bool Engine::is_running() const
