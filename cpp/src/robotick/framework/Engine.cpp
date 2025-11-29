@@ -66,7 +66,7 @@ namespace robotick
 
 	void align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
 	{
-		const size_t align = max<size_t>(type.alignment, alignof(std::max_align_t));
+	const size_t align = max<size_t>(type.alignment, alignof(max_align_t));
 		workloads_cursor = (workloads_cursor + align - 1) & ~(align - 1);
 	}
 

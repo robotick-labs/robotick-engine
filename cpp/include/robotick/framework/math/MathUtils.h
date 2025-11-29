@@ -4,6 +4,7 @@
 #pragma once
 
 #include "robotick/api_base.h"
+#include "robotick/framework/common/InitializerList.h"
 
 #include <float.h> // FLT_EPSILON, DBL_EPSILON
 #include <math.h>  // sqrtf, sqrt
@@ -20,7 +21,7 @@ namespace robotick
 		return a < b ? a : b;
 	}
 
-	template <typename T> inline T max(std::initializer_list<T> values)
+	template <typename T> inline T max(robotick::initializer_list<T> values)
 	{
 		T result = *values.begin();
 		for (T v : values)
@@ -29,7 +30,7 @@ namespace robotick
 		return result;
 	}
 
-	template <typename T> inline T min(std::initializer_list<T> values)
+	template <typename T> inline T min(robotick::initializer_list<T> values)
 	{
 		T result = *values.begin();
 		for (T v : values)

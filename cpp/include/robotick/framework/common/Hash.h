@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <type_traits>
+#include "robotick/framework/common/TypeTraits.h"
 
 namespace robotick
 {
@@ -51,8 +51,8 @@ namespace robotick
 
 		template <typename T> void update(const T& value)
 		{
-			static_assert(!std::is_pointer<T>::value, "Hash32::update<T> must not be instantiated with pointer types");
-			static_assert(std::is_trivially_copyable<T>::value, "Hash32::update<T> requires trivially copyable types");
+			static_assert(!is_pointer_v<T>, "Hash32::update<T> must not be instantiated with pointer types");
+			static_assert(is_trivially_copyable_v<T>, "Hash32::update<T> requires trivially copyable types");
 			update(&value, sizeof(T));
 		}
 

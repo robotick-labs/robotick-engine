@@ -4,10 +4,10 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 #include <new>
-#include <type_traits>
-#include <utility>
+
+#include "robotick/framework/common/Memory.h"
+#include "robotick/framework/common/TypeTraits.h"
 
 namespace robotick
 {
@@ -21,7 +21,7 @@ namespace robotick
 	//------------------------------------------------------------------------------
 	template <typename T> class State
 	{
-		static_assert(std::is_default_constructible<T>::value, "State<T> requires T to be default-constructible");
+		static_assert(is_default_constructible_v<T>, "State<T> requires T to be default-constructible");
 
 		static_assert(sizeof(T) <= MaxReasonableInlineStateSize,
 			"State<T>: Type too large for inline storage; use StatePtr<T> instead. "
@@ -32,17 +32,17 @@ namespace robotick
 		State(const State&) = delete;
 		State& operator=(const State&) = delete;
 
-		State(State&& other) noexcept(std::is_nothrow_move_constructible<T>::value)
+		State(State&& other) noexcept(is_nothrow_move_constructible_v<T>)
 		{
-			new (&storage) T(std::move(other.get()));
+			new (&storage) T(robotick::move(other.get()));
 		}
 
-		State& operator=(State&& other) noexcept(std::is_nothrow_move_constructible<T>::value)
+		State& operator=(State&& other) noexcept(is_nothrow_move_constructible_v<T>)
 		{
 			if (this != &other)
 			{
 				get().~T();
-				new (&storage) T(std::move(other.get()));
+				new (&storage) T(robotick::move(other.get()));
 			}
 			return *this;
 		}
@@ -67,7 +67,7 @@ namespace robotick
 	//------------------------------------------------------------------------------
 	template <typename T> class StatePtr
 	{
-		static_assert(std::is_default_constructible<T>::value, "StatePtr<T> requires T to be default-constructible");
+		static_assert(is_default_constructible_v<T>, "StatePtr<T> requires T to be default-constructible");
 
 		static_assert(sizeof(T) > MaxReasonableInlineStateSize,
 			"StatePtr<T>: Type small enough for inline storage. "
@@ -75,7 +75,7 @@ namespace robotick
 			"sizeof(T) = ??? (<=5KB threshold)");
 
 	  public:
-		StatePtr() : ptr(std::make_unique<T>()) {}
+		StatePtr() : ptr(robotick::make_unique<T>()) {}
 		~StatePtr() = default;
 
 		StatePtr(const StatePtr&) = delete;
@@ -93,7 +93,7 @@ namespace robotick
 		const T& get() const { return *ptr; }
 
 	  private:
-		std::unique_ptr<T> ptr;
+		robotick::UniquePtr<T> ptr;
 	};
 
 } // namespace robotick

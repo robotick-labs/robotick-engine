@@ -4,6 +4,7 @@
 #pragma once
 
 #include "robotick/api_base.h"
+#include "robotick/framework/common/Memory.h"
 
 #include <cassert>
 #include <cstddef>
@@ -11,7 +12,6 @@
 #include <cstring>
 #include <new> // operator new/delete with alignment
 #include <stdexcept>
-#include <utility>
 
 namespace robotick
 {
@@ -36,7 +36,7 @@ namespace robotick
 			if (this != &other)
 			{
 				size = other.size;
-				data = std::move(other.data);
+				data = robotick::move(other.data);
 				other.size = 0;
 			}
 			return *this;
@@ -89,7 +89,7 @@ namespace robotick
 				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset is not properly aligned for type T");
 
 			uint8_t* ptr = data.get() + offset;
-			return std::launder(reinterpret_cast<T*>(ptr));
+			return robotick::launder(reinterpret_cast<T*>(ptr));
 		}
 
 		template <typename T> const T* as(size_t offset = 0) const
@@ -101,7 +101,7 @@ namespace robotick
 				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset is not properly aligned for type T");
 
 			const uint8_t* ptr = data.get() + offset;
-			return std::launder(reinterpret_cast<const T*>(ptr));
+			return robotick::launder(reinterpret_cast<const T*>(ptr));
 		}
 
 	  private:
@@ -146,7 +146,7 @@ namespace robotick
 				if (ptr != nullptr)
 					ROBOTICK_FATAL_EXIT("AlignedStorage: attempt to allocate twice");
 
-				void* raw = ::operator new(alloc_size, std::align_val_t{alignof(std::max_align_t)});
+				void* raw = ::operator new(alloc_size, robotick::align_val_t{alignof(max_align_t)});
 				::memset(raw, 0, alloc_size);
 				ptr = static_cast<uint8_t*>(raw);
 				size = alloc_size;
@@ -156,7 +156,7 @@ namespace robotick
 			{
 				if (ptr)
 				{
-					::operator delete(ptr, std::align_val_t{alignof(std::max_align_t)});
+					::operator delete(ptr, robotick::align_val_t{alignof(max_align_t)});
 					ptr = nullptr;
 					size = 0;
 				}

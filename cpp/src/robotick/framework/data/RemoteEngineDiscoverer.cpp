@@ -1,6 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/framework/common/Memory.h"
 #include "robotick/framework/data/RemoteEngineDiscoverer.h"
 #include "robotick/api.h"
 
@@ -69,12 +70,12 @@ namespace robotick
 
 	void RemoteEngineDiscoverer::set_on_remote_model_discovered(OnRemoteModelDiscovered cb)
 	{
-		on_discovered_cb = std::move(cb);
+		on_discovered_cb = robotick::move(cb);
 	}
 
 	void RemoteEngineDiscoverer::set_on_incoming_connection_requested(OnIncomingConnectionRequested cb)
 	{
-		on_requested_cb = std::move(cb);
+		on_requested_cb = robotick::move(cb);
 	}
 
 	void RemoteEngineDiscoverer::init_recv_socket()

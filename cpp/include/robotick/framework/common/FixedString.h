@@ -2,11 +2,11 @@
 #pragma once
 
 #include "robotick/framework/common/Hash.h"
+#include "robotick/framework/common/Memory.h"
 
 #include <cstdio>
 #include <stddef.h>
 #include <string.h>
-#include <utility>
 
 namespace robotick
 {
@@ -98,7 +98,7 @@ namespace robotick
 
 		template <typename... Args> void format(const char* fmt, Args&&... args)
 		{
-			const int written = ::snprintf(data, N, fmt, std::forward<Args>(args)...);
+			const int written = ::snprintf(data, N, fmt, robotick::forward<Args>(args)...);
 			if (written < 0)
 			{
 				data[0] = '\0';
@@ -112,7 +112,7 @@ namespace robotick
 
 			if (remaining > 0)
 			{
-				const int written = ::snprintf(data + current_len, remaining, fmt, std::forward<Args>(args)...);
+				const int written = ::snprintf(data + current_len, remaining, fmt, robotick::forward<Args>(args)...);
 
 				// If snprintf wrote something and didn't overflow, we're fine.
 				if (written < 0 || static_cast<size_t>(written) >= remaining)

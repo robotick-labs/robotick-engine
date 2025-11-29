@@ -142,7 +142,7 @@ namespace robotick
 		}
 		if (mime_type == "text/plain")
 		{
-			std::strncpy(reinterpret_cast<char*>(out_value), input, size);
+			::strncpy(reinterpret_cast<char*>(out_value), input, size);
 			return true;
 		}
 

@@ -300,7 +300,14 @@ namespace robotick
 		WebServerImpl* s = static_cast<WebServerImpl*>(impl);
 		s->ctx = mg_start(nullptr, nullptr, opts);
 		if (!s->ctx)
-			ROBOTICK_FATAL_EXIT("Failed to start WebServer");
+		{
+			ROBOTICK_WARNING("Failed to start WebServer '%s' on port %u", name, port);
+			handler = nullptr;
+			running = false;
+			server_name.clear();
+			document_root.clear();
+			return;
+		}
 
 		mg_set_request_handler(s->ctx, "/", callback, this);
 		running = true;

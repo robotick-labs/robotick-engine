@@ -314,7 +314,7 @@ namespace robotick
 		}
 	}
 
-	std::tuple<void*, size_t, const FieldDescriptor*> DataConnectionUtils::find_field_info(const Engine& engine, const char* path)
+		FieldInfo DataConnectionUtils::find_field_info(const Engine& engine, const char* path)
 	{
 		const WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
 		const Map<const char*, WorkloadInstanceInfo*>& instances = engine.get_all_instance_info_map();
@@ -375,7 +375,7 @@ namespace robotick
 				++path_cursor;
 		}
 
-		return {base_ptr, size, field};
+		return FieldInfo{base_ptr, size, field};
 	}
 
 } // namespace robotick

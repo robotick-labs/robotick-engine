@@ -1,6 +1,7 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/NoStl.h"
 #include "robotick/framework/common/StringUtils.h"
 
 #include <functional>
@@ -51,7 +52,7 @@ namespace robotick
 {
 #if defined(ROBOTICK_TEST_MODE)
 
-	class TestError : public std::exception
+	class TestError : public std_approved::exception
 	{
 	  public:
 		explicit TestError(const char* message)

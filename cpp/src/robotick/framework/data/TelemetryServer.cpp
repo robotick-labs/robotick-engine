@@ -2,16 +2,15 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/common/StringView.h"
+#include "robotick/framework/common/Algorithm.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
+#include "robotick/platform/Clock.h"
 
 #include <nlohmann/json.hpp>
 
-#include <algorithm>
-#include <fstream>
-#include <string>
+#include <cstdio>
 #include <unistd.h>
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
@@ -26,7 +25,8 @@ namespace robotick
 		uint32_t raw = esp_random(); // 32-bit hardware RNG
 		session_id.format("%08X-%s", raw, model_name);
 #elif defined(ROBOTICK_PLATFORM_DESKTOP)
-		uint64_t raw = std::chrono::steady_clock::now().time_since_epoch().count(); // 64-bit timestamp
+		const uint64_t raw =
+			static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count()); // 64-bit timestamp
 		session_id.format("%016llX-%s", static_cast<unsigned long long>(raw), model_name);
 #else
 		session_id.format("12345-%s", model_name);
@@ -226,13 +226,18 @@ namespace robotick
 	static size_t get_process_memory_used()
 	{
 		long rss_pages = 0;
-		std::ifstream statm("/proc/self/statm");
 		long total_pages = 0;
+		FILE* statm = ::fopen("/proc/self/statm", "r");
 
-		if (statm >> total_pages >> rss_pages)
+		if (statm)
 		{
-			long page_size = sysconf(_SC_PAGESIZE);
-			return static_cast<size_t>(rss_pages) * page_size;
+			if (::fscanf(statm, "%ld %ld", &total_pages, &rss_pages) == 2)
+			{
+				const long page_size = ::sysconf(_SC_PAGESIZE);
+				::fclose(statm);
+				return static_cast<size_t>(rss_pages) * page_size;
+			}
+			::fclose(statm);
 		}
 
 		return 0;
@@ -291,14 +296,14 @@ namespace robotick
 		}
 
 		// sort workloads by offset (so we're seeing them in true memory-layout order)
-		std::sort(layout_json["workloads"].begin(),
+		robotick::sort(layout_json["workloads"].begin(),
 			layout_json["workloads"].end(),
 			[](const nlohmann::ordered_json& a, const nlohmann::ordered_json& b)
 			{
 				return a["offset_within_container"].get<int>() < b["offset_within_container"].get<int>();
 			});
 
-		std::sort(layout_json["types"].begin(),
+		robotick::sort(layout_json["types"].begin(),
 			layout_json["types"].end(),
 			[](const nlohmann::ordered_json& a, const nlohmann::ordered_json& b)
 			{

@@ -34,15 +34,16 @@ namespace robotick
 					{
 						ROBOTICK_INFO_IF(log_verbose, "[REC::receiver] Binding field '%s'", path);
 
-						auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*engine, path);
-						if (!ptr)
+						FieldInfo field_info = DataConnectionUtils::find_field_info(*engine, path);
+						if (!field_info.ptr)
 						{
 							ROBOTICK_FATAL_EXIT("[REC::receiver] Receiver failed to bind field: %s", path);
 						}
 						out.path = path;
-						out.recv_ptr = ptr;
-						out.size = size;
-						out.type_desc = field_desc->find_type_descriptor();
+						out.recv_ptr = field_info.ptr;
+						out.size = field_info.size;
+						ROBOTICK_ASSERT(field_info.descriptor != nullptr);
+						out.type_desc = field_info.descriptor->find_type_descriptor();
 						return true;
 					});
 
@@ -103,17 +104,18 @@ namespace robotick
 
 				ROBOTICK_INFO_IF(log_verbose, "[REC::setup] Binding sender field '%s' → '%s'", src, dst);
 
-				auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*engine, src);
-				if (!ptr)
+				FieldInfo field_info = DataConnectionUtils::find_field_info(*engine, src);
+				if (!field_info.ptr)
 				{
 					ROBOTICK_FATAL_EXIT("[REC::setup] Failed to resolve sender source: %s", src);
 				}
 
 				RemoteEngineConnection::Field f;
 				f.path = dst;
-				f.send_ptr = ptr;
-				f.size = size;
-				f.type_desc = field_desc->find_type_descriptor();
+				f.send_ptr = field_info.ptr;
+				f.size = field_info.size;
+				ROBOTICK_ASSERT(field_info.descriptor != nullptr);
+				f.type_desc = field_info.descriptor->find_type_descriptor();
 				ROBOTICK_ASSERT(f.type_desc);
 
 				remote_connection.register_field(f);

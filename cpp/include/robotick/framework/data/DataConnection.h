@@ -61,6 +61,13 @@ namespace robotick
 		}
 	};
 
+	struct FieldInfo
+	{
+		void* ptr = nullptr;
+		size_t size = 0;
+		const FieldDescriptor* descriptor = nullptr;
+	};
+
 	using FieldConfigEntry = Pair<StringView, StringView>;
 
 	class DataConnectionUtils
@@ -79,7 +86,7 @@ namespace robotick
 			const bool warnIfNotFound = true);
 
 		/// @brief Given a dot-separated field path (e.g. "MyWorkload.outputs.x"), returns the raw pointer, size in bytes, and field-descriptor
-		static std::tuple<void*, size_t, const FieldDescriptor*> find_field_info(const Engine& engine, const char* path);
+		static FieldInfo find_field_info(const Engine& engine, const char* path);
 	};
 
 } // namespace robotick

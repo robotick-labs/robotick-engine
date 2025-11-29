@@ -1,6 +1,7 @@
 #pragma once
 
 #include "robotick/framework/common/Function.h"
+#include "robotick/framework/common/Memory.h"
 
 #include <typeindex>
 
@@ -54,7 +55,7 @@ namespace robotick
 
 		static inline void for_each_workload_field(const Engine& engine, Function<void(const WorkloadFieldView&)> callback)
 		{
-			for_each_workload_field(engine, nullptr, std::move(callback));
+			for_each_workload_field(engine, nullptr, robotick::move(callback));
 		}
 	};
 } // namespace robotick

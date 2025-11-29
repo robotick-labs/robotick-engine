@@ -23,6 +23,9 @@ namespace robotick
 
 	template <bool B, typename T = void> using enable_if_t = typename std_approved::enable_if<B, T>::type;
 
-	template <typename T> constexpr bool is_standard_layout_v = std_approved::is_standard_layout<T>::value;
-	template <typename T> constexpr bool is_trivially_copyable_v = std_approved::is_trivially_copyable<T>::value;
+template <typename T> constexpr bool is_standard_layout_v = std_approved::is_standard_layout<T>::value;
+template <typename T> constexpr bool is_trivially_copyable_v = std_approved::is_trivially_copyable<T>::value;
+template <typename T> constexpr bool is_default_constructible_v = std_approved::is_default_constructible<T>::value;
+template <typename T> constexpr bool is_nothrow_move_constructible_v = std_approved::is_nothrow_move_constructible<T>::value;
+template <typename T> constexpr bool is_pointer_v = std_approved::is_pointer<T>::value;
 } // namespace robotick
