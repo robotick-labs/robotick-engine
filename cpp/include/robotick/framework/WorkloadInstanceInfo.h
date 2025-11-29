@@ -86,7 +86,7 @@ namespace robotick
 			duration_window[window_index] = duration_ns;
 		}
 
-		window_index = (window_index + 1) % duration_window.capacity();
+		window_index = (window_index + 1) % (uint32_t)duration_window.capacity();
 		last_tick_duration_ns = duration_ns;
 	}
 
