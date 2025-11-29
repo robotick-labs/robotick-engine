@@ -3,17 +3,19 @@
 
 #pragma once
 
-#include <math.h>
+#include "robotick/api_base.h"
+
+#include <cmath>
 
 namespace robotick
 {
 	inline bool isfinite(float value)
 	{
-		return ::isfinite(value);
+		return robotick::std_approved::isfinite(value);
 	}
 	inline bool isfinite(double value)
 	{
-		return ::isfinite(value);
+		return robotick::std_approved::isfinite(value);
 	}
 
 } // namespace robotick

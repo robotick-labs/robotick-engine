@@ -7,7 +7,6 @@
 #include "robotick/framework/math/IsFinite.h"
 
 #include <arpa/inet.h>
-#include <cmath>
 #include <csignal> // For signal(), SIGPIPE, SIG_IGN
 #include <cstring>
 #include <fcntl.h>
