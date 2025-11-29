@@ -74,9 +74,11 @@ namespace robotick
 		if (budget_ns == 0)
 			budget_ns = 1;
 
+		// Track whether the workload exceeded its budget so telemetry/history can report overruns.
 		if (duration_ns > budget_ns)
 			++overrun_count;
 
+		// Maintain a circular window of recent tick durations for debugging without recomputing stats each tick.
 		if (duration_window.size() < duration_window.capacity())
 		{
 			duration_window.add(duration_ns);

@@ -68,6 +68,7 @@ namespace robotick
 	extern "C" void robotick_force_register_vec3_types();
 	extern "C" void robotick_force_register_quat_types();
 
+	// Prevent integer overflow while sizing contiguous chunks so layout stays deterministic even near SIZE_MAX.
 	static bool safe_add_size(size_t lhs, size_t rhs, size_t& out)
 	{
 		const size_t max_size = SIZE_MAX;
@@ -82,6 +83,7 @@ namespace robotick
 		return (alignment > alignof(max_align_t)) ? alignment : alignof(max_align_t);
 	}
 
+	// Ensure the cursor respects the max alignment of the upcoming type so every allocation remains well-aligned.
 	static bool align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
 	{
 		const size_t alignment = max_align_for_type(type.alignment);
@@ -99,6 +101,7 @@ namespace robotick
 		return true;
 	}
 
+	// Reserve space for the named type and record the advanced cursor so the next workload starts immediately after it.
 	static bool increment_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
 	{
 		if (type.size == 0)
