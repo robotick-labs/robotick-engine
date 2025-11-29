@@ -11,6 +11,22 @@
 
 namespace robotick
 {
+	static constexpr float kPi = 3.14159265358979323846f;
+	static constexpr float kHalfPi = 0.5f * kPi;
+	static constexpr float kTwoPi = 2.0f * kPi;
+	static constexpr float kDegToRad = kPi / 180.0f;
+	static constexpr float kRadToDeg = 180.0f / kPi;
+
+	inline float deg_to_rad(float degrees)
+	{
+		return degrees * kDegToRad;
+	}
+
+	inline float rad_to_deg(float radians)
+	{
+		return radians * kRadToDeg;
+	}
+
 	template <typename T> inline T max(T a, T b)
 	{
 		return a > b ? a : b;
