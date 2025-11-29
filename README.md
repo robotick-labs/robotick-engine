@@ -18,6 +18,10 @@
 
 From bare-metal microcontrollers like the STM32 and ESP32 to Raspberry Pi, desktop systems, and edge-AI devices like NVIDIA Jetson (arm64), Robotick delivers real-time precision where it counts, and excellent performance everywhere else - without sacrificing ease of use or flexibility.
 
+### 🧱 Zero-allocation policy
+
+The engine core avoids heap-bearing `std::` containers entirely: every allocator-friendly helper is routed through `robotick::StdApproved` (defined in `cpp/include/robotick/framework/common/StdApproved.h`), while deterministic structures (buffers, callbacks, registry) rely on `FixedString`, `HeapVector`, and explicit placement-new logic. Platform/CLI layers can still use STL where needed, but the contiguous-engine runtime stays heap-free so ESP32/MCU targets see consistent timings.
+
 ---
 
 ## 🚀 What is Robotick?
