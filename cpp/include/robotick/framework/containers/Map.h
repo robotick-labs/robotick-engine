@@ -5,6 +5,7 @@
 
 #include "robotick/framework/containers/FixedVector.h"
 #include "robotick/framework/containers/List.h"
+#include "robotick/framework/strings/FixedString.h"
 #include "robotick/framework/utility/Hash.h"
 
 #include <string.h> // for strcmp
@@ -52,6 +53,16 @@ namespace robotick
 	template <> struct DefaultEqual<char*>
 	{
 		static bool equal(const char* a, const char* b) { return strcmp(a, b) == 0; }
+	};
+
+	template <size_t N> struct DefaultHash<FixedString<N>>
+	{
+		static size_t hash(const FixedString<N>& value) { return hash_string(value.c_str()); }
+	};
+
+	template <size_t N> struct DefaultEqual<FixedString<N>>
+	{
+		static bool equal(const FixedString<N>& a, const FixedString<N>& b) { return strcmp(a.c_str(), b.c_str()) == 0; }
 	};
 
 	template <typename Key, typename Value, size_t NumBuckets = 32> class Map
@@ -108,6 +119,37 @@ namespace robotick
 		bool contains(const Key& key) const { return find(key) != nullptr; }
 
 		size_t size() const { return size_; }
+
+		void clear()
+		{
+			for (Bucket& bucket : buckets)
+			{
+				bucket.entries.clear();
+			}
+			size_ = 0;
+		}
+
+		template <typename Fn> void for_each(Fn&& fn)
+		{
+			for (Bucket& bucket : buckets)
+			{
+				for (Entry& entry : bucket.entries)
+				{
+					fn(entry.key, entry.value);
+				}
+			}
+		}
+
+		template <typename Fn> void for_each(Fn&& fn) const
+		{
+			for (const Bucket& bucket : buckets)
+			{
+				for (const Entry& entry : bucket.entries)
+				{
+					fn(entry.key, entry.value);
+				}
+			}
+		}
 
 	  private:
 		FixedVector<Bucket, NumBuckets> buckets;

@@ -56,6 +56,19 @@ namespace robotick
 
 		void clear() { data[0] = '\0'; }
 
+		void assign(const char* str, size_t length)
+		{
+			if (!str)
+			{
+				data[0] = '\0';
+				return;
+			}
+
+			const size_t len = min_val(length, N - 1);
+			memcpy(data, str, len);
+			data[len] = '\0';
+		}
+
 		FixedString& operator=(const char* str)
 		{
 			const size_t len = min_val(fixed_strlen(str), N - 1);
@@ -158,6 +171,7 @@ namespace robotick
 	using FixedString128 = FixedString<128>;
 	using FixedString256 = FixedString<256>;
 	using FixedString512 = FixedString<512>;
+	using FixedString1024 = FixedString<1024>;
 	using FixedString1024 = FixedString<1024>;
 
 } // namespace robotick
