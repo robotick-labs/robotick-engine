@@ -21,4 +21,7 @@ namespace robotick
 	template <typename T> T&& declval() noexcept;
 
 	template <bool B, typename T = void> using enable_if_t = typename std::enable_if<B, T>::type;
+
+	template <typename T> constexpr bool is_standard_layout_v = std::is_standard_layout<T>::value;
+	template <typename T> constexpr bool is_trivially_copyable_v = std::is_trivially_copyable<T>::value;
 } // namespace robotick
