@@ -1,6 +1,6 @@
 #if defined(ROBOTICK_PLATFORM_ESP32)
 
-#include "robotick/platform/System.h"
+#include "robotick/framework/system/System.h"
 #include <M5Unified.h>
 
 namespace robotick

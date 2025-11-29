@@ -2,8 +2,8 @@
 #include "robotick/api.h"
 #include "robotick/framework/strings/FixedString.h"
 #include "robotick/framework/strings/StringUtils.h"
-#include "robotick/platform/Atomic.h"
-#include "robotick/platform/Thread.h"
+#include "robotick/framework/concurrency/Atomic.h"
+#include "robotick/framework/concurrency/Thread.h"
 
 #include <catch2/catch_all.hpp>
 

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/api.h"
-#include "robotick/platform/Thread.h"
-#include "robotick/platform/WebServer.h"
+#include "robotick/framework/concurrency/Thread.h"
+#include "robotick/framework/services/WebServer.h"
 
 #include <catch2/catch_all.hpp>
 #include <curl/curl.h>

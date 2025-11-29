@@ -3,8 +3,8 @@
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
-#include "robotick/platform/Atomic.h"
-#include "robotick/platform/Thread.h"
+#include "robotick/framework/concurrency/Atomic.h"
+#include "robotick/framework/concurrency/Thread.h"
 #include "robotick/config/AssertUtils.h"
 
 #include <arpa/inet.h>

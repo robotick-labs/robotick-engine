@@ -4,7 +4,7 @@
 #pragma once
 
 #include "robotick/api_base.h"
-#include "robotick/platform/Clock.h"
+#include "robotick/framework/time/Clock.h"
 #include <thread>
 
 namespace robotick
@@ -52,9 +52,9 @@ namespace robotick
 
 // Platform-specific implementation
 #if defined(ROBOTICK_PLATFORM_ESP32)
-#include "robotick/platform/esp32/Thread_esp32.inl"
+#include "robotick/framework/backends/esp32/Thread_esp32.inl"
 #elif defined(ROBOTICK_PLATFORM_DESKTOP)
-#include "robotick/platform/desktop/Thread_desktop.inl"
+#include "robotick/framework/backends/desktop/Thread_desktop.inl"
 #else
 #error "No Threading implementation for this platform – define a platform macro or add a generic fallback"
 #endif

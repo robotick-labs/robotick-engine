@@ -6,7 +6,7 @@
 #include "robotick/framework/containers/FixedVector.h"
 #include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/strings/StringUtils.h"
-#include "robotick/platform/Thread.h"
+#include "robotick/framework/concurrency/Thread.h"
 
 #include <catch2/catch_all.hpp>
 

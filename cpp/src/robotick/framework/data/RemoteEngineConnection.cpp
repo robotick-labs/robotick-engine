@@ -3,7 +3,7 @@
 
 #include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/api.h"
-#include "robotick/platform/Thread.h"
+#include "robotick/framework/concurrency/Thread.h"
 
 #include <arpa/inet.h>
 #include <cmath>

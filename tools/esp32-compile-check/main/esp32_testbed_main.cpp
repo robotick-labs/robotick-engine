@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/platform/EntryPoint.h"
-#include "robotick/platform/NetworkManager.h"
-#include "robotick/platform/Atomic.h"
+#include "robotick/framework/system/EntryPoint.h"
+#include "robotick/framework/services/NetworkManager.h"
+#include "robotick/framework/concurrency/Atomic.h"
 
 #include <M5Unified.h>
 

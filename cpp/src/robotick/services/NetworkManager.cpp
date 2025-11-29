@@ -1,7 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/platform/NetworkManager.h"
+#include "robotick/framework/services/NetworkManager.h"
 #include "robotick/api.h"
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
