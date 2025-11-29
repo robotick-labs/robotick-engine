@@ -7,7 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include <chrono>
+#include <cstdint>
 
 namespace robotick
 {
@@ -103,7 +103,9 @@ namespace robotick
 		int spin_counter = 0;
 
 		// Convert target_time to absolute time in microseconds
-		int64_t target_us = std::chrono::duration_cast<std::chrono::microseconds>(target_time.time_since_epoch()).count();
+		const Clock::duration duration_until = target_time.time_since_epoch();
+		const Clock::nanoseconds target_ns = Clock::to_nanoseconds(duration_until);
+		int64_t target_us = target_ns.count() / 1000;
 
 		// esp_task_wdt_reset();
 
