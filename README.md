@@ -22,6 +22,10 @@ From bare-metal microcontrollers like the STM32 and ESP32 to Raspberry Pi, deskt
 
 The engine core avoids heap-bearing `std::` containers entirely: every allocator-friendly helper is routed through `robotick::StdApproved` (defined in `cpp/include/robotick/framework/common/StdApproved.h`), while deterministic structures (buffers, callbacks, registry) rely on `FixedString`, `HeapVector`, and explicit placement-new logic. Platform/CLI layers can still use STL where needed, but the contiguous-engine runtime stays heap-free so ESP32/MCU targets see consistent timings.
 
+### 🕸️ Web Server startup
+
+`WebServer::start` now fatally exits if it cannot bind the requested port, making port conflicts immediately visible. Passing `port = 0` lets the OS pick an available port, so automated tests/tools can avoid busy sockets and then query `get_bound_port()` once the server runs.
+
 ---
 
 ## 🚀 What is Robotick?

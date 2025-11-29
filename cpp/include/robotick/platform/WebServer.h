@@ -112,19 +112,19 @@ namespace robotick
 		~WebServer();
 
 		void start(const char* name, uint16_t port, const char* web_root_folder = nullptr, WebRequestHandler handler = nullptr);
-
 		void stop();
 		bool is_running() const;
 
 		WebRequestHandler get_handler() const { return handler; }
 		const char* get_server_name() const { return server_name.c_str(); }
 		const char* get_document_root() const { return document_root.c_str(); }
+		uint16_t get_bound_port() const { return bound_port; }
 
 	  private:
 		WebServerImpl* impl = nullptr;
 		bool running = false;
 		WebRequestHandler handler = nullptr;
-
+		uint16_t bound_port = 0;
 		FixedString32 server_name;
 		FixedString512 document_root;
 	};

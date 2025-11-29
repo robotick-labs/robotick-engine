@@ -16,7 +16,7 @@ cmake --preset "${CONFIG_PRESET}"
 echo "[build_linux_debug] Building preset '${CONFIG_PRESET}'..."
 cmake --build --preset "${CONFIG_PRESET}" -j"$(nproc)"
 
-echo "[build_linux_debug] Running unit tests..."
-ctest --test-dir "build/${CONFIG_PRESET}/cpp/tests" --output-on-failure --timeout 120 --fail-if-no-tests -j"$(nproc)"
+echo "[build_linux_debug] Running unit tests (5s timeout)..."
+ctest --test-dir "build/${CONFIG_PRESET}/cpp/tests" --output-on-failure --timeout 5 --fail-if-no-tests -j"$(nproc)"
 
 echo "[build_linux_debug] ✅ Linux debug build + tests complete."

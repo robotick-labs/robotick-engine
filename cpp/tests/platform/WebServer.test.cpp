@@ -8,11 +8,8 @@
 #include <catch2/catch_all.hpp>
 #include <curl/curl.h>
 
-#include <arpa/inet.h>
+#include <cstdio>
 #include <cstring>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 using namespace robotick;
 
@@ -21,9 +18,7 @@ using namespace robotick;
 // ----------------------------------------------------------
 namespace
 {
-	uint16_t g_webserver_port_counter = 50000;
-
-	struct TextBuffer
+struct TextBuffer
 	{
 		char data[4096] = {};
 		size_t len = 0;
@@ -49,43 +44,6 @@ namespace
 			}
 		}
 	};
-
-	uint16_t find_free_port()
-	{
-		int sock = ::socket(AF_INET, SOCK_STREAM, 0);
-		if (sock < 0)
-			return 0;
-
-		sockaddr_in addr{};
-		addr.sin_family = AF_INET;
-		addr.sin_addr.s_addr = htonl(INADDR_ANY);
-		addr.sin_port = 0;
-
-		if (::bind(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
-		{
-			::close(sock);
-			return 0;
-		}
-
-		socklen_t addr_len = sizeof(addr);
-		if (::getsockname(sock, reinterpret_cast<sockaddr*>(&addr), &addr_len) != 0)
-		{
-			::close(sock);
-			return 0;
-		}
-
-		uint16_t port = ntohs(addr.sin_port);
-		::close(sock);
-		return port;
-	}
-
-	uint16_t allocate_test_port()
-	{
-		uint16_t port = find_free_port();
-		if (port != 0)
-			return port;
-		return g_webserver_port_counter++;
-	}
 
 	TextBuffer http_post(const char* url, const char* body)
 	{
@@ -160,11 +118,12 @@ namespace
 		WebServer server;
 		uint16_t port = 0;
 
-		ScopedTestServer(const char* name, uint16_t port_in, const char* docroot, WebRequestHandler handler)
-			: port(port_in)
+		ScopedTestServer(const char* name, const char* docroot, WebRequestHandler handler)
 		{
-			server.start(name, port, docroot, handler);
+			server.start(name, 0, docroot, handler);
 			Thread::sleep_ms(100);
+			port = server.get_bound_port();
+			REQUIRE(port != 0);
 		}
 
 		~ScopedTestServer() { server.stop(); }
@@ -188,7 +147,6 @@ TEST_CASE("Unit/Platform/WebServer")
 	SECTION("Serves index.html from document root")
 	{
 		ScopedTestServer S("StaticTest",
-			allocate_test_port(),
 			"data/remote_control_interface_web",
 			[](const WebRequest&, WebResponse&)
 			{
@@ -211,7 +169,6 @@ TEST_CASE("Unit/Platform/WebServer")
 		TextBuffer last_uri;
 
 		ScopedTestServer S("Function-based GET",
-			allocate_test_port(),
 			nullptr,
 			[&](const WebRequest& req, WebResponse& resp)
 			{
@@ -251,7 +208,6 @@ TEST_CASE("Unit/Platform/WebServer")
 		TextBuffer posted;
 
 		ScopedTestServer S("Function-based POST",
-			allocate_test_port(),
 			nullptr,
 			[&](const WebRequest& req, WebResponse& resp)
 			{
@@ -290,7 +246,6 @@ TEST_CASE("Unit/Platform/WebServer")
 	SECTION("Handler returns true but sets no body -> empty 200 OK")
 	{
 		ScopedTestServer S("NoBody",
-			allocate_test_port(),
 			nullptr,
 			[](const WebRequest&, WebResponse&)
 			{

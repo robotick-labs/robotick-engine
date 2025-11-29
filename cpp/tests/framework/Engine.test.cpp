@@ -6,7 +6,10 @@
 
 #include <atomic>
 #include <catch2/catch_all.hpp>
+#include <arpa/inet.h>
 #include <chrono>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <thread>
 
 namespace robotick::test
@@ -57,6 +60,48 @@ namespace robotick::test
 
 	} // namespace
 
+	// === Utility helpers ===
+
+	uint16_t find_free_port_for_test()
+	{
+		int sock = ::socket(AF_INET, SOCK_STREAM, 0);
+		if (sock < 0)
+			return 0;
+
+		sockaddr_in addr{};
+		addr.sin_family = AF_INET;
+		addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		addr.sin_port = 0;
+
+		if (::bind(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
+		{
+			::close(sock);
+			return 0;
+		}
+
+		socklen_t addr_len = sizeof(addr);
+		if (::getsockname(sock, reinterpret_cast<sockaddr*>(&addr), &addr_len) != 0)
+		{
+			::close(sock);
+			return 0;
+		}
+
+		const uint16_t port = ntohs(addr.sin_port);
+		::close(sock);
+		return port;
+	}
+
+	uint16_t choose_telemetry_port()
+	{
+		for (int attempt = 0; attempt < 3; ++attempt)
+		{
+			const uint16_t port = find_free_port_for_test();
+			if (port != 0)
+				return port;
+		}
+		return 0;
+	}
+
 	// === Tests ===
 
 	TEST_CASE("Unit/Framework/Engine")
@@ -64,6 +109,7 @@ namespace robotick::test
 		SECTION("DummyWorkload stores tick rate correctly")
 		{
 			Model model;
+			model.set_telemetry_port(choose_telemetry_port());
 			const WorkloadSeed& workload_seed = model.add("DummyWorkload", "A").set_tick_rate_hz(123.0f);
 			model.set_root_workload(workload_seed);
 
@@ -77,6 +123,7 @@ namespace robotick::test
 		SECTION("DummyWorkload config is loaded via load()")
 		{
 			Model model;
+			model.set_telemetry_port(choose_telemetry_port());
 			const WorkloadSeed& workload_seed = model.add("DummyWorkload", "A").set_tick_rate_hz(1.0f).set_config({{"value", "42"}});
 			model.set_root_workload(workload_seed);
 
@@ -90,6 +137,7 @@ namespace robotick::test
 		SECTION("DummyWorkload config is loaded via load()")
 		{
 			Model model;
+			model.set_telemetry_port(choose_telemetry_port());
 			const WorkloadSeed& workload_seed =
 				model.add("DummyWorkload", "A").set_tick_rate_hz(1.0f).set_inputs({{"input_string_64", "hello there"}, {"input_float", "1.234"}});
 			model.set_root_workload(workload_seed);
@@ -105,6 +153,7 @@ namespace robotick::test
 		SECTION("Multiple workloads supported")
 		{
 			Model model;
+			model.set_telemetry_port(choose_telemetry_port());
 			const WorkloadSeed& a = model.add("DummyWorkload", "one").set_tick_rate_hz(1.0f).set_config({{"value", "1"}});
 			const WorkloadSeed& b = model.add("DummyWorkload", "two").set_tick_rate_hz(1.0f).set_config({{"value", "2"}});
 			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&a, &b});
@@ -123,6 +172,7 @@ namespace robotick::test
 		SECTION("Workloads receive tick call")
 		{
 			Model model;
+			model.set_telemetry_port(choose_telemetry_port());
 			const WorkloadSeed& workload_seed = model.add("TickCounterWorkload", "ticky").set_tick_rate_hz(200.0f);
 			model.set_root_workload(workload_seed);
 
