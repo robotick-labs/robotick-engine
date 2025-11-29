@@ -31,6 +31,7 @@ namespace robotick
 		void join();
 
 		static ThreadId get_current_thread_id();
+		static uint32_t get_hardware_concurrency();
 		static void yield();
 		static void sleep_ms(uint32_t ms);
 		static void hybrid_sleep_until(Clock::time_point target_time);

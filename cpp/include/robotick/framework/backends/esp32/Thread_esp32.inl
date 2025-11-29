@@ -136,4 +136,9 @@ namespace robotick
 		return reinterpret_cast<ThreadId>(xTaskGetCurrentTaskHandle());
 	}
 
+	inline uint32_t Thread::get_hardware_concurrency()
+	{
+		return 1;
+	}
+
 } // namespace robotick

@@ -154,4 +154,9 @@ namespace robotick
 #endif
 	}
 
+	inline uint32_t Thread::get_hardware_concurrency()
+	{
+		return std_approved::thread::hardware_concurrency();
+	}
+
 } // namespace robotick
