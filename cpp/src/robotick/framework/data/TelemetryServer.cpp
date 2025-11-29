@@ -2,8 +2,8 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/common/StringView.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
+#include "robotick/framework/common/StringView.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 
@@ -95,10 +95,10 @@ namespace robotick
 		return false;
 	}
 
-static FixedString64 make_blackboard_type_name(const DynamicStructDescriptor& desc, void* data_ptr)
-{
-	const StructDescriptor* struct_desc = desc.get_struct_descriptor(data_ptr);
-	robotick::Hash32 hash;
+	static FixedString64 make_blackboard_type_name(const DynamicStructDescriptor& desc, void* data_ptr)
+	{
+		const StructDescriptor* struct_desc = desc.get_struct_descriptor(data_ptr);
+		robotick::Hash32 hash;
 
 		if (struct_desc)
 		{
@@ -111,47 +111,47 @@ static FixedString64 make_blackboard_type_name(const DynamicStructDescriptor& de
 			}
 		}
 
-	FixedString64 type_name;
-	type_name.format("Blackboard_%08X", static_cast<unsigned int>(hash.final()));
-	return type_name;
-}
-
-static FixedString256 get_type_name(const TypeDescriptor& type_desc, void* data_ptr)
-{
-	const DynamicStructDescriptor* dynamic_struct_desc = type_desc.get_dynamic_struct_desc();
-	if (dynamic_struct_desc)
-	{
-		const FixedString64 blackboard_name = make_blackboard_type_name(*dynamic_struct_desc, data_ptr);
-		FixedString256 type_name;
-		type_name = blackboard_name.c_str();
+		FixedString64 type_name;
+		type_name.format("Blackboard_%08X", static_cast<unsigned int>(hash.final()));
 		return type_name;
 	}
 
-	FixedString256 type_name;
-	if (!type_desc.name.empty())
+	static FixedString256 get_type_name(const TypeDescriptor& type_desc, void* data_ptr)
 	{
-		type_name = type_desc.name.c_str();
-	}
-	else
-	{
-		type_name = "unknown";
-	}
-	return type_name;
-}
+		const DynamicStructDescriptor* dynamic_struct_desc = type_desc.get_dynamic_struct_desc();
+		if (dynamic_struct_desc)
+		{
+			const FixedString64 blackboard_name = make_blackboard_type_name(*dynamic_struct_desc, data_ptr);
+			FixedString256 type_name;
+			type_name = blackboard_name.c_str();
+			return type_name;
+		}
 
-static void emit_type_info(
-	nlohmann::ordered_json& layout_json, const WorkloadsBuffer& workloads_buffer, void* data_ptr, const TypeDescriptor* type_desc)
-{
-	if (!type_desc)
-	{
-		return;
+		FixedString256 type_name;
+		if (!type_desc.name.empty())
+		{
+			type_name = type_desc.name.c_str();
+		}
+		else
+		{
+			type_name = "unknown";
+		}
+		return type_name;
 	}
 
-	const FixedString256 type_name = get_type_name(*type_desc, data_ptr);
-	if (type_already_emitted(layout_json, type_name.c_str()))
+	static void emit_type_info(
+		nlohmann::ordered_json& layout_json, const WorkloadsBuffer& workloads_buffer, void* data_ptr, const TypeDescriptor* type_desc)
 	{
-		return;
-	}
+		if (!type_desc)
+		{
+			return;
+		}
+
+		const FixedString256 type_name = get_type_name(*type_desc, data_ptr);
+		if (type_already_emitted(layout_json, type_name.c_str()))
+		{
+			return;
+		}
 
 		nlohmann::ordered_json type_json;
 		type_json["name"] = type_name.c_str();

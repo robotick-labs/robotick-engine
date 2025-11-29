@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/NoStl.h"
 
 #include <atomic>
 #include <chrono>
@@ -57,33 +58,33 @@ namespace robotick
 
 	inline void Thread::sleep_ms(uint32_t ms)
 	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+		std_approved::this_thread::sleep_for(std_approved::chrono::milliseconds(ms));
 	}
 
 	inline void Thread::yield()
 	{
-		std::this_thread::yield();
+		std_approved::this_thread::yield();
 	}
 
-inline void Thread::hybrid_sleep_until(Clock::time_point target_time)
-{
-	using namespace std::chrono_literals;
-	constexpr auto coarse_margin = 2ms;
-	constexpr auto coarse_step = 500us;
-	constexpr int fine_spin_iters = 20;
-
-	auto now = Clock::now();
-	while (now + coarse_margin < target_time)
+	inline void Thread::hybrid_sleep_until(Clock::time_point target_time)
 	{
-		std::this_thread::sleep_for(coarse_step);
-		now = Clock::now();
-	}
+		using namespace std_approved::chrono_literals;
+		constexpr auto coarse_margin = 2ms;
+		constexpr auto coarse_step = 500us;
+		constexpr int fine_spin_iters = 20;
 
-	while (Clock::now() < target_time)
-	{
-		for (volatile int i = 0; i < fine_spin_iters; ++i)
+		auto now = Clock::now();
+		while (now + coarse_margin < target_time)
 		{
+			std_approved::this_thread::sleep_for(coarse_step);
+			now = Clock::now();
 		}
+
+		while (Clock::now() < target_time)
+		{
+			for (volatile int i = 0; i < fine_spin_iters; ++i)
+			{
+			}
 		}
 	}
 

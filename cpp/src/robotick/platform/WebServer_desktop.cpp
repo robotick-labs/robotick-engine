@@ -239,10 +239,10 @@ namespace robotick
 
 			full_path.format("%s/%s", self->get_document_root(), uri);
 
-			FILE* f = std::fopen(full_path.c_str(), "rb");
+			FILE* f = ::fopen(full_path.c_str(), "rb");
 			if (f)
 			{
-				std::fclose(f);
+				::fclose(f);
 				return 0;
 			}
 		}

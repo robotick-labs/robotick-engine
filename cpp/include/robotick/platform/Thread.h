@@ -44,7 +44,7 @@ namespace robotick
 #if defined(ROBOTICK_PLATFORM_ESP32)
 		void* handle = nullptr;
 #else
-		std::thread thread;
+		std_approved::thread thread;
 #endif
 	};
 

@@ -76,7 +76,7 @@ namespace robotick
 
 		while (*a && *b)
 		{
-			if (std::tolower(static_cast<unsigned char>(*a)) != std::tolower(static_cast<unsigned char>(*b)))
+			if (::tolower(static_cast<unsigned char>(*a)) != ::tolower(static_cast<unsigned char>(*b)))
 			{
 				return false;
 			}

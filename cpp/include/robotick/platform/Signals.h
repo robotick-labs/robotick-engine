@@ -30,8 +30,8 @@ namespace robotick
 	inline void setup_exit_handler(void (*handler)())
 	{
 		g_exit_handler = handler;
-		std::signal(SIGINT, signal_trampoline);
-		std::signal(SIGTERM, signal_trampoline);
+		std_approved::signal(SIGINT, signal_trampoline);
+		std_approved::signal(SIGTERM, signal_trampoline);
 	}
 } // namespace robotick
 

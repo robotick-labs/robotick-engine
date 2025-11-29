@@ -119,7 +119,7 @@ namespace robotick
 			cfg.password.c_str(),
 			cfg.iface.c_str());
 
-		const int result = std::system(cmd.c_str());
+		const int result = std_approved::system(cmd.c_str());
 		const bool success = result == 0;
 		if (success)
 		{
@@ -143,7 +143,7 @@ namespace robotick
 		FixedString256 cmd;
 		cmd.format("nmcli dev wifi connect '%s' password '%s' ifname %s", cfg.ssid.c_str(), cfg.password.c_str(), cfg.iface.c_str());
 
-		const int result = std::system(cmd.c_str());
+		const int result = std_approved::system(cmd.c_str());
 		const bool success = result == 0;
 		if (success)
 		{
@@ -159,7 +159,7 @@ namespace robotick
 
 	bool NetworkClient::is_connected()
 	{
-		return std::system("nmcli -t -f WIFI g | grep -q enabled") == 0;
+		return std_approved::system("nmcli -t -f WIFI g | grep -q enabled") == 0;
 	}
 
 } // namespace robotick
