@@ -3,7 +3,7 @@
 
 #include "robotick/config/AssertUtils.h"
 #include "robotick/framework/data/Blackboard.h"
-#include "robotick/framework/memory/HeapVector.h"
+#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeMacros.h"
 #include "robotick/framework/strings/StringView.h"

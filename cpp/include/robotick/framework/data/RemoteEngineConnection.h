@@ -4,7 +4,7 @@
 #pragma once
 
 #include "robotick/framework/data/InProgressMessage.h"
-#include "robotick/framework/memory/HeapVector.h"
+#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/strings/FixedString.h"
 #include "robotick/framework/utility/Function.h"
 

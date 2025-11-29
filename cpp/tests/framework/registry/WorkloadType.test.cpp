@@ -6,7 +6,7 @@
 
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/math/Vec3.h"
-#include "robotick/framework/memory/HeapVector.h"
+#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/registry/TypeMacros.h"
 #include "robotick/framework/utils/TypeId.h"
 

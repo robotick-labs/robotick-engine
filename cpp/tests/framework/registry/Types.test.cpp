@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/config/AssertUtils.h"
-#include "robotick/framework/memory/HeapVector.h"
+#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeRegistry.h"
 #include "robotick/framework/strings/FixedString.h"

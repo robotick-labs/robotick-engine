@@ -13,7 +13,7 @@
 #include "robotick/framework/utility/Pair.h"
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
-#include "robotick/framework/memory/HeapVector.h"
+#include "robotick/framework/containers/HeapVector.h"
 #endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
 namespace robotick

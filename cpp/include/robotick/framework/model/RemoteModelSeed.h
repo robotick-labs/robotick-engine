@@ -10,7 +10,7 @@
 #include "robotick/framework/strings/StringView.h"
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
-#include "robotick/framework/memory/HeapVector.h"
+#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/strings/FixedString.h"
 #endif
 
