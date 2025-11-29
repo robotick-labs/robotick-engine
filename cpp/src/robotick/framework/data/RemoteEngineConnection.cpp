@@ -727,6 +727,14 @@ namespace robotick
 			// Flush final path if no trailing newline
 			if (handshake_receive_state.current_path_length > 0)
 			{
+				if (handshake_receive_state.current_path_length >= handshake_receive_state.current_path.capacity())
+				{
+					ROBOTICK_FATAL_EXIT("Field path too long (%zu chars): exceeds handshake buffer",
+						handshake_receive_state.current_path_length);
+				}
+
+				handshake_receive_state.current_path.data[handshake_receive_state.current_path_length] = '\0';
+
 				Field field;
 				if (!binder(handshake_receive_state.current_path.c_str(), field))
 				{

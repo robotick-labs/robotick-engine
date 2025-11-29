@@ -55,7 +55,7 @@ namespace robotick
 
 		struct Field
 		{
-			FixedString64 path;
+			FixedString512 path;
 			const void* send_ptr = nullptr;
 			void* recv_ptr = nullptr;
 			size_t size = 0;
