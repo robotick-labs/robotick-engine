@@ -5,8 +5,6 @@
 
 #include "robotick/api_base.h"
 #include "robotick/platform/Clock.h"
-
-#include <string>
 #include <thread>
 
 namespace robotick
@@ -19,7 +17,7 @@ namespace robotick
 		using EntryPoint = void (*)(void*);
 
 		Thread() = default;
-		Thread(EntryPoint fn, void* arg, const std::string& name = "", int core = -1, int stack_size = 12288, int priority = 1);
+		Thread(EntryPoint fn, void* arg, const char* name = "", int core = -1, int stack_size = 12288, int priority = 1);
 		~Thread();
 
 		Thread(const Thread&) = delete;
@@ -38,7 +36,7 @@ namespace robotick
 		static void hybrid_sleep_until(Clock::time_point target_time);
 
 	  protected:
-		static void set_name(const std::string& name);
+		static void set_name(const char* name);
 		static void set_priority_high();
 		static void set_affinity(int core);
 

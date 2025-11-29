@@ -8,7 +8,6 @@
 #include "freertos/task.h"
 
 #include <chrono>
-#include <cstring>
 
 namespace robotick
 {
@@ -30,18 +29,19 @@ namespace robotick
 		}
 	} // namespace
 
-	inline Thread::Thread(EntryPoint fn, void* arg, const std::string& name, int core, int stack_size, int priority)
+	inline Thread::Thread(EntryPoint fn, void* arg, const char* name, int core, int stack_size, int priority)
 	{
 		auto* ctx = new TaskContext{fn, arg};
 		BaseType_t result;
+		const char* task_name = (name && name[0]) ? name : "robotick-task";
 
 		if (core >= 0)
 		{
-			result = xTaskCreatePinnedToCore(task_entry, name.c_str(), stack_size, ctx, priority, reinterpret_cast<TaskHandle_t*>(&handle), core);
+			result = xTaskCreatePinnedToCore(task_entry, task_name, stack_size, ctx, priority, reinterpret_cast<TaskHandle_t*>(&handle), core);
 		}
 		else
 		{
-			result = xTaskCreate(task_entry, name.c_str(), stack_size, ctx, priority, reinterpret_cast<TaskHandle_t*>(&handle));
+			result = xTaskCreate(task_entry, task_name, stack_size, ctx, priority, reinterpret_cast<TaskHandle_t*>(&handle));
 		}
 
 		if (result != pdPASS)
@@ -76,7 +76,7 @@ namespace robotick
 		vTaskDelay(pdMS_TO_TICKS(ms));
 	}
 
-	inline void Thread::set_name(const std::string&)
+	inline void Thread::set_name(const char*)
 	{
 		// Optional: could use vTaskSetTaskName if needed
 	}

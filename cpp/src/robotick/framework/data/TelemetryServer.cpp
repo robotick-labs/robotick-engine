@@ -302,15 +302,15 @@ static void emit_type_info(
 			layout_json["types"].end(),
 			[](const nlohmann::ordered_json& a, const nlohmann::ordered_json& b)
 			{
-				const auto& a_name = a["name"].get_ref<const std::string&>();
-				const auto& b_name = b["name"].get_ref<const std::string&>();
+				const auto& a_name = a["name"].get_ref<const nlohmann::ordered_json::string_t&>();
+				const auto& b_name = b["name"].get_ref<const nlohmann::ordered_json::string_t&>();
 				return StringView(a_name.c_str()) < StringView(b_name.c_str());
 			});
 
 		res.set_status_code(WebResponseCode::OK);
 		res.set_content_type("application/json");
 
-		std::string out_str = layout_json.dump(2); // Pretty print
+		auto out_str = layout_json.dump(2); // Pretty print
 		res.set_body_string(out_str.c_str());
 	}
 

@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/HeapVector.h"
+#include "robotick/framework/common/StringUtils.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeRegistry.h"
 #include <catch2/catch_all.hpp>
-#include <cstring>
-#include <set>
 
 namespace robotick::test
 {
@@ -54,14 +54,39 @@ namespace robotick::test
 		{
 			const auto& registered_types = registry.get_registered_types();
 
-			std::set<std::string> seen_names;
-			std::set<TypeId> seen_ids;
+			HeapVector<FixedString64> seen_names;
+			HeapVector<TypeId> seen_ids;
+			seen_names.initialize(registered_types.size());
+			seen_ids.initialize(registered_types.size());
+			size_t name_count = 0;
+			size_t id_count = 0;
 
 			for (auto desc : registered_types)
 			{
 				REQUIRE(desc != nullptr);
-				REQUIRE(seen_names.insert(desc->name.c_str()).second);
-				REQUIRE(seen_ids.insert(desc->id).second);
+				bool name_unique = true;
+				for (size_t i = 0; i < name_count; ++i)
+				{
+					if (string_equals(seen_names[i].c_str(), desc->name.c_str()))
+					{
+						name_unique = false;
+						break;
+					}
+				}
+				REQUIRE(name_unique);
+				seen_names[name_count++] = desc->name.c_str();
+
+				bool id_unique = true;
+				for (size_t j = 0; j < id_count; ++j)
+				{
+					if (seen_ids[j] == desc->id)
+					{
+						id_unique = false;
+						break;
+					}
+				}
+				REQUIRE(id_unique);
+				seen_ids[id_count++] = desc->id;
 			}
 		}
 

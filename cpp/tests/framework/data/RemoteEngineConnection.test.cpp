@@ -3,12 +3,12 @@
 
 #include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/api.h"
+#include "robotick/framework/common/FixedVector.h"
+#include "robotick/framework/common/StringUtils.h"
 #include "robotick/platform/Thread.h"
 
 #include <catch2/catch_all.hpp>
 #include <chrono>
-#include <string>
-#include <vector>
 
 using namespace robotick;
 
@@ -136,7 +136,13 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 	SECTION("Handshake handles near-capacity field path", "[RemoteEngineConnection]")
 	{
 		const size_t max_path_len = FixedString512().capacity() - 1;
-		std::string long_path(max_path_len - 1, 'p'); // leave 1 byte slack before terminator
+		FixedString512 long_path;
+		const size_t fill_len = max_path_len - 1;
+		for (size_t i = 0; i < fill_len; ++i)
+		{
+			long_path.data[i] = 'p';
+		}
+		long_path.data[fill_len] = '\0';
 
 		int recv_val = 0;
 		int send_val = 123;
@@ -186,10 +192,12 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		int recv_values[kFieldCount] = {};
 		int send_values[kFieldCount] = {1, 2, 3, 4, 5, 6};
 
-		std::vector<std::string> paths;
+		FixedVector<FixedString64, kFieldCount> paths;
 		for (int i = 0; i < kFieldCount; ++i)
 		{
-			paths.push_back("field_" + std::to_string(i));
+			FixedString64 name;
+			name.format("field_%d", i);
+			paths.add(name);
 		}
 
 		int bound_count = 0;
@@ -203,7 +211,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			{
 				for (int i = 0; i < kFieldCount; ++i)
 				{
-					if (paths[i] == path)
+					if (string_equals(paths[i].c_str(), path))
 					{
 						out.path = path;
 						out.recv_ptr = &recv_values[i];

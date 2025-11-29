@@ -1,11 +1,11 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/StringUtils.h"
 
 #include <functional>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string>
 
 #if defined(__linux__) || defined(__APPLE__)
 #include <cxxabi.h>
@@ -245,7 +245,7 @@ namespace robotick
 		}                                                                                                                                            \
 		catch (const robotick::TestError& e)                                                                                                         \
 		{                                                                                                                                            \
-			REQUIRE_THAT(std::string(e.what()), Catch::Matchers::ContainsSubstring(substr_literal));                                                 \
+			REQUIRE(string_contains(e.what(), substr_literal));                                                                                      \
 		}                                                                                                                                            \
 	} while (0)
 

@@ -1,9 +1,11 @@
 #include "robotick/framework/data/RemoteEngineDiscoverer.h"
 #include "robotick/api.h"
+#include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/StringUtils.h"
 #include "robotick/platform/Atomic.h"
 #include "robotick/platform/Thread.h"
+
 #include <catch2/catch_all.hpp>
-#include <string>
 
 using namespace robotick;
 
@@ -28,7 +30,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 			[&](const char* source_id, uint16_t& port_out)
 			{
 				requested.store(true);
-				REQUIRE(std::string(source_id) == sender_model);
+				REQUIRE(string_equals(source_id, sender_model));
 				port_out = 7263;
 			});
 		sender.set_on_remote_model_discovered(
@@ -106,13 +108,13 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		recv_a.set_on_incoming_connection_requested(
 			[&](const char* src, uint16_t& out)
 			{
-				REQUIRE(std::string(src) == model_b);
+				REQUIRE(string_equals(src, model_b));
 				out = port_a;
 			});
 		recv_b.set_on_incoming_connection_requested(
 			[&](const char* src, uint16_t& out)
 			{
-				REQUIRE(std::string(src) == model_a);
+				REQUIRE(string_equals(src, model_a));
 				out = port_b;
 			});
 
@@ -163,7 +165,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		recv.set_on_incoming_connection_requested(
 			[&](const char* src, uint16_t& out)
 			{
-				REQUIRE(std::string(src) == model_peer);
+				REQUIRE(string_equals(src, model_peer));
 				out = reply_port;
 			});
 		send.set_on_remote_model_discovered(

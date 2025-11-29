@@ -4,6 +4,7 @@
 #include "robotick/framework/data/Blackboard.h"
 #include "../utils/BlackboardTestUtils.h"
 #include "robotick/api_base.h"
+#include "robotick/framework/common/StringUtils.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/utils/TypeId.h"
 
@@ -62,7 +63,7 @@ namespace robotick
 			{
 				FixedString64 name = "Magg.e";
 				blackboard->set<FixedString64>("name", name);
-				REQUIRE(std::string(blackboard->get<FixedString64>("name").c_str()) == "Magg.e");
+				REQUIRE(string_equals(blackboard->get<FixedString64>("name").c_str(), "Magg.e"));
 			}
 		}
 
