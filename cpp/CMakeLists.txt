@@ -130,7 +130,7 @@ if (DEFINED ROBOTICK_PLATFORM_LINUX OR DEFINED ROBOTICK_PLATFORM_DESKTOP)
 endif()
 
 add_custom_target(code_policy_check ALL
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/code_policy_check.py ${CMAKE_SOURCE_DIR}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/code_policy_check.py ${CMAKE_CURRENT_SOURCE_DIR}/..
     COMMENT "Checking code policy (STL usage + Apache headers)"
 )
 add_dependencies(robotick-engine code_policy_check)
