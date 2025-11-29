@@ -111,6 +111,25 @@ namespace robotick::test
 		return 0;
 	}
 
+	bool bind_to_port(uint16_t port)
+	{
+		int sock = ::socket(AF_INET, SOCK_STREAM, 0);
+		if (sock < 0)
+			return false;
+
+		int reuse = 1;
+		::setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
+		sockaddr_in addr{};
+		addr.sin_family = AF_INET;
+		addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		addr.sin_port = htons(port);
+
+		bool success = (::bind(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0);
+		::close(sock);
+		return success;
+	}
+
 	// === Tests ===
 
 	TEST_CASE("Unit/Framework/Engine")
@@ -220,6 +239,34 @@ namespace robotick::test
 			REQUIRE(root_info != nullptr);
 			REQUIRE(root_info->workload_stats != nullptr);
 			CHECK(root_info->workload_stats->overrun_count > 0);
+		}
+
+		SECTION("Telemetry + remote lifecycle")
+		{
+			const uint16_t telemetry_port = choose_telemetry_port();
+			REQUIRE(telemetry_port != 0);
+
+			auto run_engine_once = [&](uint16_t port)
+			{
+				Model model;
+				model.set_telemetry_port(port);
+				const WorkloadSeed& workload_seed = model.add("TickCounterWorkload", "ticky").set_tick_rate_hz(200.0f);
+				model.set_root_workload(workload_seed);
+
+				Engine engine;
+				engine.load(model);
+
+				AtomicFlag stop_flag{false};
+				std::thread runner([&]() { engine.run(stop_flag); });
+
+				Thread::sleep_ms(30);
+				stop_flag.set();
+				runner.join();
+			};
+
+			run_engine_once(telemetry_port);
+			REQUIRE(bind_to_port(telemetry_port));
+			run_engine_once(telemetry_port);
 		}
 	}
 
