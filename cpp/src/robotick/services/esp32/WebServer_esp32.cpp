@@ -1,3 +1,6 @@
+// Copyright Robotick Labs
+// SPDX-License-Identifier: Apache-2.0
+
 #if defined(ROBOTICK_PLATFORM_ESP32)
 
 #include "robotick/api.h"

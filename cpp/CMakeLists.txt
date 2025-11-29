@@ -5,6 +5,9 @@
 
 cmake_minimum_required(VERSION 3.16)
 
+# Detect python interpreter for code policy checks
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
 # ============================
 # Detect Platform Macros
 # ============================
@@ -125,6 +128,13 @@ if (DEFINED ROBOTICK_PLATFORM_LINUX OR DEFINED ROBOTICK_PLATFORM_DESKTOP)
     target_include_directories(robotick-engine-static PRIVATE ${CMAKE_CURRENT_LIST_DIR}/lib/civetweb/include)
     target_link_libraries(robotick-engine-static PRIVATE civetweb SDL2::SDL2)
 endif()
+
+add_custom_target(code_policy_check ALL
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/code_policy_check.py ${CMAKE_SOURCE_DIR}
+    COMMENT "Checking code policy (STL usage + Apache headers)"
+)
+add_dependencies(robotick-engine code_policy_check)
+add_dependencies(robotick-engine-static code_policy_check)
 
 # ============================
 # Unit Tests via Catch2

@@ -1,3 +1,6 @@
+// Copyright Robotick Labs
+// SPDX-License-Identifier: Apache-2.0
+
 // robotick/platform/System_desktop.cpp
 
 #if defined(ROBOTICK_PLATFORM_DESKTOP)

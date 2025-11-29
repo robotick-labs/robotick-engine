@@ -1,3 +1,6 @@
+// Copyright Robotick Labs
+// SPDX-License-Identifier: Apache-2.0
+
 #include "robotick/framework/system/PlatformEvents.h"
 
 #if defined(ROBOTICK_PLATFORM_DESKTOP)

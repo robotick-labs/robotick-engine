@@ -8,7 +8,7 @@
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/TypeMacros.h"
 
-#include <limits>
+#include <climits>
 
 namespace robotick
 {
@@ -34,7 +34,7 @@ namespace robotick
 
 	static bool safe_add(size_t lhs, size_t rhs, size_t& out)
 	{
-		constexpr size_t max_size = std::numeric_limits<size_t>::max();
+		constexpr size_t max_size = SIZE_MAX;
 		if (rhs > max_size - lhs)
 			return false;
 		out = lhs + rhs;

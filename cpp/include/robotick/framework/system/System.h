@@ -1,5 +1,8 @@
 // robotick/framework/system/System.h
 
+// Copyright Robotick Labs
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 namespace robotick

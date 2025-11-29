@@ -1,3 +1,6 @@
+// Copyright Robotick Labs
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #if defined(ROBOTICK_PLATFORM_ESP32)
