@@ -62,11 +62,11 @@ namespace robotick
 	//---------------------------------------------------------------------------------------------------
 	// StatePtr<T> - pointer-based alternative for large states (allocated on heap once on startup)
 	//---------------------------------------------------------------------------------------------------
-	template <typename T> class StatePtr
+	template <typename T, bool EnforceLargeState = true> class StatePtr
 	{
 		static_assert(is_default_constructible_v<T>, "StatePtr<T> requires T to be default-constructible");
 
-		static_assert(sizeof(T) > MaxReasonableInlineStateSize,
+		static_assert(!EnforceLargeState || sizeof(T) > MaxReasonableInlineStateSize,
 			"StatePtr<T>: Type small enough for inline storage. "
 			"Use State<T> instead.\n"
 			"sizeof(T) = ??? (<=5KB threshold)");
@@ -76,7 +76,17 @@ namespace robotick
 			: ptr(new T())
 		{
 		}
-		~StatePtr() { delete ptr; }
+		~StatePtr() { destroy(); }
+
+		// optional explicit destroy method - useful for controlling destruction order
+		void destroy()
+		{
+			if (ptr)
+			{
+				delete ptr;
+				ptr = nullptr;
+			}
+		}
 
 		StatePtr(const StatePtr&) = delete;
 		StatePtr& operator=(const StatePtr&) = delete;
