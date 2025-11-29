@@ -4,13 +4,29 @@
 #include "robotick/framework/data/RemoteEngineConnections.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/platform/Atomic.h"
+#include "robotick/platform/Clock.h"
 #include "robotick/platform/Thread.h"
 
 #include <catch2/catch_all.hpp>
-#include <thread>
 
 namespace robotick::test
 {
+	namespace
+	{
+		struct EngineRunContext
+		{
+			Engine* engine = nullptr;
+			AtomicFlag* stop_flag = nullptr;
+		};
+
+		void engine_run_entry(void* arg)
+		{
+			auto* ctx = static_cast<EngineRunContext*>(arg);
+			ctx->engine->run(*ctx->stop_flag);
+			delete ctx;
+		}
+	} // namespace
+
 	// === Test workload + structs ===
 
 	static constexpr int VALUE_TO_TRANSMIT = 123;
@@ -72,23 +88,14 @@ namespace robotick::test
 		AtomicFlag success_flag(false);
 
 		// --- Threaded run
-		std::thread sender_thread(
-			[&]()
-			{
-				sender.run(stop_flag);
-			});
-
-		std::thread receiver_thread(
-			[&]()
-			{
-				receiver.run(stop_flag);
-			});
+		Thread sender_thread(engine_run_entry, new EngineRunContext{&sender, &stop_flag});
+		Thread receiver_thread(engine_run_entry, new EngineRunContext{&receiver, &stop_flag});
 
 		// --- Watch for success or timeout
 		auto* sender_workload = sender.find_instance<TestRemoteWorkload>("sender_workload");
 		auto* receiver_workload = receiver.find_instance<TestRemoteWorkload>("receiver_workload");
 
-		const auto start = std::chrono::steady_clock::now();
+		const auto start = Clock::now();
 
 		while (!stop_flag.is_set())
 		{
@@ -98,9 +105,8 @@ namespace robotick::test
 				break;
 			}
 
-			const auto now = std::chrono::steady_clock::now();
-			const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
-			if (elapsed_ms > 3000)
+			const auto elapsed_ns = Clock::to_nanoseconds(Clock::now() - start).count();
+			if (elapsed_ns > 3000LL * 1000000LL)
 				break;
 
 			Thread::sleep_ms(10);
@@ -108,8 +114,10 @@ namespace robotick::test
 
 		stop_flag.set();
 
-		sender_thread.join();
-		receiver_thread.join();
+		if (sender_thread.is_joining_supported())
+			sender_thread.join();
+		if (receiver_thread.is_joining_supported())
+			receiver_thread.join();
 
 		REQUIRE(sender_workload->outputs.local_x == VALUE_TO_TRANSMIT);
 		REQUIRE(receiver_workload->inputs.remote_x == VALUE_TO_TRANSMIT);

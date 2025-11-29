@@ -97,19 +97,19 @@ namespace robotick
 
 		if (name == "float")
 		{
-			return std::sscanf(input, "%f", reinterpret_cast<float*>(out_value)) == 1;
+			return ::sscanf(input, "%f", reinterpret_cast<float*>(out_value)) == 1;
 		}
 		if (name == "double")
 		{
-			return std::sscanf(input, "%lf", reinterpret_cast<double*>(out_value)) == 1;
+			return ::sscanf(input, "%lf", reinterpret_cast<double*>(out_value)) == 1;
 		}
 		if (name == "bool")
 		{
-			if ((std::strcmp(input, "1") == 0) || case_insensitive_equals(input, "true"))
+			if ((::strcmp(input, "1") == 0) || case_insensitive_equals(input, "true"))
 			{
 				*reinterpret_cast<bool*>(out_value) = true;
 			}
-			else if ((std::strcmp(input, "0") == 0) || case_insensitive_equals(input, "false"))
+			else if ((::strcmp(input, "0") == 0) || case_insensitive_equals(input, "false"))
 			{
 				*reinterpret_cast<bool*>(out_value) = false;
 			}
@@ -123,16 +123,16 @@ namespace robotick
 		}
 		if (name == "int")
 		{
-			return std::sscanf(input, "%d", reinterpret_cast<int*>(out_value)) == 1;
+			return ::sscanf(input, "%d", reinterpret_cast<int*>(out_value)) == 1;
 		}
 		if (name == "uint16_t")
 		{
-			return std::sscanf(input, "%hu", reinterpret_cast<uint16_t*>(out_value)) == 1;
+			return ::sscanf(input, "%hu", reinterpret_cast<uint16_t*>(out_value)) == 1;
 		}
 		if (name == "uint32_t")
 		{
 			unsigned long parsed = 0;
-			const int read = std::sscanf(input, "%lu", &parsed);
+			const int read = ::sscanf(input, "%lu", &parsed);
 			if (read == 1)
 			{
 				*reinterpret_cast<uint32_t*>(out_value) = static_cast<uint32_t>(parsed);
@@ -180,7 +180,7 @@ namespace robotick
 		{
 			const bool v = *reinterpret_cast<const bool*>(value);
 			const char* s = v ? "true" : "false";
-			const size_t len = std::strlen(s);
+			const size_t len = ::strlen(s);
 
 			if (len + 1 > output_buffer_size)
 			{
@@ -217,7 +217,7 @@ namespace robotick
 		{
 			// Plain text: copy value (char buffer of size `this->size`) into output buffer
 			const char* src = reinterpret_cast<const char*>(value);
-			const size_t len = std::strlen(src);
+			const size_t len = ::strlen(src);
 
 			if (len + 1 > output_buffer_size)
 			{

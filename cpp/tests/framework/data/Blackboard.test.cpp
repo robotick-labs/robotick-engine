@@ -24,7 +24,8 @@ namespace robotick
 			blackboard_fields[1] = FieldDescriptor{"score", GET_TYPE_ID(double)};
 			blackboard_fields[2] = FieldDescriptor{"name", GET_TYPE_ID(FixedString64)};
 
-			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
+			auto bundle = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
+			Blackboard* blackboard = bundle.blackboard;
 
 			const auto& info = blackboard->get_info();
 
@@ -45,7 +46,8 @@ namespace robotick
 			blackboard_fields[1] = FieldDescriptor{"score", GET_TYPE_ID(double)};
 			blackboard_fields[2] = FieldDescriptor{"name", GET_TYPE_ID(FixedString64)};
 
-			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
+			auto bundle = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
+			Blackboard* blackboard = bundle.blackboard;
 
 			SECTION("Set and get int")
 			{
@@ -88,7 +90,8 @@ namespace robotick
 
 			SECTION("Throws on missing field")
 			{
-				auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
+				auto bundle = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
+				Blackboard* blackboard = bundle.blackboard;
 				ROBOTICK_REQUIRE_ERROR_MSG(blackboard->get<int>("nonexistent"), ("Blackboard"));
 			}
 		}
@@ -101,7 +104,8 @@ namespace robotick
 			blackboard_fields[1] = FieldDescriptor{"b", GET_TYPE_ID(double)};
 			blackboard_fields[2] = FieldDescriptor{"c", GET_TYPE_ID(int)};
 
-			auto [buffer, blackboard] = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
+			auto bundle = BlackboardTestUtils::make_buffer_and_embedded_blackboard(blackboard_fields);
+			Blackboard* blackboard = bundle.blackboard;
 
 			blackboard->set<int>("a", 1);
 			blackboard->set<double>("b", 3.14);

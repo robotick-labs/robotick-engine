@@ -60,7 +60,7 @@ namespace robotick
 		{
 			if (str)
 			{
-				update(str, std::strlen(str));
+				update(str, ::strlen(str));
 			}
 		}
 

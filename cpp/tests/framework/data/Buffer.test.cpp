@@ -32,7 +32,7 @@ TEST_CASE("Unit/Framework/Data/Buffer")
 	SECTION("RawBuffer clones data correctly", "[buffer][clone]")
 	{
 		RawBuffer original(64);
-		std::memset(original.raw_ptr(), 0xAB, 64);
+		memset(original.raw_ptr(), 0xAB, 64);
 
 		RawBuffer clone;
 		clone.create_mirror_from(original);
@@ -48,7 +48,7 @@ TEST_CASE("Unit/Framework/Data/Buffer")
 	{
 		RawBuffer a(16);
 		RawBuffer b(16);
-		std::memset(b.raw_ptr(), 0x66, 16);
+		memset(b.raw_ptr(), 0x66, 16);
 
 		a.update_mirror_from(b);
 		REQUIRE(memcmp(a.raw_ptr(), b.raw_ptr(), 16) == 0);

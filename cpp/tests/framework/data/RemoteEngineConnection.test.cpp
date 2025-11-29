@@ -4,11 +4,11 @@
 #include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/api.h"
 #include "robotick/framework/common/FixedVector.h"
+#include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/common/StringUtils.h"
 #include "robotick/platform/Thread.h"
 
 #include <catch2/catch_all.hpp>
-#include <chrono>
 
 using namespace robotick;
 
@@ -41,7 +41,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		receiver.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& out)
 			{
-				if (strcmp(path, "x") == 0)
+				if (string_equals(path, "x"))
 				{
 					out.path = path;
 					out.recv_ptr = &recv_value;
@@ -90,7 +90,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		receiver.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& out)
 			{
-				if (strcmp(path, path_a) == 0)
+				if (string_equals(path, path_a))
 				{
 					out.path = path;
 					out.recv_ptr = &recv_a;
@@ -99,7 +99,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 					++bind_count;
 					return true;
 				}
-				if (strcmp(path, path_b) == 0)
+				if (string_equals(path, path_b))
 				{
 					out.path = path;
 					out.recv_ptr = &recv_b;
@@ -155,7 +155,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		receiver.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& out)
 			{
-				if (strcmp(path, long_path.c_str()) == 0)
+				if (string_equals(path, long_path.c_str()))
 				{
 					out.path = path;
 					out.recv_ptr = &recv_val;
@@ -259,8 +259,12 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 	SECTION("Handles large payload", "[RemoteEngineConnection]")
 	{
 		constexpr uint8_t target_value = 0xAB;
-		std::vector<uint8_t> send_buffer(32768, target_value);
-		std::vector<uint8_t> receive_buffer(32768);
+		HeapVector<uint8_t> send_buffer;
+		send_buffer.initialize(32768);
+		for (size_t i = 0; i < send_buffer.size(); ++i)
+			send_buffer[i] = target_value;
+		HeapVector<uint8_t> receive_buffer;
+		receive_buffer.initialize(32768);
 
 		RemoteEngineConnection receiver;
 		RemoteEngineConnection sender;
@@ -307,7 +311,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		receiver.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& out)
 			{
-				if (strcmp(path, "x") == 0)
+				if (string_equals(path, "x"))
 				{
 					out.path = path;
 					out.recv_ptr = &recv_value;
@@ -416,7 +420,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		a_rx.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& f)
 			{
-				if (strcmp(path, "value") == 0)
+				if (string_equals(path, "value"))
 				{
 					f.path = path;
 					f.recv_ptr = &a_recv;
@@ -435,7 +439,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		b_rx.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& f)
 			{
-				if (strcmp(path, "value") == 0)
+				if (string_equals(path, "value"))
 				{
 					f.path = path;
 					f.recv_ptr = &b_recv;
@@ -496,7 +500,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			peer.receiver.set_field_binder(
 				[&peer, expected_sender_id](const char* path, RemoteEngineConnection::Field& f)
 				{
-					if (strcmp(path, expected_sender_id) == 0)
+					if (string_equals(path, expected_sender_id))
 					{
 						f.path = path;
 						f.recv_ptr = &peer.recv_value;
@@ -571,7 +575,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		a.receiver.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& f)
 			{
-				if (strcmp(path, "peer-c") == 0)
+				if (string_equals(path, "peer-c"))
 				{
 					f.path = path;
 					f.recv_ptr = &a.recv_value;
@@ -586,7 +590,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		b.receiver.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& f)
 			{
-				if (strcmp(path, "peer-a") == 0)
+				if (string_equals(path, "peer-a"))
 				{
 					f.path = path;
 					f.recv_ptr = &b.recv_value;
@@ -601,7 +605,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		c.receiver.set_field_binder(
 			[&](const char* path, RemoteEngineConnection::Field& f)
 			{
-				if (strcmp(path, "peer-a") == 0)
+				if (string_equals(path, "peer-a"))
 				{
 					f.path = path;
 					f.recv_ptr = &c.recv_value;
@@ -687,7 +691,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			rx.set_field_binder(
 				[=](const char* path, RemoteEngineConnection::Field& f)
 				{
-					if (strcmp(path, sender_id) == 0)
+					if (string_equals(path, sender_id))
 					{
 						f.path = path;
 						f.recv_ptr = out;
