@@ -4,6 +4,7 @@
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/common/StringUtils.h"
+#include "robotick/framework/common/StringView.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeRegistry.h"
 #include <catch2/catch_all.hpp>
@@ -125,6 +126,31 @@ namespace robotick::test
 				// compare raw bytes
 				CHECK(memcmp(parsed, entry.sample_value, desc->size) == 0);
 			}
+		}
+
+		SECTION("Primitive Types - invalid bool strings and unsupported descriptors return false")
+		{
+			const TypeDescriptor* bool_desc = registry.find_by_name("bool");
+			REQUIRE(bool_desc != nullptr);
+			bool bool_value = false;
+			CHECK_FALSE(bool_desc->from_string("not_a_boolean", &bool_value));
+
+			TypeDescriptor custom_desc{StringView("custom"), TypeId::invalid(), sizeof(int), alignof(int), TypeCategory::Primitive, {}, nullptr};
+
+			char buffer[32] = {};
+			int payload = 0;
+			CHECK_FALSE(custom_desc.to_string(&payload, buffer, sizeof(buffer)));
+			CHECK_FALSE(custom_desc.from_string("123", &payload));
+		}
+
+		SECTION("Primitive Types - text/plain descriptors stay null terminated")
+		{
+			const TypeDescriptor* text_desc = registry.find_by_name("FixedString8");
+			REQUIRE(text_desc != nullptr);
+
+			FixedString8 dest;
+			CHECK(text_desc->from_string("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", dest.data));
+			CHECK(dest.data[dest.capacity() - 1] == '\0');
 		}
 	}
 } // namespace robotick::test

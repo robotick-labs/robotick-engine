@@ -87,11 +87,20 @@ namespace robotick
 		return *a == *b;
 	}
 
+	static size_t limited_strlen(const char* str, size_t max_length)
+	{
+		size_t len = 0;
+		while (len < max_length && str[len])
+		{
+			++len;
+		}
+		return len;
+	}
+
 	bool TypeDescriptor::from_string(const char* input, void* out_value) const
 	{
 		if (!input || !out_value)
 		{
-			ROBOTICK_FATAL_EXIT("!");
 			return false;
 		}
 
@@ -115,7 +124,6 @@ namespace robotick
 			}
 			else
 			{
-				ROBOTICK_FATAL_EXIT("Invalid boolean string: '%s'", input);
 				return false;
 			}
 
@@ -142,12 +150,22 @@ namespace robotick
 		}
 		if (mime_type == "text/plain")
 		{
-			::strncpy(reinterpret_cast<char*>(out_value), input, size);
+			if (size == 0)
+				return false;
+
+			char* dest = reinterpret_cast<char*>(out_value);
+			const size_t max_copy = size - 1;
+			const size_t actual_len = limited_strlen(input, max_copy);
+
+			::memcpy(dest, input, actual_len);
+			dest[actual_len] = '\0';
+			for (size_t i = actual_len + 1; i < size; ++i)
+				dest[i] = '\0';
+
 			return true;
 		}
 
 		// fallback
-		ROBOTICK_FATAL_EXIT("!");
 		return false;
 	}
 
@@ -184,7 +202,6 @@ namespace robotick
 
 			if (len + 1 > output_buffer_size)
 			{
-				ROBOTICK_FATAL_EXIT("Output buffer too small for boolean string");
 				return false;
 			}
 
@@ -215,13 +232,15 @@ namespace robotick
 
 		if (mime_type == "text/plain")
 		{
-			// Plain text: copy value (char buffer of size `this->size`) into output buffer
+			if (size == 0 || output_buffer_size == 0)
+				return false;
+
 			const char* src = reinterpret_cast<const char*>(value);
-			const size_t len = ::strlen(src);
+			const size_t max_value_len = size - 1;
+			const size_t len = limited_strlen(src, max_value_len);
 
 			if (len + 1 > output_buffer_size)
 			{
-				ROBOTICK_FATAL_EXIT("Output buffer too small for text/plain field");
 				return false;
 			}
 
@@ -231,7 +250,6 @@ namespace robotick
 		}
 
 		// fallback — unsupported
-		ROBOTICK_FATAL_EXIT("to_string() not implemented for type '%s'", name.c_str());
 		return false;
 	}
 
