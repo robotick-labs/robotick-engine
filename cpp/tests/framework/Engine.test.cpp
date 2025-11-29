@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
+#include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/platform/Atomic.h"
+#include "robotick/platform/Thread.h"
 
+#include <arpa/inet.h>
 #include <atomic>
 #include <catch2/catch_all.hpp>
-#include <arpa/inet.h>
 #include <chrono>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -19,6 +21,13 @@ namespace robotick::test
 	};
 
 	ROBOTICK_REGISTER_WORKLOAD(TestSequencedGroupWorkload)
+
+	struct OverrunWorkload
+	{
+		void tick(const TickInfo&) { Thread::sleep_ms(10); }
+	};
+
+	ROBOTICK_REGISTER_WORKLOAD(OverrunWorkload)
 
 	namespace
 	{
@@ -184,6 +193,33 @@ namespace robotick::test
 
 			const TickCounterWorkload* ptr = engine.find_instance<TickCounterWorkload>(workload_seed.unique_name);
 			REQUIRE(ptr->count >= 1);
+		}
+
+		SECTION("Overrun workload increments counter")
+		{
+			Model model;
+			model.set_telemetry_port(choose_telemetry_port());
+			const WorkloadSeed& workload_seed = model.add("OverrunWorkload", "overrun").set_tick_rate_hz(1000.0f);
+			model.set_root_workload(workload_seed);
+
+			Engine engine;
+			engine.load(model);
+
+			AtomicFlag stop_after_next_tick_flag{false};
+			std::thread runner(
+				[&]()
+				{
+					engine.run(stop_after_next_tick_flag);
+				});
+
+			Thread::sleep_ms(50);
+			stop_after_next_tick_flag.set();
+			runner.join();
+
+			const WorkloadInstanceInfo* root_info = engine.get_root_instance_info();
+			REQUIRE(root_info != nullptr);
+			REQUIRE(root_info->workload_stats != nullptr);
+			CHECK(root_info->workload_stats->overrun_count > 0);
 		}
 	}
 
