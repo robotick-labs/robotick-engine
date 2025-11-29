@@ -32,10 +32,7 @@ namespace robotick
 		State(const State&) = delete;
 		State& operator=(const State&) = delete;
 
-		State(State&& other) noexcept(is_nothrow_move_constructible_v<T>)
-		{
-			new (&storage) T(robotick::move(other.get()));
-		}
+		State(State&& other) noexcept(is_nothrow_move_constructible_v<T>) { new (&storage) T(robotick::move(other.get())); }
 
 		State& operator=(State&& other) noexcept(is_nothrow_move_constructible_v<T>)
 		{
@@ -62,9 +59,9 @@ namespace robotick
 		alignas(T) uint8_t storage[sizeof(T)];
 	};
 
-	//------------------------------------------------------------------------------
-	// StatePtr<T> - pointer-based alternative for large states
-	//------------------------------------------------------------------------------
+	//---------------------------------------------------------------------------------------------------
+	// StatePtr<T> - pointer-based alternative for large states (allocated on heap once on startup)
+	//---------------------------------------------------------------------------------------------------
 	template <typename T> class StatePtr
 	{
 		static_assert(is_default_constructible_v<T>, "StatePtr<T> requires T to be default-constructible");
@@ -75,16 +72,34 @@ namespace robotick
 			"sizeof(T) = ??? (<=5KB threshold)");
 
 	  public:
-		StatePtr() : ptr(robotick::make_unique<T>()) {}
-		~StatePtr() = default;
+		StatePtr()
+			: ptr(new T())
+		{
+		}
+		~StatePtr() { delete ptr; }
 
 		StatePtr(const StatePtr&) = delete;
 		StatePtr& operator=(const StatePtr&) = delete;
-		StatePtr(StatePtr&&) noexcept = default;
-		StatePtr& operator=(StatePtr&&) noexcept = default;
 
-		T* operator->() { return ptr.get(); }
-		const T* operator->() const { return ptr.get(); }
+		StatePtr(StatePtr&& other) noexcept
+			: ptr(other.ptr)
+		{
+			other.ptr = nullptr;
+		}
+
+		StatePtr& operator=(StatePtr&& other) noexcept
+		{
+			if (this != &other)
+			{
+				delete ptr;
+				ptr = other.ptr;
+				other.ptr = nullptr;
+			}
+			return *this;
+		}
+
+		T* operator->() { return ptr; }
+		const T* operator->() const { return ptr; }
 
 		operator T&() { return *ptr; }
 		operator const T&() const { return *ptr; }
@@ -93,7 +108,7 @@ namespace robotick
 		const T& get() const { return *ptr; }
 
 	  private:
-		robotick::UniquePtr<T> ptr;
+		T* ptr = nullptr;
 	};
 
 } // namespace robotick

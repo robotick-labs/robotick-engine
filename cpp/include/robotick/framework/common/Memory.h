@@ -5,7 +5,6 @@
 
 #include "robotick/framework/common/NoStl.h"
 
-#include <memory>
 #include <new>
 #include <utility>
 
@@ -27,15 +26,6 @@ namespace robotick
 	constexpr T&& forward(typename std_approved::remove_reference<T>::type&& value) noexcept
 	{
 		return std_approved::forward<T>(std_approved::move(value));
-	}
-
-	template <typename T>
-	using UniquePtr = std_approved::unique_ptr<T>;
-
-	template <typename T, typename... Args>
-	UniquePtr<T> make_unique(Args&&... args)
-	{
-		return std_approved::make_unique<T>(std_approved::forward<Args>(args)...);
 	}
 
 	template <typename T>
