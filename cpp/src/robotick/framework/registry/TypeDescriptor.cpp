@@ -7,6 +7,7 @@
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/TypeRegistry.h"
+#include <cstring>
 
 namespace robotick
 {
@@ -177,21 +178,31 @@ namespace robotick
 			return false;
 		}
 
-		// Ensure the output buffer is always null-terminated
-		output_buffer[0] = '\0';
+		// Zero the output buffer before formatting
+		::memset(output_buffer, 0, output_buffer_size);
 
 		if (name == "float")
 		{
 			const float v = *reinterpret_cast<const float*>(value);
 			const int written = ::snprintf(output_buffer, output_buffer_size, "%g", v);
-			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+			{
+				::memset(output_buffer, 0, output_buffer_size);
+				return false;
+			}
+			return true;
 		}
 
 		if (name == "double")
 		{
 			const double v = *reinterpret_cast<const double*>(value);
 			const int written = ::snprintf(output_buffer, output_buffer_size, "%g", v);
-			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+			{
+				::memset(output_buffer, 0, output_buffer_size);
+				return false;
+			}
+			return true;
 		}
 
 		if (name == "bool")
@@ -213,21 +224,36 @@ namespace robotick
 		{
 			const int v = *reinterpret_cast<const int*>(value);
 			const int written = ::snprintf(output_buffer, output_buffer_size, "%d", v);
-			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+			{
+				::memset(output_buffer, 0, output_buffer_size);
+				return false;
+			}
+			return true;
 		}
 
 		if (name == "uint16_t")
 		{
 			const uint16_t v = *reinterpret_cast<const uint16_t*>(value);
 			const int written = ::snprintf(output_buffer, output_buffer_size, "%hu", v);
-			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+			{
+				::memset(output_buffer, 0, output_buffer_size);
+				return false;
+			}
+			return true;
 		}
 
 		if (name == "uint32_t")
 		{
 			const uint32_t v = *reinterpret_cast<const uint32_t*>(value);
 			const int written = ::snprintf(output_buffer, output_buffer_size, "%lu", static_cast<unsigned long>(v));
-			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
+			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+			{
+				::memset(output_buffer, 0, output_buffer_size);
+				return false;
+			}
+			return true;
 		}
 
 		if (mime_type == "text/plain")

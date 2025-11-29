@@ -1,6 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/config/AssertUtils.h"
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/common/HeapVector.h"
 #include "robotick/framework/common/StringUtils.h"
@@ -8,6 +9,7 @@
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeRegistry.h"
 #include <catch2/catch_all.hpp>
+#include <cstring>
 
 namespace robotick::test
 {
@@ -151,6 +153,53 @@ namespace robotick::test
 			FixedString8 dest;
 			CHECK(text_desc->from_string("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", dest.data));
 			CHECK(dest.data[dest.capacity() - 1] == '\0');
+		}
+
+		SECTION("Primitive Types - text/plain from_string zero-fills remainder")
+		{
+			const TypeDescriptor* text_desc = registry.find_by_name("FixedString8");
+			REQUIRE(text_desc != nullptr);
+
+			const size_t dest_size = sizeof(FixedString8);
+			char dest[dest_size];
+			memset(dest, 'Z', dest_size);
+
+			CHECK(text_desc->from_string("hello", dest));
+			const size_t actual_len = std::strlen(dest);
+			CHECK(actual_len < dest_size);
+			for (size_t i = actual_len + 1; i < dest_size; ++i)
+			{
+				CHECK(dest[i] == '\0');
+			}
+		}
+
+		SECTION("Primitive Types - to_string leaves buffer zeroed on overflow")
+		{
+			const TypeDescriptor* int_desc = registry.find_by_name("int");
+			REQUIRE(int_desc != nullptr);
+
+			char small_buffer[3];
+			memset(small_buffer, 'X', sizeof(small_buffer));
+
+			const int sample = 123456;
+			CHECK_FALSE(int_desc->to_string(&sample, small_buffer, sizeof(small_buffer)));
+			CHECK(small_buffer[0] == '\0');
+		}
+
+		SECTION("TypeRegistry rejects duplicate ids")
+		{
+			static const TypeDescriptor s_duplicate_primary{StringView("RegistryDuplicate"), TypeId("RegistryDuplicate"), sizeof(int), alignof(int), TypeCategory::Primitive, {}, nullptr};
+			static bool primary_registered = false;
+			if (!primary_registered)
+			{
+				TypeRegistry::get().register_type(s_duplicate_primary);
+				primary_registered = true;
+			}
+
+			static const TypeDescriptor s_duplicate_secondary{StringView("RegistryDuplicateAlias"), TypeId("RegistryDuplicate"), sizeof(int), alignof(int), TypeCategory::Primitive, {}, nullptr};
+			ROBOTICK_REQUIRE_ERROR_MSG(
+				TypeRegistry::get().register_type(s_duplicate_secondary),
+				"TypeRegistry::register_type() - cannot have multiple types with same id");
 		}
 	}
 } // namespace robotick::test
