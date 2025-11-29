@@ -11,12 +11,15 @@
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/Model.h"
 #include "robotick/framework/utils/TypeId.h"
-#include "robotick/platform/PlatformEvents.h"
-#include "robotick/platform/System.h"
 #include "robotick/platform/Atomic.h"
 #include "robotick/platform/Clock.h"
+#include "robotick/platform/PlatformEvents.h"
+#include "robotick/platform/System.h"
 #include "robotick/platform/Thread.h"
 #include "robotick/platform/WebServer.h"
+
+#include <limits.h>
+#include <stddef.h>
 
 namespace robotick
 {
@@ -64,15 +67,46 @@ namespace robotick
 	extern "C" void robotick_force_register_vec3_types();
 	extern "C" void robotick_force_register_quat_types();
 
-	void align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	static bool safe_add_size(size_t lhs, size_t rhs, size_t& out)
 	{
-	const size_t align = max<size_t>(type.alignment, alignof(max_align_t));
-		workloads_cursor = (workloads_cursor + align - 1) & ~(align - 1);
+		const size_t max_size = SIZE_MAX;
+		if (rhs > max_size - lhs)
+			return false;
+		out = lhs + rhs;
+		return true;
 	}
 
-	void increment_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	static size_t max_align_for_type(size_t alignment)
 	{
-		workloads_cursor += type.size;
+		return (alignment > alignof(max_align_t)) ? alignment : alignof(max_align_t);
+	}
+
+	static bool align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	{
+		const size_t alignment = max_align_for_type(type.alignment);
+		if (alignment == 0)
+			return false;
+		size_t remainder = workloads_cursor % alignment;
+		if (remainder != 0)
+		{
+			size_t delta = alignment - remainder;
+			size_t aligned_cursor = 0;
+			if (!safe_add_size(workloads_cursor, delta, aligned_cursor))
+				return false;
+			workloads_cursor = aligned_cursor;
+		}
+		return true;
+	}
+
+	static bool increment_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	{
+		if (type.size == 0)
+			return false;
+		size_t next_cursor = 0;
+		if (!safe_add_size(workloads_cursor, type.size, next_cursor))
+			return false;
+		workloads_cursor = next_cursor;
+		return true;
 	}
 
 	void Engine::load(const Model& model)
@@ -106,15 +140,23 @@ namespace robotick
 			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
 			ROBOTICK_ASSERT_MSG(workload_type, "Unknown workload type: %s", seed->type_id.get_debug_name());
 
-			align_workloads_cursor_for_type(*workload_stats_type, total_size);
-			increment_workloads_cursor_for_type(*workload_stats_type, total_size);
+			if (!align_workloads_cursor_for_type(*workload_stats_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while sizing stats type '%s'", workload_stats_type->name.c_str());
+			if (!increment_workloads_cursor_for_type(*workload_stats_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while sizing stats type '%s'", workload_stats_type->name.c_str());
 
-			align_workloads_cursor_for_type(*workload_type, total_size);
-			increment_workloads_cursor_for_type(*workload_type, total_size);
+			if (!align_workloads_cursor_for_type(*workload_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow for workload type '%s'", workload_type->name.c_str());
+			if (!increment_workloads_cursor_for_type(*workload_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while sizing workload type '%s'", workload_type->name.c_str());
 		}
 
 		// create our workloads-buffer, workload-instances info, and construct each workload:
-		state->workloads_buffer = WorkloadsBuffer(total_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
+		size_t buffer_capacity = 0;
+		if (!safe_add_size(total_size, DEFAULT_MAX_BLACKBOARDS_BYTES, buffer_capacity))
+			ROBOTICK_FATAL_EXIT(
+				"Workloads buffer size overflow when reserving blackboard space (%zu + %zu)", total_size, (size_t)DEFAULT_MAX_BLACKBOARDS_BYTES);
+		state->workloads_buffer = WorkloadsBuffer(buffer_capacity);
 
 		size_t workloads_cursor = 0;
 		uint8_t* buffer_ptr = state->workloads_buffer.raw_ptr();
@@ -130,13 +172,17 @@ namespace robotick
 			const auto* workload_desc = workload_type->get_workload_desc();
 			ROBOTICK_ASSERT(workload_desc != nullptr);
 
-			align_workloads_cursor_for_type(*workload_stats_type, workloads_cursor);
+			if (!align_workloads_cursor_for_type(*workload_stats_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while laying-out stats for workload type '%s'", workload_type->name.c_str());
 			const size_t stats_offset = workloads_cursor;
-			increment_workloads_cursor_for_type(*workload_stats_type, workloads_cursor);
+			if (!increment_workloads_cursor_for_type(*workload_stats_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while laying-out stats for workload type '%s'", workload_type->name.c_str());
 
-			align_workloads_cursor_for_type(*workload_type, workloads_cursor);
+			if (!align_workloads_cursor_for_type(*workload_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while laying-out workload type '%s'", workload_type->name.c_str());
 			const size_t instance_offset = workloads_cursor;
-			increment_workloads_cursor_for_type(*workload_type, workloads_cursor);
+			if (!increment_workloads_cursor_for_type(*workload_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while laying-out workload type '%s'", workload_type->name.c_str());
 
 			uint8_t* workload_stats_ptr = buffer_ptr + stats_offset;
 			uint8_t* workload_ptr = buffer_ptr + instance_offset;
@@ -191,7 +237,10 @@ namespace robotick
 		if (blackboard_size > 0)
 		{
 			size_t start = workloads_cursor;
-			workloads_cursor += blackboard_size;
+			size_t next_cursor = 0;
+			if (!safe_add_size(workloads_cursor, blackboard_size, next_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while reserving blackboards (%zu + %zu)", start, blackboard_size);
+			workloads_cursor = next_cursor;
 			bind_blackboards_for_instances(state->instances, start);
 		}
 
@@ -497,7 +546,15 @@ namespace robotick
 
 						const Blackboard& blackboard =
 							field.get_data<Blackboard>(state->workloads_buffer, instance, *struct_type_desc, struct_offset);
-						total += blackboard.get_info().total_datablock_size;
+						size_t next_total = 0;
+						size_t block_size = blackboard.get_info().total_datablock_size;
+						if (!safe_add_size(total, block_size, next_total))
+						{
+							const char* instance_name =
+								(instance.seed && instance.seed->unique_name.c_str()) ? instance.seed->unique_name.c_str() : "unknown";
+							ROBOTICK_FATAL_EXIT("Blackboard memory overflow while sizing workload '%s'", instance_name);
+						}
+						total = next_total;
 					}
 				}
 			};
