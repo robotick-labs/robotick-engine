@@ -442,8 +442,12 @@ namespace robotick
 			root_tick_fn(root_ptr, tick_info);
 
 			const auto now_post = Clock::now();
-			root_info.workload_stats->last_tick_duration_ns = Clock::to_nanoseconds(now_post - now).count();
+			const uint32_t duration_ns = detail::clamp_to_uint32(Clock::to_nanoseconds(now_post - now).count());
 			root_info.workload_stats->last_time_delta_ns = ns_since_last;
+
+			const uint64_t budget_ns_raw = Clock::to_nanoseconds(child_tick_interval).count();
+			const uint32_t budget_ns = detail::clamp_to_uint32(budget_ns_raw);
+			root_info.workload_stats->record_tick_duration_ns(duration_ns, budget_ns);
 
 			next_tick_time += child_tick_interval;
 			Thread::hybrid_sleep_until(next_tick_time);
