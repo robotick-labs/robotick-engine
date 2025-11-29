@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "robotick/framework/memory/StdApproved.h"
+
 #include <cmath>
 
 namespace robotick
@@ -22,8 +24,9 @@ namespace robotick
 		};
 	} // namespace internal::Pow
 
-	template <typename T> inline T pow(T base, T exponent)
+	template <typename Base, typename Exponent> inline auto pow(Base base, Exponent exponent)
 	{
-		return internal::Pow::Fn<T>::apply(base, exponent);
+		using Common = typename std_approved::common_type<Base, Exponent>::type;
+		return internal::Pow::Fn<Common>::apply(static_cast<Common>(base), static_cast<Common>(exponent));
 	}
 } // namespace robotick
