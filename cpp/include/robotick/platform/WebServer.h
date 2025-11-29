@@ -1,8 +1,10 @@
 #pragma once
 
 #include "robotick/api.h"
+
 #include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/common/FixedVector.h"
+#include "robotick/framework/common/Function.h"
 #include "robotick/framework/common/Pair.h"
 
 #include <cstdint>
@@ -99,7 +101,7 @@ namespace robotick
 		const char* content_type = "text/plain";
 	};
 
-	using WebRequestHandler = std::function<bool(const WebRequest&, WebResponse&)>;
+	using WebRequestHandler = Function<bool(const WebRequest&, WebResponse&)>;
 
 	struct WebServerImpl;
 

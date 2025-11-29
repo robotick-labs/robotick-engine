@@ -165,14 +165,14 @@ namespace robotick
 		if (name == "float")
 		{
 			const float v = *reinterpret_cast<const float*>(value);
-			const int written = std::snprintf(output_buffer, output_buffer_size, "%g", v);
+			const int written = ::snprintf(output_buffer, output_buffer_size, "%g", v);
 			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
 		}
 
 		if (name == "double")
 		{
 			const double v = *reinterpret_cast<const double*>(value);
-			const int written = std::snprintf(output_buffer, output_buffer_size, "%g", v);
+			const int written = ::snprintf(output_buffer, output_buffer_size, "%g", v);
 			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
 		}
 
@@ -195,21 +195,21 @@ namespace robotick
 		if (name == "int")
 		{
 			const int v = *reinterpret_cast<const int*>(value);
-			const int written = std::snprintf(output_buffer, output_buffer_size, "%d", v);
+			const int written = ::snprintf(output_buffer, output_buffer_size, "%d", v);
 			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
 		}
 
 		if (name == "uint16_t")
 		{
 			const uint16_t v = *reinterpret_cast<const uint16_t*>(value);
-			const int written = std::snprintf(output_buffer, output_buffer_size, "%hu", v);
+			const int written = ::snprintf(output_buffer, output_buffer_size, "%hu", v);
 			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
 		}
 
 		if (name == "uint32_t")
 		{
 			const uint32_t v = *reinterpret_cast<const uint32_t*>(value);
-			const int written = std::snprintf(output_buffer, output_buffer_size, "%lu", static_cast<unsigned long>(v));
+			const int written = ::snprintf(output_buffer, output_buffer_size, "%lu", static_cast<unsigned long>(v));
 			return written > 0 && static_cast<size_t>(written) < output_buffer_size;
 		}
 

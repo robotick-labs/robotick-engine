@@ -98,7 +98,7 @@ namespace robotick
 
 		template <typename... Args> void format(const char* fmt, Args&&... args)
 		{
-			const int written = std::snprintf(data, N, fmt, std::forward<Args>(args)...);
+			const int written = ::snprintf(data, N, fmt, std::forward<Args>(args)...);
 			if (written < 0)
 			{
 				data[0] = '\0';
@@ -112,7 +112,7 @@ namespace robotick
 
 			if (remaining > 0)
 			{
-				const int written = std::snprintf(data + current_len, remaining, fmt, std::forward<Args>(args)...);
+				const int written = ::snprintf(data + current_len, remaining, fmt, std::forward<Args>(args)...);
 
 				// If snprintf wrote something and didn't overflow, we're fine.
 				if (written < 0 || static_cast<size_t>(written) >= remaining)
