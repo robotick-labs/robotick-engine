@@ -1,5 +1,18 @@
 #pragma once
 
+#define ROBOTICK_NO_STL_DISABLED
+#if defined(ROBOTICK_NO_STL_DISABLED)
+
+namespace robotick
+{
+	namespace std_approved
+	{
+		using namespace std;
+	} // namespace std_approved
+} // namespace robotick
+
+#else
+
 // Robotick STL guard.
 //
 // The core engine/workload runtime must remain deterministic on MCUs, so we
@@ -20,3 +33,20 @@ namespace robotick
 #endif
 #endif
 } // namespace robotick
+
+#ifdef ROBOTICK_STD_FORBIDDEN
+#undef std
+#endif
+
+namespace robotick
+{
+	namespace std_approved
+	{
+		using namespace std;
+	} // namespace std_approved
+} // namespace robotick
+
+#ifdef ROBOTICK_STD_FORBIDDEN
+#define std ROBOTICK_STD_USAGE_BANNED__SEE_robotick_framework_common_NoStl_h
+#endif
+#endif
