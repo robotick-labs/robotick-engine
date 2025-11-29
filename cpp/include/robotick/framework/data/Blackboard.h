@@ -4,6 +4,7 @@
 #pragma once
 
 #include "robotick/framework/common/FixedString.h"
+#include "robotick/framework/common/TypeTraits.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/utils/Constants.h"
 #include "robotick/framework/utils/TypeId.h"
@@ -47,7 +48,7 @@ namespace robotick
 
 		template <typename T> bool set(const char* field_name, const T& value)
 		{
-			static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
+			static_assert(robotick::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
 			return set(field_name, (void*)&value, sizeof(T));
 		}
 
@@ -69,7 +70,7 @@ namespace robotick
 
 		template <typename T> bool set(const FieldDescriptor& field, const T& value)
 		{
-			static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
+			static_assert(robotick::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
 			return set(field, (void*)&value, sizeof(T));
 		}
 
@@ -98,7 +99,7 @@ namespace robotick
 		BlackboardInfo info;
 	};
 
-	static_assert(
-		std::is_trivially_copyable<Blackboard>::value, "Blackboard is not trivially copyable. It needs to be to be usable in workload structs");
+static_assert(
+	robotick::is_trivially_copyable_v<Blackboard>, "Blackboard is not trivially copyable. It needs to be to be usable in workload structs");
 
 } // namespace robotick
