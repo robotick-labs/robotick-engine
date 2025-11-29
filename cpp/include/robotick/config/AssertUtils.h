@@ -1,8 +1,8 @@
 #pragma once
 
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/common/StdApproved.h"
-#include "robotick/framework/common/StringUtils.h"
+#include "robotick/framework/memory/StdApproved.h"
+#include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/strings/StringUtils.h"
 
 #include <stdio.h>
 #include <stdlib.h>

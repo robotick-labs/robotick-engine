@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "robotick/framework/common/FixedVector.h"
-#include "robotick/framework/common/HeapVector.h"
+#include "robotick/framework/containers/FixedVector.h"
+#include "robotick/framework/memory/HeapVector.h"
 #include "robotick/framework/utils/Constants.h"
 
 #include <cstdint>
@@ -38,7 +38,7 @@ namespace robotick
 		float get_last_tick_duration_ms() const { return (float)last_tick_duration_ns * 1e-6f; }
 		float get_last_time_delta_ms() const { return (float)last_time_delta_ns * 1e-6f; }
 
-	private:
+	  private:
 		// Internal sliding-window instrumentation (not part of the public API):
 		const TickDurationWindow& get_duration_window() const { return duration_window; }
 		uint32_t get_duration_window_index() const { return window_index; }
