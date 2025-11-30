@@ -42,7 +42,7 @@ namespace robotick
 		static void set_affinity(int core);
 
 	  private:
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 		void* handle = nullptr;
 #else
 		std_approved::thread thread;
@@ -52,7 +52,7 @@ namespace robotick
 } // namespace robotick
 
 // Platform-specific implementation
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 #include "robotick/framework/backends/esp32/Thread_esp32.inl"
 #elif defined(ROBOTICK_PLATFORM_DESKTOP)
 #include "robotick/framework/backends/desktop/Thread_desktop.inl"

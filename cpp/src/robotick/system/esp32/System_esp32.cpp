@@ -3,7 +3,7 @@
 
 // robotick/platform/System_esp32.cpp
 
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 
 #include "robotick/framework/system/System.h"
 
@@ -18,4 +18,4 @@ namespace robotick
 
 } // namespace robotick
 
-#endif // ROBOTICK_PLATFORM_ESP32
+#endif // ROBOTICK_PLATFORM_ESP32S3

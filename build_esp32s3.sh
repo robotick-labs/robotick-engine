@@ -6,16 +6,16 @@ IMAGE="${ESP32_IDF_IMAGE:-espressif/idf:release-v5.4}"
 DOCKER_RUN_OPTS=(--rm --user root -v "${ROOT_DIR}:/workspace" -w /workspace)
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "[build_esp32] ❌ docker command not found. Please install Docker and try again." >&2
+  echo "[build_esp32s3] ❌ docker command not found. Please install Docker and try again." >&2
   exit 1
 fi
 
 if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
-  echo "[build_esp32] Pulling Docker image ${IMAGE}..."
+  echo "[build_esp32s3] Pulling Docker image ${IMAGE}..."
   docker pull "${IMAGE}"
 fi
 
-echo "[build_esp32] Starting ESP32 build using ${IMAGE}..."
+echo "[build_esp32s3] Starting ESP32-S3 build using ${IMAGE}..."
 docker run "${DOCKER_RUN_OPTS[@]}" "${IMAGE}" bash -c '
 set -Eeuo pipefail
 export TERM=xterm-256color
@@ -32,4 +32,4 @@ bash /workspace/tools/make_esp32_symlinks.sh
 ./2_idf_build.sh
 '
 
-echo "[build_esp32] ✅ ESP32 build (esp32s3) finished successfully."
+echo "[build_esp32s3] ✅ ESP32-S3 build finished successfully."

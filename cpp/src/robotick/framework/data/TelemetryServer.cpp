@@ -16,7 +16,7 @@
 #include <cstdio>
 #include <unistd.h>
 
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 #include <esp_random.h>
 #endif
 
@@ -30,7 +30,7 @@ namespace robotick
 
 	static void build_session_id(const char* model_name, FixedString64& session_id)
 	{
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 		uint32_t raw = esp_random(); // 32-bit hardware RNG
 		session_id.format("%08X-%s", raw, model_name);
 #elif defined(ROBOTICK_PLATFORM_DESKTOP)

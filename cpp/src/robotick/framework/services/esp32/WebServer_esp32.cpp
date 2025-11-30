@@ -1,7 +1,7 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 
 #include "robotick/api.h"
 #include "robotick/framework/services/WebServer.h"
@@ -318,4 +318,4 @@ WebServer::~WebServer()
 
 } // namespace robotick
 
-#endif // ROBOTICK_PLATFORM_ESP32
+#endif // ROBOTICK_PLATFORM_ESP32S3

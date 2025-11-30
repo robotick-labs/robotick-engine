@@ -3,7 +3,7 @@
 
 #pragma once
 
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 
 namespace robotick
 {

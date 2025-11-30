@@ -15,7 +15,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 #include "esp_netif.h"
 #endif
 
@@ -77,7 +77,7 @@ namespace robotick
 
 		bool is_network_stack_ready()
 		{
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 			esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
 			return netif && esp_netif_is_netif_up(netif);
 #else

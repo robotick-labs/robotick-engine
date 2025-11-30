@@ -4,7 +4,7 @@
 #include "robotick/framework/services/NetworkManager.h"
 #include "robotick/api.h"
 
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 
 #include <esp_event.h>
 #include <esp_log.h>
