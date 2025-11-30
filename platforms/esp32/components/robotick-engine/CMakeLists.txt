@@ -65,7 +65,7 @@ endforeach()
 idf_component_register(
     SRCS ${srcs}
     INCLUDE_DIRS ${include_dirs}
-    REQUIRES json esp_timer M5Unified esp_wifi esp_http_server
+    REQUIRES json esp_timer esp_wifi esp_http_server nvs_flash
 )
 
 

@@ -6,15 +6,14 @@
 #if defined(ROBOTICK_PLATFORM_ESP32)
 
 #include "robotick/framework/system/System.h"
-#include <M5Unified.h>
 
 namespace robotick
 {
 
 	void System::initialize()
 	{
-		M5.begin();
-		// Add more platform-specific init here as needed
+		// No-op: board-specific initialization is expected to be handled
+		// by higher-level helpers (e.g., robotick::boards::m5::ensure_initialized()).
 	}
 
 } // namespace robotick

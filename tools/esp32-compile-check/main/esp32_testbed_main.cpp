@@ -6,8 +6,6 @@
 #include "robotick/framework/services/NetworkManager.h"
 #include "robotick/framework/concurrency/Atomic.h"
 
-#include <M5Unified.h>
-
 #include "esp_task_wdt.h"
 
 #include "freertos/FreeRTOS.h"

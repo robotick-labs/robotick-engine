@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "robotick/api_base.h"
+
 #include <atomic>
 #include <type_traits>
 

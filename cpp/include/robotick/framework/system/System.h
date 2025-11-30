@@ -11,7 +11,7 @@ namespace robotick
 	class System
 	{
 	  public:
-		/// Perform platform-specific system initialization (e.g. M5.begin, signal handlers, etc)
+		/// Perform platform-specific system initialization (e.g. board init hooks, signal handlers, etc)
 		static void initialize();
 	};
 
