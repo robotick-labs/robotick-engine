@@ -4,19 +4,19 @@
 #include "robotick/framework/Engine.h"
 
 #include "robotick/api.h"
+#include "robotick/framework/concurrency/Atomic.h"
+#include "robotick/framework/concurrency/Thread.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/data/RemoteEngineConnections.h"
 #include "robotick/framework/data/TelemetryServer.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/Model.h"
-#include "robotick/framework/utils/TypeId.h"
-#include "robotick/framework/concurrency/Atomic.h"
-#include "robotick/framework/time/Clock.h"
+#include "robotick/framework/services/WebServer.h"
 #include "robotick/framework/system/PlatformEvents.h"
 #include "robotick/framework/system/System.h"
-#include "robotick/framework/concurrency/Thread.h"
-#include "robotick/framework/services/WebServer.h"
+#include "robotick/framework/time/Clock.h"
+#include "robotick/framework/utils/TypeId.h"
 
 #include <cstddef>
 
@@ -395,12 +395,8 @@ namespace robotick
 		if (root_tick_fn == nullptr)
 			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_fn - check it has been correctly registered");
 
-		// Start all workloads
-		for (auto& inst : state->instances)
-		{
-			if (inst.workload_descriptor->start_fn)
-				inst.workload_descriptor->start_fn(inst.get_ptr(*this), inst.seed->tick_rate_hz);
-		}
+		if (root_info.workload_descriptor->start_fn)
+			root_info.workload_descriptor->start_fn(root_ptr, root_tick_rate_hz);
 
 		state->telemetry_server.start(*this, state->model->get_telemetry_port());
 

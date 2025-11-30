@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
+#include "robotick/config/AssertUtils.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Thread.h"
-#include "robotick/config/AssertUtils.h"
 
 #include <arpa/inet.h>
 #include <atomic>
@@ -37,7 +37,7 @@ namespace robotick::test
 		  private:
 			std::thread& thread;
 		};
-	}
+	} // namespace
 	struct TestSequencedGroupWorkload
 	{
 	};
@@ -92,6 +92,25 @@ namespace robotick::test
 			void tick(const TickInfo&) { count++; }
 		};
 		ROBOTICK_REGISTER_WORKLOAD(TickCounterWorkload)
+
+		struct ThreadAffinityWorkload
+		{
+			std::thread::id start_thread;
+			std::thread::id first_tick_thread;
+			AtomicValue<int> tick_count{0};
+
+			void start(float) { start_thread = std::this_thread::get_id(); }
+
+			void tick(const TickInfo&)
+			{
+				const int previous = tick_count.fetch_add(1);
+				if (previous == 0)
+				{
+					first_tick_thread = std::this_thread::get_id();
+				}
+			}
+		};
+		ROBOTICK_REGISTER_WORKLOAD(ThreadAffinityWorkload)
 
 	} // namespace
 
@@ -286,7 +305,11 @@ namespace robotick::test
 				engine.load(model);
 
 				AtomicFlag stop_flag{false};
-				std::thread runner([&]() { engine.run(stop_flag); });
+				std::thread runner(
+					[&]()
+					{
+						engine.run(stop_flag);
+					});
 				ThreadJoiner runner_joiner(runner);
 
 				Thread::sleep_ms(30);
@@ -296,6 +319,34 @@ namespace robotick::test
 			run_engine_once(telemetry_port);
 			REQUIRE(bind_to_port(telemetry_port));
 			run_engine_once(telemetry_port);
+		}
+
+		SECTION("start_fn executes on same thread as tick_fn")
+		{
+			Model model;
+			model.set_telemetry_port(choose_telemetry_port());
+			const WorkloadSeed& workload_seed = model.add("ThreadAffinityWorkload", "affinity").set_tick_rate_hz(120.0f);
+			model.set_root_workload(workload_seed);
+
+			Engine engine;
+			engine.load(model);
+
+			AtomicFlag stop_flag{false};
+			std::thread runner(
+				[&]()
+				{
+					engine.run(stop_flag);
+				});
+			ThreadJoiner runner_joiner(runner);
+
+			Thread::sleep_ms(30);
+			stop_flag.set();
+
+			const auto* info = engine.find_instance<ThreadAffinityWorkload>(workload_seed.unique_name);
+			REQUIRE(info != nullptr);
+			REQUIRE(info->tick_count.load() > 0);
+			CHECK(info->start_thread == info->first_tick_thread);
+			CHECK(info->start_thread != std::thread::id{});
 		}
 	}
 
