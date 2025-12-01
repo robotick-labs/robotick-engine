@@ -7,9 +7,9 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/strings/StringView.h"
+#include "robotick/framework/time/Clock.h"
 #include "robotick/framework/utility/Algorithm.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
-#include "robotick/framework/time/Clock.h"
 
 #include <nlohmann/json.hpp>
 
@@ -47,6 +47,9 @@ namespace robotick
 
 		build_session_id(engine_in.get_model_name(), session_id);
 
+		// WebServer owns the socket lifetime; the handler lambda only decides whether a request belongs to the telemetry API.
+		// Health/layout/raw form the entire "handshake": clients first call /health to confirm the engine is alive, then fetch
+		// the static buffer layout before streaming /raw snapshots.  Keeping this in one lambda avoids dangling captures.
 		web_server.start("Telemetry",
 			telemetry_port,
 			nullptr,

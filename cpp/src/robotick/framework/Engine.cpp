@@ -68,6 +68,7 @@ namespace robotick
 	extern "C" void robotick_force_register_quat_types();
 
 	// Prevent integer overflow while sizing contiguous chunks so layout stays deterministic even near SIZE_MAX.
+	// The workloads buffer is preallocated once, so a bad descriptor must be rejected rather than silently wrapping.
 	static bool safe_add_size(size_t lhs, size_t rhs, size_t& out)
 	{
 		const size_t max_size = SIZE_MAX;
@@ -77,6 +78,7 @@ namespace robotick
 		return true;
 	}
 
+	// Clamp to max_align_t so the placement-new construction that follows always satisfies C++ object requirements.
 	static size_t max_align_for_type(size_t alignment)
 	{
 		return (alignment > alignof(max_align_t)) ? alignment : alignof(max_align_t);
@@ -97,6 +99,7 @@ namespace robotick
 			size_t aligned_cursor = 0;
 			if (!safe_add_size(workloads_cursor, delta, aligned_cursor))
 				return false;
+			// Move the cursor forward so that the next placement-new starts at an address compatible with the target type.
 			workloads_cursor = aligned_cursor;
 		}
 		return true;
@@ -110,6 +113,7 @@ namespace robotick
 		size_t next_cursor = 0;
 		if (!safe_add_size(workloads_cursor, type.size, next_cursor))
 			return false;
+		// Advance past the object we just allocated so the following type begins immediately afterwards.
 		workloads_cursor = next_cursor;
 		return true;
 	}
@@ -158,6 +162,8 @@ namespace robotick
 
 		// create our workloads-buffer, workload-instances info, and construct each workload:
 		size_t buffer_capacity = 0;
+
+		// Blackboard storage sits immediately after workload instances; reserve it now so the contiguous block never relocates.
 		if (!safe_add_size(total_size, DEFAULT_MAX_BLACKBOARDS_BYTES, buffer_capacity))
 			ROBOTICK_FATAL_EXIT(
 				"Workloads buffer size overflow when reserving blackboard space (%zu + %zu)", total_size, (size_t)DEFAULT_MAX_BLACKBOARDS_BYTES);
@@ -177,6 +183,7 @@ namespace robotick
 			const auto* workload_desc = workload_type->get_workload_desc();
 			ROBOTICK_ASSERT(workload_desc != nullptr);
 
+			// Stats/instance structs are colocated in the same buffer; align both as if they were independently allocated.
 			if (!align_workloads_cursor_for_type(*workload_stats_type, workloads_cursor))
 				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while laying-out stats for workload type '%s'", workload_type->name.c_str());
 			const size_t stats_offset = workloads_cursor;
@@ -197,6 +204,8 @@ namespace robotick
 			workload_instance_info.type = workload_type;
 			workload_instance_info.workload_descriptor = workload_desc;
 			workload_instance_info.seed = seed;
+
+			// Stats are lifetime-bound to the buffer; placement-new keeps RAII intact without separate allocations.
 			workload_instance_info.workload_stats = new (static_cast<void*>(workload_stats_ptr)) WorkloadInstanceStats{};
 			workload_instance_info.workload_stats->tick_rate_hz = seed->tick_rate_hz;
 
@@ -448,6 +457,8 @@ namespace robotick
 
 			const uint64_t budget_ns_raw = Clock::to_nanoseconds(child_tick_interval).count();
 			const uint32_t budget_ns = detail::clamp_to_uint32(budget_ns_raw);
+
+			// Update the per-workload stats in-place so telemetry can report overruns without introducing dynamic allocations.
 			root_info.workload_stats->record_tick_duration_ns(duration_ns, budget_ns);
 
 			next_tick_time += child_tick_interval;

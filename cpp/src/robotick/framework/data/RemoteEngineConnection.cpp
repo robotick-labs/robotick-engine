@@ -140,6 +140,9 @@ namespace robotick
 		const char* color_start = is_receiver ? "\033[33m" : "\033[32m"; // yellow : green
 		const char* color_end = "\033[0m";
 
+		// Pushing all log output + colorization through this gate keeps every transition auditable; callers simply request
+		// the new state and let the centralized logger/TCP cleanup run.  That in turn makes RAII cleanup (close sockets on stop)
+		// far easier to reason about.
 		if (state == State::Disconnected)
 		{
 			ROBOTICK_INFO("%s[%s] [-> State::Disconnected] - disconnected%s", color_start, mode_str, color_end);

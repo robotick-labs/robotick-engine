@@ -256,6 +256,9 @@ namespace robotick
 		WebResponse resp;
 		resp.conn = c;
 
+		// User handlers follow a simple RAII rule: if they return true we finalize headers/body here (finish()),
+		// otherwise CivetWeb continues searching for static files.  Centralizing `finish()` means handlers can
+		// bail early without worrying about partially written responses.
 		if (self->get_handler()(req, resp))
 		{
 			resp.finish();

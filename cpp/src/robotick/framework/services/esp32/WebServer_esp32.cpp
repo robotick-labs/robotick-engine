@@ -69,27 +69,27 @@ namespace robotick
 		content_type = type ? type : "text/plain";
 	}
 
-void WebResponse::add_header(const char* header_line)
-{
-	if (state == State::BodyStreaming || state == State::Done)
+	void WebResponse::add_header(const char* header_line)
 	{
-		ROBOTICK_FATAL_EXIT("WebResponse: header call after body started");
-	}
+		if (state == State::BodyStreaming || state == State::Done)
+		{
+			ROBOTICK_FATAL_EXIT("WebResponse: header call after body started");
+		}
 
-	httpd_req_t* req = static_cast<httpd_req_t*>(conn);
+		httpd_req_t* req = static_cast<httpd_req_t*>(conn);
 
-	if (state == State::Start)
-	{
-		write_status_and_cors(req, status_code);
-		state = State::HeadersOpen;
-	}
+		if (state == State::Start)
+		{
+			write_status_and_cors(req, status_code);
+			state = State::HeadersOpen;
+		}
 
-	ensure_headers_open();
+		ensure_headers_open();
 
-	if (header_line && *header_line)
-	{
-		// Add raw header line
-		// ESP-IDF requires key:value form
+		if (header_line && *header_line)
+		{
+			// Add raw header line
+			// ESP-IDF requires key:value form
 			const char* colon = strchr(header_line, ':');
 			if (!colon)
 			{
@@ -239,6 +239,8 @@ void WebResponse::add_header(const char* header_line)
 		WebResponse resp;
 		resp.conn = req;
 
+		// The handler owns the response lifetime: on true we finalize/flush once here so callers cannot accidentally
+		// leak chunked transfers or leave sockets half-written.
 		bool handled = self->get_handler()(r, resp);
 		if (handled)
 		{
@@ -255,17 +257,17 @@ void WebResponse::add_header(const char* header_line)
 	//  WebServer lifecycle
 	// ----------------------------------------
 
-WebServer::WebServer()
-{
-	impl = new WebServerImpl();
-}
+	WebServer::WebServer()
+	{
+		impl = new WebServerImpl();
+	}
 
-WebServer::~WebServer()
-{
-	stop();
-	delete static_cast<WebServerImpl*>(impl);
-	impl = nullptr;
-}
+	WebServer::~WebServer()
+	{
+		stop();
+		delete static_cast<WebServerImpl*>(impl);
+		impl = nullptr;
+	}
 
 	bool WebServer::is_running() const
 	{
