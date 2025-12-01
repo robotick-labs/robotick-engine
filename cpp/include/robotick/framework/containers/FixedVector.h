@@ -173,7 +173,7 @@ namespace robotick
 
 	  public:
 		T data_buffer[Capacity]{}; ///< Underlying storage.
-		uint32_t count = 0;		   ///< Current number of elements.
+		size_t count = 0;		   ///< Current number of elements.
 	};
 
 	using FixedVector1k = FixedVector<uint8_t, 1 * 1024>;
@@ -192,7 +192,7 @@ namespace robotick
 #define ROBOTICK_REGISTER_FIXED_VECTOR(StructType, ElementType)                                                                                      \
 	ROBOTICK_REGISTER_STRUCT_BEGIN(StructType)                                                                                                       \
 	ROBOTICK_STRUCT_FIXED_ARRAY_FIELD(StructType, ElementType, StructType::capacity(), data_buffer)                                                  \
-	ROBOTICK_STRUCT_FIELD(StructType, uint32_t, count)                                                                                               \
+	ROBOTICK_STRUCT_FIELD(StructType, size_t, count)                                                                                                 \
 	ROBOTICK_REGISTER_STRUCT_END(StructType)
 
 } // namespace robotick

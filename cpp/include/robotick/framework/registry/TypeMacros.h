@@ -43,7 +43,7 @@ namespace robotick
 		#StructType " is not standard layout. Only standard layout structs can be registered as field types.");                                      \
 	static_assert(robotick::is_trivially_copyable_v<StructType>,                                                                                     \
 		#StructType " is not trivially copyable. Only trivially copyable structs can be registered as field types.");                                \
-	static constexpr ::robotick::StructDescriptor s_struct_desc_##StructType = {::robotick::ArrayView<::robotick::FieldDescriptor>{                  \
+	static const ::robotick::StructDescriptor s_struct_desc_##StructType = {::robotick::ArrayView<::robotick::FieldDescriptor>{                      \
 		s_fields_##StructType, sizeof(s_fields_##StructType) / sizeof(::robotick::FieldDescriptor)}};                                                \
 	static constexpr ::robotick::TypeDescriptor s_type_desc_##StructType = {#StructType,                                                             \
 		GET_TYPE_ID(StructType),                                                                                                                     \

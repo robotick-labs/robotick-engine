@@ -49,10 +49,27 @@ namespace robotick
 		// Copy constructor
 		HeapVector(const HeapVector& other)
 		{
-			initialize(other.size_);
-			for (size_t i = 0; i < size_; ++i)
+			if (other.size_ == 0)
+				return;
+			data_ = static_cast<T*>(operator new[](other.size_ * sizeof(T)));
+			size_t constructed = 0;
+			try
 			{
-				new (&data_[i]) T(other.data_[i]);
+				for (; constructed < other.size_; ++constructed)
+				{
+					new (&data_[constructed]) T(other.data_[constructed]);
+				}
+				size_ = other.size_;
+			}
+			catch (...)
+			{
+				for (size_t i = 0; i < constructed; ++i)
+				{
+					data_[i].~T();
+				}
+				operator delete[](data_);
+				data_ = nullptr;
+				throw;
 			}
 		}
 
@@ -63,10 +80,27 @@ namespace robotick
 			{
 				ROBOTICK_FATAL_EXIT("Cannot assign to already-initialized HeapVector");
 			}
-			initialize(other.size_);
-			for (size_t i = 0; i < size_; ++i)
+			if (other.size_ == 0)
+				return *this;
+			data_ = static_cast<T*>(operator new[](other.size_ * sizeof(T)));
+			size_t constructed = 0;
+			try
 			{
-				new (&data_[i]) T(other.data_[i]);
+				for (; constructed < other.size_; ++constructed)
+				{
+					new (&data_[constructed]) T(other.data_[constructed]);
+				}
+				size_ = other.size_;
+			}
+			catch (...)
+			{
+				for (size_t i = 0; i < constructed; ++i)
+				{
+					data_[i].~T();
+				}
+				operator delete[](data_);
+				data_ = nullptr;
+				throw;
 			}
 			return *this;
 		}

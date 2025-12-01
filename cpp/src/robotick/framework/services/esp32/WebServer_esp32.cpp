@@ -280,6 +280,7 @@ namespace robotick
 
 		server_name = name;
 		handler = handler_in;
+		(void)webroot; // Static files not supported on ESP32; parameter intentionally ignored.
 
 		WebServerImpl* s = static_cast<WebServerImpl*>(impl);
 
