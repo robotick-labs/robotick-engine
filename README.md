@@ -165,6 +165,10 @@ Compiled and deployed executables are tested across an expanding range of target
 
 ---
 
+## ✅ Validation Matrix
+
+`docs/module-map.md` now documents the exact commands that must pass before a PR merges: `./build_linux_debug.sh`, the ESP32 build helpers such as `./build_esp32s3.sh`, and the remote/telemetry Catch2 suites executed via `ctest` inside `build/robotick-engine-tests-linux-debug/cpp/tests`. Running those scripts locally reproduces the CI gate and keeps the soft-launch baseline healthy.
+
 ## 🗺️ Roadmap
 
 - [ ] Python zero-copy memory overlay
