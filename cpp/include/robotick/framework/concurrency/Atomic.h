@@ -21,6 +21,8 @@ namespace robotick
 		inline void set(bool value = true) { flag.store(value); }
 		inline void clear() { flag.store(false); }
 		inline bool is_set() const { return flag.load(); }
+
+		// Returns true if the flag was already set; false when we successfully claim it (now set).
 		inline bool test_and_set()
 		{
 			bool expected = false;

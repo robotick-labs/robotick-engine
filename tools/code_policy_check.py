@@ -132,6 +132,7 @@ def check_file(path, check_std_usage, header_mode):
 # Directory traversal helpers
 # ---------------------------------------------------------------------------
 
+
 def _normalize_excludes(root, exclude_dirs):
     if not exclude_dirs:
         return []
@@ -197,11 +198,7 @@ def run_policy_check(
         if error:
             failures.append(error)
 
-    if failures:
-        print("Code policy violations detected:", file=sys.stderr)
-        for failure in failures:
-            print(f"  {failure}", file=sys.stderr)
-        sys.exit(1)
+    return failures
 
 
 if __name__ == "__main__":
@@ -248,7 +245,7 @@ if __name__ == "__main__":
         help="Relative directory to skip while scanning (may be supplied multiple times).",
     )
     args = parser.parse_args()
-    run_policy_check(
+    failures = run_policy_check(
         args.source_root,
         source_dirs=args.source_dirs,
         file_suffixes=tuple(args.suffixes) if args.suffixes else None,
@@ -257,7 +254,9 @@ if __name__ == "__main__":
         header_mode=args.header_mode,
         exclude_dirs=args.exclude_dirs,
     )
-PER_FILE_CHECKS = [
-    _check_headers,
-    _check_std_usage,
-]
+
+    if failures:
+        print("Code policy violations detected:", file=sys.stderr)
+        for failure in failures:
+            print(f"  {failure}", file=sys.stderr)
+        sys.exit(1)

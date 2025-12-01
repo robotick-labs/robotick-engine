@@ -4,6 +4,10 @@
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
 
+#if __has_include("sdkconfig.h")
+#include "sdkconfig.h"
+#endif
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -138,8 +142,12 @@ namespace robotick
 
 	inline uint32_t Thread::get_hardware_concurrency()
 	{
-		// IDF sets CONFIG_FREERTOS_NUMBER_OF_CORES per target (e.g. 2 on ESP32-S3).
+		// Prefer the IDF-configured core count when available; fall back to single-core.
+#ifdef CONFIG_FREERTOS_NUMBER_OF_CORES
 		return CONFIG_FREERTOS_NUMBER_OF_CORES;
+#else
+		return 1;
+#endif
 	}
 
 } // namespace robotick
