@@ -161,7 +161,7 @@ Compiled and deployed executables are tested across an expanding range of target
 - **TypeRegistry** is the only global singleton in the engine. It is written exactly once during startup by the thread that registers workloads and sealed via `TypeRegistry::seal()`. The registry asserts that all mutations come from that same thread, so contributors must finish registration before launching `Engine::load()`. After sealing, it becomes immutable and thread-safe to read.
 - **TelemetryServer** and **RemoteEngineConnections** are not globals; they are owned by `Engine::State` and rely on RAII. They start when the engine starts and stop automatically in `Engine::~Engine`/`Engine::run` teardown. This keeps sockets, ports, and threads scoped to each engine instead of leaking across processes.
 - **No hidden singletons**: other subsystems (data connections, workloads, etc.) are explicit members hanging off `Engine::State`. If a component needs process-wide coordination, document it alongside its owning class rather than relying on unnamed globals.
-- See `docs/ownership.md` for the full policy and contributor guidelines.
+- See `docs/ownership.md` for the full policy and contributor guidelines, and `docs/module-map.md` for a subsystem/init-order walkthrough.
 
 ---
 
