@@ -7,6 +7,16 @@
 
 namespace robotick
 {
+	inline size_t string_length(const char* str)
+	{
+		if (!str)
+			return 0;
+		size_t len = 0;
+		while (*str++)
+			++len;
+		return len;
+	}
+
 	inline bool string_equals(const char* a, const char* b)
 	{
 		if (a == b)

@@ -13,29 +13,47 @@
 #include <chrono>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <thread>
 
 namespace robotick::test
 {
 	namespace
 	{
-		struct ThreadJoiner
+		struct EngineRunContext
 		{
-			explicit ThreadJoiner(std::thread& t)
-				: thread(t)
+			Engine* engine = nullptr;
+			AtomicFlag* stop_flag = nullptr;
+		};
+
+		class EngineRunThread
+		{
+		  public:
+			EngineRunThread(Engine& engine, AtomicFlag& stop_flag)
 			{
+				context.engine = &engine;
+				context.stop_flag = &stop_flag;
+				thread = Thread(&EngineRunThread::run_entry, &context, "EngineRunThread");
 			}
 
-			~ThreadJoiner()
+			~EngineRunThread()
 			{
-				if (thread.joinable())
+				if (thread.is_joining_supported() && thread.is_joinable())
 				{
 					thread.join();
 				}
 			}
 
 		  private:
-			std::thread& thread;
+			static void run_entry(void* user_data)
+			{
+				auto* ctx = static_cast<EngineRunContext*>(user_data);
+				if (ctx->engine && ctx->stop_flag)
+				{
+					ctx->engine->run(*ctx->stop_flag);
+				}
+			}
+
+			EngineRunContext context{};
+			Thread thread;
 		};
 	} // namespace
 	struct TestSequencedGroupWorkload
@@ -95,18 +113,18 @@ namespace robotick::test
 
 		struct ThreadAffinityWorkload
 		{
-			std::thread::id start_thread;
-			std::thread::id first_tick_thread;
+			Thread::ThreadId start_thread = 0;
+			Thread::ThreadId first_tick_thread = 0;
 			AtomicValue<int> tick_count{0};
 
-			void start(float) { start_thread = std::this_thread::get_id(); }
+			void start(float) { start_thread = Thread::get_current_thread_id(); }
 
 			void tick(const TickInfo&)
 			{
 				const int previous = tick_count.fetch_add(1);
 				if (previous == 0)
 				{
-					first_tick_thread = std::this_thread::get_id();
+					first_tick_thread = Thread::get_current_thread_id();
 				}
 			}
 		};
@@ -273,12 +291,7 @@ namespace robotick::test
 			engine.load(model);
 
 			AtomicFlag stop_after_next_tick_flag{false};
-			std::thread runner(
-				[&]()
-				{
-					engine.run(stop_after_next_tick_flag);
-				});
-			ThreadJoiner runner_joiner(runner);
+			EngineRunThread runner(engine, stop_after_next_tick_flag);
 
 			Thread::sleep_ms(50);
 			stop_after_next_tick_flag.set();
@@ -305,12 +318,7 @@ namespace robotick::test
 				engine.load(model);
 
 				AtomicFlag stop_flag{false};
-				std::thread runner(
-					[&]()
-					{
-						engine.run(stop_flag);
-					});
-				ThreadJoiner runner_joiner(runner);
+				EngineRunThread runner(engine, stop_flag);
 
 				Thread::sleep_ms(30);
 				stop_flag.set();
@@ -332,12 +340,7 @@ namespace robotick::test
 			engine.load(model);
 
 			AtomicFlag stop_flag{false};
-			std::thread runner(
-				[&]()
-				{
-					engine.run(stop_flag);
-				});
-			ThreadJoiner runner_joiner(runner);
+			EngineRunThread runner(engine, stop_flag);
 
 			Thread::sleep_ms(30);
 			stop_flag.set();
@@ -346,7 +349,7 @@ namespace robotick::test
 			REQUIRE(info != nullptr);
 			REQUIRE(info->tick_count.load() > 0);
 			CHECK(info->start_thread == info->first_tick_thread);
-			CHECK(info->start_thread != std::thread::id{});
+			CHECK(info->start_thread != Thread::ThreadId{});
 		}
 	}
 

@@ -16,7 +16,7 @@ import argparse
 import os
 import sys
 
-DEFAULT_SOURCE_DIRS = ["cpp/src", "cpp/include"]
+DEFAULT_SOURCE_DIRS = ["cpp/src", "cpp/include", "cpp/tests"]
 DEFAULT_SUFFIXES = (".cpp", ".cc", ".c", ".h", ".hpp", ".inl")
 DEFAULT_TOOL_FILES = ["tools/code_policy_check.py"]
 
@@ -100,6 +100,26 @@ def check_file(path, check_std_usage, header_mode):
     return None
 
 
+def _normalize_excludes(root, exclude_dirs):
+    if not exclude_dirs:
+        return []
+    normalized = []
+    for rel in exclude_dirs:
+        path = os.path.normpath(os.path.join(root, rel))
+        normalized.append(path)
+    return normalized
+
+
+def _is_excluded(path, excludes):
+    if not excludes:
+        return False
+    norm = os.path.normpath(path)
+    for ex in excludes:
+        if norm == ex or norm.startswith(ex + os.sep):
+            return True
+    return False
+
+
 def run_policy_check(
     root,
     source_dirs=None,
@@ -107,17 +127,26 @@ def run_policy_check(
     tool_files=None,
     check_std_usage=True,
     header_mode="exact",
+    exclude_dirs=None,
 ):
     failures = []
     dirs_to_scan = source_dirs if source_dirs is not None else DEFAULT_SOURCE_DIRS
     suffixes = file_suffixes if file_suffixes is not None else DEFAULT_SUFFIXES
     tools = tool_files if tool_files is not None else DEFAULT_TOOL_FILES
+    excludes = _normalize_excludes(root, exclude_dirs)
 
     for rel_dir in dirs_to_scan:
         base_dir = os.path.join(root, rel_dir)
         if not os.path.isdir(base_dir):
             continue
-        for dirpath, _, filenames in os.walk(base_dir):
+        for dirpath, dirnames, filenames in os.walk(base_dir):
+            if _is_excluded(dirpath, excludes):
+                continue
+            dirnames[:] = [
+                d
+                for d in dirnames
+                if not _is_excluded(os.path.join(dirpath, d), excludes)
+            ]
             for filename in filenames:
                 if not filename.endswith(suffixes):
                     continue
@@ -180,6 +209,12 @@ if __name__ == "__main__":
         default="exact",
         help="Header validation strictness. Default matches the engine's exact header.",
     )
+    parser.add_argument(
+        "--exclude-dir",
+        dest="exclude_dirs",
+        action="append",
+        help="Relative directory to skip while scanning (may be supplied multiple times).",
+    )
     args = parser.parse_args()
     run_policy_check(
         args.source_root,
@@ -188,4 +223,5 @@ if __name__ == "__main__":
         tool_files=args.tool_files,
         check_std_usage=not args.allow_std,
         header_mode=args.header_mode,
+        exclude_dirs=args.exclude_dirs,
     )

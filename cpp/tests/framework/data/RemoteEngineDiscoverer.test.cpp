@@ -1,3 +1,6 @@
+// Copyright Robotick Labs
+// SPDX-License-Identifier: Apache-2.0
+
 #include "robotick/framework/data/RemoteEngineDiscoverer.h"
 #include "robotick/api.h"
 #include "robotick/framework/strings/FixedString.h"

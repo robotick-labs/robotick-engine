@@ -166,7 +166,7 @@ namespace robotick::test
 			memset(dest, 'Z', dest_size);
 
 			CHECK(text_desc->from_string("hello", dest));
-			const size_t actual_len = std::strlen(dest);
+			const size_t actual_len = robotick::string_length(dest);
 			CHECK(actual_len < dest_size);
 			for (size_t i = actual_len + 1; i < dest_size; ++i)
 			{
