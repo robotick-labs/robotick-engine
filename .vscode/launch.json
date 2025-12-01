@@ -5,14 +5,14 @@
             "name": "Debug robotick_engine_tests",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/robotick-engine-tests-linux-debug/cpp/tests/robotick_engine_tests",
+            "program": "${workspaceFolder}/build/${input:buildPreset}/cpp/tests/robotick_engine_tests",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
                 {
                     "name": "LD_LIBRARY_PATH",
-                    "value": "${workspaceFolder}/build/robotick-engine-tests-linux-debug"
+                    "value": "${workspaceFolder}/build/${input:buildPreset}"
                 },
                 {
                     "name": "ROBOTICK_ENABLE_BACKTRACE",
@@ -30,10 +30,10 @@
                 }
             ],
             "logging": {
-                "engineLogging": true
+                "engineLogging": false // set to true when debugging adapter issues
             },
             "preLaunchTask": "Build robotick_engine_tests",
-            "additionalSOLibSearchPath": "${workspaceFolder}/build/robotick-engine-tests-linux-debug",
+            "additionalSOLibSearchPath": "${workspaceFolder}/build/${input:buildPreset}",
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen"
         }

@@ -3,6 +3,7 @@
 
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/model/Model.h"
+#include "robotick/framework/strings/StringUtils.h"
 
 #include <catch2/catch_all.hpp>
 
@@ -243,21 +244,21 @@ TEST_CASE("Unit/Framework/Model-Dynamic")
 		for (const WorkloadSeed* seed : workload_seeds)
 		{
 			CHECK(seed != nullptr);
-			if (strcmp(seed->unique_name.c_str(), "A") == 0)
+			if (string_equals(seed->unique_name.c_str(), "A"))
 			{
 				found_a = seed;
 				CHECK(seed->type_id == TypeId("DummyModelWorkload"));
 				CHECK(seed->tick_rate_hz == s_tick_100hz);
 				CHECK(seed->children.size() == 0);
 			}
-			else if (strcmp(seed->unique_name.c_str(), "B") == 0)
+			else if (string_equals(seed->unique_name.c_str(), "B"))
 			{
 				found_b = seed;
 				CHECK(seed->type_id == TypeId("DummyModelWorkload"));
 				CHECK(seed->tick_rate_hz == s_tick_100hz);
 				CHECK(seed->children.size() == 0);
 			}
-			else if (strcmp(seed->unique_name.c_str(), "Group") == 0)
+			else if (string_equals(seed->unique_name.c_str(), "Group"))
 			{
 				found_group = seed;
 				CHECK(seed->type_id == TypeId("DummyModelWorkload"));

@@ -48,40 +48,23 @@ namespace robotick
 
 	void WebResponse::set_status_code(int code)
 	{
-		// Illegal after body start
-		if (state == State::BodyStreaming || state == State::Done)
-		{
-			ROBOTICK_FATAL_EXIT("WebResponse: header call after body started");
-		}
-
 		ensure_headers_open();
 		status_code = code;
 	}
 
 	void WebResponse::set_content_type(const char* type)
 	{
-		if (state == State::BodyStreaming || state == State::Done)
-		{
-			ROBOTICK_FATAL_EXIT("WebResponse: header call after body started");
-		}
-
 		ensure_headers_open();
 		content_type = type ? type : "text/plain";
 	}
 
 	void WebResponse::add_header(const char* header_line)
 	{
-		if (state == State::BodyStreaming || state == State::Done)
-		{
-			ROBOTICK_FATAL_EXIT("WebResponse: header call after body started");
-		}
-
 		httpd_req_t* req = static_cast<httpd_req_t*>(conn);
 
 		if (state == State::Start)
 		{
 			write_status_and_cors(req, status_code);
-			state = State::HeadersOpen;
 		}
 
 		ensure_headers_open();
@@ -114,7 +97,7 @@ namespace robotick
 		{
 			write_status_and_cors(req, status_code);
 			httpd_resp_set_type(req, content_type);
-			state = State::HeadersOpen;
+			ensure_headers_open();
 		}
 
 		// If headers are open and body is starting, close header block
@@ -280,6 +263,7 @@ namespace robotick
 
 		server_name = name;
 		handler = handler_in;
+		(void)webroot; // Static files not supported on ESP32; parameter intentionally ignored.
 
 		WebServerImpl* s = static_cast<WebServerImpl*>(impl);
 

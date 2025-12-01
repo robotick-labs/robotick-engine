@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
+#include "robotick/framework/strings/StringUtils.h"
 #include "robotick/framework/utility/Hash.h"
 
 #include <stddef.h>
@@ -45,23 +46,13 @@ namespace robotick
 
 		bool equals(const char* other) const noexcept
 		{
-			if (!data && !other)
-				return true;
-			if (!data || !other)
-				return false;
-			return strcmp(data, other) == 0;
+			return string_equals(data, other);
 		}
 
 		/** @brief Lexicographic comparison (for use in maps, etc.) */
 		bool operator<(const StringView& other) const noexcept
 		{
-			if (!data && !other.data)
-				return false;
-			if (!data)
-				return true;
-			if (!other.data)
-				return false;
-			return strcmp(data, other.data) < 0;
+			return string_compare(data, other.data) < 0;
 		}
 
 		/** @brief Get the raw character pointer */

@@ -25,7 +25,7 @@ TEST_CASE("Unit/Framework/Data/Buffer")
 
 		SECTION("Out-of-bounds access throws")
 		{
-			ROBOTICK_REQUIRE_ERROR_MSG(buffer.as<int>(32), "");
+			ROBOTICK_REQUIRE_ERROR_MSG(buffer.as<int>(32), "out of range");
 		}
 	}
 

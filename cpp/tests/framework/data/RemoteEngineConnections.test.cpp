@@ -4,8 +4,8 @@
 #include "robotick/framework/data/RemoteEngineConnections.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/concurrency/Atomic.h"
-#include "robotick/framework/time/Clock.h"
 #include "robotick/framework/concurrency/Thread.h"
+#include "robotick/framework/time/Clock.h"
 
 #include <catch2/catch_all.hpp>
 
@@ -18,6 +18,8 @@ namespace robotick::test
 			Engine* engine = nullptr;
 			AtomicFlag* stop_flag = nullptr;
 		};
+
+		constexpr long long kRemoteEngineConnectionTimeoutNs = 3'000'000'000LL;
 
 		void engine_run_entry(void* arg)
 		{
@@ -106,7 +108,7 @@ namespace robotick::test
 			}
 
 			const auto elapsed_ns = Clock::to_nanoseconds(Clock::now() - start).count();
-			if (elapsed_ns > 3000LL * 1000000LL)
+			if (elapsed_ns > kRemoteEngineConnectionTimeoutNs)
 				break;
 
 			Thread::sleep_ms(10);

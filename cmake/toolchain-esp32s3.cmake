@@ -1,15 +1,44 @@
+# ESP32-S3 toolchain configuration.
+# Override these via -DESP32_TOOLCHAIN=/path/to/toolchain or -DEXE_SUFFIX=.exe when invoking CMake.
+# If unspecified, the file falls back to the ESP32_TOOLCHAIN environment variable or host-specific defaults.
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR xtensa)
 
-# Choose toolchain root path based on platform
+set(_esp32_default_toolchain "")
+set(_esp32_default_exe_suffix "")
+
 if(WIN32)
-    set(ESP32_TOOLCHAIN "C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf")
-    set(EXE_SUFFIX ".exe")
+    set(_esp32_default_toolchain "C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf")
+    set(_esp32_default_exe_suffix ".exe")
 elseif(UNIX)
-    set(ESP32_TOOLCHAIN "$ENV{HOME}/.espressif/tools/xtensa-esp32s3-elf/esp-14.2.0_20241119/xtensa-esp32s3-elf")
-    set(EXE_SUFFIX "")
+    set(_esp32_default_toolchain "$ENV{HOME}/.espressif/tools/xtensa-esp32s3-elf/esp-14.2.0_20241119/xtensa-esp32s3-elf")
 else()
     message(FATAL_ERROR "Unsupported host platform")
+endif()
+
+set(_esp32_toolchain_help "Path to the Xtensa ESP32-S3 toolchain root (override with -DESP32_TOOLCHAIN=... or ESP32_TOOLCHAIN env)")
+set(_esp32_toolchain_value "")
+if(DEFINED ESP32_TOOLCHAIN AND NOT "${ESP32_TOOLCHAIN}" STREQUAL "")
+    set(_esp32_toolchain_value "${ESP32_TOOLCHAIN}")
+elseif(DEFINED ENV{ESP32_TOOLCHAIN} AND NOT "$ENV{ESP32_TOOLCHAIN}" STREQUAL "")
+    set(_esp32_toolchain_value "$ENV{ESP32_TOOLCHAIN}")
+else()
+    set(_esp32_toolchain_value "${_esp32_default_toolchain}")
+endif()
+set(ESP32_TOOLCHAIN "${_esp32_toolchain_value}" CACHE PATH "${_esp32_toolchain_help}")
+if(NOT ESP32_TOOLCHAIN)
+    message(FATAL_ERROR "ESP32_TOOLCHAIN is not set. Provide it via -DESP32_TOOLCHAIN=... or env ESP32_TOOLCHAIN.")
+endif()
+
+set(_esp32_exe_suffix_help "Executable suffix for Xtensa ESP32-S3 tools (e.g. .exe on Windows)")
+if(NOT DEFINED EXE_SUFFIX OR "${EXE_SUFFIX}" STREQUAL "")
+    if(NOT "${_esp32_default_exe_suffix}" STREQUAL "")
+        set(EXE_SUFFIX "${_esp32_default_exe_suffix}" CACHE STRING "${_esp32_exe_suffix_help}")
+    else()
+        set(EXE_SUFFIX "" CACHE STRING "${_esp32_exe_suffix_help}")
+    endif()
+else()
+    set(EXE_SUFFIX "${EXE_SUFFIX}" CACHE STRING "${_esp32_exe_suffix_help}")
 endif()
 
 # Compiler executables

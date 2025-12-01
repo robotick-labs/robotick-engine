@@ -6,10 +6,9 @@
 #include "robotick/framework/containers/FixedVector.h"
 #include "robotick/framework/containers/List.h"
 #include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/strings/StringUtils.h"
 #include "robotick/framework/utility/Hash.h"
-
-#include <string.h> // for strcmp
-
+#include "robotick/framework/utils/TypeId.h"
 namespace robotick
 {
 	template <typename Key, typename Value> struct MapEntry
@@ -26,7 +25,18 @@ namespace robotick
 	// --- Default Hash + Equals Traits ---
 	template <typename T> struct DefaultHash
 	{
-		static size_t hash(const T& value) { return static_cast<size_t>(value); }
+		static size_t hash(const T& value)
+		{
+			static_assert(is_trivially_copyable_v<T>, "DefaultHash requires trivially copyable keys");
+			Hash32 hasher;
+			hasher.update(value);
+			return static_cast<size_t>(hasher.final());
+		}
+	};
+
+	template <> struct DefaultHash<TypeId>
+	{
+		static size_t hash(const TypeId& value) { return static_cast<size_t>(static_cast<uint32_t>(value)); }
 	};
 
 	template <typename T> struct DefaultEqual
@@ -42,7 +52,7 @@ namespace robotick
 
 	template <> struct DefaultEqual<const char*>
 	{
-		static bool equal(const char* a, const char* b) { return strcmp(a, b) == 0; }
+		static bool equal(const char* a, const char* b) { return string_equals(a, b); }
 	};
 
 	template <> struct DefaultHash<char*>
@@ -52,7 +62,7 @@ namespace robotick
 
 	template <> struct DefaultEqual<char*>
 	{
-		static bool equal(const char* a, const char* b) { return strcmp(a, b) == 0; }
+		static bool equal(const char* a, const char* b) { return string_equals(a, b); }
 	};
 
 	template <size_t N> struct DefaultHash<FixedString<N>>
@@ -62,9 +72,12 @@ namespace robotick
 
 	template <size_t N> struct DefaultEqual<FixedString<N>>
 	{
-		static bool equal(const FixedString<N>& a, const FixedString<N>& b) { return strcmp(a.c_str(), b.c_str()) == 0; }
+		static bool equal(const FixedString<N>& a, const FixedString<N>& b) { return string_equals(a.c_str(), b.c_str()); }
 	};
 
+	// When the Key type stores pointers (e.g. "const char*"), Map keeps the raw pointer values.
+	// The caller must ensure the referenced data lives at least as long as the Map; owned keys should
+	// use a standard string type or FixedString (or provide a Map specialization that copies data).
 	template <typename Key, typename Value, size_t NumBuckets = 32> class Map
 	{
 	  public:

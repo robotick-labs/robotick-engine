@@ -6,9 +6,6 @@
 #include "robotick/framework/registry/TypeRegistry.h"
 #include "robotick/framework/strings/FixedString.h"
 
-#include <cstdio>
-#include <ctype.h>
-
 namespace robotick
 {
 

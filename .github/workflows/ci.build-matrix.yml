@@ -45,7 +45,7 @@ jobs:
 
       - name: Run Build inside Docker
         run: |
-          docker run --rm \
+          docker run --rm --init \
             --user root \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \

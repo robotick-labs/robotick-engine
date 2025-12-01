@@ -5,10 +5,6 @@
 
 #include "robotick/api_base.h"
 
-#ifdef ROBOTICK_ENABLE_MODEL_HEAP
-#include "robotick/framework/containers/HeapVector.h"
-#endif // #ifdef ROBOTICK_ENABLE_MODEL_HEAP
-
 #include <cstddef> // size_t
 
 namespace robotick
@@ -32,10 +28,12 @@ namespace robotick
 		constexpr ArrayView(const ArrayView& other) = default;
 
 		/// @brief Construct from pointer and size
-		constexpr ArrayView(T* data_in, size_t size_in)
+		ArrayView(T* data_in, size_t size_in)
 			: data(data_in)
 			, array_size(size_in)
 		{
+			if (size_in > 0 && data_in == nullptr)
+				ROBOTICK_FATAL_EXIT("ArrayView::use called with null data and non-zero size");
 		}
 
 		/// @brief Construct from fixed-size C-style array

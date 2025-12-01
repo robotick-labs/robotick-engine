@@ -1,9 +1,10 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/services/WebServer.h"
 #include "robotick/api.h"
 #include "robotick/framework/concurrency/Thread.h"
+#include "robotick/framework/services/WebServer.h"
+#include "robotick/framework/strings/StringUtils.h"
 
 #include <catch2/catch_all.hpp>
 #include <curl/curl.h>
@@ -190,8 +191,8 @@ TEST_CASE("Unit/Framework/WebServer")
 		wait_for(called);
 
 		REQUIRE(called);
-		REQUIRE(::strcmp(method.data, "GET") == 0);
-		REQUIRE(::strcmp(last_uri.data, "/does_not_exist") == 0);
+		REQUIRE(string_equals(method.data, "GET"));
+		REQUIRE(string_equals(last_uri.data, "/does_not_exist"));
 		REQUIRE(::strstr(body.data, "Custom: /does_not_exist") != nullptr);
 	}
 
@@ -231,8 +232,8 @@ TEST_CASE("Unit/Framework/WebServer")
 		wait_for(called);
 
 		REQUIRE(called);
-		REQUIRE(::strcmp(method.data, "POST") == 0);
-		REQUIRE(::strcmp(posted.data, "hello=world") == 0);
+		REQUIRE(string_equals(method.data, "POST"));
+		REQUIRE(string_equals(posted.data, "hello=world"));
 		REQUIRE(::strstr(body.data, "POST: /api/x") != nullptr);
 	}
 

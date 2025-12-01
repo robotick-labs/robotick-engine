@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/RemoteEngineConnection.h"
+
 #include "robotick/api.h"
+#include "robotick/framework/concurrency/Thread.h"
 #include "robotick/framework/containers/FixedVector.h"
 #include "robotick/framework/containers/HeapVector.h"
+#include "robotick/framework/strings/FixedString.h"
 #include "robotick/framework/strings/StringUtils.h"
-#include "robotick/framework/concurrency/Thread.h"
 
 #include <catch2/catch_all.hpp>
 
@@ -23,6 +25,9 @@ static int wait_for_listen_port(RemoteEngineConnection& receiver, int max_attemp
 			return port;
 		Thread::sleep_ms(sleep_ms);
 	}
+	FixedString256 msg;
+	msg.format("wait_for_listen_port timed out (port=%d attempts=%d sleep_ms=%d)", port, max_attempts, sleep_ms);
+	WARN(msg.c_str());
 	return port; // 0 if failed
 }
 

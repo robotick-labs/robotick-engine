@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/strings/StringUtils.h"
 #include <catch2/catch_all.hpp>
 
 namespace robotick::test
@@ -18,7 +19,7 @@ namespace robotick::test
 			CHECK(a != c);
 			CHECK(!(a < b));
 			CHECK(a < c);
-			CHECK(strcmp(a.c_str(), "hello") == 0);
+			CHECK(string_equals(a.c_str(), "hello"));
 		}
 
 		SECTION("Assignment and truncation")

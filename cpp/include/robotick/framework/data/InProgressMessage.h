@@ -11,9 +11,6 @@
 
 namespace robotick
 {
-	constexpr char MAGIC[4] = {'R', 'B', 'I', 'N'};
-	constexpr uint8_t VERSION = 1;
-
 	// Incremental send/receive helper that lets RemoteEngineConnection share a single scratch buffer across non-blocking sockets.
 	// Each instance owns one half-duplex stream (either outbound or inbound) so we can make progress on both directions without
 	// forcing the caller to juggle partial headers/payloads manually.
@@ -46,10 +43,13 @@ namespace robotick
 		bool is_completed() const { return stage == Stage::Completed; }
 		uint32_t payload_length() const { return header.payload_len; }
 
-		InProgressMessage::Result tick(int socket_fd);
+		Result tick(int socket_fd);
 		void vacate();
 
 	  private:
+		static constexpr char kMagic[4] = {'R', 'B', 'I', 'N'};
+		static constexpr uint8_t kVersion = 1;
+
 		Stage stage = Stage::Vacant;
 		MessageHeader header{};
 

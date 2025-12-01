@@ -436,7 +436,7 @@ namespace robotick
 			const auto ns_since_start = Clock::to_nanoseconds(now - engine_start_time).count();
 			const auto ns_since_last = Clock::to_nanoseconds(now - last_tick_time).count();
 
-			static const float s_1_nanosecond_sec = 1e-9F;
+			constexpr float s_1_nanosecond_sec = 1e-9F;
 
 			tick_info.tick_count += 1;
 			tick_info.time_now_ns = ns_since_start;
@@ -492,7 +492,7 @@ namespace robotick
 
 	bool Engine::is_running() const
 	{
-		return state && state->is_running;
+		return state->is_running;
 	}
 
 	const char* Engine::get_model_name() const

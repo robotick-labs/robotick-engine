@@ -37,5 +37,19 @@ namespace robotick::test
 			map.insert("key", 123);
 			CHECK(map.find("notfound") == nullptr);
 		}
+
+		SECTION("C-string keys compare by contents, not pointers")
+		{
+			char key_a[] = "same";
+			char key_b[] = "same";
+
+			REQUIRE(&key_a[0] != &key_b[0]); // defensive guard: distinct buffers
+
+			map.insert(key_a, 99);
+
+			const int* found = map.find(key_b);
+			REQUIRE(found != nullptr);
+			CHECK(*found == 99);
+		}
 	}
 } // namespace robotick::test

@@ -45,7 +45,7 @@ namespace robotick
 		/**
 		 * @brief Returns the number of elements currently stored.
 		 */
-		constexpr size_t size() const { return count; }
+		size_t size() const { return count; }
 
 		/**
 		 * @brief Returns the maximum capacity of the vector.
@@ -55,12 +55,12 @@ namespace robotick
 		/**
 		 * @brief Checks if the vector is empty.
 		 */
-		constexpr bool empty() const { return count == 0; }
+		bool empty() const { return count == 0; }
 
 		/**
 		 * @brief Checks if the vector is full.
 		 */
-		constexpr bool full() const { return count == Capacity; }
+		bool full() const { return count == Capacity; }
 
 		/**
 		 * @brief Fills the vector to capacity, starting at current element
@@ -173,7 +173,7 @@ namespace robotick
 
 	  public:
 		T data_buffer[Capacity]{}; ///< Underlying storage.
-		uint32_t count = 0;		   ///< Current number of elements.
+		uint32_t count = 0;		   ///< Current number of elements (uint32_t ensures same ABI everywhere).
 	};
 
 	using FixedVector1k = FixedVector<uint8_t, 1 * 1024>;

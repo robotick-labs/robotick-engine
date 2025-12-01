@@ -58,10 +58,10 @@ namespace robotick
 		stage = Stage::Sending;
 		header = {};
 
-		static_assert(sizeof(MAGIC) == sizeof(header.magic));
+		static_assert(sizeof(InProgressMessage::kMagic) == sizeof(header.magic));
 
-		::memcpy(header.magic, MAGIC, sizeof(MAGIC));
-		header.version = VERSION;
+		::memcpy(header.magic, InProgressMessage::kMagic, sizeof(InProgressMessage::kMagic));
+		header.version = InProgressMessage::kVersion;
 		header.type = message_type;
 		header.payload_len = static_cast<uint32_t>(payload_size_in);
 
@@ -208,9 +208,10 @@ namespace robotick
 
 				header.deserialize(header_bytes);
 
-				static_assert(sizeof(MAGIC) == sizeof(header.magic));
+				static_assert(sizeof(InProgressMessage::kMagic) == sizeof(header.magic));
 
-				if (memcmp(header.magic, MAGIC, sizeof(MAGIC)) != 0 || header.version != VERSION)
+				if (memcmp(header.magic, InProgressMessage::kMagic, sizeof(InProgressMessage::kMagic)) != 0 ||
+					header.version != InProgressMessage::kVersion)
 				{
 					ROBOTICK_WARNING("InProgressMessage::tick(): Invalid header magic or version");
 					return Result::ConnectionLost;
