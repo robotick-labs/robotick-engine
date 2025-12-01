@@ -223,20 +223,6 @@ namespace robotick::test
 		{
 			Model model;
 			model.set_telemetry_port(choose_telemetry_port());
-			const WorkloadSeed& workload_seed = model.add("DummyWorkload", "A").set_tick_rate_hz(1.0f).set_config({{"value", "42"}});
-			model.set_root_workload(workload_seed);
-
-			Engine engine;
-			engine.load(model);
-
-			const DummyWorkload* ptr = engine.find_instance<DummyWorkload>(workload_seed.unique_name);
-			REQUIRE(ptr->config.value == 42);
-		}
-
-		SECTION("DummyWorkload config is loaded via load()")
-		{
-			Model model;
-			model.set_telemetry_port(choose_telemetry_port());
 			const WorkloadSeed& workload_seed =
 				model.add("DummyWorkload", "A").set_tick_rate_hz(1.0f).set_inputs({{"input_string_64", "hello there"}, {"input_float", "1.234"}});
 			model.set_root_workload(workload_seed);
@@ -247,6 +233,20 @@ namespace robotick::test
 			const DummyWorkload* ptr = engine.find_instance<DummyWorkload>(workload_seed.unique_name);
 			REQUIRE(ptr->inputs.input_float == 1.234f);
 			REQUIRE(ptr->inputs.input_string_64 == "hello there");
+		}
+
+		SECTION("DummyWorkload inputs are loaded via load()")
+		{
+			Model model;
+			model.set_telemetry_port(choose_telemetry_port());
+			const WorkloadSeed& workload_seed = model.add("DummyWorkload", "A").set_tick_rate_hz(1.0f).set_config({{"value", "42"}});
+			model.set_root_workload(workload_seed);
+
+			Engine engine;
+			engine.load(model);
+
+			const DummyWorkload* ptr = engine.find_instance<DummyWorkload>(workload_seed.unique_name);
+			REQUIRE(ptr->config.value == 42);
 		}
 
 		SECTION("Multiple workloads supported")

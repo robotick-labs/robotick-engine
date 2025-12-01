@@ -2,16 +2,16 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build Example: desktop-testbed",
+      "label": "Build robotick_engine_tests (debug)",
       "type": "shell",
       "command": "cmake",
       "args": [
         "--build",
         "--preset",
-        "desktop-testbed-linux-debug"
+        "robotick-engine-tests-linux-debug"
       ],
       "options": {
-        "cwd": "${workspaceFolder}/examples/cpp/desktop-testbed"
+        "cwd": "${workspaceFolder}"
       },
       "group": {
         "kind": "build",
