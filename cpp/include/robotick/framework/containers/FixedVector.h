@@ -45,7 +45,7 @@ namespace robotick
 		/**
 		 * @brief Returns the number of elements currently stored.
 		 */
-		constexpr size_t size() const { return count; }
+		size_t size() const { return count; }
 
 		/**
 		 * @brief Returns the maximum capacity of the vector.
@@ -55,12 +55,12 @@ namespace robotick
 		/**
 		 * @brief Checks if the vector is empty.
 		 */
-		constexpr bool empty() const { return count == 0; }
+		bool empty() const { return count == 0; }
 
 		/**
 		 * @brief Checks if the vector is full.
 		 */
-		constexpr bool full() const { return count == Capacity; }
+		bool full() const { return count == Capacity; }
 
 		/**
 		 * @brief Fills the vector to capacity, starting at current element

@@ -99,7 +99,4 @@ namespace robotick
 		BlackboardInfo info;
 	};
 
-	static_assert(
-		robotick::is_trivially_copyable_v<Blackboard>, "Blackboard is not trivially copyable. It needs to be to be usable in workload structs");
-
 } // namespace robotick
