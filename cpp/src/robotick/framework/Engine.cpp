@@ -404,6 +404,7 @@ namespace robotick
 		if (root_tick_fn == nullptr)
 			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_fn - check it has been correctly registered");
 
+		// start_fn always runs on the same thread that will perform ticks so workloads can safely cache thread-affine handles.
 		if (root_info.workload_descriptor->start_fn)
 			root_info.workload_descriptor->start_fn(root_ptr, root_tick_rate_hz);
 
@@ -418,6 +419,8 @@ namespace robotick
 		auto last_tick_time = engine_start_time;
 		auto next_tick_time = engine_start_time;
 
+		// TickInfo is reused every iteration; we update its running clock/delta fields so consumers never see partially
+		// initialized values.
 		TickInfo tick_info;
 		tick_info.workload_stats = root_info.workload_stats;
 		tick_info.tick_rate_hz = root_tick_rate_hz;
