@@ -96,6 +96,8 @@ def _check_std_usage(path, lines, context):
     start_index = context.get("body_start_index", 0)
     for line in lines[start_index:]:
         if "std::" in line:
+            # Simple substring match; we intentionally accept false positives in comments/strings
+            # to keep this check lightweight.
             return f"Forbidden std:: usage in {path} -> {line.strip()}"
     return None
 
