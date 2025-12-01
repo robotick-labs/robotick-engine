@@ -34,9 +34,6 @@
             },
             "preLaunchTask": "Build robotick_engine_tests",
             "additionalSOLibSearchPath": "${workspaceFolder}/build/robotick-engine-tests-linux-debug",
-            "sourceFileMap": {
-                "${workspaceFolder}": "${workspaceFolder}"
-            },
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen"
         }

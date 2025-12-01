@@ -99,11 +99,78 @@ namespace robotick
 
 #elif defined(ROBOTICK_PLATFORM_LINUX)
 
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 
 namespace robotick
 {
+
+	namespace
+	{
+		bool is_valid_iface_name(const char* iface)
+		{
+			if (!iface || iface[0] == '\0')
+			{
+				return false;
+			}
+
+			for (size_t i = 0; iface[i] != '\0'; ++i)
+			{
+				const unsigned char c = static_cast<unsigned char>(iface[i]);
+				if (!::isalnum(c) && c != '-' && c != '_' && c != '.' && c != ':')
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+		bool is_valid_nmcli_text(const char* value)
+		{
+			if (!value || value[0] == '\0')
+			{
+				return false;
+			}
+
+			for (size_t i = 0; value[i] != '\0'; ++i)
+			{
+				const char c = value[i];
+				if (c == '\n' || c == '\r')
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+		FixedString256 shell_escape_single_quotes(const char* value)
+		{
+			FixedString256 escaped;
+			if (!value)
+			{
+				return escaped;
+			}
+
+			for (size_t i = 0; value[i] != '\0'; ++i)
+			{
+				const char c = value[i];
+				if (c == '\'')
+				{
+					escaped.append("'\\''");
+				}
+				else
+				{
+					char buffer[2] = {c, '\0'};
+					escaped.append(buffer);
+				}
+			}
+
+			return escaped;
+		}
+	} // namespace
 
 	bool NetworkHotspot::start(const NetworkHotspotConfig& cfg)
 	{
@@ -112,11 +179,32 @@ namespace robotick
 			return false;
 		}
 
+		if (!is_valid_iface_name(cfg.iface.c_str()))
+		{
+			ROBOTICK_WARNING("NetworkHotspot invalid interface: %s", cfg.iface.c_str());
+			return false;
+		}
+
+		if (!is_valid_nmcli_text(cfg.ssid.c_str()))
+		{
+			ROBOTICK_WARNING("NetworkHotspot invalid SSID");
+			return false;
+		}
+
+		if (!is_valid_nmcli_text(cfg.password.c_str()))
+		{
+			ROBOTICK_WARNING("NetworkHotspot invalid password");
+			return false;
+		}
+
+		const FixedString256 escaped_ssid = shell_escape_single_quotes(cfg.ssid.c_str());
+		const FixedString256 escaped_password = shell_escape_single_quotes(cfg.password.c_str());
+
 		FixedString256 cmd;
-		cmd.format("nmcli dev wifi hotspot ifname %s ssid %s password %s && ip a | grep %s",
+		cmd.format("nmcli dev wifi hotspot ifname %s ssid '%s' password '%s' && ip a | grep %s",
 			cfg.iface.c_str(),
-			cfg.ssid.c_str(),
-			cfg.password.c_str(),
+			escaped_ssid.c_str(),
+			escaped_password.c_str(),
 			cfg.iface.c_str());
 
 		const int result = std_approved::system(cmd.c_str());
@@ -140,8 +228,29 @@ namespace robotick
 			return false;
 		}
 
+		if (!is_valid_iface_name(cfg.iface.c_str()))
+		{
+			ROBOTICK_WARNING("NetworkClient invalid interface: %s", cfg.iface.c_str());
+			return false;
+		}
+
+		if (!is_valid_nmcli_text(cfg.ssid.c_str()))
+		{
+			ROBOTICK_WARNING("NetworkClient invalid SSID");
+			return false;
+		}
+
+		if (!is_valid_nmcli_text(cfg.password.c_str()))
+		{
+			ROBOTICK_WARNING("NetworkClient invalid password");
+			return false;
+		}
+
+		const FixedString256 escaped_ssid = shell_escape_single_quotes(cfg.ssid.c_str());
+		const FixedString256 escaped_password = shell_escape_single_quotes(cfg.password.c_str());
+
 		FixedString256 cmd;
-		cmd.format("nmcli dev wifi connect '%s' password '%s' ifname %s", cfg.ssid.c_str(), cfg.password.c_str(), cfg.iface.c_str());
+		cmd.format("nmcli dev wifi connect '%s' password '%s' ifname %s", escaped_ssid.c_str(), escaped_password.c_str(), cfg.iface.c_str());
 
 		const int result = std_approved::system(cmd.c_str());
 		const bool success = result == 0;
@@ -159,7 +268,7 @@ namespace robotick
 
 	bool NetworkClient::is_connected()
 	{
-		return std_approved::system("nmcli -t -f WIFI g | grep -q enabled") == 0;
+		return std_approved::system("nmcli -t -f STATE g | grep -q '^connected$'") == 0;
 	}
 
 } // namespace robotick
@@ -170,6 +279,16 @@ namespace robotick
 {
 
 	bool NetworkHotspot::start(const NetworkHotspotConfig&)
+	{
+		return false;
+	}
+
+	bool NetworkClient::connect(const NetworkClientConfig&)
+	{
+		return false;
+	}
+
+	bool NetworkClient::is_connected()
 	{
 		return false;
 	}

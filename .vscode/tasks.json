@@ -25,9 +25,8 @@
       "command": "cmake",
       "args": [
         "--build",
-        "${workspaceFolder}/build/${input:buildPreset}",
-        "--config",
-        "Debug",
+        "--preset",
+        "${input:buildPreset}",
         "--target",
         "robotick_engine_tests"
       ],

@@ -9,7 +9,7 @@
   "cmake.testExplorer.extraCTestArgs": "--test-dir ${workspaceFolder}/build/linux-debug/cpp/tests",
   "testMate.cpp.testFramework": "catch2",
   "testMate.cpp.enableTestDiscovery": true,
-  "testMate.cpp.debug.config.template": "Debug Robotick Tests (No Leak Check)",
+  "testMate.cpp.debug.config.template": "Debug robotick_engine_tests",
   "C_Cpp.default.compileCommands": "${workspaceFolder}/build/linux-debug/compile_commands.json",
   "C_Cpp.codeAnalysis.clangTidy.enabled": true,
   "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
