@@ -214,6 +214,8 @@ namespace robotick
 				return;
 			}
 
+			// Connection state machine deliberately tears down and recreates sockets per transition.  Rebinding avoids
+			// reusing half-closed FDs and guarantees both sender/receiver restart cleanly after network failures.
 			if (mode == Mode::Sender)
 			{
 				tick_disconnected_sender();
@@ -1039,7 +1041,8 @@ namespace robotick
 
 	void RemoteEngineConnection::disconnect()
 	{
-		// tick both in_progress_message's if occupied, to ensure we're not sending partial messages
+		// Drain any partially sent/received packets before closing the socket.  This guarantees that both sides either see a
+		// fully framed message or a disconnect — never a half-written payload that could desynchronize the protocol.
 		InProgressMessage* in_progress_messages[] = {&in_progress_message_in, &in_progress_message_out};
 
 		for (InProgressMessage* in_progress_message_ptr : in_progress_messages)
@@ -1064,6 +1067,8 @@ namespace robotick
 			in_progress_message.vacate();
 		}
 
+		// Explicit close() even after ConnectionLost lets us reclaim the file descriptor immediately; the next state machine
+		// iteration will build a fresh socket with clean errno/flags.
 		if (socket_fd >= 0)
 			close(socket_fd);
 		socket_fd = -1;

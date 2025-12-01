@@ -99,6 +99,8 @@ namespace robotick
 		payload_reader = nullptr;
 	}
 
+	// Called repeatedly from RemoteEngineConnection::tick() so sockets can make forward progress without blocking.
+	// Returning InProgress keeps the state machine live, while ConnectionLost tells the owner to tear the socket down.
 	InProgressMessage::Result InProgressMessage::tick(int socket_fd)
 	{
 		if (stage == Stage::Vacant)

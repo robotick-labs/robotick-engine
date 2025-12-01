@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "robotick/framework/data/InProgressMessage.h"
 #include "robotick/framework/containers/HeapVector.h"
+#include "robotick/framework/data/InProgressMessage.h"
 #include "robotick/framework/strings/FixedString.h"
 #include "robotick/framework/utility/Function.h"
 
@@ -139,8 +139,10 @@ namespace robotick
 		float mutual_tick_rate_hz = 0.0f; // gets set to minimum of receiver and sender engine's root tick-rate, on handshake
 		uint64_t ticks_until_next_send = 1;
 
-		InProgressMessage in_progress_message_in;  // seperate InProgressMessage's in case we need to send/receive...
-		InProgressMessage in_progress_message_out; // 	... both on same tick, while other is occupied.
+		// Each half of the TCP stream gets its own InProgressMessage so a long-running send never blocks an incoming reader.
+		// This lets the tick loop pump READY + FIELD packets back-to-back without reentrancy hazards.
+		InProgressMessage in_progress_message_in;
+		InProgressMessage in_progress_message_out;
 
 		// Persist incremental parsing across non-blocking recv for the handshake payload (tick-rate + paths)
 		struct HandshakeReceiveState
