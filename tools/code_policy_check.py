@@ -35,6 +35,14 @@ LICENSE_HEADERS = {
 }
 SPDX_IDENTIFIER = "SPDX-License-Identifier: Apache-2.0"
 
+# ---------------------------------------------------------------------------
+# Per-file check registry (append new checkers here)
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Header helpers
+# ---------------------------------------------------------------------------
+
 
 def _expected_header(path):
     _, ext = os.path.splitext(path)
@@ -48,57 +56,81 @@ def _normalize_header_line(line, line_index):
     return normalized
 
 
-def _has_spdx_header(path):
-    with open(path, "r", encoding="utf-8", errors="ignore") as handle:
-        for _ in range(5):
-            line = handle.readline()
-            if not line:
-                break
-            if SPDX_IDENTIFIER in line:
-                return True
+def _has_spdx_header(lines):
+    for line in lines[:5]:
+        if SPDX_IDENTIFIER in line:
+            return True
     return False
 
 
-def check_file(path, check_std_usage, header_mode):
+def _check_headers(path, lines, context):
+    header_mode = context["header_mode"]
     if header_mode == "spdx":
-        if not _has_spdx_header(path):
+        if not _has_spdx_header(lines):
             return f"Missing Apache header in {path}"
-    else:
-        expected_header = _expected_header(path)
-        with open(path, "r", encoding="utf-8", errors="ignore") as handle:
-            for index, expected_line in enumerate(expected_header, start=1):
-                line = handle.readline()
-                if not line:
-                    return (
-                        f"Missing header line {index} in {path}. "
-                        f"Expected '{expected_line}'."
-                    )
-                normalized = _normalize_header_line(line, index)
-                if normalized != expected_line:
-                    return (
-                        f"Incorrect header line {index} in {path}. "
-                        f"Expected '{expected_line}', found '{normalized}'."
-                    )
-            if not check_std_usage:
-                return None
-            for line in handle:
-                if "std::" in line:
-                    return f"Forbidden std:: usage in {path} -> {line.strip()}"
+        context["body_start_index"] = min(5, len(lines))
         return None
 
-    if not check_std_usage:
-        return None
+    expected_header = _expected_header(path)
+    for index, expected_line in enumerate(expected_header, start=1):
+        if len(lines) < index:
+            return (
+                f"Missing header line {index} in {path}. "
+                f"Expected '{expected_line}'."
+            )
+        normalized = _normalize_header_line(lines[index - 1], index)
+        if normalized != expected_line:
+            return (
+                f"Incorrect header line {index} in {path}. "
+                f"Expected '{expected_line}', found '{normalized}'."
+            )
 
-    with open(path, "r", encoding="utf-8", errors="ignore") as handle:
-        # Skip up to the header lines already checked.
-        for _ in range(5):
-            if not handle.readline():
-                break
-        for line in handle:
-            if "std::" in line:
-                return f"Forbidden std:: usage in {path} -> {line.strip()}"
+    context["body_start_index"] = len(expected_header)
     return None
 
+
+def _check_std_usage(path, lines, context):
+    if not context["check_std_usage"]:
+        return None
+
+    start_index = context.get("body_start_index", 0)
+    for line in lines[start_index:]:
+        if "std::" in line:
+            return f"Forbidden std:: usage in {path} -> {line.strip()}"
+    return None
+
+
+# Register default per-file checks (headers first, then std:: scan).
+PER_FILE_CHECKS = [
+    _check_headers,
+    _check_std_usage,
+]
+
+
+def check_file(path, check_std_usage, header_mode):
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as handle:
+            lines = handle.readlines()
+    except OSError as exc:
+        return f"Failed to read {path}: {exc}"
+
+    context = {
+        "header_mode": header_mode,
+        "check_std_usage": check_std_usage,
+        "body_start_index": 0,
+    }
+
+    for check in PER_FILE_CHECKS:
+        error = check(path, lines, context)
+        if error:
+            return error
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Directory traversal helpers
+# ---------------------------------------------------------------------------
 
 def _normalize_excludes(root, exclude_dirs):
     if not exclude_dirs:
@@ -225,3 +257,7 @@ if __name__ == "__main__":
         header_mode=args.header_mode,
         exclude_dirs=args.exclude_dirs,
     )
+PER_FILE_CHECKS = [
+    _check_headers,
+    _check_std_usage,
+]
