@@ -4,6 +4,7 @@
 
 #include "robotick/framework/memory/Memory.h"
 #include "robotick/framework/utility/Hash.h"
+#include "robotick/framework/strings/StringUtils.h"
 
 #include <cstdio>
 #include <stddef.h>
@@ -77,7 +78,7 @@ namespace robotick
 			return *this;
 		}
 
-		bool operator<(const FixedString<N>& other) const noexcept { return strcmp(data, other.data) < 0; }
+		bool operator<(const FixedString<N>& other) const noexcept { return string_compare(data, other.data) < 0; }
 
 		char* str() { return data; }
 
@@ -85,11 +86,11 @@ namespace robotick
 
 		operator const char*() const { return data; }
 
-		bool equals(const char* other) const noexcept { return strcmp(data, other) == 0; }
+		bool equals(const char* other) const noexcept { return string_equals(data, other); }
 
-		bool operator==(const char* other) const noexcept { return strcmp(data, other) == 0; }
+		bool operator==(const char* other) const noexcept { return string_equals(data, other); }
 
-		bool operator==(const FixedString<N>& other) const { return strcmp(data, other.data) == 0; }
+		bool operator==(const FixedString<N>& other) const { return string_equals(data, other.data); }
 
 		bool operator!=(const FixedString<N>& other) const { return !(*this == other); }
 

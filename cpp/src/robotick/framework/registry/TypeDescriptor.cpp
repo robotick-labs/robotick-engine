@@ -7,6 +7,8 @@
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/TypeRegistry.h"
+#include "robotick/framework/strings/StringUtils.h"
+
 #include <cstring>
 
 namespace robotick
@@ -68,26 +70,6 @@ namespace robotick
 		return nullptr;
 	}
 
-	inline bool case_insensitive_equals(const char* a, const char* b)
-	{
-		if (!a || !b)
-		{
-			return false;
-		}
-
-		while (*a && *b)
-		{
-			if (::tolower(static_cast<unsigned char>(*a)) != ::tolower(static_cast<unsigned char>(*b)))
-			{
-				return false;
-			}
-			++a;
-			++b;
-		}
-
-		return *a == *b;
-	}
-
 	static size_t limited_strlen(const char* str, size_t max_length)
 	{
 		size_t len = 0;
@@ -115,11 +97,11 @@ namespace robotick
 		}
 		if (name == "bool")
 		{
-			if ((::strcmp(input, "1") == 0) || case_insensitive_equals(input, "true"))
+			if (string_equals(input, "1") || string_equals_ignore_case(input, "true"))
 			{
 				*reinterpret_cast<bool*>(out_value) = true;
 			}
-			else if ((::strcmp(input, "0") == 0) || case_insensitive_equals(input, "false"))
+			else if (string_equals(input, "0") || string_equals_ignore_case(input, "false"))
 			{
 				*reinterpret_cast<bool*>(out_value) = false;
 			}

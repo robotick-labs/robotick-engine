@@ -4,6 +4,7 @@
 #include "robotick/framework/data/DataConnection.h"
 
 #include "robotick/api_base.h"
+#include "robotick/framework/Engine.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/DataConnectionSeed.h"

@@ -6,9 +6,8 @@
 #include "robotick/framework/containers/FixedVector.h"
 #include "robotick/framework/containers/List.h"
 #include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/strings/StringUtils.h"
 #include "robotick/framework/utility/Hash.h"
-
-#include <string.h> // for strcmp
 
 namespace robotick
 {
@@ -42,7 +41,7 @@ namespace robotick
 
 	template <> struct DefaultEqual<const char*>
 	{
-		static bool equal(const char* a, const char* b) { return strcmp(a, b) == 0; }
+		static bool equal(const char* a, const char* b) { return string_equals(a, b); }
 	};
 
 	template <> struct DefaultHash<char*>
@@ -52,7 +51,7 @@ namespace robotick
 
 	template <> struct DefaultEqual<char*>
 	{
-		static bool equal(const char* a, const char* b) { return strcmp(a, b) == 0; }
+		static bool equal(const char* a, const char* b) { return string_equals(a, b); }
 	};
 
 	template <size_t N> struct DefaultHash<FixedString<N>>
@@ -62,7 +61,7 @@ namespace robotick
 
 	template <size_t N> struct DefaultEqual<FixedString<N>>
 	{
-		static bool equal(const FixedString<N>& a, const FixedString<N>& b) { return strcmp(a.c_str(), b.c_str()) == 0; }
+		static bool equal(const FixedString<N>& a, const FixedString<N>& b) { return string_equals(a.c_str(), b.c_str()); }
 	};
 
 	template <typename Key, typename Value, size_t NumBuckets = 32> class Map
