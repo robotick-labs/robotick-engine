@@ -138,7 +138,8 @@ namespace robotick
 
 	inline uint32_t Thread::get_hardware_concurrency()
 	{
-		return 1;
+		// IDF sets CONFIG_FREERTOS_NUMBER_OF_CORES per target (e.g. 2 on ESP32-S3).
+		return CONFIG_FREERTOS_NUMBER_OF_CORES;
 	}
 
 } // namespace robotick

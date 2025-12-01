@@ -19,7 +19,6 @@ namespace robotick
 		}
 
 		inline void set(bool value = true) { flag.store(value); }
-		inline void unset() { flag.store(false); }
 		inline void clear() { flag.store(false); }
 		inline bool is_set() const { return flag.load(); }
 		inline bool test_and_set()
