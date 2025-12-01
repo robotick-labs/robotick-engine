@@ -4,31 +4,43 @@
 #pragma once
 
 #include "robotick/api_base.h"
+#include "robotick/framework/memory/Memory.h"
 
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <memory>
 #include <new> // operator new/delete with alignment
 #include <stdexcept>
 
 namespace robotick
 {
+
 	class RawBuffer
 	{
 	  public:
 		RawBuffer() = default;
 		RawBuffer(RawBuffer&&) noexcept = default;
 
-		explicit RawBuffer(size_t size) : size(size) { allocate_aligned(size); }
+		explicit RawBuffer(size_t size)
+			: size(size)
+		{
+			allocate_aligned(size);
+		}
 
-		// delete all copy / move options - use create_mirror_from() instead
 		RawBuffer(const RawBuffer&) = delete;
 		RawBuffer& operator=(const RawBuffer&) = delete;
 
-		// default move assignment
-		RawBuffer& operator=(RawBuffer&&) noexcept = default;
+		RawBuffer& operator=(RawBuffer&& other) noexcept
+		{
+			if (this != &other)
+			{
+				size = other.size;
+				data = robotick::move(other.data);
+				other.size = 0;
+			}
+			return *this;
+		}
 
 		uint8_t* raw_ptr() { return data.get(); }
 		const uint8_t* raw_ptr() const { return data.get(); }
@@ -39,8 +51,6 @@ namespace robotick
 			const uint8_t* buffer_start = raw_ptr();
 			const uint8_t* buffer_end = raw_ptr() + get_size();
 
-			// Object lies entirely inside the buffer, inclusive of the last byte.
-			// NB: Allow zero-sized objects while avoiding overflow.
 			return (query_ptr >= buffer_start) && (query_size <= get_size()) && (query_ptr + query_size <= buffer_end);
 		}
 
@@ -49,11 +59,9 @@ namespace robotick
 			return contains_object(static_cast<const uint8_t*>(query_ptr), query_size);
 		}
 
-		// One-time initialization only. Must be called once per RawBuffer instance.
-		// Allocates memory to match source and copies its contents.
 		void create_mirror_from(const RawBuffer& source)
 		{
-			if (data)
+			if (data.is_allocated())
 				ROBOTICK_FATAL_EXIT("RawBuffer::create_mirror_from: buffer already allocated");
 
 			size = source.size;
@@ -61,17 +69,15 @@ namespace robotick
 			update_mirror_from(source);
 		}
 
-		// Update this buffer with the contents of the source buffer.
-		// Buffers must already be the same size — use create_mirror_from() to allocate initially.
 		void update_mirror_from(const RawBuffer& source)
 		{
-			if (!data || size == 0)
+			if (!data.is_allocated() || size == 0)
 				ROBOTICK_FATAL_EXIT("RawBuffer::mirror_from: destination buffer not initialized");
 
 			if (size != source.size)
 				ROBOTICK_FATAL_EXIT("RawBuffer::update_mirror_from: size mismatch");
 
-			std::memcpy(data.get(), source.data.get(), size);
+			::memcpy(data.get(), source.data.get(), size);
 		}
 
 		template <typename T> T* as(size_t offset = 0)
@@ -83,7 +89,7 @@ namespace robotick
 				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset is not properly aligned for type T");
 
 			uint8_t* ptr = data.get() + offset;
-			return std::launder(reinterpret_cast<T*>(ptr));
+			return robotick::launder(reinterpret_cast<T*>(ptr));
 		}
 
 		template <typename T> const T* as(size_t offset = 0) const
@@ -95,34 +101,99 @@ namespace robotick
 				ROBOTICK_FATAL_EXIT("RawBuffer::as<T>: Offset is not properly aligned for type T");
 
 			const uint8_t* ptr = data.get() + offset;
-			return std::launder(reinterpret_cast<const T*>(ptr));
+			return robotick::launder(reinterpret_cast<const T*>(ptr));
 		}
 
 	  private:
 		size_t size = 0;
 
-		struct AlignedDeleter
+		struct AlignedStorage
 		{
-			void operator()(void* ptr) const noexcept { ::operator delete(ptr, std::align_val_t{alignof(std::max_align_t)}); }
+			AlignedStorage() = default;
+			AlignedStorage(AlignedStorage&& other) noexcept
+				: ptr(other.ptr)
+				, size(other.size)
+			{
+				other.ptr = nullptr;
+				other.size = 0;
+			}
+
+			AlignedStorage& operator=(AlignedStorage&& other) noexcept
+			{
+				if (this != &other)
+				{
+					release();
+					ptr = other.ptr;
+					size = other.size;
+					other.ptr = nullptr;
+					other.size = 0;
+				}
+				return *this;
+			}
+
+			AlignedStorage(const AlignedStorage&) = delete;
+			AlignedStorage& operator=(const AlignedStorage&) = delete;
+
+			~AlignedStorage() { release(); }
+
+			uint8_t* get() { return ptr; }
+			const uint8_t* get() const { return ptr; }
+
+			bool is_allocated() const { return ptr != nullptr; }
+
+			void allocate(size_t alloc_size)
+			{
+				if (ptr != nullptr)
+					ROBOTICK_FATAL_EXIT("AlignedStorage: attempt to allocate twice");
+
+				void* raw = ::operator new(alloc_size, robotick::align_val_t{alignof(max_align_t)});
+				::memset(raw, 0, alloc_size);
+				ptr = static_cast<uint8_t*>(raw);
+				size = alloc_size;
+			}
+
+			void release()
+			{
+				if (ptr)
+				{
+					::operator delete(ptr, robotick::align_val_t{alignof(max_align_t)});
+					ptr = nullptr;
+					size = 0;
+				}
+			}
+
+			uint8_t* ptr = nullptr;
+			size_t size = 0;
 		};
 
-		std::unique_ptr<uint8_t[], AlignedDeleter> data;
+		AlignedStorage data;
 
-		void allocate_aligned(size_t alloc_size)
-		{
-			void* ptr = ::operator new(alloc_size, std::align_val_t{alignof(std::max_align_t)});
-
-			std::memset(ptr, 0, alloc_size); // <- Zero entire buffer  before use to ensure deterministic workload construction and avoid
-											 //    undefined behavior from uninitialized memory
-
-			data = std::unique_ptr<uint8_t[], AlignedDeleter>(static_cast<uint8_t*>(ptr));
-		}
+		void allocate_aligned(size_t alloc_size) { data.allocate(alloc_size); }
 	};
 
 	class WorkloadsBuffer : public RawBuffer
 	{
 	  public:
-		using RawBuffer::RawBuffer; // inherit base-class constructors
+		using RawBuffer::RawBuffer;
+
+		void set_size_used(const size_t value) { size_used = value; }
+		size_t get_size_used() const { return size_used; };
+
+		bool contains_object_used_space(const uint8_t* query_ptr, const size_t query_size) const
+		{
+			const uint8_t* buffer_start = raw_ptr();
+			const uint8_t* buffer_end = raw_ptr() + get_size_used();
+
+			return (query_ptr >= buffer_start) && (query_size <= get_size_used()) && (query_ptr + query_size <= buffer_end);
+		}
+
+		bool contains_object_used_space(const void* query_ptr, const size_t query_size) const
+		{
+			return contains_object_used_space(static_cast<const uint8_t*>(query_ptr), query_size);
+		}
+
+	  private:
+		size_t size_used = 0;
 	};
 
 } // namespace robotick

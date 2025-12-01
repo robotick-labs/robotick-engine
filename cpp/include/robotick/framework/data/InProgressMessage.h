@@ -4,17 +4,16 @@
 #pragma once
 
 #include "robotick/framework/data/MessageHeader.h"
+#include "robotick/framework/utility/Function.h"
 
 #include <cstdint>
 #include <cstring>
-#include <tuple>
-#include <vector>
 
 namespace robotick
 {
-	constexpr char MAGIC[4] = {'R', 'B', 'I', 'N'};
-	constexpr uint8_t VERSION = 1;
-
+	// Incremental send/receive helper that lets RemoteEngineConnection share a single scratch buffer across non-blocking sockets.
+	// Each instance owns one half-duplex stream (either outbound or inbound) so we can make progress on both directions without
+	// forcing the caller to juggle partial headers/payloads manually.
 	class InProgressMessage
 	{
 	  public:
@@ -33,31 +32,42 @@ namespace robotick
 			ConnectionLost
 		};
 
-		void begin_send(uint8_t message_type, const uint8_t* data_ptr, const size_t data_size);
-		void begin_receive();
+		using PayloadWriter = Function<size_t(size_t offset, uint8_t* dst, size_t max_len)>;
+		using PayloadReader = Function<void(const uint8_t* data, size_t len)>;
+
+		void begin_send(uint8_t message_type, size_t payload_size, const PayloadWriter& writer);
+		void begin_receive(const PayloadReader& reader);
 
 		bool is_vacant() const { return stage == Stage::Vacant; }
 		bool is_occupied() const { return stage != Stage::Vacant; }
 		bool is_completed() const { return stage == Stage::Completed; }
+		uint32_t payload_length() const { return header.payload_len; }
 
-		std::tuple<const uint8_t*, size_t> get_payload() const;
-
-		InProgressMessage::Result tick(int socket_fd);
+		Result tick(int socket_fd);
 		void vacate();
 
 	  private:
+		static constexpr char kMagic[4] = {'R', 'B', 'I', 'N'};
+		static constexpr uint8_t kVersion = 1;
+
 		Stage stage = Stage::Vacant;
-		size_t cursor = 0;
 		MessageHeader header{};
-		std::vector<uint8_t> buffer;
+
+		// send state
+		size_t header_bytes_sent = 0;
+		size_t payload_size = 0;
+		size_t payload_bytes_sent = 0;
+		size_t chunk_bytes_sent = 0;
+		size_t chunk_bytes_total = 0;
+		PayloadWriter payload_writer;
+
+		// receive state
+		size_t header_bytes_received = 0;
+		size_t payload_bytes_received = 0;
+		PayloadReader payload_reader;
+
+		// Temporary scratch reused for both send & receive payload chunks.  Keeping it inline avoids heap churn in tight tick loops.
+		uint8_t chunk_buffer[1024]{};
 	};
-
-	inline std::tuple<const uint8_t*, size_t> InProgressMessage::get_payload() const
-	{
-		if (buffer.size() <= sizeof(MessageHeader))
-			return {nullptr, 0};
-
-		return {buffer.data() + sizeof(MessageHeader), buffer.size() - sizeof(MessageHeader)};
-	}
 
 } // namespace robotick

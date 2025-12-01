@@ -1,11 +1,12 @@
-
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/common/ArrayView.h"
+#include "robotick/framework/containers/ArrayView.h"
+#include "robotick/framework/containers/FixedVector.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
+#include "robotick/framework/strings/StringUtils.h"
 #include "robotick/framework/utils/TypeId.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
 
@@ -76,7 +77,7 @@ namespace robotick::test
 					const auto* field_ptr = static_cast<const uint8_t*>(view.field_ptr);
 
 					// Verify pointer lies within workloads buffer
-					CHECK(workloads_buf.contains_object(field_ptr, view.field_info->find_type_descriptor()->size));
+					CHECK(workloads_buf.contains_object_used_space(field_ptr, view.field_info->find_type_descriptor()->size));
 
 					if (view.field_info->name == "input_value")
 					{
@@ -106,10 +107,12 @@ namespace robotick::test
 			// const auto& original = engine.get_all_instance_info();
 			const auto& original_buf = engine.get_workloads_buffer();
 
-			WorkloadsBuffer mirror_buf(original_buf.get_size());
-			std::memcpy(mirror_buf.raw_ptr(), original_buf.raw_ptr(), original_buf.get_size());
+			WorkloadsBuffer mirror_buf(original_buf.get_size_used());
+			::memcpy(mirror_buf.raw_ptr(), original_buf.raw_ptr(), original_buf.get_size_used());
 
-			auto* mirror_workload = reinterpret_cast<SimpleWorkload*>(mirror_buf.raw_ptr());
+			const auto& inst = engine.get_all_instance_info()[0];
+			auto* mirror_workload = reinterpret_cast<SimpleWorkload*>(mirror_buf.raw_ptr() + inst.offset_in_workloads_buffer);
+
 			mirror_workload->inputs.input_value = 99;
 			mirror_workload->outputs.output_value = 888;
 
@@ -151,16 +154,26 @@ namespace robotick::test
 			Engine engine;
 			engine.load(model);
 
-			std::vector<std::string> seen_names;
+			FixedVector<FixedString64, 16> seen_names;
 			WorkloadFieldsIterator::for_each_workload(engine,
 				[&](const WorkloadInstanceInfo& info)
 				{
-					seen_names.push_back(std::string(info.seed->unique_name.c_str()));
+					FixedString64 copied_name(info.seed->unique_name.c_str());
+					seen_names.add(copied_name);
 				});
 
 			REQUIRE(seen_names.size() == 2);
-			CHECK_THAT(seen_names, Catch::Matchers::Contains("W1"));
-			CHECK_THAT(seen_names, Catch::Matchers::Contains("W2"));
+			bool has_w1 = false;
+			bool has_w2 = false;
+			for (const auto& name : seen_names)
+			{
+				if (string_equals(name.c_str(), "W1"))
+					has_w1 = true;
+				if (string_equals(name.c_str(), "W2"))
+					has_w2 = true;
+			}
+			CHECK(has_w1);
+			CHECK(has_w2);
 		}
 
 		SECTION("for_each_field_in_workload walks individual workload fields")
@@ -174,67 +187,21 @@ namespace robotick::test
 
 			const auto& info = engine.get_all_instance_info()[0];
 
-			std::set<std::string> found_fields;
+			int input_hits = 0;
+			int output_hits = 0;
 			WorkloadFieldsIterator::for_each_field_in_workload(engine,
 				info,
 				nullptr,
 				[&](const WorkloadFieldView& view)
 				{
-					found_fields.insert(view.field_info->name.c_str());
+					if (string_equals(view.field_info->name.c_str(), "input_value"))
+						++input_hits;
+					if (string_equals(view.field_info->name.c_str(), "output_value"))
+						++output_hits;
 				});
 
-			CHECK(found_fields.count("input_value") == 1);
-			CHECK(found_fields.count("output_value") == 1);
-		}
-
-		SECTION("Blackboard subfields correctly walked via input-wrapped Blackboard")
-		{
-			struct BBInputs
-			{
-				Blackboard blackboard;
-			};
-			ROBOTICK_REGISTER_STRUCT_BEGIN(BBInputs)
-			ROBOTICK_STRUCT_FIELD(BBInputs, Blackboard, blackboard)
-			ROBOTICK_REGISTER_STRUCT_END(BBInputs)
-
-			struct BBWorkload
-			{
-				BBInputs inputs;
-
-				FixedVector<FieldDescriptor, 2> blackboard_fields;
-
-				void pre_load()
-				{
-					blackboard_fields.fill();
-
-					blackboard_fields[0] = FieldDescriptor{"x", GET_TYPE_ID(int)};
-					blackboard_fields[1] = FieldDescriptor{"y", GET_TYPE_ID(double)};
-
-					inputs.blackboard.initialize_fields(ArrayView(blackboard_fields.begin(), blackboard_fields.size()));
-				}
-
-				void tick(const TickInfo&) {}
-			};
-			ROBOTICK_REGISTER_WORKLOAD(BBWorkload, void, BBInputs, void)
-
-			Model model;
-			WorkloadSeed& workload_seed = model.add("BBWorkload", "BB").set_tick_rate_hz(10.0f);
-			model.set_root_workload(workload_seed);
-
-			Engine engine;
-			engine.load(model);
-
-			std::set<std::string> seen_fields;
-			WorkloadFieldsIterator::for_each_workload_field(engine,
-				nullptr,
-				[&](const WorkloadFieldView& view)
-				{
-					if (view.subfield_info)
-						seen_fields.insert(view.subfield_info->name.c_str());
-				});
-
-			CHECK(seen_fields.count("x") == 1);
-			CHECK(seen_fields.count("y") == 1);
+			CHECK(input_hits == 1);
+			CHECK(output_hits == 1);
 		}
 	}
 

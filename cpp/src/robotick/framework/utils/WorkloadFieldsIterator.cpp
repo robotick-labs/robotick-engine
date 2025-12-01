@@ -10,7 +10,7 @@
 namespace robotick
 {
 
-	void WorkloadFieldsIterator::for_each_workload(const Engine& engine, std::function<void(const WorkloadInstanceInfo&)> callback)
+	void WorkloadFieldsIterator::for_each_workload(const Engine& engine, Function<void(const WorkloadInstanceInfo&)> callback)
 	{
 		for (const WorkloadInstanceInfo& instance : engine.get_all_instance_info())
 		{
@@ -21,7 +21,7 @@ namespace robotick
 	void WorkloadFieldsIterator::for_each_field_in_workload(const Engine& engine,
 		const WorkloadInstanceInfo& instance,
 		WorkloadsBuffer* workloads_override,
-		std::function<void(const WorkloadFieldView&)> callback)
+		Function<void(const WorkloadFieldView&)> callback)
 	{
 		auto& workloads_buffer = workloads_override ? *workloads_override : engine.get_workloads_buffer();
 
@@ -31,55 +31,92 @@ namespace robotick
 		const WorkloadDescriptor* workload_desc = workload_type->get_workload_desc();
 		ROBOTICK_ASSERT(workload_desc != nullptr);
 
-		auto walk_struct = [&](const TypeDescriptor* struct_type, const size_t struct_offset)
+		for_each_field_in_struct(instance, workload_desc->config_desc, workload_desc->config_offset, workloads_buffer, callback);
+		for_each_field_in_struct(instance, workload_desc->inputs_desc, workload_desc->inputs_offset, workloads_buffer, callback);
+		for_each_field_in_struct(instance, workload_desc->outputs_desc, workload_desc->outputs_offset, workloads_buffer, callback);
+	}
+
+	void WorkloadFieldsIterator::for_each_field_in_struct(const WorkloadInstanceInfo& instance,
+		const TypeDescriptor* struct_type,
+		const size_t struct_offset,
+		WorkloadsBuffer& workloads_buffer,
+		Function<void(const WorkloadFieldView&)> callback)
+	{
+		if (!struct_type)
+			return;
+
+		const StructDescriptor* struct_desc = struct_type->get_struct_desc();
+		ROBOTICK_ASSERT(struct_desc);
+
+		for (const FieldDescriptor& field_desc : struct_desc->fields)
 		{
-			if (!struct_type)
-				return;
-
-			const StructDescriptor* struct_desc = struct_type->get_struct_desc();
-			ROBOTICK_ASSERT(struct_desc);
-
-			for (const FieldDescriptor& field_desc : struct_desc->fields)
+			void* base_ptr = field_desc.get_data_ptr(workloads_buffer, instance, *struct_type, struct_offset);
+			if (!base_ptr)
 			{
-				void* base_ptr = field_desc.get_data_ptr(workloads_buffer, instance, *struct_type, struct_offset);
-				if (!base_ptr)
-					continue;
-
-				const TypeDescriptor* field_type_desc = field_desc.find_type_descriptor();
-				if (!field_type_desc)
-				{
-					continue;
-				}
-
-				const StructDescriptor* struct_desc = field_type_desc->get_struct_desc();
-				if (!struct_desc)
-				{
-					if (const DynamicStructDescriptor* dynamic_struct_desc = field_type_desc->get_dynamic_struct_desc())
-					{
-						struct_desc = dynamic_struct_desc->get_struct_descriptor(base_ptr);
-					}
-				}
-
-				if (struct_desc)
-				{
-					for (const FieldDescriptor& sub_field : struct_desc->fields)
-					{
-						void* sub_field_data_ptr = sub_field.get_data_ptr(base_ptr);
-						WorkloadFieldView view{&instance, struct_type, &field_desc, &sub_field, sub_field_data_ptr};
-						callback(view);
-					}
-				}
-				else
-				{
-					WorkloadFieldView view{&instance, struct_type, &field_desc, nullptr, base_ptr};
-					callback(view);
-				}
+				continue;
 			}
-		};
 
-		walk_struct(workload_desc->config_desc, workload_desc->config_offset);
-		walk_struct(workload_desc->inputs_desc, workload_desc->inputs_offset);
-		walk_struct(workload_desc->outputs_desc, workload_desc->outputs_offset);
+			WorkloadFieldView view{&instance, struct_type, &field_desc, nullptr, base_ptr};
+			callback(view);
+		}
+	}
+
+	void WorkloadFieldsIterator::for_each_field_in_struct_field(
+		const WorkloadFieldView& parent_field, Function<void(const WorkloadFieldView&)> callback)
+	{
+		const StructDescriptor* struct_desc = parent_field.get_field_struct_desc();
+		if (!struct_desc)
+			return;
+
+		for (const FieldDescriptor& field_desc : struct_desc->fields)
+		{
+			void* base_ptr = field_desc.get_data_ptr(parent_field.field_ptr);
+			if (!base_ptr)
+				continue;
+
+			const TypeDescriptor* parent_type_desc = nullptr;
+			if (parent_field.field_info)
+			{
+				parent_type_desc = parent_field.field_info->find_type_descriptor();
+			}
+			if (!parent_type_desc)
+			{
+				parent_type_desc = parent_field.struct_info;
+			}
+
+			if (!parent_type_desc)
+			{
+				continue;
+			}
+
+			WorkloadFieldView view{parent_field.workload_info, parent_type_desc, &field_desc, nullptr, base_ptr};
+			callback(view);
+		}
+	}
+
+	const StructDescriptor* WorkloadFieldView::get_field_struct_desc() const
+	{
+		if (!field_info)
+			return nullptr;
+
+		const TypeDescriptor* field_type_desc = field_info->find_type_descriptor();
+		if (!field_type_desc)
+			return nullptr;
+
+		const StructDescriptor* sub_struct_desc = field_type_desc->get_struct_desc();
+		if (sub_struct_desc)
+			return sub_struct_desc;
+
+		const DynamicStructDescriptor* dyn_desc = field_type_desc->get_dynamic_struct_desc();
+		if (dyn_desc)
+			return dyn_desc->get_struct_descriptor(field_ptr);
+
+		return nullptr;
+	}
+
+	bool WorkloadFieldView::is_struct_field() const
+	{
+		return get_field_struct_desc() != nullptr;
 	}
 
 } // namespace robotick

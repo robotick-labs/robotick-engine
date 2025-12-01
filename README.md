@@ -18,6 +18,18 @@
 
 From bare-metal microcontrollers like the STM32 and ESP32 to Raspberry Pi, desktop systems, and edge-AI devices like NVIDIA Jetson (arm64), Robotick delivers real-time precision where it counts, and excellent performance everywhere else - without sacrificing ease of use or flexibility.
 
+### 🧱 Zero-allocation policy
+
+The engine core avoids heap-bearing `std::` containers entirely: approved STL headers are wrapped by `robotick::StdApproved` (defined in `cpp/include/robotick/framework/common/StdApproved.h`), while deterministic structures rely on native types like `FixedString` and `HeapVector` (each defined in their own headers) plus explicit placement-new logic. Platform/CLI layers can still use STL where needed, but the contiguous-engine runtime stays heap-free so ESP32/MCU targets see consistent timings.
+
+### 🧭 Callback contract
+
+`start_fn`, `tick_fn`, and `stop_fn` are invoked inside the core loop where exceptions are not allowed, so workloads must catch and log their own exceptions before returning. If a workload wraps a third-party API that can throw, the workload should capture the exception, emit a warning via `ROBOTICK_WARNING` (or ROBOTICK_FATAL_EXIT it can't be handled elegantly), and then cleanly return so the engine can continue ticking. We keep the engine exception-free for MCU determinism.
+
+### 🕸️ Web Server startup
+
+`WebServer::start` now fatally exits if it cannot bind the requested port, making port conflicts immediately visible. Passing `port = 0` lets the OS pick an available port, so automated tests/tools can avoid busy sockets and then query `get_bound_port()` once the server runs.
+
 ---
 
 ## 🚀 What is Robotick?
@@ -40,6 +52,7 @@ Built for early learners and industry professionals alike, Robotick is simple en
 ### 🧩 Modular Workloads
 
 Each unit of logic is a workload - a small, testable module with clearly defined inputs, outputs, and config:
+
 ```cpp
 struct HelloWorkload {
     HelloConfig config;
@@ -49,6 +62,9 @@ struct HelloWorkload {
     void tick(const TickInfo& tick_info);
 };
 ```
+
+ROBOTICK_REGISTER_WORKLOAD(HelloWorkload, HelloConfig, HelloInputs, HelloOutputs)
+
 Reflection macros make every field visible and usable for config, scripting, or telemetry.
 
 ### 🔁 Real-Time Engine
@@ -140,7 +156,18 @@ Compiled and deployed executables are tested across an expanding range of target
 - **Flexible**: Modular composition and optional Python integration
 - **Embeddable**: Works standalone or embedded into larger stacks
 
+### 🧠 Ownership & Singletons
+
+- **TypeRegistry** is the only global singleton in the engine. It is written exactly once during startup by the thread that registers workloads and sealed via `TypeRegistry::seal()`. The registry asserts that all mutations come from that same thread, so contributors must finish registration before launching `Engine::load()`. After sealing, it becomes immutable and thread-safe to read.
+- **TelemetryServer** and **RemoteEngineConnections** are not globals; they are owned by `Engine::State` and rely on RAII. They start when the engine starts and stop automatically in `Engine::~Engine`/`Engine::run` teardown. This keeps sockets, ports, and threads scoped to each engine instead of leaking across processes.
+- **No hidden singletons**: other subsystems (data connections, workloads, etc.) are explicit members hanging off `Engine::State`. If a component needs process-wide coordination, document it alongside its owning class rather than relying on unnamed globals.
+- See `docs/ownership.md` for the full policy and contributor guidelines, and `docs/module-map.md` for a subsystem/init-order walkthrough.
+
 ---
+
+## ✅ Validation Matrix
+
+`docs/module-map.md` now documents the exact commands that must pass before a PR merges: `./build_linux_debug.sh`, the ESP32 build helpers such as `./build_esp32s3.sh`, and the remote/telemetry Catch2 suites executed via `ctest` inside `build/robotick-engine-tests-linux-debug/cpp/tests`. Running those scripts locally reproduces the CI gate and keeps the soft-launch baseline healthy.
 
 ## 🗺️ Roadmap
 

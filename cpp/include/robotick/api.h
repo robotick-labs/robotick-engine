@@ -4,6 +4,7 @@
 #pragma once
 
 // This header is intended for **commonly used includes** that are relevant to **any workload**.
+//
 // It should be kept minimal — only include essentials that are broadly useful across most workloads,
 // such as tick metadata, fixed strings, and field/registration helpers.
 //
@@ -21,12 +22,14 @@
 #define ROBOTICK_API
 #endif
 
-#include "robotick/framework/Engine.h"
 #include "robotick/framework/TickInfo.h"
-#include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/data/State.h"
+#include "robotick/framework/math/MathUtils.h"
+#include "robotick/framework/math/Quat.h"
 #include "robotick/framework/math/Vec2.h"
 #include "robotick/framework/math/Vec3.h"
 #include "robotick/framework/model/Model.h"
 #include "robotick/framework/registry/TypeMacros.h"
 #include "robotick/framework/registry/TypeRegistry.h"
+#include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/strings/StringView.h"

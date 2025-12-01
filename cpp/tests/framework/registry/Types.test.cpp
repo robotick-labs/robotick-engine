@@ -1,12 +1,15 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/common/FixedString.h"
+#include "robotick/config/AssertUtils.h"
+#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeRegistry.h"
+#include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/strings/StringUtils.h"
+#include "robotick/framework/strings/StringView.h"
 #include <catch2/catch_all.hpp>
 #include <cstring>
-#include <set>
 
 namespace robotick::test
 {
@@ -54,14 +57,40 @@ namespace robotick::test
 		{
 			const auto& registered_types = registry.get_registered_types();
 
-			std::set<std::string> seen_names;
-			std::set<TypeId> seen_ids;
+			HeapVector<FixedString64> seen_names;
+			HeapVector<TypeId> seen_ids;
+			seen_names.initialize(registered_types.size());
+			seen_ids.initialize(registered_types.size());
+			size_t name_count = 0;
+			size_t id_count = 0;
 
 			for (auto desc : registered_types)
 			{
 				REQUIRE(desc != nullptr);
-				REQUIRE(seen_names.insert(desc->name.c_str()).second);
-				REQUIRE(seen_ids.insert(desc->id).second);
+				bool name_unique = true;
+				const char* name_cstr = desc->name.c_str();
+				for (size_t i = 0; i < name_count; ++i)
+				{
+					if (seen_names[i] == name_cstr)
+					{
+						name_unique = false;
+						break;
+					}
+				}
+				REQUIRE(name_unique);
+				seen_names[name_count++] = desc->name.c_str();
+
+				bool id_unique = true;
+				for (size_t j = 0; j < id_count; ++j)
+				{
+					if (seen_ids[j] == desc->id)
+					{
+						id_unique = false;
+						break;
+					}
+				}
+				REQUIRE(id_unique);
+				seen_ids[id_count++] = desc->id;
 			}
 		}
 
@@ -100,6 +129,85 @@ namespace robotick::test
 				// compare raw bytes
 				CHECK(memcmp(parsed, entry.sample_value, desc->size) == 0);
 			}
+		}
+
+		SECTION("Primitive Types - invalid bool strings and unsupported descriptors return false")
+		{
+			const TypeDescriptor* bool_desc = registry.find_by_name("bool");
+			REQUIRE(bool_desc != nullptr);
+			bool bool_value = false;
+			CHECK_FALSE(bool_desc->from_string("not_a_boolean", &bool_value));
+
+			TypeDescriptor custom_desc{StringView("custom"), TypeId::invalid(), sizeof(int), alignof(int), TypeCategory::Primitive, {}, nullptr};
+
+			char buffer[32] = {};
+			int payload = 0;
+			CHECK_FALSE(custom_desc.to_string(&payload, buffer, sizeof(buffer)));
+			CHECK_FALSE(custom_desc.from_string("123", &payload));
+		}
+
+		SECTION("Primitive Types - text/plain descriptors stay null terminated")
+		{
+			const TypeDescriptor* text_desc = registry.find_by_name("FixedString8");
+			REQUIRE(text_desc != nullptr);
+
+			FixedString8 dest;
+			CHECK(text_desc->from_string("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", dest.data));
+			CHECK(dest.data[dest.capacity() - 1] == '\0');
+		}
+
+		SECTION("Primitive Types - text/plain from_string zero-fills remainder")
+		{
+			const TypeDescriptor* text_desc = registry.find_by_name("FixedString8");
+			REQUIRE(text_desc != nullptr);
+
+			const size_t dest_size = sizeof(FixedString8);
+			char dest[dest_size];
+			memset(dest, 'Z', dest_size);
+
+			CHECK(text_desc->from_string("hello", dest));
+			const size_t actual_len = robotick::string_length(dest);
+			CHECK(actual_len < dest_size);
+			for (size_t i = actual_len + 1; i < dest_size; ++i)
+			{
+				CHECK(dest[i] == '\0');
+			}
+		}
+
+		SECTION("Primitive Types - to_string leaves buffer zeroed on overflow")
+		{
+			const TypeDescriptor* int_desc = registry.find_by_name("int");
+			REQUIRE(int_desc != nullptr);
+
+			char small_buffer[3];
+			memset(small_buffer, 'X', sizeof(small_buffer));
+
+			const int sample = 123456;
+			CHECK_FALSE(int_desc->to_string(&sample, small_buffer, sizeof(small_buffer)));
+			CHECK(small_buffer[0] == '\0');
+		}
+
+		SECTION("TypeRegistry rejects duplicate ids")
+		{
+			static FixedString64 persistent_names[32];
+			static size_t persistent_count = 0;
+			const size_t primary_idx = persistent_count++;
+			const size_t alias_idx = persistent_count++;
+			ROBOTICK_ASSERT(primary_idx < 32 && alias_idx < 32);
+
+			FixedString64& primary_name = persistent_names[primary_idx];
+			FixedString64& alias_name = persistent_names[alias_idx];
+			primary_name.format("RegistryDuplicate_%zu", primary_idx);
+			alias_name.format("RegistryDuplicateAlias_%zu", primary_idx);
+
+			const TypeDescriptor s_duplicate_primary{
+				StringView(primary_name.c_str()), TypeId(primary_name.c_str()), sizeof(int), alignof(int), TypeCategory::Primitive, {}, nullptr};
+			TypeRegistry::get().register_type(s_duplicate_primary);
+
+			const TypeDescriptor s_duplicate_secondary{
+				StringView(alias_name.c_str()), TypeId(primary_name.c_str()), sizeof(int), alignof(int), TypeCategory::Primitive, {}, nullptr};
+			ROBOTICK_REQUIRE_ERROR_MSG(
+				TypeRegistry::get().register_type(s_duplicate_secondary), "TypeRegistry::register_type() - cannot have multiple types with same id");
 		}
 	}
 } // namespace robotick::test

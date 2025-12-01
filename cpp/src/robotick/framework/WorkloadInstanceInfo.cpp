@@ -7,9 +7,20 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/registry/TypeMacros.h"
 
 namespace robotick
 {
+	ROBOTICK_REGISTER_FIXED_VECTOR(TickDurationWindow, uint32_t);
+
+	ROBOTICK_REGISTER_STRUCT_BEGIN(WorkloadInstanceStats)
+	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, last_tick_duration_ns)
+	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, last_time_delta_ns)
+	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, float, tick_rate_hz)
+	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, TickDurationWindow, duration_window)
+	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, window_index)
+	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, overrun_count)
+	ROBOTICK_REGISTER_STRUCT_END(WorkloadInstanceStats)
 
 	uint8_t* WorkloadInstanceInfo::get_ptr(const Engine& engine) const
 	{

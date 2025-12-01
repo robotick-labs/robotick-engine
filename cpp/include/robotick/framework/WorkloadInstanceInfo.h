@@ -3,10 +3,12 @@
 
 #pragma once
 
-#include "robotick/framework/common/HeapVector.h"
+#include "robotick/framework/containers/FixedVector.h"
+#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/utils/Constants.h"
 
 #include <cstdint>
+#include <stddef.h>
 
 namespace robotick
 {
@@ -16,16 +18,33 @@ namespace robotick
 	struct WorkloadsBuffer;
 	struct WorkloadDescriptor;
 
+	using TickDurationWindow = FixedVector<uint32_t, 64>;
+
 	struct WorkloadInstanceStats
 	{
-		uint32_t last_tick_duration_ns{0}; // (uint32_t can store up to 4.29s of nanoseconds - should be fine for these deltas)
-		uint32_t last_time_delta_ns{0};
+		// Stats travel with each workload instance inside WorkloadsBuffer so telemetry can be read without locks.
+		uint32_t last_tick_duration_ns = 0; // (uint32_t can store up to 4.29s of nanoseconds - should be fine for these deltas)
+		uint32_t last_time_delta_ns = 0;
+		float tick_rate_hz = 0.0f;
+
+		// Sliding window lives inline so we never touch the heap while sampling ticks.
+		TickDurationWindow duration_window;
+		uint32_t window_index = 0;
+		uint32_t overrun_count = 0;
+
+		void record_tick_duration_ns(uint32_t duration_ns, uint32_t budget_ns);
 
 		float get_last_tick_duration_sec() const { return (float)last_tick_duration_ns * 1e-9f; }
 		float get_last_time_delta_sec() const { return (float)last_time_delta_ns * 1e-9f; }
 
 		float get_last_tick_duration_ms() const { return (float)last_tick_duration_ns * 1e-6f; }
 		float get_last_time_delta_ms() const { return (float)last_time_delta_ns * 1e-6f; }
+
+	  private:
+		// Internal sliding-window instrumentation (not part of the public API):
+		const TickDurationWindow& get_duration_window() const { return duration_window; }
+		uint32_t get_duration_window_index() const { return window_index; }
+		size_t get_duration_window_count() const { return duration_window.size(); }
 	};
 
 	struct WorkloadInstanceInfo
@@ -41,8 +60,33 @@ namespace robotick
 
 		HeapVector<const WorkloadInstanceInfo*> children;
 
-		// mutable state:
-		mutable WorkloadInstanceStats mutable_stats;
-		// ^- mutable so we can set it during ticking, even when WorkloadInstanceInfo is const - e.g. for stats
+		WorkloadInstanceStats* workload_stats = nullptr;
 	};
+
+	inline void WorkloadInstanceStats::record_tick_duration_ns(uint32_t duration_ns, uint32_t budget_ns)
+	{
+		if (budget_ns == 0)
+			budget_ns = 1;
+
+		// Track whether the workload exceeded its budget; the stats object owns this monotonic counter
+		// for the lifetime of the workload instance (placement-new in WorkloadsBuffer keeps it alive).
+		if (duration_ns > budget_ns)
+			++overrun_count;
+
+		// Maintain a circular window of recent tick durations.  The buffer stays fixed-size to avoid heap churn
+		// while still giving telemetry consumers enough history to compute variance/mean offline.
+		if (duration_window.size() < duration_window.capacity())
+		{
+			duration_window.add(duration_ns);
+		}
+		else
+		{
+			duration_window[window_index] = duration_ns;
+		}
+
+		// Wrap in a predictable order so each call advances the "cursor" without reallocating.
+		window_index = (window_index + 1) % (uint32_t)duration_window.capacity();
+		last_tick_duration_ns = duration_ns;
+	}
+
 } // namespace robotick

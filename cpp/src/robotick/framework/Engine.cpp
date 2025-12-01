@@ -4,13 +4,21 @@
 #include "robotick/framework/Engine.h"
 
 #include "robotick/api.h"
+#include "robotick/framework/concurrency/Atomic.h"
+#include "robotick/framework/concurrency/Thread.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/DataConnection.h"
-#include "robotick/framework/data/RemoteEngineConnection.h"
+#include "robotick/framework/data/RemoteEngineConnections.h"
+#include "robotick/framework/data/TelemetryServer.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/Model.h"
+#include "robotick/framework/services/WebServer.h"
+#include "robotick/framework/system/PlatformEvents.h"
+#include "robotick/framework/system/System.h"
+#include "robotick/framework/time/Clock.h"
 #include "robotick/framework/utils/TypeId.h"
-#include "robotick/platform/Threading.h"
+
+#include <cstddef>
 
 namespace robotick
 {
@@ -21,14 +29,15 @@ namespace robotick
 
 		WorkloadsBuffer workloads_buffer;
 
+		TelemetryServer telemetry_server;
+
 		const WorkloadInstanceInfo* root_instance = nullptr;
 		HeapVector<WorkloadInstanceInfo> instances;
 		Map<const char*, WorkloadInstanceInfo*> instances_by_unique_name;
 		HeapVector<DataConnectionInfo> data_connections_all;
 		HeapVector<DataConnectionInfo*> data_connections_acquired;
 
-		HeapVector<RemoteEngineConnection> remote_engine_senders; // one sender per remote-engine we need to send data to
-		RemoteEngineConnection remote_engines_receiver;			  // one receiver in case any engines need to send data to us
+		RemoteEngineConnections remote_engine_connections;
 	};
 
 	Engine::Engine()
@@ -38,6 +47,9 @@ namespace robotick
 
 	Engine::~Engine()
 	{
+		state->telemetry_server.stop();
+		state->remote_engine_connections.stop();
+
 		for (auto& instance : state->instances)
 		{
 			if (instance.workload_descriptor->destruct_fn)
@@ -52,12 +64,73 @@ namespace robotick
 
 	extern "C" void robotick_force_register_primitives();
 	extern "C" void robotick_force_register_fixed_vector_types();
+	extern "C" void robotick_force_register_vec3_types();
+	extern "C" void robotick_force_register_quat_types();
+
+	// Prevent integer overflow while sizing contiguous chunks so layout stays deterministic even near SIZE_MAX.
+	// The workloads buffer is preallocated once, so a bad descriptor must be rejected rather than silently wrapping.
+	static bool safe_add_size(size_t lhs, size_t rhs, size_t& out)
+	{
+		const size_t max_size = SIZE_MAX;
+		if (rhs > max_size - lhs)
+			return false;
+		out = lhs + rhs;
+		return true;
+	}
+
+	// Clamp to max_align_t so the placement-new construction that follows always satisfies C++ object requirements.
+	static size_t max_align_for_type(size_t alignment)
+	{
+		return (alignment > alignof(max_align_t)) ? alignment : alignof(max_align_t);
+	}
+
+	// Ensure the cursor respects the max alignment of the upcoming type so every allocation remains well-aligned.
+	static bool align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	{
+		const size_t alignment = max_align_for_type(type.alignment);
+		// This should never fail, since max_align_for_type clamps to at least alignof(max_align_t),
+		// but we keep the division defensive to protect the cursor from bad alignments.
+		if (alignment == 0)
+			return false;
+		size_t remainder = workloads_cursor % alignment;
+		if (remainder != 0)
+		{
+			size_t delta = alignment - remainder;
+			size_t aligned_cursor = 0;
+			if (!safe_add_size(workloads_cursor, delta, aligned_cursor))
+				return false;
+			// Move the cursor forward so that the next placement-new starts at an address compatible with the target type.
+			workloads_cursor = aligned_cursor;
+		}
+		return true;
+	}
+
+	// Reserve space for the named type and record the advanced cursor so the next workload starts immediately after it.
+	static bool increment_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	{
+		if (type.size == 0)
+			return false;
+		size_t next_cursor = 0;
+		if (!safe_add_size(workloads_cursor, type.size, next_cursor))
+			return false;
+		// Advance past the object we just allocated so the following type begins immediately afterwards.
+		workloads_cursor = next_cursor;
+		return true;
+	}
 
 	void Engine::load(const Model& model)
 	{
-		// ensure out standard types don't get pruned by the linker:
+		ROBOTICK_INFO("Loading model: %s", model.get_model_name());
+
+		// initialize the host-system
+		System::initialize();
+
+		// ensure our standard types don't get pruned by the linker, and then seal the registry:
 		robotick_force_register_primitives();
 		robotick_force_register_fixed_vector_types();
+		robotick_force_register_vec3_types();
+		robotick_force_register_quat_types();
+		TypeRegistry::get().seal();
 
 		if (!model.get_root_workload())
 			ROBOTICK_FATAL_EXIT("Model has no root workload");
@@ -68,48 +141,83 @@ namespace robotick
 		state->model = &model;
 
 		// compute how big we need our workloads-buffer to be:
+		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
+		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
+
 		const auto& seeds = model.get_workload_seeds();
-		size_t workloads_cursor = 0;
-		std::vector<size_t> offsets;
+		size_t total_size = 0;
 		for (const WorkloadSeed* seed : seeds)
 		{
 			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
-			if (!workload_type)
-				ROBOTICK_FATAL_EXIT("Unknown workload type: %s", seed->type_id.get_debug_name());
+			ROBOTICK_ASSERT_MSG(workload_type, "Unknown workload type: %s", seed->type_id.get_debug_name());
 
-			const size_t align = std::max<size_t>(workload_type->alignment, alignof(std::max_align_t));
-			workloads_cursor = (workloads_cursor + align - 1) & ~(align - 1);
-			offsets.push_back(workloads_cursor);
-			workloads_cursor += workload_type->size;
+			if (!align_workloads_cursor_for_type(*workload_stats_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while sizing stats type '%s'", workload_stats_type->name.c_str());
+			if (!increment_workloads_cursor_for_type(*workload_stats_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while sizing stats type '%s'", workload_stats_type->name.c_str());
+
+			if (!align_workloads_cursor_for_type(*workload_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow for workload type '%s'", workload_type->name.c_str());
+			if (!increment_workloads_cursor_for_type(*workload_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while sizing workload type '%s'", workload_type->name.c_str());
 		}
 
 		// create our workloads-buffer, workload-instances info, and construct each workload:
-		const size_t total_size = workloads_cursor;
-		state->workloads_buffer = WorkloadsBuffer(total_size + DEFAULT_MAX_BLACKBOARDS_BYTES);
+		size_t buffer_capacity = 0;
+
+		// Blackboard storage sits immediately after workload instances; reserve it now so the contiguous block never relocates.
+		if (!safe_add_size(total_size, DEFAULT_MAX_BLACKBOARDS_BYTES, buffer_capacity))
+			ROBOTICK_FATAL_EXIT(
+				"Workloads buffer size overflow when reserving blackboard space (%zu + %zu)", total_size, (size_t)DEFAULT_MAX_BLACKBOARDS_BYTES);
+		state->workloads_buffer = WorkloadsBuffer(buffer_capacity);
+
+		size_t workloads_cursor = 0;
 		uint8_t* buffer_ptr = state->workloads_buffer.raw_ptr();
 		state->instances.initialize(seeds.size());
 
 		for (size_t i = 0; i < seeds.size(); ++i)
 		{
 			const auto* seed = seeds[i];
+
 			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
+			ROBOTICK_ASSERT_MSG(workload_type, "Unknown workload type: %s", seed->type_id.get_debug_name());
 
 			const auto* workload_desc = workload_type->get_workload_desc();
 			ROBOTICK_ASSERT(workload_desc != nullptr);
 
-			uint8_t* ptr = buffer_ptr + offsets[i];
+			// Stats/instance structs are colocated in the same buffer; align both as if they were independently allocated.
+			if (!align_workloads_cursor_for_type(*workload_stats_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while laying-out stats for workload type '%s'", workload_type->name.c_str());
+			const size_t stats_offset = workloads_cursor;
+			if (!increment_workloads_cursor_for_type(*workload_stats_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while laying-out stats for workload type '%s'", workload_type->name.c_str());
+
+			if (!align_workloads_cursor_for_type(*workload_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while laying-out workload type '%s'", workload_type->name.c_str());
+			const size_t instance_offset = workloads_cursor;
+			if (!increment_workloads_cursor_for_type(*workload_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while laying-out workload type '%s'", workload_type->name.c_str());
+
+			uint8_t* workload_stats_ptr = buffer_ptr + stats_offset;
+			uint8_t* workload_ptr = buffer_ptr + instance_offset;
 
 			WorkloadInstanceInfo& workload_instance_info = state->instances[i];
-			workload_instance_info.offset_in_workloads_buffer = offsets[i];
+			workload_instance_info.offset_in_workloads_buffer = instance_offset;
 			workload_instance_info.type = workload_type;
 			workload_instance_info.workload_descriptor = workload_desc;
 			workload_instance_info.seed = seed;
+
+			// Stats are lifetime-bound to the buffer; placement-new keeps RAII intact without separate allocations.
+			workload_instance_info.workload_stats = new (static_cast<void*>(workload_stats_ptr)) WorkloadInstanceStats{};
+			workload_instance_info.workload_stats->tick_rate_hz = seed->tick_rate_hz;
 
 			// add it to our map for quick lookup by name
 			state->instances_by_unique_name.insert(seed->unique_name.c_str(), &workload_instance_info);
 
 			if (workload_desc->construct_fn)
-				workload_desc->construct_fn(ptr);
+			{
+				workload_desc->construct_fn(workload_ptr);
+			}
 		}
 
 		// handle pre-load for each workload (we can multithread this in future, where platforms allow)
@@ -125,13 +233,11 @@ namespace robotick
 			if (seed->config.size() > 0 && workload_desc->config_desc)
 			{
 				ROBOTICK_ASSERT(workload_desc->config_offset != OFFSET_UNBOUND);
-				DataConnectionUtils::apply_struct_field_values(ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config);
-			}
 
-			if (seed->inputs.size() > 0 && workload_desc->inputs_desc)
-			{
-				ROBOTICK_ASSERT(workload_desc->inputs_offset != OFFSET_UNBOUND);
-				DataConnectionUtils::apply_struct_field_values(ptr + workload_desc->inputs_offset, *workload_desc->inputs_desc, seed->inputs);
+				// don't error on first pass - we may need to set some, preload a script to create blackboard, and then have final pass
+				const bool fatalExitIfNotFound = false;
+				DataConnectionUtils::apply_struct_field_values(
+					ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config, fatalExitIfNotFound);
 			}
 
 			if (workload_desc->pre_load_fn)
@@ -147,8 +253,39 @@ namespace robotick
 		if (blackboard_size > 0)
 		{
 			size_t start = workloads_cursor;
-			workloads_cursor += blackboard_size;
+			size_t next_cursor = 0;
+			if (!safe_add_size(workloads_cursor, blackboard_size, next_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while reserving blackboards (%zu + %zu)", start, blackboard_size);
+			workloads_cursor = next_cursor;
 			bind_blackboards_for_instances(state->instances, start);
+		}
+
+		state->workloads_buffer.set_size_used(workloads_cursor);
+
+		// post-blackboard-setup config pass:
+		for (size_t i = 0; i < seeds.size(); ++i)
+		{
+			const auto& seed = seeds[i];
+			const auto* workload_desc = state->instances[i].workload_descriptor;
+			uint8_t* ptr = buffer_ptr + state->instances[i].offset_in_workloads_buffer;
+
+			if (seed->config.size() > 0 && workload_desc->config_desc)
+			{
+				ROBOTICK_ASSERT(workload_desc->config_offset != OFFSET_UNBOUND);
+
+				const bool fatalExitIfNotFound = true;
+				DataConnectionUtils::apply_struct_field_values(
+					ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config, fatalExitIfNotFound);
+			}
+
+			if (seed->inputs.size() > 0 && workload_desc->inputs_desc)
+			{
+				ROBOTICK_ASSERT(workload_desc->inputs_offset != OFFSET_UNBOUND);
+
+				const bool fatalExitIfNotFound = true;
+				DataConnectionUtils::apply_struct_field_values(
+					ptr + workload_desc->inputs_offset, *workload_desc->inputs_desc, seed->inputs, fatalExitIfNotFound);
+			}
 		}
 
 		// handle load for each workload (we can multithread this in future, where platforms allow)
@@ -243,14 +380,18 @@ namespace robotick
 				inst.workload_descriptor->setup_fn(inst.get_ptr(*this));
 		}
 
-		setup_remote_engine_senders(model);
-		setup_remote_engines_receiver();
+		ROBOTICK_ASSERT(state->model != nullptr);
+		state->remote_engine_connections.setup(*this, *(state->model));
 
 		state->root_instance = root_instance;
+
+		ROBOTICK_INFO("Loading complete for model: %s", model.get_model_name());
 	}
 
 	void Engine::run(const AtomicFlag& stop_after_next_tick_flag)
 	{
+		ROBOTICK_INFO("Running model: %s", state->model->get_model_name());
+
 		if (!state->root_instance)
 			ROBOTICK_FATAL_EXIT("Root workload instance-info not set");
 
@@ -268,34 +409,34 @@ namespace robotick
 		if (root_tick_fn == nullptr)
 			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_fn - check it has been correctly registered");
 
-		// Start all workloads
-		for (auto& inst : state->instances)
-		{
-			if (inst.workload_descriptor->start_fn)
-				inst.workload_descriptor->start_fn(inst.get_ptr(*this), inst.seed->tick_rate_hz);
-		}
+		// start_fn always runs on the same thread that will perform ticks so workloads can safely cache thread-affine handles.
+		if (root_info.workload_descriptor->start_fn)
+			root_info.workload_descriptor->start_fn(root_ptr, root_tick_rate_hz);
+
+		state->telemetry_server.start(*this, state->model->get_telemetry_port());
 
 		state->is_running = true;
 
-		const auto child_tick_interval_sec = std::chrono::duration<float>(1.0f / root_tick_rate_hz);
-		const auto child_tick_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(child_tick_interval_sec);
-
-		const auto engine_start_time = std::chrono::steady_clock::now() - child_tick_interval;
+		const auto child_tick_interval = Clock::from_seconds(1.0f / root_tick_rate_hz);
+		const auto engine_start_time = Clock::now() - child_tick_interval;
 		// ^- subtract tick-interval so initial delta is from tick-interval
 
 		auto last_tick_time = engine_start_time;
 		auto next_tick_time = engine_start_time;
 
+		// TickInfo is reused every iteration; we update its running clock/delta fields so consumers never see partially
+		// initialized values.
 		TickInfo tick_info;
-		tick_info.workload_stats = &root_info.mutable_stats;
+		tick_info.workload_stats = root_info.workload_stats;
+		tick_info.tick_rate_hz = root_tick_rate_hz;
 
 		do
 		{
-			const auto now = std::chrono::steady_clock::now();
-			const auto ns_since_start = std::chrono::duration_cast<std::chrono::nanoseconds>(now - engine_start_time).count();
-			const auto ns_since_last = std::chrono::duration_cast<std::chrono::nanoseconds>(now - last_tick_time).count();
+			const auto now = Clock::now();
+			const auto ns_since_start = Clock::to_nanoseconds(now - engine_start_time).count();
+			const auto ns_since_last = Clock::to_nanoseconds(now - last_tick_time).count();
 
-			static const float s_1_nanosecond_sec = 1e-9F;
+			constexpr float s_1_nanosecond_sec = 1e-9F;
 
 			tick_info.tick_count += 1;
 			tick_info.time_now_ns = ns_since_start;
@@ -305,7 +446,7 @@ namespace robotick
 			last_tick_time = now;
 
 			// update remote data-connections
-			tick_remote_engine_connections(tick_info);
+			state->remote_engine_connections.tick(tick_info);
 
 			// update local data-connections
 			for (const DataConnectionInfo* data_connection : state->data_connections_acquired)
@@ -313,18 +454,27 @@ namespace robotick
 				data_connection->do_data_copy();
 			}
 
-			std::atomic_thread_fence(std::memory_order_release);
+			// Ensure all published data writes are visible before workloads read them (cross-thread barrier via Atomic helpers)
+			thread_fence_release();
 
 			root_tick_fn(root_ptr, tick_info);
 
-			const auto now_post = std::chrono::steady_clock::now();
-			root_info.mutable_stats.last_tick_duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now_post - now).count();
-			root_info.mutable_stats.last_time_delta_ns = ns_since_last;
+			const auto now_post = Clock::now();
+			const uint32_t duration_ns = detail::clamp_to_uint32(Clock::to_nanoseconds(now_post - now).count());
+			root_info.workload_stats->last_time_delta_ns = ns_since_last;
+
+			const uint64_t budget_ns_raw = Clock::to_nanoseconds(child_tick_interval).count();
+			const uint32_t budget_ns = detail::clamp_to_uint32(budget_ns_raw);
+
+			// Update the per-workload stats in-place so telemetry can report overruns without introducing dynamic allocations.
+			root_info.workload_stats->record_tick_duration_ns(duration_ns, budget_ns);
 
 			next_tick_time += child_tick_interval;
 			Thread::hybrid_sleep_until(next_tick_time);
 
-		} while (!stop_after_next_tick_flag.is_set());
+		} while (!stop_after_next_tick_flag.is_set() && !should_exit_application());
+
+		ROBOTICK_INFO("Engine stopping for model: %s", state->model->get_model_name());
 
 		state->is_running = false;
 
@@ -333,96 +483,21 @@ namespace robotick
 			if (inst.workload_descriptor->stop_fn)
 				inst.workload_descriptor->stop_fn(inst.get_ptr(*this));
 		}
-	}
 
-	constexpr int DEFAULT_REMOTE_ENGINE_PORT = 7262;
+		state->remote_engine_connections.stop();
+		state->telemetry_server.stop();
 
-	void Engine::setup_remote_engines_receiver()
-	{
-		ROBOTICK_INFO("Setting up remote engines receiver...");
-
-		state->remote_engines_receiver.configure(
-			RemoteEngineConnection::ConnectionConfig{"", DEFAULT_REMOTE_ENGINE_PORT}, RemoteEngineConnection::Mode::Receiver);
-
-		state->remote_engines_receiver.set_field_binder(
-			[&](const char* path, RemoteEngineConnection::Field& out)
-			{
-				auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*this, path);
-				if (ptr == nullptr)
-				{
-					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engines_receiver() - unable to resolve field path: %s", path);
-				}
-
-				out.path = path;
-				out.recv_ptr = ptr;
-				out.size = size;
-				out.type_desc = field_desc->find_type_descriptor();
-				ROBOTICK_ASSERT(out.type_desc != nullptr);
-
-				return true;
-			});
-	}
-
-	void Engine::setup_remote_engine_senders(const Model& model)
-	{
-		const auto& remote_model_seeds = model.get_remote_models();
-		if (remote_model_seeds.size() == 0)
-		{
-			return;
-		}
-
-		ROBOTICK_INFO("Setting up remote engine senders...");
-
-		state->remote_engine_senders.initialize(remote_model_seeds.size());
-
-		uint32_t remote_engine_index = 0;
-
-		for (const RemoteModelSeed* remote_model_seed : remote_model_seeds)
-		{
-			ROBOTICK_ASSERT(remote_model_seed != nullptr);
-
-			if (remote_model_seed->remote_data_connection_seeds.size() == 0)
-			{
-				ROBOTICK_WARNING("Remote model '%s' has no remote data-connections - skipping adding remote_engine_sender for it",
-					remote_model_seed->model_name.c_str());
-
-				continue;
-			}
-
-			RemoteEngineConnection& remote_engine_connection = state->remote_engine_senders[remote_engine_index];
-			remote_engine_index++;
-
-			RemoteEngineConnection::ConnectionConfig config;
-			config.host = remote_model_seed->comms_channel.c_str();
-			config.port = DEFAULT_REMOTE_ENGINE_PORT;
-
-			remote_engine_connection.configure(config, RemoteEngineConnection::Mode::Sender);
-
-			for (const auto* remote_data_connection_seed : remote_model_seed->remote_data_connection_seeds)
-			{
-				const char* source_field_path = remote_data_connection_seed->source_field_path.c_str();
-
-				auto [ptr, size, field_desc] = DataConnectionUtils::find_field_info(*this, source_field_path);
-				if (ptr == nullptr)
-				{
-					ROBOTICK_FATAL_EXIT("Engine::setup_remote_engine_senders() - unable to resolve source field path: %s", source_field_path);
-				}
-
-				RemoteEngineConnection::Field remote_field;
-				remote_field.path = remote_data_connection_seed->dest_field_path.c_str();
-				remote_field.send_ptr = ptr;
-				remote_field.size = size;
-				remote_field.type_desc = field_desc->find_type_descriptor();
-				ROBOTICK_ASSERT(remote_field.type_desc != nullptr);
-
-				remote_engine_connection.register_field(remote_field);
-			}
-		}
+		ROBOTICK_INFO("Engine stopped for model: %s", state->model->get_model_name());
 	}
 
 	bool Engine::is_running() const
 	{
-		return state && state->is_running;
+		return state->is_running;
+	}
+
+	const char* Engine::get_model_name() const
+	{
+		return (state != nullptr && state->model != nullptr) ? state->model->get_model_name() : "model_not_set";
 	}
 
 	const WorkloadInstanceInfo* Engine::get_root_instance_info() const
@@ -500,7 +575,15 @@ namespace robotick
 
 						const Blackboard& blackboard =
 							field.get_data<Blackboard>(state->workloads_buffer, instance, *struct_type_desc, struct_offset);
-						total += blackboard.get_info().total_datablock_size;
+						size_t next_total = 0;
+						size_t block_size = blackboard.get_info().total_datablock_size;
+						if (!safe_add_size(total, block_size, next_total))
+						{
+							const char* instance_name =
+								(instance.seed && instance.seed->unique_name.c_str()) ? instance.seed->unique_name.c_str() : "unknown";
+							ROBOTICK_FATAL_EXIT("Blackboard memory overflow while sizing workload '%s'", instance_name);
+						}
+						total = next_total;
 					}
 				}
 			};
@@ -513,7 +596,7 @@ namespace robotick
 	}
 
 	void Engine::bind_blackboards_in_struct(
-		WorkloadInstanceInfo& instance, const TypeDescriptor& struct_type_desc, const size_t struct_offset, const size_t blackboard_storage_offset)
+		WorkloadInstanceInfo& instance, const TypeDescriptor& struct_type_desc, const size_t struct_offset, size_t& blackboard_storage_offset)
 	{
 		const StructDescriptor* struct_desc = struct_type_desc.get_struct_desc();
 		ROBOTICK_ASSERT(struct_desc != nullptr);
@@ -523,7 +606,7 @@ namespace robotick
 			if (field.type_id == GET_TYPE_ID(Blackboard))
 			{
 				Blackboard& blackboard = field.get_data<Blackboard>(state->workloads_buffer, instance, struct_type_desc, struct_offset);
-				blackboard.bind(blackboard_storage_offset);
+				blackboard.bind(state->workloads_buffer, blackboard_storage_offset);
 			}
 		}
 	}
@@ -542,21 +625,6 @@ namespace robotick
 				bind_blackboards_in_struct(instance, *workload_desc->inputs_desc, workload_desc->inputs_offset, start_offset);
 			if (workload_desc->outputs_desc)
 				bind_blackboards_in_struct(instance, *workload_desc->outputs_desc, workload_desc->outputs_offset, start_offset);
-		}
-	}
-
-	void Engine::tick_remote_engine_connections(const TickInfo& tick_info)
-	{
-		const bool enable_remote_engines_receiver = (state->remote_engine_senders.size() == 0); // placeholder for having config setting
-
-		if (enable_remote_engines_receiver)
-		{
-			state->remote_engines_receiver.tick(tick_info);
-		}
-
-		for (auto& remote_engine_sender : state->remote_engine_senders)
-		{
-			remote_engine_sender.tick(tick_info);
 		}
 	}
 

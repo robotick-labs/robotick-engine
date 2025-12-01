@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "robotick/framework/common/List.h"
-#include "robotick/framework/common/Map.h"
+#include "robotick/framework/containers/List.h"
+#include "robotick/framework/containers/Map.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <stddef.h>
@@ -15,10 +15,19 @@ namespace robotick
 
 	using TypeDescriptors = List<const TypeDescriptor*>;
 
+	// NOTE: TypeRegistry is a process-wide singleton intended to be populated exactly once,
+	// from a single thread, during program startup (typically via the registration macros).
+	// After the executable begins running, the registry is treated as immutable - no runtime
+	// registration is allowed. Any attempt to register types outside of the single-threaded
+	// startup path is a bug and should trip the corresponding assertions in the implementation.
+
 	class TypeRegistry
 	{
 	  public:
 		static TypeRegistry& get();
+
+		void seal(); // mark the registry as immutable (no further registrations)
+		bool is_sealed() const;
 
 		void register_type(const TypeDescriptor& desc);
 

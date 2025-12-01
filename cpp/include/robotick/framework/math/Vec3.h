@@ -5,26 +5,11 @@
 
 #include "robotick/api_base.h"
 
-#include <math.h> // sqrtf, sqrt
+#include "robotick/framework/math/Abs.h"
+#include "robotick/framework/math/Sqrt.h"
 
 namespace robotick
 {
-	// --- sqrt dispatch helper ---
-
-	namespace internal::Vec3
-	{
-		template <typename T> struct SqrtFn;
-
-		template <> struct SqrtFn<float>
-		{
-			static inline float apply(float v) { return sqrtf(v); }
-		};
-		template <> struct SqrtFn<double>
-		{
-			static inline double apply(double v) { return sqrt(v); }
-		};
-	} // namespace internal::Vec3
-
 	// --- Templated base class ---
 
 	template <typename TDerived, typename TReal> struct Vec3Base
@@ -50,7 +35,7 @@ namespace robotick
 		TDerived operator*(TReal scalar) const { return TDerived(x * scalar, y * scalar, z * scalar); }
 		TDerived operator/(TReal scalar) const
 		{
-			ROBOTICK_ASSERT_MSG((fabs(scalar) > static_cast<TReal>(kFloatEpsilon)), "Divide by zero requested!");
+			ROBOTICK_ASSERT_MSG((robotick::abs(scalar) > static_cast<TReal>(kFloatEpsilon)), "Divide by zero requested!");
 			return TDerived(x / scalar, y / scalar, z / scalar);
 		}
 
@@ -77,7 +62,7 @@ namespace robotick
 		}
 		TDerived& operator/=(TReal scalar)
 		{
-			ROBOTICK_ASSERT_MSG((fabs(scalar) > static_cast<TReal>(kFloatEpsilon)), "Divide by zero requested (in-place)!");
+			ROBOTICK_ASSERT_MSG((robotick::abs(scalar) > static_cast<TReal>(kFloatEpsilon)), "Divide by zero requested (in-place)!");
 
 			x /= scalar;
 			y /= scalar;
@@ -91,7 +76,7 @@ namespace robotick
 
 		TReal length_squared() const { return x * x + y * y + z * z; }
 
-		TReal length() const { return internal::Vec3::SqrtFn<TReal>::apply(length_squared()); }
+		TReal length() const { return robotick::sqrt(length_squared()); }
 	};
 
 	// --- Final types (can be forward-declared) ---

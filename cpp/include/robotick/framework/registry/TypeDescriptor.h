@@ -5,9 +5,9 @@
 
 #include "robotick/api_base.h"
 
-#include "robotick/framework/common/ArrayView.h"
-#include "robotick/framework/common/HeapVector.h"
-#include "robotick/framework/common/StringView.h"
+#include "robotick/framework/containers/ArrayView.h"
+#include "robotick/framework/containers/HeapVector.h"
+#include "robotick/framework/strings/StringView.h"
 #include "robotick/framework/utils/Constants.h"
 #include "robotick/framework/utils/TypeId.h"
 
@@ -30,6 +30,7 @@ namespace robotick
 		StringView name;
 		TypeId type_id;
 		size_t offset_within_container = OFFSET_UNBOUND;
+		size_t element_count = 1; // number of times our type repeats in each field (e.g. array[element_count])
 
 		const TypeDescriptor* find_type_descriptor() const;
 
@@ -142,12 +143,7 @@ namespace robotick
 
 		TypeCategoryDesc type_category_desc{};
 
-		// Converts data to string form, writing to buffer. Null-terminated.
-		// Returns true if successful.
-		ToStringFn to_string = nullptr;
-
-		// Parses string and stores result in out_data.
-		FromStringFn from_string = nullptr;
+		StringView mime_type; // http-style metadata - e.g. "img/png" (optional)
 
 		// --- misc helpers: ---
 		const WorkloadDescriptor* get_workload_desc() const
@@ -162,17 +158,8 @@ namespace robotick
 			return (type_category == TypeCategory::DynamicStruct ? type_category_desc.dynamic_struct_desc : nullptr);
 		}
 
-		// --- templated string helpers: ---
-
-		template <typename TData, typename TString> inline bool to_string_typed(const TData& value, TString& output) const
-		{
-			return to_string(&value, output.str(), output.capacity());
-		}
-
-		template <typename TData, typename TString> inline bool from_string_typed(const TString& input, TData& out_value) const
-		{
-			return from_string(input.c_str(), &out_value);
-		}
+		bool to_string(const void* value, char* output_buffer, size_t output_buffer_size) const;
+		bool from_string(const char* input, void* out_value) const;
 	};
 
 	extern const TypeDescriptor s_type_desc_void;

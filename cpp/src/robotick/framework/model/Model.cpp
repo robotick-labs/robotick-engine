@@ -7,9 +7,26 @@
 #include "robotick/framework/model/DataConnectionSeed.h"
 #include "robotick/framework/model/RemoteModelSeed.h"
 #include "robotick/framework/model/WorkloadSeed.h"
+#include "robotick/framework/strings/StringUtils.h"
 
 namespace robotick
 {
+
+	namespace
+	{
+		size_t count_char(const char* begin, char ch)
+		{
+			size_t count = 0;
+			for (const char* cur = begin; *cur != '\0'; ++cur)
+			{
+				if (*cur == ch)
+				{
+					count++;
+				}
+			}
+			return count;
+		}
+	} // namespace
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
 
@@ -42,7 +59,7 @@ namespace robotick
 		if (!source_field_path || !dest_field_path || !*source_field_path || !*dest_field_path)
 			ROBOTICK_FATAL_EXIT("Field paths must be non-empty");
 
-		if (strcmp(source_field_path, dest_field_path) == 0)
+		if (string_equals(source_field_path, dest_field_path))
 			ROBOTICK_FATAL_EXIT("Source and destination field paths are identical: %s", dest_field_path);
 
 		if (source_field_path[0] == '|')
@@ -59,7 +76,7 @@ namespace robotick
 
 		for (const DataConnectionSeed& existing : data_connection_seeds_storage)
 		{
-			if (strcmp(existing.dest_field_path.c_str(), dest_field_path) == 0)
+			if (string_equals(existing.dest_field_path.c_str(), dest_field_path))
 			{
 				ROBOTICK_FATAL_EXIT("Destination field already has an incoming connection: %s", dest_field_path);
 			}
@@ -80,7 +97,7 @@ namespace robotick
 
 		for (const auto& rm : remote_models_storage)
 		{
-			if (strcmp(rm.model_name.c_str(), model_name) == 0)
+			if (string_equals(rm.model_name.c_str(), model_name))
 				ROBOTICK_FATAL_EXIT("add_remote_model: a remote model with name '%s' already exists", model_name);
 		}
 
@@ -207,6 +224,11 @@ namespace robotick
 		}
 	}
 
+	void Model::set_telemetry_port(const uint16_t in_telemetry_port)
+	{
+		telemetry_port = in_telemetry_port;
+	}
+
 	void Model::finalize()
 	{
 		if (!root_workload)
@@ -236,7 +258,7 @@ namespace robotick
 			}
 
 			// Ensure valid source path format (at least 3 tokens: workload.outputs.field)
-			if (std::count(source, source + strlen(source), '.') < 2)
+			if (count_char(source, '.') < 2)
 			{
 				ROBOTICK_FATAL_EXIT("Data connection error: malformed source field path '%s'. Expected format: workload.outputs.field", source);
 			}
@@ -248,7 +270,7 @@ namespace robotick
 			}
 
 			// Ensure valid destination path format (at least 3 tokens: workload.inputs.field)
-			if (std::count(dest, dest + strlen(dest), '.') < 2)
+			if (count_char(dest, '.') < 2)
 			{
 				ROBOTICK_FATAL_EXIT("Data connection error: malformed destination field path '%s'. Expected format: workload.inputs.field", dest);
 			}
@@ -257,7 +279,7 @@ namespace robotick
 			for (size_t j = i + 1; j < data_connection_seeds.size(); ++j)
 			{
 				const char* dest_j = data_connection_seeds[j]->dest_field_path.c_str();
-				if (strcmp(dest, dest_j) == 0)
+				if (string_equals(dest, dest_j))
 				{
 					ROBOTICK_FATAL_EXIT("Data connection error: destination field '%s' already has an incoming connection.", dest);
 				}

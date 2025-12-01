@@ -5,12 +5,8 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
-#include "robotick/framework/common/Map.h"
+#include "robotick/framework/containers/Map.h"
 #include "robotick/framework/utils/TypeId.h"
-
-#include <atomic>
-#include <memory>
-#include <string>
 
 namespace robotick
 {
@@ -27,7 +23,6 @@ namespace robotick
 	  public: // main api accessors
 		Engine();
 		~Engine();
-
 		void load(const Model& model);
 
 		// The stop_flag must outlive this call. Do not pass temporaries.
@@ -36,6 +31,8 @@ namespace robotick
 		void run(const AtomicFlag&&) = delete; // cause compile-error if a temporary is used
 
 		bool is_running() const;
+
+		const char* get_model_name() const;
 
 	  public: // internal public accessors
 		const WorkloadInstanceInfo* get_root_instance_info() const;
@@ -61,15 +58,10 @@ namespace robotick
 		void bind_blackboards_in_struct(WorkloadInstanceInfo& workload_instance_info,
 			const TypeDescriptor& struct_type_desc,
 			const size_t struct_offset,
-			const size_t blackboard_storage_offset);
+			size_t& blackboard_storage_offset);
 		void bind_blackboards_for_instances(HeapVector<WorkloadInstanceInfo>& instances, const size_t blackboards_data_start_offset);
 
 		size_t compute_blackboard_memory_requirements(const HeapVector<WorkloadInstanceInfo>& instances);
-
-		void setup_remote_engine_senders(const Model& model);
-		void setup_remote_engines_receiver();
-
-		void tick_remote_engine_connections(const TickInfo& tick_info);
 
 	  private:
 		struct State;

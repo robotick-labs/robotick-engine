@@ -1,0 +1,83 @@
+name: CI - Build Matrix (Linux + ESP32-S3)
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    name: Build & Test (${{ matrix.platform }} - ${{ matrix.preset }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            preset: robotick-engine-tests-linux-debug
+            docker_image: mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04
+          - platform: linux
+            preset: robotick-engine-tests-linux-release
+            docker_image: mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04
+          - platform: esp32s3
+            preset: esp32s3
+            docker_image: espressif/idf:release-v5.4
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Pull Docker image
+        run: docker pull ${{ matrix.docker_image }}
+
+      - name: Run Build inside Docker
+        run: |
+          docker run --rm --init \
+            --user root \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ matrix.docker_image }} \
+            bash -c "
+              set -Eeuo pipefail
+              export TERM=xterm-256color
+              set -x
+
+              if [ '${{ matrix.platform }}' == 'esp32s3' ]; then
+                echo '🚧 ESP32-S3 Setup'
+                cd tools/esp32-compile-check
+
+                if ! command -v ninja >/dev/null 2>&1; then
+                  DEBIAN_FRONTEND=noninteractive apt-get update -yq
+                  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ninja-build ccache
+                  apt-get clean
+                  rm -rf /var/lib/apt/lists/*
+                fi
+
+                bash /workspace/tools/make_esp32_symlinks.sh
+                ./1_idf_clean.sh || (echo '❌ Idf Clean failed' && exit 1)
+                ./2_idf_build.sh || (echo '❌ Idf Build failed' && exit 1)
+
+              else
+                echo '🚧 Linux Setup'
+                bash tools/setup_my_env_as_root.linux.sh
+                cmake --preset ${{ matrix.preset }}
+                cmake --build --preset ${{ matrix.preset }} -j$(nproc)
+
+                if [ '${{ matrix.preset }}' == 'robotick-engine-tests-linux-debug' ]; then
+                  ctest --test-dir build/${{ matrix.preset }}/cpp/tests --output-on-failure --timeout 120 --fail-if-no-tests -j$(nproc)
+                fi
+              fi
+            "

@@ -3,8 +3,9 @@
 
 #pragma once
 
-#include "robotick/framework/common/FixedString.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/utility/TypeTraits.h"
 #include "robotick/framework/utils/Constants.h"
 #include "robotick/framework/utils/TypeId.h"
 
@@ -35,6 +36,9 @@ namespace robotick
 		void initialize_fields(const HeapVector<FieldDescriptor>& fields);
 		void initialize_fields(const ArrayView<FieldDescriptor>& fields);
 
+		static const StructDescriptor* resolve_descriptor(const void* instance);
+
+	  public: // field-query methods (by name - slower as requires string-based lookup)
 		const FieldDescriptor* find_field(const char* field_name) const;
 		void* find_field_data(const char* field_name, const FieldDescriptor*& found_field) const;
 
@@ -44,7 +48,7 @@ namespace robotick
 
 		template <typename T> bool set(const char* field_name, const T& value)
 		{
-			static_assert(std::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
+			static_assert(robotick::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
 			return set(field_name, (void*)&value, sizeof(T));
 		}
 
@@ -60,10 +64,30 @@ namespace robotick
 			return T();
 		}
 
-		static const StructDescriptor* resolve_descriptor(const void* instance);
+	  public: // field-query methods (by pre-cached FieldDescriptor - fast)
+		bool set(const FieldDescriptor& field, void* value, size_t size);
+		void* get(const FieldDescriptor& field, size_t size) const;
+
+		template <typename T> bool set(const FieldDescriptor& field, const T& value)
+		{
+			static_assert(robotick::is_trivially_copyable_v<T>, "Blackboard::set only supports trivially-copyable types");
+			return set(field, (void*)&value, sizeof(T));
+		}
+
+		template <typename T> T get(const FieldDescriptor& field) const
+		{
+			void* found_value = get(field, sizeof(T));
+			if (found_value)
+			{
+				return *static_cast<T*>(found_value);
+			}
+
+			ROBOTICK_FATAL_EXIT("Blackboard::get called with invalid field reference: '%s'", field.name.c_str());
+			return T();
+		}
 
 	  public: // non-API accessors - used for setup and lower-level querying of Blackboard
-		void bind(const size_t datablock_offset);
+		void bind(const WorkloadsBuffer& workloads_buffer, size_t& datablock_offset_in_workloads_buffer);
 
 		const StructDescriptor& get_struct_descriptor() const { return info.struct_descriptor; };
 		const BlackboardInfo& get_info() const { return info; };
@@ -74,8 +98,5 @@ namespace robotick
 	  private:
 		BlackboardInfo info;
 	};
-
-	static_assert(
-		std::is_trivially_copyable<Blackboard>::value, "Blackboard is not trivially copyable. It needs to be to be usable in workload structs");
 
 } // namespace robotick
