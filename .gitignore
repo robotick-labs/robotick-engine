@@ -1,8 +1,9 @@
-**/__pycache__/*
-*.pyc
-robotick.egg-info
-**/build/*
-*.log
 .venv
-tools/esp32-compile-check/platforms/
+*.log
+*.pyc
+**/__pycache__/*
+**/build/*
 /scratch/
+robotick.egg-info
+tools/esp32-compile-check/platforms/
+tools/esp32-compile-check/sdkconfig
