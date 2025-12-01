@@ -42,6 +42,11 @@ namespace robotick::test
 				}
 			}
 
+			EngineRunThread(const EngineRunThread&) = delete;
+			EngineRunThread& operator=(const EngineRunThread&) = delete;
+			EngineRunThread(EngineRunThread&&) = delete;
+			EngineRunThread& operator=(EngineRunThread&&) = delete;
+
 		  private:
 			static void run_entry(void* user_data)
 			{

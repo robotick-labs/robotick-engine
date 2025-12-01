@@ -77,29 +77,28 @@ namespace robotick
 	{
 		struct ResolvedField
 		{
-			const WorkloadInstanceInfo* workload;
-			const void* ptr;
-			TypeId type;
-			size_t size;
+			const WorkloadInstanceInfo* workload = nullptr;
+			const void* ptr = nullptr;
+			TypeId type = TypeId::invalid();
+			size_t size = 0;
 		};
 
-		inline FixedString64 extract_next_token(const char*& path_cursor)
+		inline bool extract_next_token(const char*& path_cursor, FixedString64& token)
 		{
-			FixedString64 token;
 			size_t i = 0;
 			while (*path_cursor && *path_cursor != '.')
 			{
 				if (i >= token.capacity() - 1)
 				{
 					ROBOTICK_WARNING("Token too long in path (max %zu): %s", token.capacity() - 1, path_cursor);
-					return {};
+					return false;
 				}
 				token.data[i++] = *path_cursor++;
 			}
 			token.data[i] = '\0';
 			if (*path_cursor == '.')
 				++path_cursor; // skip dot
-			return token;
+			return true;
 		}
 
 		// Walks a dotted member path inside an already-addressable container (supports static or dynamic structs).
@@ -137,7 +136,11 @@ namespace robotick
 					return false;
 				}
 
-				FixedString64 token = extract_next_token(cursor);
+				FixedString64 token;
+				if (!extract_next_token(cursor, token))
+				{
+					return false;
+				}
 				const FieldDescriptor* fld = cur_struct->find_field(token.c_str());
 				if (!fld)
 				{
@@ -172,21 +175,33 @@ namespace robotick
 			const char* path_cursor = path;
 
 			// Step 1: workload
-			const FixedString64 workload_token = extract_next_token(path_cursor);
+			FixedString64 workload_token;
+			if (!extract_next_token(path_cursor, workload_token))
+			{
+				ROBOTICK_FATAL_EXIT("Workload token too long in path: %s", path);
+			}
 			WorkloadInstanceInfo* const* found_workload_ptr = instances.find(workload_token.c_str());
 			const WorkloadInstanceInfo* workload = found_workload_ptr ? *found_workload_ptr : nullptr;
 			if (!workload)
 				ROBOTICK_FATAL_EXIT("Unknown workload: %s", workload_token.c_str());
 
 			// Step 2: section (config, inputs, outputs)
-			const FixedString64 section_token = extract_next_token(path_cursor);
+			FixedString64 section_token;
+			if (!extract_next_token(path_cursor, section_token))
+			{
+				ROBOTICK_FATAL_EXIT("Section token too long in path: %s", path);
+			}
 			size_t struct_offset = OFFSET_UNBOUND;
 			const TypeDescriptor* struct_type = DataConnectionHelpers::get_struct_entry(*workload, section_token.c_str(), struct_offset);
 			if (!struct_type)
 				ROBOTICK_FATAL_EXIT("Unknown section '%s' in path: %s", section_token.c_str(), path);
 
 			// Step 3: field
-			const FixedString64 field_token = extract_next_token(path_cursor);
+			FixedString64 field_token;
+			if (!extract_next_token(path_cursor, field_token))
+			{
+				ROBOTICK_FATAL_EXIT("Field token too long in path: %s", path);
+			}
 			const FieldDescriptor* field = DataConnectionHelpers::find_field(struct_type, field_token.c_str());
 			if (!field)
 				ROBOTICK_FATAL_EXIT("Field '%s' not found in path: %s", field_token.c_str(), path);
@@ -329,7 +344,12 @@ namespace robotick
 		const char* path_cursor = path;
 
 		// workload.section.field[.subfield...]
-		const FixedString64 workload_token = extract_next_token(path_cursor);
+		FixedString64 workload_token;
+		if (!extract_next_token(path_cursor, workload_token))
+		{
+			ROBOTICK_WARNING("Workload token too long in field path: %s", path);
+			return {nullptr, 0, nullptr};
+		}
 		auto* workload_info_ptr = instances.find(workload_token.c_str());
 		if (!workload_info_ptr)
 		{
@@ -339,7 +359,12 @@ namespace robotick
 		const WorkloadInstanceInfo* workload_info = *workload_info_ptr;
 
 		// workload.section.field[.subfield]
-		const FixedString64 section_token = extract_next_token(path_cursor);
+		FixedString64 section_token;
+		if (!extract_next_token(path_cursor, section_token))
+		{
+			ROBOTICK_WARNING("Section token too long in field path: %s", path);
+			return {nullptr, 0, nullptr};
+		}
 		size_t struct_offset = OFFSET_UNBOUND;
 		const TypeDescriptor* struct_type = DataConnectionHelpers::get_struct_entry(*workload_info, section_token.c_str(), struct_offset);
 		if (!struct_type)
@@ -348,7 +373,12 @@ namespace robotick
 			return {nullptr, 0, nullptr};
 		}
 
-		const FixedString64 field_token = extract_next_token(path_cursor);
+		FixedString64 field_token;
+		if (!extract_next_token(path_cursor, field_token))
+		{
+			ROBOTICK_WARNING("Field token too long in field path: %s", path);
+			return {nullptr, 0, nullptr};
+		}
 		const FieldDescriptor* field = DataConnectionHelpers::find_field(struct_type, field_token.c_str());
 		if (!field)
 		{
@@ -372,7 +402,8 @@ namespace robotick
 
 			if (!resolve_nested_member(sub_ptr, sub_type, path_cursor, &sub_ptr, &sub_type, &sub_desc))
 			{
-				ROBOTICK_FATAL_EXIT("Invalid sub-field path after '%s' in: %s", field_token.c_str(), path);
+				ROBOTICK_WARNING("Invalid sub-field path after '%s' in: %s", field_token.c_str(), path);
+				return {nullptr, 0, nullptr};
 			}
 
 			base_ptr = sub_ptr;
