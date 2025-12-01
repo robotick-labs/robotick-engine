@@ -64,9 +64,6 @@ target_compile_definitions(robotick_engine_tests PRIVATE CATCH_CONFIG_ENABLE_EXC
 include(Catch)
 catch_discover_tests(robotick_engine_tests)
 
-# Ensure robotick-engine is built before running tests
-add_dependencies(robotick_engine_tests robotick-engine)
-
 # ========================
 # ✅ Runtime DLL Copy (for VS Code / Debugging)
 # ========================
@@ -87,6 +84,9 @@ set(TEST_DATA_DEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/data)
 message(STATUS "📦 Copying test data from: ${TEST_DATA_SOURCE_DIR}")
 message(STATUS "📦 Copying test data to:   ${TEST_DATA_DEST_DIR}")
 
-file(COPY ${TEST_DATA_SOURCE_DIR}
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-
+add_custom_command(TARGET robotick_engine_tests PRE_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${TEST_DATA_SOURCE_DIR}
+    ${TEST_DATA_DEST_DIR}
+  COMMENT "Copying robotick_engine_tests data files"
+)

@@ -74,7 +74,22 @@ namespace robotick
 			if (!base_ptr)
 				continue;
 
-			WorkloadFieldView view{parent_field.workload_info, parent_field.field_info->find_type_descriptor(), &field_desc, nullptr, base_ptr};
+			const TypeDescriptor* parent_type_desc = nullptr;
+			if (parent_field.field_info)
+			{
+				parent_type_desc = parent_field.field_info->find_type_descriptor();
+			}
+			if (!parent_type_desc)
+			{
+				parent_type_desc = parent_field.struct_info;
+			}
+
+			if (!parent_type_desc)
+			{
+				continue;
+			}
+
+			WorkloadFieldView view{parent_field.workload_info, parent_type_desc, &field_desc, nullptr, base_ptr};
 			callback(view);
 		}
 	}
