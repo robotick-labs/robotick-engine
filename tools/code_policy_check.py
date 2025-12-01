@@ -15,6 +15,7 @@ heap-bearing std:: containers while still running on every local/CI build.
 import argparse
 import os
 import sys
+from typing import Any, Dict, List, Optional
 
 DEFAULT_SOURCE_DIRS = ["cpp/src", "cpp/include", "cpp/tests"]
 DEFAULT_SUFFIXES = (".cpp", ".cc", ".c", ".h", ".hpp", ".inl")
@@ -44,26 +45,26 @@ SPDX_IDENTIFIER = "SPDX-License-Identifier: Apache-2.0"
 # ---------------------------------------------------------------------------
 
 
-def _expected_header(path):
+def _expected_header(path: str):
     _, ext = os.path.splitext(path)
     return LICENSE_HEADERS.get(ext.lower(), CPP_LICENSE_HEADER)
 
 
-def _normalize_header_line(line, line_index):
+def _normalize_header_line(line: str, line_index: int) -> str:
     normalized = line.rstrip("\r\n")
     if line_index == 1 and normalized.startswith("\ufeff"):
         normalized = normalized.lstrip("\ufeff")
     return normalized
 
 
-def _has_spdx_header(lines):
+def _has_spdx_header(lines: List[str]) -> bool:
     for line in lines[:5]:
         if SPDX_IDENTIFIER in line:
             return True
     return False
 
 
-def _check_headers(path, lines, context):
+def _check_headers(path: str, lines: List[str], context: Dict[str, Any]) -> Optional[str]:
     header_mode = context["header_mode"]
     if header_mode == "spdx":
         if not _has_spdx_header(lines):
@@ -89,7 +90,7 @@ def _check_headers(path, lines, context):
     return None
 
 
-def _check_std_usage(path, lines, context):
+def _check_std_usage(path: str, lines: List[str], context: Dict[str, Any]) -> Optional[str]:
     if not context["check_std_usage"]:
         return None
 
@@ -111,7 +112,7 @@ PER_FILE_CHECKS = [
 
 def check_file(path, check_std_usage, header_mode):
     try:
-        with open(path, "r", encoding="utf-8", errors="ignore") as handle:
+        with open(path, encoding="utf-8", errors="ignore") as handle:
             lines = handle.readlines()
     except OSError as exc:
         return f"Failed to read {path}: {exc}"
