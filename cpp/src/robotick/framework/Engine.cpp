@@ -120,6 +120,8 @@ namespace robotick
 
 	void Engine::load(const Model& model)
 	{
+		ROBOTICK_INFO("Loading model: %s", model.get_model_name());
+
 		// initialize the host-system
 		System::initialize();
 
@@ -232,10 +234,10 @@ namespace robotick
 			{
 				ROBOTICK_ASSERT(workload_desc->config_offset != OFFSET_UNBOUND);
 
-				// don't warn on first pass - we may need to set some, preload a script to create blackboard, and then have final pass
-				const bool warnIfNotFound = false;
+				// don't error on first pass - we may need to set some, preload a script to create blackboard, and then have final pass
+				const bool fatalExitIfNotFound = false;
 				DataConnectionUtils::apply_struct_field_values(
-					ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config, warnIfNotFound);
+					ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config, fatalExitIfNotFound);
 			}
 
 			if (workload_desc->pre_load_fn)
@@ -258,7 +260,6 @@ namespace robotick
 			bind_blackboards_for_instances(state->instances, start);
 		}
 
-		ROBOTICK_INFO("workloads_cursor: %zu", workloads_cursor);
 		state->workloads_buffer.set_size_used(workloads_cursor);
 
 		// post-blackboard-setup config pass:
@@ -272,18 +273,18 @@ namespace robotick
 			{
 				ROBOTICK_ASSERT(workload_desc->config_offset != OFFSET_UNBOUND);
 
-				const bool warnIfNotFound = true;
+				const bool fatalExitIfNotFound = true;
 				DataConnectionUtils::apply_struct_field_values(
-					ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config, warnIfNotFound);
+					ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config, fatalExitIfNotFound);
 			}
 
 			if (seed->inputs.size() > 0 && workload_desc->inputs_desc)
 			{
 				ROBOTICK_ASSERT(workload_desc->inputs_offset != OFFSET_UNBOUND);
 
-				const bool warnIfNotFound = true;
+				const bool fatalExitIfNotFound = true;
 				DataConnectionUtils::apply_struct_field_values(
-					ptr + workload_desc->inputs_offset, *workload_desc->inputs_desc, seed->inputs, warnIfNotFound);
+					ptr + workload_desc->inputs_offset, *workload_desc->inputs_desc, seed->inputs, fatalExitIfNotFound);
 			}
 		}
 
@@ -383,10 +384,14 @@ namespace robotick
 		state->remote_engine_connections.setup(*this, *(state->model));
 
 		state->root_instance = root_instance;
+
+		ROBOTICK_INFO("Loading complete for model: %s", model.get_model_name());
 	}
 
 	void Engine::run(const AtomicFlag& stop_after_next_tick_flag)
 	{
+		ROBOTICK_INFO("Running model: %s", state->model->get_model_name());
+
 		if (!state->root_instance)
 			ROBOTICK_FATAL_EXIT("Root workload instance-info not set");
 
@@ -469,6 +474,8 @@ namespace robotick
 
 		} while (!stop_after_next_tick_flag.is_set() && !should_exit_application());
 
+		ROBOTICK_INFO("Engine stopping for model: %s", state->model->get_model_name());
+
 		state->is_running = false;
 
 		for (auto& inst : state->instances)
@@ -479,6 +486,8 @@ namespace robotick
 
 		state->remote_engine_connections.stop();
 		state->telemetry_server.stop();
+
+		ROBOTICK_INFO("Engine stopped for model: %s", state->model->get_model_name());
 	}
 
 	bool Engine::is_running() const

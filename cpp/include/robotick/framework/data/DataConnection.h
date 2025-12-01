@@ -5,8 +5,8 @@
 
 #include "robotick/api_base.h"
 #include "robotick/framework/containers/ArrayView.h"
-#include "robotick/framework/containers/Map.h"
 #include "robotick/framework/containers/HeapVector.h"
+#include "robotick/framework/containers/Map.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeRegistry.h"
 #include "robotick/framework/strings/FixedString.h"
@@ -80,7 +80,7 @@ namespace robotick
 		static void apply_struct_field_values(void* struct_ptr,
 			const TypeDescriptor& struct_type_desc,
 			const ArrayView<const FieldConfigEntry>& field_config_entries,
-			const bool warnIfNotFound = true);
+			const bool fatalExitIfNotFound = true);
 
 		/// @brief Given a dot-separated field path (e.g. "MyWorkload.outputs.x"), returns the raw pointer, size in bytes, and field-descriptor
 		static FieldInfo find_field_info(const Engine& engine, const char* path);

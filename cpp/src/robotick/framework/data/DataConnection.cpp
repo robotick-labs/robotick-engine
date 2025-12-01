@@ -281,7 +281,7 @@ namespace robotick
 	void DataConnectionUtils::apply_struct_field_values(void* struct_ptr,
 		const TypeDescriptor& struct_type_desc,
 		const ArrayView<const FieldConfigEntry>& field_config_entries,
-		const bool warnIfNotFound)
+		const bool fatalExitIfNotFound)
 	{
 		if (!struct_ptr)
 			ROBOTICK_FATAL_EXIT("Struct-ptr not provided");
@@ -303,7 +303,10 @@ namespace robotick
 
 			if (!resolve_nested_member(struct_ptr, &struct_type_desc, dotted, &target_ptr, &target_type, &target_field))
 			{
-				ROBOTICK_WARNING_IF(warnIfNotFound, "Unable to find field '%s'", dotted);
+				if (fatalExitIfNotFound)
+				{
+					ROBOTICK_FATAL_EXIT("Unable to find field '%s'", dotted);
+				}
 				continue;
 			}
 
@@ -312,7 +315,7 @@ namespace robotick
 
 			if (!target_type->from_string(value.c_str(), target_ptr))
 			{
-				ROBOTICK_WARNING(
+				ROBOTICK_FATAL_EXIT(
 					"Unable to parse value-string '%s' for field: %s", value.c_str(), target_field ? target_field->name.c_str() : dotted);
 			}
 		}
