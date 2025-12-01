@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "robotick/framework/common/Function.h"
 #include "robotick/framework/data/MessageHeader.h"
+#include "robotick/framework/utility/Function.h"
 
 #include <cstdint>
 #include <cstring>
@@ -14,6 +14,9 @@ namespace robotick
 	constexpr char MAGIC[4] = {'R', 'B', 'I', 'N'};
 	constexpr uint8_t VERSION = 1;
 
+	// Incremental send/receive helper that lets RemoteEngineConnection share a single scratch buffer across non-blocking sockets.
+	// Each instance owns one half-duplex stream (either outbound or inbound) so we can make progress on both directions without
+	// forcing the caller to juggle partial headers/payloads manually.
 	class InProgressMessage
 	{
 	  public:
@@ -63,7 +66,7 @@ namespace robotick
 		size_t payload_bytes_received = 0;
 		PayloadReader payload_reader;
 
-		// temporary buffer reused for both send & receive payload chunks
+		// Temporary scratch reused for both send & receive payload chunks.  Keeping it inline avoids heap churn in tight tick loops.
 		uint8_t chunk_buffer[1024]{};
 	};
 

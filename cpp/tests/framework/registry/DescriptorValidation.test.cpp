@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/config/AssertUtils.h"
-#include "robotick/framework/common/HeapVector.h"
-#include "robotick/framework/common/StringView.h"
 #include "robotick/framework/data/Blackboard.h"
+#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeMacros.h"
+#include "robotick/framework/strings/StringView.h"
 #include "robotick/framework/utils/Constants.h"
 #include <catch2/catch_all.hpp>
 
@@ -15,23 +15,11 @@ namespace robotick::test
 	namespace
 	{
 		const TypeDescriptor s_zero_align_desc{
-			StringView("ZeroAlignDescriptor"),
-			TypeId("ZeroAlignDescriptor"),
-			sizeof(int),
-			0,
-			TypeCategory::Primitive,
-			{},
-			nullptr};
+			StringView("ZeroAlignDescriptor"), TypeId("ZeroAlignDescriptor"), sizeof(int), 0, TypeCategory::Primitive, {}, nullptr};
 		const AutoRegisterType s_zero_align_reg(s_zero_align_desc);
 
 		const TypeDescriptor s_zero_size_desc{
-			StringView("ZeroSizeDescriptor"),
-			TypeId("ZeroSizeDescriptor"),
-			0,
-			alignof(int),
-			TypeCategory::Primitive,
-			{},
-			nullptr};
+			StringView("ZeroSizeDescriptor"), TypeId("ZeroSizeDescriptor"), 0, alignof(int), TypeCategory::Primitive, {}, nullptr};
 		const AutoRegisterType s_zero_size_reg(s_zero_size_desc);
 	} // namespace
 

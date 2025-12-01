@@ -4,33 +4,21 @@
 #include "robotick/framework/Engine.h"
 
 #include "robotick/api.h"
+#include "robotick/framework/concurrency/Atomic.h"
+#include "robotick/framework/concurrency/Thread.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/data/RemoteEngineConnections.h"
 #include "robotick/framework/data/TelemetryServer.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/Model.h"
+#include "robotick/framework/services/WebServer.h"
+#include "robotick/framework/system/PlatformEvents.h"
+#include "robotick/framework/system/System.h"
+#include "robotick/framework/time/Clock.h"
 #include "robotick/framework/utils/TypeId.h"
-#include "robotick/platform/Atomic.h"
-#include "robotick/platform/Clock.h"
-#include "robotick/platform/PlatformEvents.h"
-#include "robotick/platform/System.h"
-#include "robotick/platform/Thread.h"
-#include "robotick/platform/WebServer.h"
 
-#include <climits>
 #include <cstddef>
-
-namespace
-{
-	namespace detail
-	{
-		static inline uint32_t clamp_to_uint32(uint64_t value)
-		{
-			return (value > UINT32_MAX) ? UINT32_MAX : static_cast<uint32_t>(value);
-		}
-	} // namespace detail
-}
 
 namespace robotick
 {
@@ -80,6 +68,7 @@ namespace robotick
 	extern "C" void robotick_force_register_quat_types();
 
 	// Prevent integer overflow while sizing contiguous chunks so layout stays deterministic even near SIZE_MAX.
+	// The workloads buffer is preallocated once, so a bad descriptor must be rejected rather than silently wrapping.
 	static bool safe_add_size(size_t lhs, size_t rhs, size_t& out)
 	{
 		const size_t max_size = SIZE_MAX;
@@ -89,26 +78,28 @@ namespace robotick
 		return true;
 	}
 
+	// Clamp to max_align_t so the placement-new construction that follows always satisfies C++ object requirements.
 	static size_t max_align_for_type(size_t alignment)
 	{
 		return (alignment > alignof(max_align_t)) ? alignment : alignof(max_align_t);
 	}
 
 	// Ensure the cursor respects the max alignment of the upcoming type so every allocation remains well-aligned.
-		static bool align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
-		{
-			const size_t alignment = max_align_for_type(type.alignment);
-			// This should never fail, since max_align_for_type clamps to at least alignof(max_align_t),
-			// but we keep the division defensive to protect the cursor from bad alignments.
-			if (alignment == 0)
-				return false;
-			size_t remainder = workloads_cursor % alignment;
+	static bool align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	{
+		const size_t alignment = max_align_for_type(type.alignment);
+		// This should never fail, since max_align_for_type clamps to at least alignof(max_align_t),
+		// but we keep the division defensive to protect the cursor from bad alignments.
+		if (alignment == 0)
+			return false;
+		size_t remainder = workloads_cursor % alignment;
 		if (remainder != 0)
 		{
 			size_t delta = alignment - remainder;
 			size_t aligned_cursor = 0;
 			if (!safe_add_size(workloads_cursor, delta, aligned_cursor))
 				return false;
+			// Move the cursor forward so that the next placement-new starts at an address compatible with the target type.
 			workloads_cursor = aligned_cursor;
 		}
 		return true;
@@ -122,6 +113,7 @@ namespace robotick
 		size_t next_cursor = 0;
 		if (!safe_add_size(workloads_cursor, type.size, next_cursor))
 			return false;
+		// Advance past the object we just allocated so the following type begins immediately afterwards.
 		workloads_cursor = next_cursor;
 		return true;
 	}
@@ -170,6 +162,8 @@ namespace robotick
 
 		// create our workloads-buffer, workload-instances info, and construct each workload:
 		size_t buffer_capacity = 0;
+
+		// Blackboard storage sits immediately after workload instances; reserve it now so the contiguous block never relocates.
 		if (!safe_add_size(total_size, DEFAULT_MAX_BLACKBOARDS_BYTES, buffer_capacity))
 			ROBOTICK_FATAL_EXIT(
 				"Workloads buffer size overflow when reserving blackboard space (%zu + %zu)", total_size, (size_t)DEFAULT_MAX_BLACKBOARDS_BYTES);
@@ -189,6 +183,7 @@ namespace robotick
 			const auto* workload_desc = workload_type->get_workload_desc();
 			ROBOTICK_ASSERT(workload_desc != nullptr);
 
+			// Stats/instance structs are colocated in the same buffer; align both as if they were independently allocated.
 			if (!align_workloads_cursor_for_type(*workload_stats_type, workloads_cursor))
 				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while laying-out stats for workload type '%s'", workload_type->name.c_str());
 			const size_t stats_offset = workloads_cursor;
@@ -209,6 +204,8 @@ namespace robotick
 			workload_instance_info.type = workload_type;
 			workload_instance_info.workload_descriptor = workload_desc;
 			workload_instance_info.seed = seed;
+
+			// Stats are lifetime-bound to the buffer; placement-new keeps RAII intact without separate allocations.
 			workload_instance_info.workload_stats = new (static_cast<void*>(workload_stats_ptr)) WorkloadInstanceStats{};
 			workload_instance_info.workload_stats->tick_rate_hz = seed->tick_rate_hz;
 
@@ -407,12 +404,9 @@ namespace robotick
 		if (root_tick_fn == nullptr)
 			ROBOTICK_FATAL_EXIT("Root workload must have valid tick_fn - check it has been correctly registered");
 
-		// Start all workloads
-		for (auto& inst : state->instances)
-		{
-			if (inst.workload_descriptor->start_fn)
-				inst.workload_descriptor->start_fn(inst.get_ptr(*this), inst.seed->tick_rate_hz);
-		}
+		// start_fn always runs on the same thread that will perform ticks so workloads can safely cache thread-affine handles.
+		if (root_info.workload_descriptor->start_fn)
+			root_info.workload_descriptor->start_fn(root_ptr, root_tick_rate_hz);
 
 		state->telemetry_server.start(*this, state->model->get_telemetry_port());
 
@@ -425,6 +419,8 @@ namespace robotick
 		auto last_tick_time = engine_start_time;
 		auto next_tick_time = engine_start_time;
 
+		// TickInfo is reused every iteration; we update its running clock/delta fields so consumers never see partially
+		// initialized values.
 		TickInfo tick_info;
 		tick_info.workload_stats = root_info.workload_stats;
 		tick_info.tick_rate_hz = root_tick_rate_hz;
@@ -464,6 +460,8 @@ namespace robotick
 
 			const uint64_t budget_ns_raw = Clock::to_nanoseconds(child_tick_interval).count();
 			const uint32_t budget_ns = detail::clamp_to_uint32(budget_ns_raw);
+
+			// Update the per-workload stats in-place so telemetry can report overruns without introducing dynamic allocations.
 			root_info.workload_stats->record_tick_duration_ns(duration_ns, budget_ns);
 
 			next_tick_time += child_tick_interval;

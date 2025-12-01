@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "robotick/framework/common/TypeTraits.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeRegistry.h"
+#include "robotick/framework/utility/TypeTraits.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <cstddef>
@@ -20,16 +20,15 @@ namespace robotick::registry
 	};
 	template <typename T>
 	struct has_set_children<T,
-		void_t<decltype(declval<T>().set_children(declval<const HeapVector<const WorkloadInstanceInfo*>&>(),
-			declval<HeapVector<DataConnectionInfo>&>()))>> : TrueType<>
+		void_t<decltype(declval<T>().set_children(
+			declval<const HeapVector<const WorkloadInstanceInfo*>&>(), declval<HeapVector<DataConnectionInfo>&>()))>> : TrueType<>
 	{
 	};
 
 	template <typename T, typename = void> struct has_set_engine : FalseType<>
 	{
 	};
-	template <typename T>
-	struct has_set_engine<T, void_t<decltype(declval<T>().set_engine(declval<const Engine&>()))>> : TrueType<>
+	template <typename T> struct has_set_engine<T, void_t<decltype(declval<T>().set_engine(declval<const Engine&>()))>> : TrueType<>
 	{
 	};
 

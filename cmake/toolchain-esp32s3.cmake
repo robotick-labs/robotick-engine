@@ -25,7 +25,7 @@ set(CMAKE_AR           "${ESP32_TOOLCHAIN}/bin/xtensa-esp32s3-elf-ar${EXE_SUFFIX
 set(CMAKE_OBJCOPY      "${ESP32_TOOLCHAIN}/bin/xtensa-esp32s3-elf-objcopy${EXE_SUFFIX}")
 
 # Force define for ESP32-specific builds
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DROBOTICK_PLATFORM_ESP32")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DROBOTICK_PLATFORM_ESP32S3")
 
 # Use IDF_PATH from environment
 set(IDF_PATH "$ENV{IDF_PATH}" CACHE PATH "Path to ESP-IDF")

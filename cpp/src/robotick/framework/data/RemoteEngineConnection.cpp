@@ -3,10 +3,10 @@
 
 #include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/api.h"
-#include "robotick/platform/Thread.h"
+#include "robotick/framework/concurrency/Thread.h"
+#include "robotick/framework/math/IsFinite.h"
 
 #include <arpa/inet.h>
-#include <cmath>
 #include <csignal> // For signal(), SIGPIPE, SIG_IGN
 #include <cstring>
 #include <fcntl.h>
@@ -15,7 +15,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 #include "esp_netif.h"
 #endif
 
@@ -77,7 +77,7 @@ namespace robotick
 
 		bool is_network_stack_ready()
 		{
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 			esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
 			return netif && esp_netif_is_netif_up(netif);
 #else
@@ -140,6 +140,9 @@ namespace robotick
 		const char* color_start = is_receiver ? "\033[33m" : "\033[32m"; // yellow : green
 		const char* color_end = "\033[0m";
 
+		// Pushing all log output + colorization through this gate keeps every transition auditable; callers simply request
+		// the new state and let the centralized logger/TCP cleanup run.  That in turn makes RAII cleanup (close sockets on stop)
+		// far easier to reason about.
 		if (state == State::Disconnected)
 		{
 			ROBOTICK_INFO("%s[%s] [-> State::Disconnected] - disconnected%s", color_start, mode_str, color_end);
@@ -211,6 +214,8 @@ namespace robotick
 				return;
 			}
 
+			// Connection state machine deliberately tears down and recreates sockets per transition.  Rebinding avoids
+			// reusing half-closed FDs and guarantees both sender/receiver restart cleanly after network failures.
 			if (mode == Mode::Sender)
 			{
 				tick_disconnected_sender();
@@ -568,13 +573,13 @@ namespace robotick
 			this->mutual_tick_rate_hz = local_sender_tick_rate_hz; // start off with our local tick-rate - this will get adjusted to mutual rate later
 			const uint32_t tick_rate_net = float_to_network_bytes(local_sender_tick_rate_hz);
 
-		for (size_t i = 0; i < field_count; ++i)
-		{
-			const auto& field = fields[i];
-			if (field.path.contains('\n'))
+			for (size_t i = 0; i < field_count; ++i)
 			{
-				ROBOTICK_FATAL_EXIT("Field path contains newline character - this will break handshake data: %s", field.path.c_str());
-			}
+				const auto& field = fields[i];
+				if (field.path.contains('\n'))
+				{
+					ROBOTICK_FATAL_EXIT("Field path contains newline character - this will break handshake data: %s", field.path.c_str());
+				}
 			}
 
 			auto writer = [this, tick_rate_net](size_t offset, uint8_t* dst, size_t max_len) -> size_t
@@ -729,8 +734,7 @@ namespace robotick
 			{
 				if (handshake_receive_state.current_path_length >= handshake_receive_state.current_path.capacity())
 				{
-					ROBOTICK_FATAL_EXIT("Field path too long (%zu chars): exceeds handshake buffer",
-						handshake_receive_state.current_path_length);
+					ROBOTICK_FATAL_EXIT("Field path too long (%zu chars): exceeds handshake buffer", handshake_receive_state.current_path_length);
 				}
 
 				handshake_receive_state.current_path.data[handshake_receive_state.current_path_length] = '\0';
@@ -760,7 +764,7 @@ namespace robotick
 
 			const float sender_tick_rate_hz = handshake_receive_state.sender_tick_rate_hz;
 
-			if (!::isfinite(sender_tick_rate_hz) || sender_tick_rate_hz <= 0.0f)
+			if (!robotick::isfinite(sender_tick_rate_hz) || sender_tick_rate_hz <= 0.0f)
 			{
 				ROBOTICK_FATAL_EXIT("Invalid sender tick rate: %f", sender_tick_rate_hz);
 			}
@@ -907,7 +911,7 @@ namespace robotick
 				received_mutual_tick_rate_hz = 0.0f;
 			}
 
-			if (::isfinite(received_mutual_tick_rate_hz) && received_mutual_tick_rate_hz > 0.0f)
+			if (robotick::isfinite(received_mutual_tick_rate_hz) && received_mutual_tick_rate_hz > 0.0f)
 			{
 				ROBOTICK_INFO_IF(
 					ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE, "Sender received mutual tick rate: %.2f Hz", received_mutual_tick_rate_hz);
@@ -1037,7 +1041,8 @@ namespace robotick
 
 	void RemoteEngineConnection::disconnect()
 	{
-		// tick both in_progress_message's if occupied, to ensure we're not sending partial messages
+		// Drain any partially sent/received packets before closing the socket.  This guarantees that both sides either see a
+		// fully framed message or a disconnect — never a half-written payload that could desynchronize the protocol.
 		InProgressMessage* in_progress_messages[] = {&in_progress_message_in, &in_progress_message_out};
 
 		for (InProgressMessage* in_progress_message_ptr : in_progress_messages)
@@ -1062,6 +1067,8 @@ namespace robotick
 			in_progress_message.vacate();
 		}
 
+		// Explicit close() even after ConnectionLost lets us reclaim the file descriptor immediately; the next state machine
+		// iteration will build a fresh socket with clean errno/flags.
 		if (socket_fd >= 0)
 			close(socket_fd);
 		socket_fd = -1;

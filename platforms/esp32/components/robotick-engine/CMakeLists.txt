@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Define the platform before anything else uses it
-set(ROBOTICK_PLATFORM_ESP32 TRUE)
+set(ROBOTICK_PLATFORM_ESP32S3 TRUE)
 
 set(ROBOTICK_ENGINE_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
@@ -65,9 +65,9 @@ endforeach()
 idf_component_register(
     SRCS ${srcs}
     INCLUDE_DIRS ${include_dirs}
-    REQUIRES json esp_timer M5Unified esp_wifi esp_http_server
+    REQUIRES json esp_timer esp_wifi esp_http_server nvs_flash
 )
 
 
 
-target_compile_definitions(${COMPONENT_LIB} PUBLIC ROBOTICK_PLATFORM_ESP32)
+target_compile_definitions(${COMPONENT_LIB} PUBLIC ROBOTICK_PLATFORM_ESP32S3)

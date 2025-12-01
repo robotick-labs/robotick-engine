@@ -4,16 +4,16 @@
 #pragma once
 
 #include "robotick/api_base.h"
-#include "robotick/framework/common/ArrayView.h"
-#include "robotick/framework/common/StringView.h"
+#include "robotick/framework/containers/ArrayView.h"
 #include "robotick/framework/model/DataConnectionSeed.h"
 #include "robotick/framework/model/RemoteModelSeed.h"
 #include "robotick/framework/model/WorkloadSeed.h"
+#include "robotick/framework/strings/StringView.h"
 
 #ifdef ROBOTICK_ENABLE_MODEL_HEAP
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/common/HeapVector.h"
-#include "robotick/framework/common/List.h"
+#include "robotick/framework/containers/List.h"
+#include "robotick/framework/containers/HeapVector.h"
+#include "robotick/framework/strings/FixedString.h"
 #endif
 
 #include <cstdint>

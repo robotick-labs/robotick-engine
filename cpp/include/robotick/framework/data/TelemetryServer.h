@@ -1,7 +1,10 @@
+// Copyright Robotick Labs
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/platform/WebServer.h"
+#include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/services/WebServer.h"
 
 namespace robotick
 {

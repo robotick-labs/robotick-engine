@@ -5,7 +5,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
-#include "robotick/framework/common/Map.h"
+#include "robotick/framework/containers/Map.h"
 #include "robotick/framework/utils/TypeId.h"
 
 namespace robotick

@@ -1,15 +1,14 @@
-
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/common/ArrayView.h"
+#include "robotick/framework/containers/ArrayView.h"
+#include "robotick/framework/containers/FixedVector.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
+#include "robotick/framework/strings/StringUtils.h"
 #include "robotick/framework/utils/TypeId.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
-#include "robotick/framework/common/FixedVector.h"
-#include "robotick/framework/common/StringUtils.h"
 
 #include <catch2/catch_all.hpp>
 

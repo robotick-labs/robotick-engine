@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/WorkloadInstanceInfo.h"
-#include "robotick/platform/Atomic.h"
-#include "robotick/platform/Thread.h"
 #include "robotick/config/AssertUtils.h"
+#include "robotick/framework/WorkloadInstanceInfo.h"
+#include "robotick/framework/concurrency/Atomic.h"
+#include "robotick/framework/concurrency/Thread.h"
 
 #include <arpa/inet.h>
 #include <atomic>
@@ -13,31 +13,49 @@
 #include <chrono>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <thread>
 
 namespace robotick::test
 {
 	namespace
 	{
-		struct ThreadJoiner
+		struct EngineRunContext
 		{
-			explicit ThreadJoiner(std::thread& t)
-				: thread(t)
+			Engine* engine = nullptr;
+			AtomicFlag* stop_flag = nullptr;
+		};
+
+		class EngineRunThread
+		{
+		  public:
+			EngineRunThread(Engine& engine, AtomicFlag& stop_flag)
 			{
+				context.engine = &engine;
+				context.stop_flag = &stop_flag;
+				thread = Thread(&EngineRunThread::run_entry, &context, "EngineRunThread");
 			}
 
-			~ThreadJoiner()
+			~EngineRunThread()
 			{
-				if (thread.joinable())
+				if (thread.is_joining_supported() && thread.is_joinable())
 				{
 					thread.join();
 				}
 			}
 
 		  private:
-			std::thread& thread;
+			static void run_entry(void* user_data)
+			{
+				auto* ctx = static_cast<EngineRunContext*>(user_data);
+				if (ctx->engine && ctx->stop_flag)
+				{
+					ctx->engine->run(*ctx->stop_flag);
+				}
+			}
+
+			EngineRunContext context{};
+			Thread thread;
 		};
-	}
+	} // namespace
 	struct TestSequencedGroupWorkload
 	{
 	};
@@ -92,6 +110,25 @@ namespace robotick::test
 			void tick(const TickInfo&) { count++; }
 		};
 		ROBOTICK_REGISTER_WORKLOAD(TickCounterWorkload)
+
+		struct ThreadAffinityWorkload
+		{
+			Thread::ThreadId start_thread = 0;
+			Thread::ThreadId first_tick_thread = 0;
+			AtomicValue<int> tick_count{0};
+
+			void start(float) { start_thread = Thread::get_current_thread_id(); }
+
+			void tick(const TickInfo&)
+			{
+				const int previous = tick_count.fetch_add(1);
+				if (previous == 0)
+				{
+					first_tick_thread = Thread::get_current_thread_id();
+				}
+			}
+		};
+		ROBOTICK_REGISTER_WORKLOAD(ThreadAffinityWorkload)
 
 	} // namespace
 
@@ -254,12 +291,7 @@ namespace robotick::test
 			engine.load(model);
 
 			AtomicFlag stop_after_next_tick_flag{false};
-			std::thread runner(
-				[&]()
-				{
-					engine.run(stop_after_next_tick_flag);
-				});
-			ThreadJoiner runner_joiner(runner);
+			EngineRunThread runner(engine, stop_after_next_tick_flag);
 
 			Thread::sleep_ms(50);
 			stop_after_next_tick_flag.set();
@@ -286,8 +318,7 @@ namespace robotick::test
 				engine.load(model);
 
 				AtomicFlag stop_flag{false};
-				std::thread runner([&]() { engine.run(stop_flag); });
-				ThreadJoiner runner_joiner(runner);
+				EngineRunThread runner(engine, stop_flag);
 
 				Thread::sleep_ms(30);
 				stop_flag.set();
@@ -296,6 +327,29 @@ namespace robotick::test
 			run_engine_once(telemetry_port);
 			REQUIRE(bind_to_port(telemetry_port));
 			run_engine_once(telemetry_port);
+		}
+
+		SECTION("start_fn executes on same thread as tick_fn")
+		{
+			Model model;
+			model.set_telemetry_port(choose_telemetry_port());
+			const WorkloadSeed& workload_seed = model.add("ThreadAffinityWorkload", "affinity").set_tick_rate_hz(120.0f);
+			model.set_root_workload(workload_seed);
+
+			Engine engine;
+			engine.load(model);
+
+			AtomicFlag stop_flag{false};
+			EngineRunThread runner(engine, stop_flag);
+
+			Thread::sleep_ms(30);
+			stop_flag.set();
+
+			const auto* info = engine.find_instance<ThreadAffinityWorkload>(workload_seed.unique_name);
+			REQUIRE(info != nullptr);
+			REQUIRE(info->tick_count.load() > 0);
+			CHECK(info->start_thread == info->first_tick_thread);
+			CHECK(info->start_thread != Thread::ThreadId{});
 		}
 	}
 

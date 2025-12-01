@@ -4,21 +4,30 @@
 #pragma once
 
 #include "robotick/api_base.h"
-#include "robotick/framework/common/InitializerList.h"
+#include "robotick/framework/utility/InitializerList.h"
 
-#include <float.h> // FLT_EPSILON, DBL_EPSILON
-#include <math.h>  // sqrtf, sqrt
+#include "robotick/framework/math/Clamp.h"
+#include "robotick/framework/math/Trig.h"
+
+#include <cfloat>
+#include <cmath>
 
 namespace robotick
 {
-	template <typename T> inline T max(T a, T b)
+	static constexpr float kPi = 3.14159265358979323846f;
+	static constexpr float kHalfPi = 0.5f * kPi;
+	static constexpr float kTwoPi = 2.0f * kPi;
+	static constexpr float kDegToRad = kPi / 180.0f;
+	static constexpr float kRadToDeg = 180.0f / kPi;
+
+	inline float deg_to_rad(float degrees)
 	{
-		return a > b ? a : b;
+		return degrees * kDegToRad;
 	}
 
-	template <typename T> inline T min(T a, T b)
+	inline float rad_to_deg(float radians)
 	{
-		return a < b ? a : b;
+		return radians * kRadToDeg;
 	}
 
 	template <typename T> inline T max(robotick::initializer_list<T> values)
@@ -30,6 +39,16 @@ namespace robotick
 		return result;
 	}
 
+	template <typename T> inline T max(const T& lhs, const T& rhs)
+	{
+		return (lhs > rhs) ? lhs : rhs;
+	}
+
+	template <typename T> inline T min(const T& lhs, const T& rhs)
+	{
+		return (lhs < rhs) ? lhs : rhs;
+	}
+
 	template <typename T> inline T min(robotick::initializer_list<T> values)
 	{
 		T result = *values.begin();
@@ -39,14 +58,9 @@ namespace robotick
 		return result;
 	}
 
-	template <typename T> inline T clamp(T v, T lo, T hi)
-	{
-		return v < lo ? lo : (v > hi ? hi : v);
-	}
-
 	template <typename T> inline T clamp01(T v)
 	{
-		return clamp(v, T(0), T(1));
+		return robotick::clamp(v, T(0), T(1));
 	}
 
 	inline float lerp(float a, float b, float t)

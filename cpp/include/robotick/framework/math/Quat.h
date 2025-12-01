@@ -5,26 +5,15 @@
 
 #include "robotick/api_base.h"
 
-#include <float.h> // FLT_EPSILON, DBL_EPSILON
-#include <math.h>  // sqrtf, sqrt
+#include "robotick/framework/math/Abs.h"
+#include "robotick/framework/math/Sqrt.h"
+#include "robotick/framework/math/Trig.h"
+#include <cfloat> // FLT_EPSILON, DBL_EPSILON
 
 namespace robotick
 {
-	// --- sqrt dispatch helper ---
-
 	namespace internal::Quat
 	{
-		template <typename T> struct SqrtFn;
-
-		template <> struct SqrtFn<float>
-		{
-			static inline float apply(float v) { return sqrtf(v); }
-		};
-		template <> struct SqrtFn<double>
-		{
-			static inline double apply(double v) { return sqrt(v); }
-		};
-
 		template <typename T> struct Epsilon;
 
 		template <> struct Epsilon<float>
@@ -71,7 +60,7 @@ namespace robotick
 		TDerived operator*(TReal s) const { return TDerived(w * s, x * s, y * s, z * s); }
 		TDerived operator/(TReal s) const
 		{
-			ROBOTICK_ASSERT_MSG(fabs(s) > static_cast<TReal>(kFloatEpsilon), "Divide by zero requested!");
+			ROBOTICK_ASSERT_MSG(robotick::abs(s) > static_cast<TReal>(kFloatEpsilon), "Divide by zero requested!");
 			return TDerived(w / s, x / s, y / s, z / s);
 		}
 
@@ -101,7 +90,7 @@ namespace robotick
 		}
 		TDerived& operator/=(TReal s)
 		{
-			ROBOTICK_ASSERT_MSG(fabs(s) > static_cast<TReal>(kFloatEpsilon), "Divide by zero requested (in-place)!");
+			ROBOTICK_ASSERT_MSG(robotick::abs(s) > static_cast<TReal>(kFloatEpsilon), "Divide by zero requested (in-place)!");
 			w /= s;
 			x /= s;
 			y /= s;
@@ -126,7 +115,7 @@ namespace robotick
 
 		TReal length_squared() const { return dot(static_cast<const TDerived&>(*this)); }
 
-		TReal length() const { return internal::Quat::SqrtFn<TReal>::apply(length_squared()); }
+		TReal length() const { return robotick::sqrt(length_squared()); }
 
 		void normalize()
 		{
@@ -174,20 +163,20 @@ namespace robotick
 		static TDerived from_axis_angle(TReal axis_x, TReal axis_y, TReal axis_z, TReal angle_rad)
 		{
 			const TReal half = static_cast<TReal>(0.5) * angle_rad;
-			const TReal s = sin(half);
-			const TReal c = cos(half);
+			const TReal s = robotick::sin(half);
+			const TReal c = robotick::cos(half);
 			return TDerived(c, axis_x * s, axis_y * s, axis_z * s);
 		}
 
 		// Factory: from ZYX Euler (yaw, pitch, roll)
 		static TDerived from_euler_zyx(TReal yaw, TReal pitch, TReal roll)
 		{
-			const TReal cy = cos(yaw * 0.5);
-			const TReal sy = sin(yaw * 0.5);
-			const TReal cp = cos(pitch * 0.5);
-			const TReal sp = sin(pitch * 0.5);
-			const TReal cr = cos(roll * 0.5);
-			const TReal sr = sin(roll * 0.5);
+			const TReal cy = robotick::cos(yaw * 0.5);
+			const TReal sy = robotick::sin(yaw * 0.5);
+			const TReal cp = robotick::cos(pitch * 0.5);
+			const TReal sp = robotick::sin(pitch * 0.5);
+			const TReal cr = robotick::cos(roll * 0.5);
+			const TReal sr = robotick::sin(roll * 0.5);
 
 			// q = Rz(yaw) * Ry(pitch) * Rx(roll)
 			TReal qw = cr * cp * cy + sr * sp * sy;

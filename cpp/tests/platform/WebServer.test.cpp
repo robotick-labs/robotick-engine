@@ -1,9 +1,9 @@
 // Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/framework/services/WebServer.h"
 #include "robotick/api.h"
-#include "robotick/platform/Thread.h"
-#include "robotick/platform/WebServer.h"
+#include "robotick/framework/concurrency/Thread.h"
 
 #include <catch2/catch_all.hpp>
 #include <curl/curl.h>
@@ -18,7 +18,7 @@ using namespace robotick;
 // ----------------------------------------------------------
 namespace
 {
-struct TextBuffer
+	struct TextBuffer
 	{
 		char data[4096] = {};
 		size_t len = 0;
@@ -128,10 +128,7 @@ struct TextBuffer
 
 		~ScopedTestServer() { server.stop(); }
 
-		void url(char* out, size_t out_size, const char* path) const
-		{
-			::snprintf(out, out_size, "http://localhost:%u%s", (unsigned)port, path);
-		}
+		void url(char* out, size_t out_size, const char* path) const { ::snprintf(out, out_size, "http://localhost:%u%s", (unsigned)port, path); }
 	};
 
 } // namespace
@@ -139,7 +136,7 @@ struct TextBuffer
 // =======================================================================================
 // FINAL TEST SUITE
 // =======================================================================================
-TEST_CASE("Unit/Platform/WebServer")
+TEST_CASE("Unit/Framework/WebServer")
 {
 	// -----------------------------------------------------------------------------------
 	// 1. Serving static file

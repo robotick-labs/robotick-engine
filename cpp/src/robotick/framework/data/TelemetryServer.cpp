@@ -1,19 +1,22 @@
+// Copyright Robotick Labs
+// SPDX-License-Identifier: Apache-2.0
+
 #include "robotick/framework/data/TelemetryServer.h"
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
-#include "robotick/framework/common/StringView.h"
-#include "robotick/framework/common/Algorithm.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
+#include "robotick/framework/strings/StringView.h"
+#include "robotick/framework/time/Clock.h"
+#include "robotick/framework/utility/Algorithm.h"
 #include "robotick/framework/utils/WorkloadFieldsIterator.h"
-#include "robotick/platform/Clock.h"
 
 #include <nlohmann/json.hpp>
 
 #include <cstdio>
 #include <unistd.h>
 
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 #include <esp_random.h>
 #endif
 
@@ -27,12 +30,11 @@ namespace robotick
 
 	static void build_session_id(const char* model_name, FixedString64& session_id)
 	{
-#if defined(ROBOTICK_PLATFORM_ESP32)
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 		uint32_t raw = esp_random(); // 32-bit hardware RNG
 		session_id.format("%08X-%s", raw, model_name);
 #elif defined(ROBOTICK_PLATFORM_DESKTOP)
-		const uint64_t raw =
-			static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count()); // 64-bit timestamp
+		const uint64_t raw = static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count()); // 64-bit timestamp
 		session_id.format("%016llX-%s", static_cast<unsigned long long>(raw), model_name);
 #else
 		session_id.format("12345-%s", model_name);
@@ -45,6 +47,9 @@ namespace robotick
 
 		build_session_id(engine_in.get_model_name(), session_id);
 
+		// WebServer owns the socket lifetime; the handler lambda only decides whether a request belongs to the telemetry API.
+		// Health/layout/raw form the entire "handshake": clients first call /health to confirm the engine is alive, then fetch
+		// the static buffer layout before streaming /raw snapshots.  Keeping this in one lambda avoids dangling captures.
 		web_server.start("Telemetry",
 			telemetry_port,
 			nullptr,

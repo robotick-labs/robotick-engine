@@ -4,7 +4,7 @@
 #pragma once
 
 #include "robotick/api_base.h"
-#include "robotick/framework/common/Memory.h"
+#include "robotick/framework/memory/Memory.h"
 
 #include <cassert>
 #include <cstddef>

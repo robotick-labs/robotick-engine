@@ -5,5 +5,5 @@
 
 #include "robotick/config/AssertUtils.h"
 #include "robotick/config/PlatformDefaults.h"
+#include "robotick/framework/memory/StdApproved.h"
 #include "robotick/framework/utils/Constants.h"
-#include "robotick/framework/common/StdApproved.h"

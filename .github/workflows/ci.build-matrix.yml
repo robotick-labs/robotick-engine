@@ -1,4 +1,4 @@
-name: CI - Build Matrix (Linux + ESP32)
+name: CI - Build Matrix (Linux + ESP32-S3)
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
           - platform: linux
             preset: robotick-engine-tests-linux-release
             docker_image: mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04
-          - platform: esp32
+          - platform: esp32s3
             preset: esp32s3
             docker_image: espressif/idf:release-v5.4
 
@@ -55,8 +55,8 @@ jobs:
               export TERM=xterm-256color
               set -x
 
-              if [ '${{ matrix.platform }}' == 'esp32' ]; then
-                echo '🚧 ESP32 Setup'
+              if [ '${{ matrix.platform }}' == 'esp32s3' ]; then
+                echo '🚧 ESP32-S3 Setup'
                 cd tools/esp32-compile-check
 
                 if ! command -v ninja >/dev/null 2>&1; then

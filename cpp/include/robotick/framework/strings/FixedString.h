@@ -1,0 +1,177 @@
+// Copyright Robotick Labs
+// SPDX-License-Identifier: Apache-2.0
+#pragma once
+
+#include "robotick/framework/memory/Memory.h"
+#include "robotick/framework/utility/Hash.h"
+
+#include <cstdio>
+#include <stddef.h>
+#include <string.h>
+
+namespace robotick
+{
+	// constexpr min function
+	template <typename T> constexpr T min_val(T a, T b)
+	{
+		return (a < b) ? a : b;
+	}
+
+	// Lightweight replacement for strlen
+	constexpr size_t fixed_strlen(const char* str)
+	{
+		size_t len = 0;
+		while (str[len] != '\0')
+			++len;
+		return len;
+	}
+
+	template <size_t N> struct FixedString
+	{
+		static_assert(N > 1, "FixedString must be at least 2 characters long (incl null)");
+
+		char data[N] = {};
+
+		FixedString() = default;
+
+		FixedString(const char* str)
+		{
+			const size_t len = min_val(fixed_strlen(str), N - 1);
+			memcpy(data, str, len);
+			data[len] = '\0';
+		}
+
+		FixedString(const char* str, const size_t max_copy_length)
+		{
+			if (!str)
+			{
+				data[0] = '\0';
+				return;
+			}
+
+			const size_t len = min_val(fixed_strlen(str), min_val(max_copy_length, N - 1));
+			memcpy(data, str, len);
+			data[len] = '\0';
+		}
+
+		void clear() { data[0] = '\0'; }
+
+		void assign(const char* str, size_t length)
+		{
+			if (!str)
+			{
+				data[0] = '\0';
+				return;
+			}
+
+			const size_t len = min_val(length, N - 1);
+			memcpy(data, str, len);
+			data[len] = '\0';
+		}
+
+		FixedString& operator=(const char* str)
+		{
+			const size_t len = min_val(fixed_strlen(str), N - 1);
+			memcpy(data, str, len);
+			data[len] = '\0';
+			return *this;
+		}
+
+		bool operator<(const FixedString<N>& other) const noexcept { return strcmp(data, other.data) < 0; }
+
+		char* str() { return data; }
+
+		const char* c_str() const { return data; }
+
+		operator const char*() const { return data; }
+
+		bool equals(const char* other) const noexcept { return strcmp(data, other) == 0; }
+
+		bool operator==(const char* other) const noexcept { return strcmp(data, other) == 0; }
+
+		bool operator==(const FixedString<N>& other) const { return strcmp(data, other.data) == 0; }
+
+		bool operator!=(const FixedString<N>& other) const { return !(*this == other); }
+
+		bool empty() const { return data[0] == '\0'; }
+
+		bool contains(const char query_char) const
+		{
+			const size_t str_length = length();
+			for (size_t i = 0; i < str_length; ++i)
+			{
+				if (data[i] == query_char)
+					return true;
+			}
+			return false;
+		}
+
+		size_t length() const { return fixed_strlen(data); };
+
+		constexpr size_t capacity() const { return N; }
+
+		template <typename... Args> void format(const char* fmt, Args&&... args)
+		{
+			const int written = ::snprintf(data, N, fmt, robotick::forward<Args>(args)...);
+			if (written < 0)
+			{
+				data[0] = '\0';
+			}
+		}
+
+		template <typename... Args> void appendf(const char* fmt, Args&&... args)
+		{
+			const size_t current_len = strlen(data);
+			const size_t remaining = (N > current_len) ? N - current_len : 0;
+
+			if (remaining > 0)
+			{
+				const int written = ::snprintf(data + current_len, remaining, fmt, robotick::forward<Args>(args)...);
+
+				// If snprintf wrote something and didn't overflow, we're fine.
+				if (written < 0 || static_cast<size_t>(written) >= remaining)
+				{
+					// Truncate on error or overflow
+					data[N - 1] = '\0';
+				}
+			}
+		}
+
+		void append(const char* text)
+		{
+			if (!text)
+			{
+				return;
+			}
+
+			const size_t current_len = strlen(data);
+			const size_t remaining = (N > current_len) ? N - current_len : 0;
+
+			if (remaining > 1)
+			{
+				const size_t text_len = strlen(text);
+				const size_t copy_len = (text_len < remaining - 1) ? text_len : remaining - 1;
+
+				memcpy(data + current_len, text, copy_len);
+				data[current_len + copy_len] = '\0';
+			}
+		}
+	};
+
+	template <size_t N> inline size_t hash(const FixedString<N>& s)
+	{
+		return hash_string(s.data);
+	}
+
+	// Type aliases
+	using FixedString8 = FixedString<8>;
+	using FixedString16 = FixedString<16>;
+	using FixedString32 = FixedString<32>;
+	using FixedString64 = FixedString<64>;
+	using FixedString128 = FixedString<128>;
+	using FixedString256 = FixedString<256>;
+	using FixedString512 = FixedString<512>;
+	using FixedString1024 = FixedString<1024>;
+	using FixedString1024 = FixedString<1024>;
+
+} // namespace robotick

@@ -5,8 +5,8 @@
 
 #include "robotick/api_base.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
-#include "robotick/platform/Atomic.h"
-#include "robotick/platform/Thread.h"
+#include "robotick/framework/concurrency/Atomic.h"
+#include "robotick/framework/concurrency/Thread.h"
 
 namespace robotick
 {

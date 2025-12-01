@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "robotick/framework/common/FixedString.h"
-#include "robotick/framework/common/TypeTraits.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/strings/FixedString.h"
+#include "robotick/framework/utility/TypeTraits.h"
 #include "robotick/framework/utils/Constants.h"
 #include "robotick/framework/utils/TypeId.h"
 
@@ -99,7 +99,7 @@ namespace robotick
 		BlackboardInfo info;
 	};
 
-static_assert(
-	robotick::is_trivially_copyable_v<Blackboard>, "Blackboard is not trivially copyable. It needs to be to be usable in workload structs");
+	static_assert(
+		robotick::is_trivially_copyable_v<Blackboard>, "Blackboard is not trivially copyable. It needs to be to be usable in workload structs");
 
 } // namespace robotick

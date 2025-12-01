@@ -1,4 +1,4 @@
-// Copyright Robotick
+// Copyright Robotick Labs
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/DataConnection.h"
@@ -7,8 +7,8 @@
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/DataConnectionSeed.h"
-#include "robotick/framework/common/StringUtils.h"
 #include "robotick/framework/model/WorkloadSeed.h"
+#include "robotick/framework/strings/StringUtils.h"
 
 namespace robotick
 {
@@ -190,6 +190,10 @@ namespace robotick
 			if (!field)
 				ROBOTICK_FATAL_EXIT("Field '%s' not found in path: %s", field_token.c_str(), path);
 
+			// get_data_ptr sums the instance base address and the section offset computed during Engine::load(), so every
+			// field pointer stays stable even as other workloads expand.  That offset math mirrors the contiguous layout.
+			// get_data_ptr sums the engine's contiguous base pointer with the struct offset computed during Engine::load(),
+			// so every resolved pointer matches the deterministic layout even though the memory lives in a single buffer.
 			const uint8_t* ptr = (uint8_t*)field->get_data_ptr(workloads_buffer, *workload, *struct_type, struct_offset);
 			const TypeDescriptor* field_type_desc = field->find_type_descriptor();
 			if (!field_type_desc)
@@ -314,7 +318,7 @@ namespace robotick
 		}
 	}
 
-		FieldInfo DataConnectionUtils::find_field_info(const Engine& engine, const char* path)
+	FieldInfo DataConnectionUtils::find_field_info(const Engine& engine, const char* path)
 	{
 		const WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
 		const Map<const char*, WorkloadInstanceInfo*>& instances = engine.get_all_instance_info_map();
@@ -330,6 +334,7 @@ namespace robotick
 		}
 		const WorkloadInstanceInfo* workload_info = *workload_info_ptr;
 
+		// workload.section.field[.subfield]
 		const FixedString64 section_token = extract_next_token(path_cursor);
 		size_t struct_offset = OFFSET_UNBOUND;
 		const TypeDescriptor* struct_type = DataConnectionHelpers::get_struct_entry(*workload_info, section_token.c_str(), struct_offset);

@@ -4,8 +4,8 @@
 #include "robotick/framework/data/Blackboard.h"
 #include "../utils/BlackboardTestUtils.h"
 #include "robotick/api_base.h"
-#include "robotick/framework/common/StringUtils.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
+#include "robotick/framework/strings/StringUtils.h"
 #include "robotick/framework/utils/TypeId.h"
 
 #include <catch2/catch_all.hpp>
