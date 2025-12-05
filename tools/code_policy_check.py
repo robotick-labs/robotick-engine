@@ -1,4 +1,4 @@
-# Copyright Robotick Labs
+# Copyright Robotick contributors
 # SPDX-License-Identifier: Apache-2.0
 
 """
@@ -22,12 +22,12 @@ DEFAULT_SUFFIXES = (".cpp", ".cc", ".c", ".h", ".hpp", ".inl")
 DEFAULT_TOOL_FILES = ["tools/code_policy_check.py"]
 
 CPP_LICENSE_HEADER = [
-    "// Copyright Robotick Labs",
+    "// Copyright Robotick contributors",
     "// SPDX-License-Identifier: Apache-2.0",
 ]
 
 PYTHON_LICENSE_HEADER = [
-    "# Copyright Robotick Labs",
+    "# Copyright Robotick contributors",
     "# SPDX-License-Identifier: Apache-2.0",
 ]
 
@@ -64,7 +64,9 @@ def _has_spdx_header(lines: List[str]) -> bool:
     return False
 
 
-def _check_headers(path: str, lines: List[str], context: Dict[str, Any]) -> Optional[str]:
+def _check_headers(
+    path: str, lines: List[str], context: Dict[str, Any]
+) -> Optional[str]:
     header_mode = context["header_mode"]
     if header_mode == "spdx":
         if not _has_spdx_header(lines):
@@ -90,7 +92,9 @@ def _check_headers(path: str, lines: List[str], context: Dict[str, Any]) -> Opti
     return None
 
 
-def _check_std_usage(path: str, lines: List[str], context: Dict[str, Any]) -> Optional[str]:
+def _check_std_usage(
+    path: str, lines: List[str], context: Dict[str, Any]
+) -> Optional[str]:
     if not context["check_std_usage"]:
         return None
 
