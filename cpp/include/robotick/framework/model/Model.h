@@ -10,12 +10,6 @@
 #include "robotick/framework/model/WorkloadSeed.h"
 #include "robotick/framework/strings/StringView.h"
 
-#ifdef ROBOTICK_ENABLE_MODEL_HEAP
-#include "robotick/framework/containers/List.h"
-#include "robotick/framework/containers/HeapVector.h"
-#include "robotick/framework/strings/FixedString.h"
-#endif
-
 #include <cstdint>
 
 namespace robotick
@@ -23,16 +17,6 @@ namespace robotick
 	class Model
 	{
 	  public:
-#ifdef ROBOTICK_ENABLE_MODEL_HEAP
-		// dynamic modifiers and accessor(s):
-		WorkloadSeed& add();
-		WorkloadSeed& add(const char* type_name, const char* unique_name);
-		void connect(const char* source_field_path, const char* dest_field_path);
-		RemoteModelSeed& add_remote_model(const char* model_name, const char* comms_channel);
-
-		const List<WorkloadSeed>& get_workload_seeds_storage() const { return workload_seeds_storage; }
-
-#endif
 		// non-dynamic modifiers:
 		void set_model_name(const char* in_model_name) { model_name = in_model_name; }
 
@@ -68,13 +52,6 @@ namespace robotick
 		const WorkloadSeed* get_root_workload() const { return root_workload; }
 		uint16_t get_telemetry_port() const { return telemetry_port; };
 
-	  protected:
-#ifdef ROBOTICK_ENABLE_MODEL_HEAP
-		void bake_dynamic_workloads();
-		void bake_dynamic_data_connections();
-		void bake_dynamic_remote_models();
-#endif
-
 	  private:
 		StringView model_name;
 
@@ -85,16 +62,6 @@ namespace robotick
 		const WorkloadSeed* root_workload = nullptr;
 
 		uint16_t telemetry_port = 7090;
-
-#ifdef ROBOTICK_ENABLE_MODEL_HEAP
-		List<WorkloadSeed> workload_seeds_storage;
-		List<DataConnectionSeed> data_connection_seeds_storage;
-		List<RemoteModelSeed> remote_models_storage;
-
-		HeapVector<const WorkloadSeed*> baked_workload_ptrs;
-		HeapVector<const DataConnectionSeed*> baked_data_connection_ptrs;
-		HeapVector<const RemoteModelSeed*> baked_remote_model_ptrs;
-#endif
 	};
 
 } // namespace robotick

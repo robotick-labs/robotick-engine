@@ -1,11 +1,12 @@
 // Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/Engine.h"
 #include "robotick/config/AssertUtils.h"
+#include "robotick/framework/Engine.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Thread.h"
+#include "robotick/framework/data/DataConnection.h"
 
 #include <arpa/inet.h>
 #include <atomic>
@@ -209,7 +210,16 @@ namespace robotick::test
 		{
 			Model model;
 			model.set_telemetry_port(choose_telemetry_port());
-			const WorkloadSeed& workload_seed = model.add("DummyWorkload", "A").set_tick_rate_hz(123.0f);
+			static const WorkloadSeed workload_seed{
+				TypeId("DummyWorkload"),
+				StringView("A"),
+				123.0f,
+				{}, // children
+				{}, // config
+				{}	// inputs
+			};
+			static const WorkloadSeed* workloads[] = {&workload_seed};
+			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 
 			Engine engine;
@@ -223,8 +233,17 @@ namespace robotick::test
 		{
 			Model model;
 			model.set_telemetry_port(choose_telemetry_port());
-			const WorkloadSeed& workload_seed =
-				model.add("DummyWorkload", "A").set_tick_rate_hz(1.0f).set_inputs({{"input_string_64", "hello there"}, {"input_float", "1.234"}});
+			static const FieldConfigEntry inputs[] = {{"input_string_64", "hello there"}, {"input_float", "1.234"}};
+			static const WorkloadSeed workload_seed{
+				TypeId("DummyWorkload"),
+				StringView("A"),
+				1.0f,
+				{},		 // children
+				{},		 // config
+				inputs // inputs
+			};
+			static const WorkloadSeed* workloads[] = {&workload_seed};
+			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 
 			Engine engine;
@@ -239,7 +258,17 @@ namespace robotick::test
 		{
 			Model model;
 			model.set_telemetry_port(choose_telemetry_port());
-			const WorkloadSeed& workload_seed = model.add("DummyWorkload", "A").set_tick_rate_hz(1.0f).set_config({{"value", "42"}});
+			static const FieldConfigEntry config[] = {{"value", "42"}};
+			static const WorkloadSeed workload_seed{
+				TypeId("DummyWorkload"),
+				StringView("A"),
+				1.0f,
+				{},	  // children
+				config,
+				{} // inputs
+			};
+			static const WorkloadSeed* workloads[] = {&workload_seed};
+			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 
 			Engine engine;
@@ -253,9 +282,35 @@ namespace robotick::test
 		{
 			Model model;
 			model.set_telemetry_port(choose_telemetry_port());
-			const WorkloadSeed& a = model.add("DummyWorkload", "one").set_tick_rate_hz(1.0f).set_config({{"value", "1"}});
-			const WorkloadSeed& b = model.add("DummyWorkload", "two").set_tick_rate_hz(1.0f).set_config({{"value", "2"}});
-			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&a, &b});
+			static const FieldConfigEntry config_one[] = {{"value", "1"}};
+			static const FieldConfigEntry config_two[] = {{"value", "2"}};
+			static const WorkloadSeed workload_one{
+				TypeId("DummyWorkload"),
+				StringView("one"),
+				1.0f,
+				{},			 // children
+				config_one, // config
+				{}			 // inputs
+			};
+			static const WorkloadSeed workload_two{
+				TypeId("DummyWorkload"),
+				StringView("two"),
+				1.0f,
+				{},			 // children
+				config_two, // config
+				{}			 // inputs
+			};
+			static const WorkloadSeed* root_children[] = {&workload_one, &workload_two};
+			static const WorkloadSeed root{
+				TypeId("TestSequencedGroupWorkload"),
+				StringView("group"),
+				1.0f,
+				root_children,
+				{}, // config
+				{}	// inputs
+			};
+			static const WorkloadSeed* workloads[] = {&workload_one, &workload_two, &root};
+			model.use_workload_seeds(workloads);
 			model.set_root_workload(root);
 
 			Engine engine;
@@ -272,7 +327,16 @@ namespace robotick::test
 		{
 			Model model;
 			model.set_telemetry_port(choose_telemetry_port());
-			const WorkloadSeed& workload_seed = model.add("TickCounterWorkload", "ticky").set_tick_rate_hz(200.0f);
+			static const WorkloadSeed workload_seed{
+				TypeId("TickCounterWorkload"),
+				StringView("ticky"),
+				200.0f,
+				{}, // children
+				{}, // config
+				{}	// inputs
+			};
+			static const WorkloadSeed* workloads[] = {&workload_seed};
+			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 
 			Engine engine;
@@ -289,7 +353,16 @@ namespace robotick::test
 		{
 			Model model;
 			model.set_telemetry_port(choose_telemetry_port());
-			const WorkloadSeed& workload_seed = model.add("OverrunWorkload", "overrun").set_tick_rate_hz(1000.0f);
+			static const WorkloadSeed workload_seed{
+				TypeId("OverrunWorkload"),
+				StringView("overrun"),
+				1000.0f,
+				{}, // children
+				{}, // config
+				{}	// inputs
+			};
+			static const WorkloadSeed* workloads[] = {&workload_seed};
+			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 
 			Engine engine;
@@ -316,7 +389,16 @@ namespace robotick::test
 			{
 				Model model;
 				model.set_telemetry_port(port);
-				const WorkloadSeed& workload_seed = model.add("TickCounterWorkload", "ticky").set_tick_rate_hz(200.0f);
+				static const WorkloadSeed workload_seed{
+					TypeId("TickCounterWorkload"),
+					StringView("telemetry_ticky"),
+					200.0f,
+					{}, // children
+					{}, // config
+					{}	// inputs
+				};
+				static const WorkloadSeed* workloads[] = {&workload_seed};
+				model.use_workload_seeds(workloads);
 				model.set_root_workload(workload_seed);
 
 				Engine engine;
@@ -338,7 +420,16 @@ namespace robotick::test
 		{
 			Model model;
 			model.set_telemetry_port(choose_telemetry_port());
-			const WorkloadSeed& workload_seed = model.add("ThreadAffinityWorkload", "affinity").set_tick_rate_hz(120.0f);
+			static const WorkloadSeed workload_seed{
+				TypeId("ThreadAffinityWorkload"),
+				StringView("affinity"),
+				120.0f,
+				{}, // children
+				{}, // config
+				{}	// inputs
+			};
+			static const WorkloadSeed* workloads[] = {&workload_seed};
+			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 
 			Engine engine;

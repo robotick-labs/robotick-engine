@@ -50,7 +50,16 @@ namespace robotick::test
 		SECTION("Field pointers match expected values and buffers")
 		{
 			Model model;
-			const WorkloadSeed& w = model.add("SimpleWorkload", "W").set_tick_rate_hz(10.0f);
+			static const WorkloadSeed w{
+				TypeId("SimpleWorkload"),
+				StringView("W"),
+				10.0f,
+				{}, // children
+				{}, // config
+				{}	// inputs
+			};
+			static const WorkloadSeed* workloads[] = {&w};
+			model.use_workload_seeds(workloads);
 			model.set_root_workload(w);
 
 			Engine engine;
@@ -98,7 +107,16 @@ namespace robotick::test
 		SECTION("Override buffer works correctly")
 		{
 			Model model;
-			const WorkloadSeed& w = model.add("SimpleWorkload", "W").set_tick_rate_hz(10.0f);
+			static const WorkloadSeed w{
+				TypeId("SimpleWorkload"),
+				StringView("W"),
+				10.0f,
+				{}, // children
+				{}, // config
+				{}	// inputs
+			};
+			static const WorkloadSeed* workloads[] = {&w};
+			model.use_workload_seeds(workloads);
 			model.set_root_workload(w);
 
 			Engine engine;
@@ -147,8 +165,24 @@ namespace robotick::test
 		SECTION("for_each_workload returns all instances")
 		{
 			Model model;
-			const WorkloadSeed& w1 = model.add("SimpleWorkload", "W1").set_tick_rate_hz(10.0f);
-			model.add("SimpleWorkload", "W2").set_tick_rate_hz(10.0f);
+			static const WorkloadSeed w1{
+				TypeId("SimpleWorkload"),
+				StringView("W1"),
+				10.0f,
+				{}, // children
+				{}, // config
+				{}	// inputs
+			};
+			static const WorkloadSeed w2{
+				TypeId("SimpleWorkload"),
+				StringView("W2"),
+				10.0f,
+				{}, // children
+				{}, // config
+				{}	// inputs
+			};
+			static const WorkloadSeed* workloads[] = {&w1, &w2};
+			model.use_workload_seeds(workloads);
 			model.set_root_workload(w1);
 
 			Engine engine;
@@ -179,7 +213,16 @@ namespace robotick::test
 		SECTION("for_each_field_in_workload walks individual workload fields")
 		{
 			Model model;
-			const WorkloadSeed& w = model.add("SimpleWorkload", "Solo").set_tick_rate_hz(10.0f);
+			static const WorkloadSeed w{
+				TypeId("SimpleWorkload"),
+				StringView("Solo"),
+				10.0f,
+				{}, // children
+				{}, // config
+				{}	// inputs
+			};
+			static const WorkloadSeed* workloads[] = {&w};
+			model.use_workload_seeds(workloads);
 			model.set_root_workload(w);
 
 			Engine engine;
