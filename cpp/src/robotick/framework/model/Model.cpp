@@ -28,9 +28,10 @@ namespace robotick
 		}
 	} // namespace
 
-	void Model::use_workload_seeds(const WorkloadSeed** all_workloads, size_t num_workloads)
+	void Model::use_workload_seeds(const WorkloadSeed* const* all_workloads, size_t num_workloads)
 	{
-		workload_seeds = ArrayView<const WorkloadSeed*>(all_workloads, num_workloads);
+		const WorkloadSeed** mutable_ptr = const_cast<const WorkloadSeed**>(all_workloads);
+		workload_seeds = ArrayView<const WorkloadSeed*>(mutable_ptr, num_workloads);
 
 		// validate workloads
 		for (const WorkloadSeed* workload_seed : workload_seeds)
@@ -40,14 +41,16 @@ namespace robotick
 		}
 	}
 
-	void Model::use_data_connection_seeds(const DataConnectionSeed** in_connections, size_t num_connections)
+	void Model::use_data_connection_seeds(const DataConnectionSeed* const* in_connections, size_t num_connections)
 	{
-		data_connection_seeds = ArrayView<const DataConnectionSeed*>(in_connections, num_connections);
+		const DataConnectionSeed** mutable_ptr = const_cast<const DataConnectionSeed**>(in_connections);
+		data_connection_seeds = ArrayView<const DataConnectionSeed*>(mutable_ptr, num_connections);
 	}
 
-	void Model::use_remote_models(const RemoteModelSeed** in_remote_model_seeds, size_t num_remote_model_seeds)
+	void Model::use_remote_models(const RemoteModelSeed* const* in_remote_model_seeds, size_t num_remote_model_seeds)
 	{
-		remote_models = ArrayView<const RemoteModelSeed*>(in_remote_model_seeds, num_remote_model_seeds);
+		const RemoteModelSeed** mutable_ptr = const_cast<const RemoteModelSeed**>(in_remote_model_seeds);
+		remote_models = ArrayView<const RemoteModelSeed*>(mutable_ptr, num_remote_model_seeds);
 	}
 
 	void Model::set_root_workload(const WorkloadSeed& root, bool auto_finalize)

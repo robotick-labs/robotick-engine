@@ -76,9 +76,9 @@ namespace robotick::test
 			{}, // config
 			{}	// inputs
 		};
-		static const WorkloadSeed* sender_workloads[] = {&sender_seed};
+		static const WorkloadSeed* const sender_workloads[] = {&sender_seed};
 		static const DataConnectionSeed remote_connection{"sender_workload.outputs.local_x", "receiver_workload.inputs.remote_x"};
-		static const DataConnectionSeed* remote_connections[] = {&remote_connection};
+		static const DataConnectionSeed* const remote_connections[] = {&remote_connection};
 		static const RemoteModelSeed remote_receiver = []() {
 			RemoteModelSeed seed{
 				StringView("receiver_model"),
@@ -88,7 +88,7 @@ namespace robotick::test
 			seed.comms_channel = StringView("ip:127.0.0.1");
 			return seed;
 		}();
-		static const RemoteModelSeed* remote_models[] = {&remote_receiver};
+		static const RemoteModelSeed* const remote_models[] = {&remote_receiver};
 
 		sender_model.use_workload_seeds(sender_workloads);
 		sender_model.use_remote_models(remote_models);
@@ -105,7 +105,7 @@ namespace robotick::test
 			{}, // config
 			{}	// inputs
 		};
-		static const WorkloadSeed* receiver_workloads[] = {&receiver_seed};
+		static const WorkloadSeed* const receiver_workloads[] = {&receiver_seed};
 		receiver_model.set_telemetry_port(7091); // so as to not conflict with the above
 		receiver_model.use_workload_seeds(receiver_workloads);
 		receiver_model.set_root_workload(receiver_seed);

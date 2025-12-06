@@ -111,7 +111,7 @@ namespace robotick::test
 			{}	// inputs
 		};
 
-		static const WorkloadSeed* root_children[] = {&seed_dummy_a, &seed_dummy_b};
+		static const WorkloadSeed* const root_children[] = {&seed_dummy_a, &seed_dummy_b};
 
 		static const WorkloadSeed seed_group{
 			TypeId("TestSequencedGroupWorkload"),
@@ -122,8 +122,8 @@ namespace robotick::test
 			{}	// inputs
 		};
 
-		static const WorkloadSeed* all_workloads[] = {&seed_dummy_a, &seed_dummy_b, &seed_group};
-		static const WorkloadSeed* dummy_a_only[] = {&seed_dummy_a};
+		static const WorkloadSeed* const all_workloads[] = {&seed_dummy_a, &seed_dummy_b, &seed_group};
+		static const WorkloadSeed* const dummy_a_only[] = {&seed_dummy_a};
 
 		void init_default_model(Model& model)
 		{

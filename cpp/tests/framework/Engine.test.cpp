@@ -1,8 +1,8 @@
 // Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/config/AssertUtils.h"
 #include "robotick/framework/Engine.h"
+#include "robotick/config/AssertUtils.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Thread.h"
@@ -218,7 +218,7 @@ namespace robotick::test
 				{}, // config
 				{}	// inputs
 			};
-			static const WorkloadSeed* workloads[] = {&workload_seed};
+			static const WorkloadSeed* const workloads[] = {&workload_seed};
 			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 
@@ -238,11 +238,11 @@ namespace robotick::test
 				TypeId("DummyWorkload"),
 				StringView("A"),
 				1.0f,
-				{},		 // children
-				{},		 // config
+				{},	   // children
+				{},	   // config
 				inputs // inputs
 			};
-			static const WorkloadSeed* workloads[] = {&workload_seed};
+			static const WorkloadSeed* const workloads[] = {&workload_seed};
 			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 
@@ -263,11 +263,11 @@ namespace robotick::test
 				TypeId("DummyWorkload"),
 				StringView("A"),
 				1.0f,
-				{},	  // children
+				{}, // children
 				config,
 				{} // inputs
 			};
-			static const WorkloadSeed* workloads[] = {&workload_seed};
+			static const WorkloadSeed* const workloads[] = {&workload_seed};
 			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 
@@ -288,19 +288,19 @@ namespace robotick::test
 				TypeId("DummyWorkload"),
 				StringView("one"),
 				1.0f,
-				{},			 // children
+				{},			// children
 				config_one, // config
-				{}			 // inputs
+				{}			// inputs
 			};
 			static const WorkloadSeed workload_two{
 				TypeId("DummyWorkload"),
 				StringView("two"),
 				1.0f,
-				{},			 // children
+				{},			// children
 				config_two, // config
-				{}			 // inputs
+				{}			// inputs
 			};
-			static const WorkloadSeed* root_children[] = {&workload_one, &workload_two};
+			static const WorkloadSeed* const root_children[] = {&workload_one, &workload_two};
 			static const WorkloadSeed root{
 				TypeId("TestSequencedGroupWorkload"),
 				StringView("group"),
@@ -309,7 +309,7 @@ namespace robotick::test
 				{}, // config
 				{}	// inputs
 			};
-			static const WorkloadSeed* workloads[] = {&workload_one, &workload_two, &root};
+			static const WorkloadSeed* const workloads[] = {&workload_one, &workload_two, &root};
 			model.use_workload_seeds(workloads);
 			model.set_root_workload(root);
 
@@ -335,7 +335,7 @@ namespace robotick::test
 				{}, // config
 				{}	// inputs
 			};
-			static const WorkloadSeed* workloads[] = {&workload_seed};
+			static const WorkloadSeed* const workloads[] = {&workload_seed};
 			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 
@@ -361,7 +361,7 @@ namespace robotick::test
 				{}, // config
 				{}	// inputs
 			};
-			static const WorkloadSeed* workloads[] = {&workload_seed};
+			static const WorkloadSeed* const workloads[] = {&workload_seed};
 			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 
@@ -397,7 +397,7 @@ namespace robotick::test
 					{}, // config
 					{}	// inputs
 				};
-				static const WorkloadSeed* workloads[] = {&workload_seed};
+				static const WorkloadSeed* const workloads[] = {&workload_seed};
 				model.use_workload_seeds(workloads);
 				model.set_root_workload(workload_seed);
 
@@ -428,7 +428,7 @@ namespace robotick::test
 				{}, // config
 				{}	// inputs
 			};
-			static const WorkloadSeed* workloads[] = {&workload_seed};
+			static const WorkloadSeed* const workloads[] = {&workload_seed};
 			model.use_workload_seeds(workloads);
 			model.set_root_workload(workload_seed);
 

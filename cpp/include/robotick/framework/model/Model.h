@@ -20,20 +20,20 @@ namespace robotick
 		// non-dynamic modifiers:
 		void set_model_name(const char* in_model_name) { model_name = in_model_name; }
 
-		template <size_t N> void use_workload_seeds(const WorkloadSeed* (&in_seeds)[N]) { use_workload_seeds(in_seeds, N); }
-		void use_workload_seeds(const WorkloadSeed** all_workloads, size_t num_workloads);
+		template <size_t N> void use_workload_seeds(const WorkloadSeed* const (&in_seeds)[N]) { use_workload_seeds(in_seeds, N); }
+		void use_workload_seeds(const WorkloadSeed* const* all_workloads, size_t num_workloads);
 
-		template <size_t N> void use_data_connection_seeds(const DataConnectionSeed* (&in_connections)[N])
+		template <size_t N> void use_data_connection_seeds(const DataConnectionSeed* const (&in_connections)[N])
 		{
 			use_data_connection_seeds(in_connections, N);
 		}
-		void use_data_connection_seeds(const DataConnectionSeed** in_connections, size_t num_connections);
+		void use_data_connection_seeds(const DataConnectionSeed* const* in_connections, size_t num_connections);
 
-		template <size_t N> void use_remote_models(const RemoteModelSeed* (&in_remote_model_seeds)[N])
+		template <size_t N> void use_remote_models(const RemoteModelSeed* const (&in_remote_model_seeds)[N])
 		{
 			use_remote_models(in_remote_model_seeds, N);
 		}
-		void use_remote_models(const RemoteModelSeed** in_remote_model_seeds, size_t num_remote_model_seeds);
+		void use_remote_models(const RemoteModelSeed* const* in_remote_model_seeds, size_t num_remote_model_seeds);
 
 		void set_root_workload(const WorkloadSeed& root_workload, bool auto_finalize_and_validate = true);
 
