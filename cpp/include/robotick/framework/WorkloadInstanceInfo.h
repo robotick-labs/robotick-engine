@@ -19,6 +19,7 @@ namespace robotick
 	struct WorkloadDescriptor;
 
 	using TickDurationWindow = FixedVector<uint32_t, 64>;
+	using TickDeltaWindow = FixedVector<uint32_t, 64>;
 
 	struct WorkloadInstanceStats
 	{
@@ -27,12 +28,14 @@ namespace robotick
 		uint32_t last_time_delta_ns = 0;
 		float tick_rate_hz = 0.0f;
 
-		// Sliding window lives inline so we never touch the heap while sampling ticks.
+		// Sliding windows live inline so we never touch the heap while sampling ticks.
 		TickDurationWindow duration_window;
-		uint32_t window_index = 0;
+		TickDeltaWindow delta_window;
+		uint32_t duration_window_index = 0;
+		uint32_t delta_window_index = 0;
 		uint32_t overrun_count = 0;
 
-		void record_tick_duration_ns(uint32_t duration_ns, uint32_t budget_ns);
+		void record_tick_sample(uint32_t duration_ns, uint32_t delta_ns, uint32_t budget_ns);
 
 		float get_last_tick_duration_sec() const { return (float)last_tick_duration_ns * 1e-9f; }
 		float get_last_time_delta_sec() const { return (float)last_time_delta_ns * 1e-9f; }
@@ -43,7 +46,9 @@ namespace robotick
 	  private:
 		// Internal sliding-window instrumentation (not part of the public API):
 		const TickDurationWindow& get_duration_window() const { return duration_window; }
-		uint32_t get_duration_window_index() const { return window_index; }
+		const TickDeltaWindow& get_delta_window() const { return delta_window; }
+		uint32_t get_duration_window_index() const { return duration_window_index; }
+		uint32_t get_delta_window_index() const { return delta_window_index; }
 		size_t get_duration_window_count() const { return duration_window.size(); }
 	};
 
@@ -63,7 +68,7 @@ namespace robotick
 		WorkloadInstanceStats* workload_stats = nullptr;
 	};
 
-	inline void WorkloadInstanceStats::record_tick_duration_ns(uint32_t duration_ns, uint32_t budget_ns)
+	inline void WorkloadInstanceStats::record_tick_sample(uint32_t duration_ns, uint32_t delta_ns, uint32_t budget_ns)
 	{
 		if (budget_ns == 0)
 			budget_ns = 1;
@@ -73,20 +78,25 @@ namespace robotick
 		if (duration_ns > budget_ns)
 			++overrun_count;
 
-		// Maintain a circular window of recent tick durations.  The buffer stays fixed-size to avoid heap churn
-		// while still giving telemetry consumers enough history to compute variance/mean offline.
-		if (duration_window.size() < duration_window.capacity())
+		const auto append_sample = [](auto& window, uint32_t& index, uint32_t sample)
 		{
-			duration_window.add(duration_ns);
-		}
-		else
-		{
-			duration_window[window_index] = duration_ns;
-		}
+			if (window.size() < window.capacity())
+			{
+				window.add(sample);
+			}
+			else
+			{
+				window[index] = sample;
+			}
+			index = (index + 1) % (uint32_t)window.capacity();
+		};
 
-		// Wrap in a predictable order so each call advances the "cursor" without reallocating.
-		window_index = (window_index + 1) % (uint32_t)duration_window.capacity();
+		// Maintain circular windows of recent tick durations and actual intervals.
+		append_sample(duration_window, duration_window_index, duration_ns);
+		append_sample(delta_window, delta_window_index, delta_ns);
+
 		last_tick_duration_ns = duration_ns;
+		last_time_delta_ns = delta_ns;
 	}
 
 } // namespace robotick
