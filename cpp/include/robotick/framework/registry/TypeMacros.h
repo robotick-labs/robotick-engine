@@ -34,7 +34,7 @@ namespace robotick
 	static_assert(robotick::is_enum_v<EnumType>, #EnumType " must be an enum type");                                                                 \
 	static ::robotick::EnumValue s_enum_values_##EnumType[] = {
 
-#define ROBOTICK_ENUM_VALUE(NameLiteral, ValueExpr) {NameLiteral, static_cast<uint64_t>(ValueExpr)},
+#define ROBOTICK_ENUM_VALUE(NameLiteral, ValueExpr) {NameLiteral, static_cast<uint64_t>((ValueExpr))},
 
 #define ROBOTICK_REGISTER_ENUM_END(EnumType)                                                                                                         \
 	}                                                                                                                                                \

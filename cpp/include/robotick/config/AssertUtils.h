@@ -72,9 +72,9 @@ inline bool robotick_resolve_module_from_proc_maps(void* addr, char* out_path, s
 	return false;
 }
 #else
-inline bool robotick_resolve_module_from_proc_maps(void*, char*, size_t, uintptr_t&)
+inline bool robotick_resolve_module_from_proc_maps(void* /*proc_maps*/, char* /*path*/, size_t /*len*/, uintptr_t& /*out_addr*/)
 {
-	return false;
+	return false; // platform stub
 }
 #endif
 #endif
@@ -161,6 +161,7 @@ namespace robotick
 			if (dladdr_ok && info.dli_fname && info.dli_fname[0] != '\0')
 			{
 				strncpy(module_path, info.dli_fname, sizeof(module_path) - 1);
+				module_path[sizeof(module_path) - 1] = '\0';
 				module_base = reinterpret_cast<uintptr_t>(info.dli_fbase);
 			}
 			else
