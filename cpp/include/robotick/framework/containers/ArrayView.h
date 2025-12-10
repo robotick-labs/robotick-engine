@@ -97,15 +97,13 @@ namespace robotick
 		/// @brief Bounds-checked element access
 		T& operator[](size_t index)
 		{
-			if (index >= array_size)
-				ROBOTICK_FATAL_EXIT("ArrayView index out of bounds");
+			ROBOTICK_ASSERT_MSG((index < array_size), "ArrayView index out of bounds [%zu/%zu]", index, array_size);
 			return data[index];
 		}
 
 		const T& operator[](size_t index) const
 		{
-			if (index >= array_size)
-				ROBOTICK_FATAL_EXIT("ArrayView index out of bounds");
+			ROBOTICK_ASSERT_MSG((index < array_size), "ArrayView index out of bounds [%zu/%zu]", index, array_size);
 			return data[index];
 		}
 

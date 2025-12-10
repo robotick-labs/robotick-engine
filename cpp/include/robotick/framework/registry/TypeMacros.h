@@ -44,13 +44,8 @@ namespace robotick
 		sizeof(EnumType),                                                                                                                            \
 		robotick::is_signed_v<robotick::underlying_type_t<EnumType>>,                                                                                \
 		false};                                                                                                                                      \
-	static constexpr ::robotick::TypeDescriptor s_type_desc_##EnumType = {#EnumType,                                                                 \
-		GET_TYPE_ID(EnumType),                                                                                                                       \
-		sizeof(EnumType),                                                                                                                            \
-		alignof(EnumType),                                                                                                                           \
-		::robotick::TypeCategory::Enum,                                                                                                              \
-		{&s_enum_desc_##EnumType},                                                                                                                   \
-		"text/plain"};                                                                                                                               \
+	static constexpr ::robotick::TypeDescriptor s_type_desc_##EnumType = {                                                                           \
+		#EnumType, GET_TYPE_ID(EnumType), sizeof(EnumType), alignof(EnumType), ::robotick::TypeCategory::Enum, {&s_enum_desc_##EnumType}, nullptr};  \
 	static const ::robotick::AutoRegisterType s_register_##EnumType(s_type_desc_##EnumType);
 
 /// @brief Macros to register Structs:

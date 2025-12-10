@@ -7,6 +7,8 @@
 #include "robotick/framework/strings/FixedString.h"
 #include "robotick/framework/strings/StringUtils.h"
 
+#include <cstdint>
+#include <cstring>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -15,6 +17,66 @@
 #include <dlfcn.h>
 #include <execinfo.h>
 #include <unistd.h>
+
+#if defined(__linux__)
+inline bool robotick_resolve_module_from_proc_maps(void* addr, char* out_path, size_t out_path_size, uintptr_t& base_addr_out)
+{
+	if (!addr)
+		return false;
+
+	FILE* maps = fopen("/proc/self/maps", "r");
+	if (!maps)
+		return false;
+
+	char line[512];
+	while (fgets(line, sizeof(line), maps))
+	{
+		unsigned long long start = 0;
+		unsigned long long end = 0;
+		char perms[5] = {};
+		unsigned long long offset = 0;
+		unsigned int dev_major = 0;
+		unsigned int dev_minor = 0;
+		unsigned long long inode = 0;
+		int path_index = 0;
+
+		const int parsed =
+			sscanf(line, "%llx-%llx %4s %llx %x:%x %llu %n", &start, &end, perms, &offset, &dev_major, &dev_minor, &inode, &path_index);
+		if (parsed < 7)
+			continue;
+
+		const uintptr_t addr_value = reinterpret_cast<uintptr_t>(addr);
+		if (addr_value < start || addr_value >= end)
+			continue;
+
+		const char* path = line + path_index;
+		while (*path == ' ' || *path == '\t')
+			++path;
+
+		size_t len = strcspn(path, "\n");
+		if (len == 0)
+			break;
+
+		if (out_path_size > 0)
+		{
+			const size_t copy_len = (len < out_path_size - 1) ? len : (out_path_size - 1);
+			memcpy(out_path, path, copy_len);
+			out_path[copy_len] = '\0';
+		}
+		base_addr_out = static_cast<uintptr_t>(start);
+		fclose(maps);
+		return true;
+	}
+
+	fclose(maps);
+	return false;
+}
+#else
+inline bool robotick_resolve_module_from_proc_maps(void*, char*, size_t, uintptr_t&)
+{
+	return false;
+}
+#endif
 #endif
 
 // =====================================================================
@@ -87,47 +149,77 @@ namespace robotick
 
 		fprintf(stderr, "Callstack:\n");
 
+		char** symbols = backtrace_symbols(callstack, frames);
+
 		for (int i = 1; i < frames; ++i) // skip report_error itself
 		{
 			Dl_info info{};
-			if (dladdr(callstack[i], &info) && info.dli_sname)
+			const bool dladdr_ok = dladdr(callstack[i], &info) != 0;
+			char module_path[512] = {};
+			uintptr_t module_base = 0;
+
+			if (dladdr_ok && info.dli_fname && info.dli_fname[0] != '\0')
+			{
+				strncpy(module_path, info.dli_fname, sizeof(module_path) - 1);
+				module_base = reinterpret_cast<uintptr_t>(info.dli_fbase);
+			}
+			else
+			{
+				robotick_resolve_module_from_proc_maps(callstack[i], module_path, sizeof(module_path), module_base);
+			}
+
+			bool printed_symbol = false;
+
+			if (dladdr_ok && info.dli_sname)
 			{
 				int status = 0;
 				const char* symname = info.dli_sname;
 				char* demangled = abi::__cxa_demangle(symname, nullptr, nullptr, &status);
 				const char* pretty = (status == 0 && demangled) ? demangled : symname;
-
-				// Print frame info
 				fprintf(stderr, "  [%02d] %s\n", i, pretty);
-
-				// Try to resolve file + line via addr2line
-				if (info.dli_fname)
-				{
-					char cmd[512];
-					snprintf(cmd, sizeof(cmd), "addr2line -e %s -f -p %p 2>/dev/null", info.dli_fname, callstack[i]);
-					FILE* fp = popen(cmd, "r");
-					if (fp)
-					{
-						char buf[512];
-						if (fgets(buf, sizeof(buf), fp))
-						{
-							// addr2line outputs: func (file:line)
-							size_t len = strlen(buf);
-							if (len && buf[len - 1] == '\n')
-								buf[len - 1] = 0;
-							fprintf(stderr, "        ↳ %s\n", buf);
-						}
-						pclose(fp);
-					}
-				}
 				if (demangled)
 					free(demangled);
+				printed_symbol = true;
 			}
-			else
+
+			if (!printed_symbol)
 			{
-				fprintf(stderr, "  [%02d] (unresolved @ %p)\n", i, callstack[i]);
+				if (module_path[0] != '\0')
+					fprintf(stderr, "  [%02d] %s @ %p\n", i, module_path, callstack[i]);
+				else if (symbols && symbols[i])
+					fprintf(stderr, "  [%02d] %s\n", i, symbols[i]);
+				else
+					fprintf(stderr, "  [%02d] (unresolved @ %p)\n", i, callstack[i]);
+			}
+
+			if (module_path[0] != '\0')
+			{
+				uintptr_t abs_addr = reinterpret_cast<uintptr_t>(callstack[i]);
+				uintptr_t rel_addr = module_base ? (abs_addr - module_base) : abs_addr;
+
+				char cmd[512];
+				const size_t raw_len = strnlen(module_path, sizeof(module_path));
+				const int path_max = static_cast<int>((raw_len < 192) ? raw_len : 192);
+				snprintf(
+					cmd, sizeof(cmd), "addr2line -e %.*s -f -p 0x%llx 2>/dev/null", path_max, module_path, static_cast<unsigned long long>(rel_addr));
+				FILE* fp = popen(cmd, "r");
+				if (fp)
+				{
+					char buf[512];
+					if (fgets(buf, sizeof(buf), fp))
+					{
+						size_t len = strlen(buf);
+						if (len && buf[len - 1] == '\n')
+							buf[len - 1] = 0;
+						fprintf(stderr, "        ↳ %s\n", buf);
+					}
+					pclose(fp);
+				}
 			}
 		}
+
+		if (symbols)
+			free(symbols);
 #else
 		fprintf(stderr, "(Callstack not supported on this platform)\n");
 #endif
