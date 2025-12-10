@@ -29,6 +29,25 @@ namespace robotick
 /// @brief Macro to register Primitives (no mime_type needed):
 #define ROBOTICK_REGISTER_PRIMITIVE(TypeName) ROBOTICK_REGISTER_PRIMITIVE_WITH_MIME_TYPE(TypeName, nullptr)
 
+/// @brief Enum registration helpers:
+#define ROBOTICK_REGISTER_ENUM_BEGIN(EnumType)                                                                                                       \
+	static_assert(robotick::is_enum_v<EnumType>, #EnumType " must be an enum type");                                                                 \
+	static ::robotick::EnumValue s_enum_values_##EnumType[] = {
+
+#define ROBOTICK_ENUM_VALUE(NameLiteral, ValueExpr) {NameLiteral, static_cast<uint64_t>((ValueExpr))},
+
+#define ROBOTICK_REGISTER_ENUM_END(EnumType)                                                                                                         \
+	}                                                                                                                                                \
+	;                                                                                                                                                \
+	static const ::robotick::EnumDescriptor s_enum_desc_##EnumType = {                                                                               \
+		::robotick::ArrayView<::robotick::EnumValue>{s_enum_values_##EnumType, sizeof(s_enum_values_##EnumType) / sizeof(::robotick::EnumValue)},    \
+		sizeof(EnumType),                                                                                                                            \
+		robotick::is_signed_v<robotick::underlying_type_t<EnumType>>,                                                                                \
+		false};                                                                                                                                      \
+	static constexpr ::robotick::TypeDescriptor s_type_desc_##EnumType = {                                                                           \
+		#EnumType, GET_TYPE_ID(EnumType), sizeof(EnumType), alignof(EnumType), ::robotick::TypeCategory::Enum, {&s_enum_desc_##EnumType}, nullptr};  \
+	static const ::robotick::AutoRegisterType s_register_##EnumType(s_type_desc_##EnumType);
+
 /// @brief Macros to register Structs:
 #define ROBOTICK_REGISTER_STRUCT_BEGIN(StructType) static ::robotick::FieldDescriptor s_fields_##StructType[] = {
 

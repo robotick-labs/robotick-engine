@@ -28,4 +28,7 @@ namespace robotick
 	template <typename T> constexpr bool is_default_constructible_v = std_approved::is_default_constructible<T>::value;
 	template <typename T> constexpr bool is_nothrow_move_constructible_v = std_approved::is_nothrow_move_constructible<T>::value;
 	template <typename T> constexpr bool is_pointer_v = std_approved::is_pointer<T>::value;
+	template <typename T> constexpr bool is_enum_v = std_approved::is_enum<T>::value;
+	template <typename T> constexpr bool is_signed_v = std_approved::is_signed<T>::value;
+	template <typename T> using underlying_type_t = typename std_approved::underlying_type<T>::type;
 } // namespace robotick

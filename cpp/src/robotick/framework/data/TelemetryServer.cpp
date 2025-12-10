@@ -22,6 +22,7 @@
 
 namespace robotick
 {
+	nlohmann::ordered_json build_workloads_buffer_layout_json(const Engine& engine, const char* session_id_override);
 
 	TelemetryServer::~TelemetryServer()
 	{
@@ -175,6 +176,22 @@ namespace robotick
 			type_json["mime_type"] = type_desc->mime_type.c_str();
 		}
 
+		const EnumDescriptor* enum_desc = type_desc->get_enum_desc();
+		if (enum_desc)
+		{
+			type_json["enum_values"] = nlohmann::ordered_json::array();
+			for (const EnumValue& enum_value : enum_desc->values)
+			{
+				nlohmann::ordered_json enum_json;
+				enum_json["name"] = enum_value.name.c_str();
+				enum_json["value"] = enum_value.value;
+				type_json["enum_values"].push_back(enum_json);
+			}
+			type_json["enum_underlying_size"] = static_cast<int>(enum_desc->underlying_size);
+			type_json["enum_is_signed"] = enum_desc->is_signed;
+			type_json["enum_is_flags"] = enum_desc->is_flags;
+		}
+
 		const DynamicStructDescriptor* dynamic_struct_desc = type_desc->get_dynamic_struct_desc();
 		const StructDescriptor* struct_desc =
 			dynamic_struct_desc ? dynamic_struct_desc->get_struct_descriptor(data_ptr) : type_desc->get_struct_desc();
@@ -254,19 +271,17 @@ namespace robotick
 		return 0;
 	}
 
-	void TelemetryServer::handle_get_workloads_buffer_layout(const WebRequest& /*req*/, WebResponse& res)
+	static nlohmann::ordered_json build_layout_json(const Engine& engine)
 	{
-		WorkloadsBuffer& workloads_buffer = engine->get_workloads_buffer();
-		const auto& instances = engine->get_all_instance_info();
+		WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
+		const auto& instances = engine.get_all_instance_info();
 
 		nlohmann::ordered_json layout_json;
-		layout_json["engine_session_id"] = get_session_id();
 		layout_json["workloads_buffer_size_used"] = workloads_buffer.get_size_used();
 		layout_json["process_memory_used"] = get_process_memory_used();
 		layout_json["workloads"] = nlohmann::ordered_json::array();
 		layout_json["types"] = nlohmann::ordered_json::array();
 
-		// lookup type for workload-stats
 		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
 		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
 
@@ -297,7 +312,6 @@ namespace robotick
 			emit_struct_info(layout_json, workload_json, workloads_buffer, workload_ptr, "inputs", desc->inputs_desc, desc->inputs_offset);
 			emit_struct_info(layout_json, workload_json, workloads_buffer, workload_ptr, "outputs", desc->outputs_desc, desc->outputs_offset);
 
-			// emits stats info:
 			workload_json["stats_offset_within_container"] =
 				static_cast<int>((uint8_t*)workload_instance_info.workload_stats - workloads_buffer.raw_ptr());
 
@@ -306,7 +320,6 @@ namespace robotick
 			layout_json["workloads"].push_back(workload_json);
 		}
 
-		// sort workloads by offset (so we're seeing them in true memory-layout order)
 		robotick::sort(layout_json["workloads"].begin(),
 			layout_json["workloads"].end(),
 			[](const nlohmann::ordered_json& a, const nlohmann::ordered_json& b)
@@ -322,6 +335,13 @@ namespace robotick
 				const auto& b_name = b["name"].get_ref<const nlohmann::ordered_json::string_t&>();
 				return StringView(a_name.c_str()) < StringView(b_name.c_str());
 			});
+
+		return layout_json;
+	}
+
+	void TelemetryServer::handle_get_workloads_buffer_layout(const WebRequest& /*req*/, WebResponse& res)
+	{
+		nlohmann::ordered_json layout_json = build_workloads_buffer_layout_json(*engine, get_session_id());
 
 		res.set_status_code(WebResponseCode::OK);
 		res.set_content_type("application/json");
@@ -343,6 +363,13 @@ namespace robotick
 		res.add_header(session_header.c_str());
 
 		res.set_body(workloads_buffer.raw_ptr(), workloads_buffer.get_size_used());
+	}
+
+	nlohmann::ordered_json build_workloads_buffer_layout_json(const Engine& engine, const char* session_id_override)
+	{
+		nlohmann::ordered_json layout_json = build_layout_json(engine);
+		layout_json["engine_session_id"] = session_id_override ? session_id_override : "";
+		return layout_json;
 	}
 
 } // namespace robotick

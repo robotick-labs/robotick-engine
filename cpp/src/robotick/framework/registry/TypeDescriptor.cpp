@@ -6,10 +6,12 @@
 #include "robotick/api_base.h"
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
+#include "robotick/framework/memory/StdApproved.h"
 #include "robotick/framework/registry/TypeRegistry.h"
 #include "robotick/framework/strings/StringUtils.h"
 
 #include <cstring>
+#include <limits>
 
 namespace robotick
 {
@@ -80,6 +82,191 @@ namespace robotick
 		return len;
 	}
 
+	namespace
+	{
+		struct EnumStorageValue
+		{
+			uint64_t raw_unsigned = 0;
+			int64_t raw_signed = 0;
+			bool has_signed_value = false;
+		};
+
+		static bool read_enum_storage(const void* input, const EnumDescriptor& desc, EnumStorageValue& out_value)
+		{
+			if (!input)
+				return false;
+
+			out_value.has_signed_value = desc.is_signed;
+			switch (desc.underlying_size)
+			{
+			case 1:
+				if (desc.is_signed)
+				{
+					const int8_t v = *reinterpret_cast<const int8_t*>(input);
+					out_value.raw_signed = v;
+					out_value.raw_unsigned = static_cast<uint8_t>(v);
+				}
+				else
+				{
+					const uint8_t v = *reinterpret_cast<const uint8_t*>(input);
+					out_value.raw_unsigned = v;
+				}
+				return true;
+			case 2:
+				if (desc.is_signed)
+				{
+					const int16_t v = *reinterpret_cast<const int16_t*>(input);
+					out_value.raw_signed = v;
+					out_value.raw_unsigned = static_cast<uint16_t>(v);
+				}
+				else
+				{
+					const uint16_t v = *reinterpret_cast<const uint16_t*>(input);
+					out_value.raw_unsigned = v;
+				}
+				return true;
+			case 4:
+				if (desc.is_signed)
+				{
+					const int32_t v = *reinterpret_cast<const int32_t*>(input);
+					out_value.raw_signed = v;
+					out_value.raw_unsigned = static_cast<uint32_t>(v);
+				}
+				else
+				{
+					const uint32_t v = *reinterpret_cast<const uint32_t*>(input);
+					out_value.raw_unsigned = v;
+				}
+				return true;
+			case 8:
+				if (desc.is_signed)
+				{
+					const int64_t v = *reinterpret_cast<const int64_t*>(input);
+					out_value.raw_signed = v;
+					out_value.raw_unsigned = static_cast<uint64_t>(v);
+				}
+				else
+				{
+					const uint64_t v = *reinterpret_cast<const uint64_t*>(input);
+					out_value.raw_unsigned = v;
+				}
+				return true;
+			default:
+				return false;
+			}
+		}
+
+		template <typename T> static bool check_signed_range(int64_t value)
+		{
+			return value >= static_cast<int64_t>(std_approved::numeric_limits<T>::min()) &&
+				   value <= static_cast<int64_t>(std_approved::numeric_limits<T>::max());
+		}
+
+		template <typename T> static bool check_unsigned_range(uint64_t value)
+		{
+			return value <= static_cast<uint64_t>(std_approved::numeric_limits<T>::max());
+		}
+
+		static bool write_signed_value(int64_t value, void* output, const EnumDescriptor& desc)
+		{
+			switch (desc.underlying_size)
+			{
+			case 1:
+				if (!check_signed_range<int8_t>(value))
+					return false;
+				*reinterpret_cast<int8_t*>(output) = static_cast<int8_t>(value);
+				return true;
+			case 2:
+				if (!check_signed_range<int16_t>(value))
+					return false;
+				*reinterpret_cast<int16_t*>(output) = static_cast<int16_t>(value);
+				return true;
+			case 4:
+				if (!check_signed_range<int32_t>(value))
+					return false;
+				*reinterpret_cast<int32_t*>(output) = static_cast<int32_t>(value);
+				return true;
+			case 8:
+				*reinterpret_cast<int64_t*>(output) = static_cast<int64_t>(value);
+				return true;
+			default:
+				return false;
+			}
+		}
+
+		static bool write_unsigned_value(uint64_t value, void* output, const EnumDescriptor& desc)
+		{
+			switch (desc.underlying_size)
+			{
+			case 1:
+				if (!check_unsigned_range<uint8_t>(value))
+					return false;
+				*reinterpret_cast<uint8_t*>(output) = static_cast<uint8_t>(value);
+				return true;
+			case 2:
+				if (!check_unsigned_range<uint16_t>(value))
+					return false;
+				*reinterpret_cast<uint16_t*>(output) = static_cast<uint16_t>(value);
+				return true;
+			case 4:
+				if (!check_unsigned_range<uint32_t>(value))
+					return false;
+				*reinterpret_cast<uint32_t*>(output) = static_cast<uint32_t>(value);
+				return true;
+			case 8:
+				*reinterpret_cast<uint64_t*>(output) = static_cast<uint64_t>(value);
+				return true;
+			default:
+				return false;
+			}
+		}
+
+		static bool convert_raw_to_signed(uint64_t raw_value, const EnumDescriptor& desc, int64_t& out)
+		{
+			switch (desc.underlying_size)
+			{
+			case 1:
+				out = static_cast<int8_t>(static_cast<uint8_t>(raw_value));
+				return true;
+			case 2:
+				out = static_cast<int16_t>(static_cast<uint16_t>(raw_value));
+				return true;
+			case 4:
+				out = static_cast<int32_t>(static_cast<uint32_t>(raw_value));
+				return true;
+			case 8:
+				out = static_cast<int64_t>(raw_value);
+				return true;
+			default:
+				return false;
+			}
+		}
+
+		static const EnumValue* find_enum_value_by_name(const EnumDescriptor& desc, const char* name)
+		{
+			for (const EnumValue& entry : desc.values)
+			{
+				if (string_equals(entry.name.c_str(), name))
+				{
+					return &entry;
+				}
+			}
+			return nullptr;
+		}
+
+		static const EnumValue* find_enum_value_by_raw(const EnumDescriptor& desc, uint64_t raw_value)
+		{
+			for (const EnumValue& entry : desc.values)
+			{
+				if (entry.value == raw_value)
+				{
+					return &entry;
+				}
+			}
+			return nullptr;
+		}
+	} // namespace
+
 	bool TypeDescriptor::from_string(const char* input, void* out_value) const
 	{
 		if (!input || !out_value)
@@ -131,6 +318,42 @@ namespace robotick
 			}
 			return false;
 		}
+		const EnumDescriptor* enum_desc = get_enum_desc();
+		if (enum_desc)
+		{
+			const EnumValue* named_value = find_enum_value_by_name(*enum_desc, input);
+			if (named_value)
+			{
+				if (enum_desc->is_signed)
+				{
+					int64_t signed_value = 0;
+					if (!convert_raw_to_signed(named_value->value, *enum_desc, signed_value))
+						return false;
+					return write_signed_value(signed_value, out_value, *enum_desc);
+				}
+				return write_unsigned_value(named_value->value, out_value, *enum_desc);
+			}
+
+			if (enum_desc->is_signed)
+			{
+				long long parsed = 0;
+				if (::sscanf(input, "%lld", &parsed) != 1)
+				{
+					return false;
+				}
+				return write_signed_value(parsed, out_value, *enum_desc);
+			}
+			else
+			{
+				unsigned long long parsed = 0;
+				if (::sscanf(input, "%llu", &parsed) != 1)
+				{
+					return false;
+				}
+				return write_unsigned_value(parsed, out_value, *enum_desc);
+			}
+		}
+
 		if (mime_type == "text/plain")
 		{
 			if (size == 0)
@@ -236,6 +459,48 @@ namespace robotick
 				return false;
 			}
 			return true;
+		}
+
+		const EnumDescriptor* enum_desc = get_enum_desc();
+		if (enum_desc)
+		{
+			EnumStorageValue raw_value{};
+			if (!read_enum_storage(value, *enum_desc, raw_value))
+				return false;
+
+			const EnumValue* entry = find_enum_value_by_raw(*enum_desc, raw_value.raw_unsigned);
+
+			if (entry)
+			{
+				const size_t len = entry->name.length();
+				if (len + 1 > output_buffer_size)
+					return false;
+
+				::memcpy(output_buffer, entry->name.c_str(), len);
+				output_buffer[len] = '\0';
+				return true;
+			}
+
+			if (enum_desc->is_signed && raw_value.has_signed_value)
+			{
+				const int written = ::snprintf(output_buffer, output_buffer_size, "%lld", static_cast<long long>(raw_value.raw_signed));
+				if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+				{
+					::memset(output_buffer, 0, output_buffer_size);
+					return false;
+				}
+				return true;
+			}
+			else
+			{
+				const int written = ::snprintf(output_buffer, output_buffer_size, "%llu", static_cast<unsigned long long>(raw_value.raw_unsigned));
+				if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+				{
+					::memset(output_buffer, 0, output_buffer_size);
+					return false;
+				}
+				return true;
+			}
 		}
 
 		if (mime_type == "text/plain")

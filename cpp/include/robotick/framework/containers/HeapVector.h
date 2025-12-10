@@ -150,19 +150,13 @@ namespace robotick
 
 		T& operator[](size_t index)
 		{
-			if (index >= size_)
-			{
-				ROBOTICK_FATAL_EXIT("HeapVector index out of bounds");
-			}
+			ROBOTICK_ASSERT_MSG(index < size_, "HeapVector index out of bounds [%zu/%zu]", index, size_);
 			return data_[index];
 		}
 
 		const T& operator[](size_t index) const
 		{
-			if (index >= size_)
-			{
-				ROBOTICK_FATAL_EXIT("HeapVector index out of bounds");
-			}
+			ROBOTICK_ASSERT_MSG(index < size_, "HeapVector index out of bounds [%zu/%zu]", index, size_);
 			return data_[index];
 		}
 

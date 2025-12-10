@@ -7,13 +7,21 @@
 #include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Thread.h"
 #include "robotick/framework/data/DataConnection.h"
+#include "robotick/framework/data/TelemetryServer.h"
 
+#include <algorithm>
 #include <arpa/inet.h>
 #include <atomic>
 #include <catch2/catch_all.hpp>
 #include <chrono>
 #include <netinet/in.h>
+#include <nlohmann/json.hpp>
 #include <sys/socket.h>
+
+namespace robotick
+{
+	nlohmann::ordered_json build_workloads_buffer_layout_json(const Engine& engine, const char* session_id_override);
+}
 
 namespace robotick::test
 {
@@ -135,6 +143,32 @@ namespace robotick::test
 			}
 		};
 		ROBOTICK_REGISTER_WORKLOAD(ThreadAffinityWorkload)
+
+		enum class LayoutTestEnum : uint32_t
+		{
+			Alpha = 0,
+			Beta = 1,
+			Gamma = 2
+		};
+		ROBOTICK_REGISTER_ENUM_BEGIN(LayoutTestEnum)
+		ROBOTICK_ENUM_VALUE("Alpha", LayoutTestEnum::Alpha)
+		ROBOTICK_ENUM_VALUE("Beta", LayoutTestEnum::Beta)
+		ROBOTICK_ENUM_VALUE("Gamma", LayoutTestEnum::Gamma)
+		ROBOTICK_REGISTER_ENUM_END(LayoutTestEnum)
+
+		struct LayoutEnumConfig
+		{
+			LayoutTestEnum status = LayoutTestEnum::Alpha;
+		};
+		ROBOTICK_REGISTER_STRUCT_BEGIN(LayoutEnumConfig)
+		ROBOTICK_STRUCT_FIELD(LayoutEnumConfig, LayoutTestEnum, status)
+		ROBOTICK_REGISTER_STRUCT_END(LayoutEnumConfig)
+
+		struct LayoutEnumWorkload
+		{
+			LayoutEnumConfig config;
+		};
+		ROBOTICK_REGISTER_WORKLOAD(LayoutEnumWorkload, LayoutEnumConfig)
 
 	} // namespace
 
@@ -414,6 +448,47 @@ namespace robotick::test
 			run_engine_once(telemetry_port);
 			REQUIRE(bind_to_port(telemetry_port));
 			run_engine_once(telemetry_port);
+		}
+
+		SECTION("Telemetry layout emits enum metadata")
+		{
+			Model model;
+			model.set_telemetry_port(choose_telemetry_port());
+			static const WorkloadSeed workload_seed{TypeId("LayoutEnumWorkload"), StringView("layout_enum"), 30.0f, {}, {}, {}};
+			static const WorkloadSeed* const workloads[] = {&workload_seed};
+			model.use_workload_seeds(workloads);
+			model.set_root_workload(workload_seed);
+
+			Engine engine;
+			engine.load(model);
+
+			nlohmann::ordered_json layout = build_workloads_buffer_layout_json(engine, "test");
+
+			REQUIRE(layout.contains("types"));
+			const auto& types = layout["types"];
+			const nlohmann::ordered_json* enum_it = nullptr;
+			for (const auto& type_json : types)
+			{
+				if (type_json.contains("name") && type_json["name"] == "LayoutTestEnum")
+				{
+					enum_it = &type_json;
+					break;
+				}
+			}
+			REQUIRE(enum_it != nullptr);
+
+			REQUIRE(enum_it->contains("enum_values"));
+			const auto& enum_values = (*enum_it)["enum_values"];
+			REQUIRE(enum_values.size() == 3);
+			CHECK(enum_values[0]["name"] == "Alpha");
+			CHECK(enum_values[0]["value"] == 0);
+			CHECK(enum_values[1]["name"] == "Beta");
+			CHECK(enum_values[1]["value"] == 1);
+			CHECK(enum_values[2]["name"] == "Gamma");
+			CHECK(enum_values[2]["value"] == 2);
+
+			CHECK((*enum_it)["enum_underlying_size"] == sizeof(LayoutTestEnum));
+			CHECK((*enum_it)["enum_is_flags"] == false);
 		}
 
 		SECTION("start_fn executes on same thread as tick_fn")
