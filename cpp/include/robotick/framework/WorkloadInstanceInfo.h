@@ -26,6 +26,7 @@ namespace robotick
 		// Stats travel with each workload instance inside WorkloadsBuffer so telemetry can be read without locks.
 		uint32_t last_tick_duration_ns = 0; // (uint32_t can store up to 4.29s of nanoseconds - should be fine for these deltas)
 		uint32_t last_time_delta_ns = 0;
+		uint64_t tick_count = 0;
 		float tick_rate_hz = 0.0f;
 
 		// Sliding windows live inline so we never touch the heap while sampling ticks.

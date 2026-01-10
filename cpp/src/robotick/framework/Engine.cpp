@@ -468,6 +468,7 @@ namespace robotick
 
 			// Update the per-workload stats in-place so telemetry can report overruns without introducing dynamic allocations.
 			root_info.workload_stats->record_tick_sample(duration_ns, clamped_delta_ns, budget_ns);
+			root_info.workload_stats->tick_count++;
 
 			next_tick_time += child_tick_interval;
 			Thread::hybrid_sleep_until(next_tick_time);

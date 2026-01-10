@@ -17,6 +17,7 @@ namespace robotick
 	ROBOTICK_REGISTER_STRUCT_BEGIN(WorkloadInstanceStats)
 	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, last_tick_duration_ns)
 	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, last_time_delta_ns)
+	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint64_t, tick_count)
 	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, float, tick_rate_hz)
 	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, TickDurationWindow, duration_window)
 	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, TickDeltaWindow, delta_window)
