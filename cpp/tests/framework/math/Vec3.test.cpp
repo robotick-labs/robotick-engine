@@ -10,7 +10,7 @@
 
 using namespace robotick;
 
-TEST_CASE("Unit/Framework/Math/Vec3")
+TEST_CASE("Unit/Framework/Math/Vec3f")
 {
 	SECTION("Default construction and member access")
 	{
@@ -141,13 +141,13 @@ TEST_CASE("Unit/Framework/Math/Vec3")
 			}
 		}
 
-		const TypeDescriptor* type_descriptor_vec3 = TypeRegistry::get().find_by_id(GET_TYPE_ID(Vec3));
+		const TypeDescriptor* type_descriptor_vec3 = TypeRegistry::get().find_by_id(GET_TYPE_ID(Vec3f));
 		CHECK(type_descriptor_vec3 != nullptr);
 
 		if (type_descriptor_vec3)
 		{
-			CHECK(type_descriptor_vec3->name == GET_TYPE_NAME(Vec3));
-			CHECK(type_descriptor_vec3->id == GET_TYPE_ID(Vec3));
+			CHECK(type_descriptor_vec3->name == GET_TYPE_NAME(Vec3f));
+			CHECK(type_descriptor_vec3->id == GET_TYPE_ID(Vec3f));
 			CHECK(type_descriptor_vec3->type_category == TypeCategory::Struct);
 			CHECK(type_descriptor_vec3->type_category_desc.struct_desc != nullptr);
 			if (type_descriptor_vec3->type_category_desc.struct_desc)

@@ -18,26 +18,26 @@ namespace robotick::test
 		struct RegistryTestInputs
 		{
 			int input_value = 0;
-			Vec3 input_vec3;
+			Vec3f input_vec3;
 		};
 
 		ROBOTICK_REGISTER_STRUCT_BEGIN(RegistryTestInputs)
 		ROBOTICK_STRUCT_FIELD(RegistryTestInputs, int, input_value)
-		ROBOTICK_STRUCT_FIELD(RegistryTestInputs, Vec3, input_vec3)
+		ROBOTICK_STRUCT_FIELD(RegistryTestInputs, Vec3f, input_vec3)
 		ROBOTICK_REGISTER_STRUCT_END(RegistryTestInputs)
 
 		struct RegistryTestOutputs
 		{
 			int output_value_1 = 0;
 			int output_value_2 = 0;
-			Vec3 output_vec3;
+			Vec3f output_vec3;
 			Blackboard output_blackboard;
 		};
 
 		ROBOTICK_REGISTER_STRUCT_BEGIN(RegistryTestOutputs)
 		ROBOTICK_STRUCT_FIELD(RegistryTestOutputs, int, output_value_1)
 		ROBOTICK_STRUCT_FIELD(RegistryTestOutputs, int, output_value_2)
-		ROBOTICK_STRUCT_FIELD(RegistryTestOutputs, Vec3, output_vec3)
+		ROBOTICK_STRUCT_FIELD(RegistryTestOutputs, Vec3f, output_vec3)
 		ROBOTICK_STRUCT_FIELD(RegistryTestOutputs, Blackboard, output_blackboard)
 		ROBOTICK_REGISTER_STRUCT_END(RegistryTestOutputs)
 
@@ -61,7 +61,7 @@ namespace robotick::test
 				ROBOTICK_ASSERT(state->blackboard_fields.size() == num_fields_required);
 
 				state->blackboard_fields[0] = FieldDescriptor{"counter", GET_TYPE_ID(int)};
-				state->blackboard_fields[1] = FieldDescriptor{"target_position", GET_TYPE_ID(Vec3)};
+				state->blackboard_fields[1] = FieldDescriptor{"target_position", GET_TYPE_ID(Vec3f)};
 
 				outputs.output_blackboard.initialize_fields(state->blackboard_fields);
 			}
@@ -112,7 +112,7 @@ namespace robotick::test
 			CHECK(sd->fields[0].name == "input_value");
 			CHECK(sd->fields[0].type_id == GET_TYPE_ID(int));
 			CHECK(sd->fields[1].name == "input_vec3");
-			CHECK(sd->fields[1].type_id == GET_TYPE_ID(Vec3));
+			CHECK(sd->fields[1].type_id == GET_TYPE_ID(Vec3f));
 		}
 
 		SECTION("Can find 'RegistryTestOutputs' struct in the registry with correct metadata")
@@ -133,7 +133,7 @@ namespace robotick::test
 			CHECK(sd->fields[1].type_id == GET_TYPE_ID(int));
 			CHECK(sd->fields[1].find_type_descriptor()->id == sd->fields[1].type_id);
 			CHECK(sd->fields[2].name == "output_vec3");
-			CHECK(sd->fields[2].type_id == GET_TYPE_ID(Vec3));
+			CHECK(sd->fields[2].type_id == GET_TYPE_ID(Vec3f));
 			CHECK(sd->fields[2].find_type_descriptor()->id == sd->fields[2].type_id);
 			CHECK(sd->fields[3].name == "output_blackboard");
 			CHECK(sd->fields[3].type_id == GET_TYPE_ID(Blackboard));
@@ -166,8 +166,8 @@ namespace robotick::test
 			CHECK(resolved_struct->fields[0].find_type_descriptor()->id == GET_TYPE_ID(int));
 
 			CHECK(resolved_struct->fields[1].name == "target_position");
-			CHECK(resolved_struct->fields[1].type_id == GET_TYPE_ID(Vec3));
-			CHECK(resolved_struct->fields[1].find_type_descriptor()->id == GET_TYPE_ID(Vec3));
+			CHECK(resolved_struct->fields[1].type_id == GET_TYPE_ID(Vec3f));
+			CHECK(resolved_struct->fields[1].find_type_descriptor()->id == GET_TYPE_ID(Vec3f));
 		}
 
 		SECTION("'RegistryTestWorkload' links correctly to input/output types from registry")
