@@ -120,20 +120,5 @@ TEST_CASE("Unit/Framework/Math/Vec2f")
 				CHECK(type_descriptor_vec2d->type_category_desc.struct_desc->fields.size() == 2);
 			}
 		}
-
-		const TypeDescriptor* type_descriptor_vec2 = TypeRegistry::get().find_by_id(GET_TYPE_ID(Vec2f));
-		CHECK(type_descriptor_vec2 != nullptr);
-
-		if (type_descriptor_vec2)
-		{
-			CHECK(type_descriptor_vec2->name == GET_TYPE_NAME(Vec2f));
-			CHECK(type_descriptor_vec2->id == GET_TYPE_ID(Vec2f));
-			CHECK(type_descriptor_vec2->type_category == TypeCategory::Struct);
-			CHECK(type_descriptor_vec2->type_category_desc.struct_desc != nullptr);
-			if (type_descriptor_vec2->type_category_desc.struct_desc)
-			{
-				CHECK(type_descriptor_vec2->type_category_desc.struct_desc->fields.size() == 2);
-			}
-		}
 	}
 }

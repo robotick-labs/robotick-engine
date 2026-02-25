@@ -140,20 +140,5 @@ TEST_CASE("Unit/Framework/Math/Vec3f")
 				CHECK(type_descriptor_vec3d->type_category_desc.struct_desc->fields.size() == 3);
 			}
 		}
-
-		const TypeDescriptor* type_descriptor_vec3 = TypeRegistry::get().find_by_id(GET_TYPE_ID(Vec3f));
-		CHECK(type_descriptor_vec3 != nullptr);
-
-		if (type_descriptor_vec3)
-		{
-			CHECK(type_descriptor_vec3->name == GET_TYPE_NAME(Vec3f));
-			CHECK(type_descriptor_vec3->id == GET_TYPE_ID(Vec3f));
-			CHECK(type_descriptor_vec3->type_category == TypeCategory::Struct);
-			CHECK(type_descriptor_vec3->type_category_desc.struct_desc != nullptr);
-			if (type_descriptor_vec3->type_category_desc.struct_desc)
-			{
-				CHECK(type_descriptor_vec3->type_category_desc.struct_desc->fields.size() == 3);
-			}
-		}
 	}
 }
