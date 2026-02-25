@@ -91,16 +91,4 @@ namespace robotick
 		using Vec3Base::Vec3Base;
 	};
 
-#if defined(ROBOTICK_DEFAULT_REAL_IS_DOUBLE)
-	struct Vec3 : public Vec3Base<Vec3, double>
-	{
-		using Vec3Base::Vec3Base;
-	};
-#else
-	struct Vec3 : public Vec3Base<Vec3, float>
-	{
-		using Vec3Base::Vec3Base;
-	};
-#endif
-
 } // namespace robotick

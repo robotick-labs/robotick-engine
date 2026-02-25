@@ -80,16 +80,4 @@ namespace robotick
 		using Vec2Base::Vec2Base;
 	};
 
-#if defined(ROBOTICK_DEFAULT_REAL_IS_DOUBLE)
-	struct Vec2 : public Vec2Base<Vec2, double>
-	{
-		using Vec2Base::Vec2Base;
-	};
-#else
-	struct Vec2 : public Vec2Base<Vec2, float>
-	{
-		using Vec2Base::Vec2Base;
-	};
-#endif
-
 } // namespace robotick

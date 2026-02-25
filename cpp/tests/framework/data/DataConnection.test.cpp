@@ -18,14 +18,14 @@ namespace robotick::test
 		{
 			int x = 0;
 			double y = 0.0;
-			Vec3 out_vec3;
+			Vec3f out_vec3;
 			Blackboard out_blackboard;
 		};
 		ROBOTICK_REGISTER_STRUCT_BEGIN(DummyAOutput)
 		ROBOTICK_STRUCT_FIELD(DummyAOutput, Blackboard, out_blackboard)
 		ROBOTICK_STRUCT_FIELD(DummyAOutput, int, x)
 		ROBOTICK_STRUCT_FIELD(DummyAOutput, double, y)
-		ROBOTICK_STRUCT_FIELD(DummyAOutput, Vec3, out_vec3)
+		ROBOTICK_STRUCT_FIELD(DummyAOutput, Vec3f, out_vec3)
 		ROBOTICK_REGISTER_STRUCT_END(DummyAOutput)
 
 		struct DummyBInput
@@ -33,13 +33,13 @@ namespace robotick::test
 			Blackboard in_blackboard;
 			double y = 0.0;
 			int x = 0;
-			Vec3 in_vec3;
+			Vec3f in_vec3;
 		};
 		ROBOTICK_REGISTER_STRUCT_BEGIN(DummyBInput)
 		ROBOTICK_STRUCT_FIELD(DummyBInput, Blackboard, in_blackboard)
 		ROBOTICK_STRUCT_FIELD(DummyBInput, double, y)
 		ROBOTICK_STRUCT_FIELD(DummyBInput, int, x)
-		ROBOTICK_STRUCT_FIELD(DummyBInput, Vec3, in_vec3)
+		ROBOTICK_STRUCT_FIELD(DummyBInput, Vec3f, in_vec3)
 		ROBOTICK_REGISTER_STRUCT_END(DummyBInput)
 
 		struct DummyState
@@ -419,8 +419,8 @@ namespace robotick::test
 			auto* a = engine.find_instance<DummyA>(seed_dummy_a.unique_name);
 			auto* b = engine.find_instance<DummyB>(seed_dummy_b.unique_name);
 
-			a->outputs.out_vec3 = Vec3(1, 2, 3);
-			b->inputs.in_vec3 = Vec3(9, 9, 9); // Should get overwritten
+			a->outputs.out_vec3 = Vec3f(1, 2, 3);
+			b->inputs.in_vec3 = Vec3f(9, 9, 9); // Should get overwritten
 
 			static const DataConnectionSeed conn_1("A.outputs.out_vec3", "B.inputs.in_vec3");
 			static const DataConnectionSeed* connections[] = {&conn_1};
@@ -432,8 +432,8 @@ namespace robotick::test
 			REQUIRE(resolved.size() == 1);
 			resolved[0].do_data_copy();
 
-			REQUIRE(b->inputs.in_vec3 == Vec3(1, 2, 3));
-			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
+			REQUIRE(b->inputs.in_vec3 == Vec3f(1, 2, 3));
+			REQUIRE(a->outputs.out_vec3 == Vec3f(1, 2, 3)); // Confirm unmodified
 		}
 
 		SECTION("Unidirectional copy (per-element vec3)")
@@ -447,8 +447,8 @@ namespace robotick::test
 			auto* a = engine.find_instance<DummyA>(seed_dummy_a.unique_name);
 			auto* b = engine.find_instance<DummyB>(seed_dummy_b.unique_name);
 
-			a->outputs.out_vec3 = Vec3(1, 2, 3);
-			b->inputs.in_vec3 = Vec3(9, 9, 9); // Should get overwritten
+			a->outputs.out_vec3 = Vec3f(1, 2, 3);
+			b->inputs.in_vec3 = Vec3f(9, 9, 9); // Should get overwritten
 
 			static const DataConnectionSeed conn_X("A.outputs.out_vec3.x", "B.inputs.in_vec3.x");
 			static const DataConnectionSeed conn_Y("A.outputs.out_vec3.y", "B.inputs.in_vec3.y");
@@ -462,16 +462,16 @@ namespace robotick::test
 			REQUIRE(resolved.size() == 3);
 
 			resolved[0].do_data_copy();
-			REQUIRE(b->inputs.in_vec3 == Vec3(1, 9, 9));
-			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
+			REQUIRE(b->inputs.in_vec3 == Vec3f(1, 9, 9));
+			REQUIRE(a->outputs.out_vec3 == Vec3f(1, 2, 3)); // Confirm unmodified
 
 			resolved[1].do_data_copy();
-			REQUIRE(b->inputs.in_vec3 == Vec3(1, 2, 9));
-			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
+			REQUIRE(b->inputs.in_vec3 == Vec3f(1, 2, 9));
+			REQUIRE(a->outputs.out_vec3 == Vec3f(1, 2, 3)); // Confirm unmodified
 
 			resolved[2].do_data_copy();
-			REQUIRE(b->inputs.in_vec3 == Vec3(1, 2, 3));
-			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
+			REQUIRE(b->inputs.in_vec3 == Vec3f(1, 2, 3));
+			REQUIRE(a->outputs.out_vec3 == Vec3f(1, 2, 3)); // Confirm unmodified
 		}
 
 		SECTION("Throws for blackboard subfield not found")
