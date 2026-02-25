@@ -46,6 +46,16 @@ else
   FEATURE_NAME="feature/${FEATURE}"
 fi
 
+if git show-ref --verify --quiet "refs/heads/${FEATURE_NAME}"; then
+  echo "❌ Aborting: branch '${FEATURE_NAME}' already exists locally. Delete it first or choose a new name."
+  exit 1
+fi
+
+if git ls-remote --exit-code --heads origin "${FEATURE_NAME}" >/dev/null 2>&1; then
+  echo "❌ Aborting: branch '${FEATURE_NAME}' already exists on origin. Delete or rename it before rerunning."
+  exit 1
+fi
+
 echo "👉 Switching to ${BASE}..."
 git fetch origin "${BASE}"
 git checkout "${BASE}"
@@ -56,11 +66,6 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 git reset --hard "origin/${BASE}"
-
-if git show-ref --verify --quiet "refs/heads/${FEATURE_NAME}"; then
-  echo "🧹 Deleting local branch '${FEATURE_NAME}'..."
-  git branch -D "${FEATURE_NAME}"
-fi
 
 echo "🌱 Creating fresh branch '${FEATURE_NAME}' from ${BASE}..."
 git checkout -b "${FEATURE_NAME}"

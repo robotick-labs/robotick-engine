@@ -1,15 +1,42 @@
-// Copyright Robotick Labs
+// Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/config/AssertUtils.h"
 #include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/registry/TypeMacros.h"
 #include "robotick/framework/registry/TypeRegistry.h"
 #include "robotick/framework/strings/FixedString.h"
 #include "robotick/framework/strings/StringUtils.h"
 #include "robotick/framework/strings/StringView.h"
 #include <catch2/catch_all.hpp>
 #include <cstring>
+
+enum class RegistryTestSignedEnum : int32_t
+{
+	Negative = -5,
+	Zero = 0,
+	Positive = 12
+};
+
+ROBOTICK_REGISTER_ENUM_BEGIN(RegistryTestSignedEnum)
+ROBOTICK_ENUM_VALUE("Negative", RegistryTestSignedEnum::Negative)
+ROBOTICK_ENUM_VALUE("Zero", RegistryTestSignedEnum::Zero)
+ROBOTICK_ENUM_VALUE("Positive", RegistryTestSignedEnum::Positive)
+ROBOTICK_REGISTER_ENUM_END(RegistryTestSignedEnum)
+
+enum RegistryTestUnsignedEnum : uint32_t
+{
+	RegistryTestUnsignedEnum_None = 0,
+	RegistryTestUnsignedEnum_FlagA = 1u << 0,
+	RegistryTestUnsignedEnum_FlagHigh = 0x80000000u
+};
+
+ROBOTICK_REGISTER_ENUM_BEGIN(RegistryTestUnsignedEnum)
+ROBOTICK_ENUM_VALUE("None", RegistryTestUnsignedEnum_None)
+ROBOTICK_ENUM_VALUE("FlagA", RegistryTestUnsignedEnum_FlagA)
+ROBOTICK_ENUM_VALUE("FlagHigh", RegistryTestUnsignedEnum_FlagHigh)
+ROBOTICK_REGISTER_ENUM_END(RegistryTestUnsignedEnum)
 
 namespace robotick::test
 {
@@ -185,6 +212,62 @@ namespace robotick::test
 			const int sample = 123456;
 			CHECK_FALSE(int_desc->to_string(&sample, small_buffer, sizeof(small_buffer)));
 			CHECK(small_buffer[0] == '\0');
+		}
+
+		SECTION("Enum Types - metadata and signed conversions")
+		{
+			const TypeDescriptor* signed_desc = registry.find_by_name("RegistryTestSignedEnum");
+			REQUIRE(signed_desc != nullptr);
+			CHECK(signed_desc->type_category == TypeCategory::Enum);
+
+			const EnumDescriptor* enum_desc = signed_desc->get_enum_desc();
+			REQUIRE(enum_desc != nullptr);
+			CHECK(enum_desc->is_signed);
+			CHECK(enum_desc->values.size() == 3);
+
+			RegistryTestSignedEnum value = RegistryTestSignedEnum::Positive;
+			char buffer[32] = {};
+			REQUIRE(signed_desc->to_string(&value, buffer, sizeof(buffer)));
+			CHECK(robotick::string_equals(buffer, "Positive"));
+
+			RegistryTestSignedEnum parsed = RegistryTestSignedEnum::Zero;
+			REQUIRE(signed_desc->from_string("Negative", &parsed));
+			CHECK(parsed == RegistryTestSignedEnum::Negative);
+
+			REQUIRE(signed_desc->from_string("37", &parsed));
+			CHECK(static_cast<int>(parsed) == 37);
+
+			parsed = static_cast<RegistryTestSignedEnum>(99);
+			REQUIRE(signed_desc->to_string(&parsed, buffer, sizeof(buffer)));
+			CHECK(robotick::string_equals(buffer, "99"));
+		}
+
+		SECTION("Enum Types - unsigned conversions and fallback")
+		{
+			const TypeDescriptor* unsigned_desc = registry.find_by_name("RegistryTestUnsignedEnum");
+			REQUIRE(unsigned_desc != nullptr);
+			CHECK(unsigned_desc->type_category == TypeCategory::Enum);
+
+			const EnumDescriptor* enum_desc = unsigned_desc->get_enum_desc();
+			REQUIRE(enum_desc != nullptr);
+			CHECK_FALSE(enum_desc->is_signed);
+			CHECK(enum_desc->values.size() == 3);
+
+			RegistryTestUnsignedEnum value = RegistryTestUnsignedEnum_FlagHigh;
+			char buffer[32] = {};
+			REQUIRE(unsigned_desc->to_string(&value, buffer, sizeof(buffer)));
+			CHECK(robotick::string_equals(buffer, "FlagHigh"));
+
+			REQUIRE(unsigned_desc->from_string("FlagA", &value));
+			CHECK(value == RegistryTestUnsignedEnum_FlagA);
+
+			REQUIRE(unsigned_desc->from_string("2147483648", &value));
+			REQUIRE(unsigned_desc->to_string(&value, buffer, sizeof(buffer)));
+			CHECK(robotick::string_equals(buffer, "FlagHigh"));
+
+			value = static_cast<RegistryTestUnsignedEnum>(0xDEADBEEFu);
+			REQUIRE(unsigned_desc->to_string(&value, buffer, sizeof(buffer)));
+			CHECK(robotick::string_equals(buffer, "3735928559"));
 		}
 
 		SECTION("TypeRegistry rejects duplicate ids")

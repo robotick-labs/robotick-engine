@@ -1,4 +1,4 @@
-// Copyright Robotick Labs
+// Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
@@ -9,6 +9,28 @@
 
 namespace robotick
 {
+	namespace detail
+	{
+		template <bool Condition, typename T = void> struct EnableIf
+		{
+		};
+
+		template <typename T> struct EnableIf<true, T>
+		{
+			using type = T;
+		};
+
+		template <typename T> struct IsConst
+		{
+			static constexpr bool value = false;
+		};
+
+		template <typename T> struct IsConst<const T>
+		{
+			static constexpr bool value = true;
+		};
+	} // namespace detail
+
 	/**
 	 * @brief A non-owning view of a fixed-size array.
 	 *
@@ -44,6 +66,13 @@ namespace robotick
 		{
 		}
 
+		template <size_t N, typename Dummy = T, typename detail::EnableIf<!detail::IsConst<Dummy>::value, int>::type = 0>
+		constexpr ArrayView(const T (&arr)[N])
+			: data(const_cast<T*>(arr))
+			, array_size(N)
+		{
+		}
+
 		/// @brief Assignment operator
 		constexpr ArrayView& operator=(const ArrayView& other) = default;
 
@@ -65,18 +94,16 @@ namespace robotick
 		size_t size() const { return array_size; }
 		bool empty() const { return array_size == 0; }
 
-		/// @brief Bounds-checked element access
+		/// @brief Debug-only bounds assertions on element access
 		T& operator[](size_t index)
 		{
-			if (index >= array_size)
-				ROBOTICK_FATAL_EXIT("ArrayView index out of bounds");
+			ROBOTICK_ASSERT_MSG((index < array_size), "ArrayView index out of bounds [%zu/%zu]", index, array_size);
 			return data[index];
 		}
 
 		const T& operator[](size_t index) const
 		{
-			if (index >= array_size)
-				ROBOTICK_FATAL_EXIT("ArrayView index out of bounds");
+			ROBOTICK_ASSERT_MSG((index < array_size), "ArrayView index out of bounds [%zu/%zu]", index, array_size);
 			return data[index];
 		}
 

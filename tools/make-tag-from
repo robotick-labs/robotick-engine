@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: make-tag-from <target-branch> <tag-id>
+
+Creates an annotated tag at the HEAD of the specified branch and pushes it to
+origin. The working tree must be clean, and the tag must not already exist
+locally or on origin.
+
+Examples:
+  make-tag-from main release/v1.2.3
+  mctag dev release/2024-12-09
+EOF
+  exit 1
+}
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  usage
+fi
+
+if [ $# -ne 2 ]; then
+  usage
+fi
+
+TARGET_BRANCH="$1"
+TAG_NAME="$2"
+
+if [ -z "${TARGET_BRANCH}" ] || [ -z "${TAG_NAME}" ]; then
+  usage
+fi
+
+if git show-ref --verify --quiet "refs/tags/${TAG_NAME}"; then
+  echo "❌ Aborting: tag '${TAG_NAME}' already exists locally."
+  exit 1
+fi
+
+if git ls-remote --exit-code --tags origin "${TAG_NAME}" >/dev/null 2>&1; then
+  echo "❌ Aborting: tag '${TAG_NAME}' already exists on origin."
+  exit 1
+fi
+
+echo "👉 Fetching latest '${TARGET_BRANCH}'..."
+git fetch origin "${TARGET_BRANCH}"
+git checkout "${TARGET_BRANCH}"
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "❌ Aborting: working tree has uncommitted changes. Please clean it up before tagging."
+  exit 1
+fi
+
+git reset --hard "origin/${TARGET_BRANCH}"
+
+echo "🏷️ Creating annotated tag '${TAG_NAME}' from '${TARGET_BRANCH}'..."
+git tag -a "${TAG_NAME}" -m "Tag ${TAG_NAME} from ${TARGET_BRANCH}"
+
+echo "🚀 Pushing tag '${TAG_NAME}' to origin..."
+git push origin "${TAG_NAME}"
+
+echo "✅ Done! Tag '${TAG_NAME}' now points to branch '${TARGET_BRANCH}'."

@@ -1,4 +1,4 @@
-# Copyright Robotick Labs
+# Copyright Robotick contributors
 # SPDX-License-Identifier: Apache-2.0
 
 # robotick-engine/cpp/CMakeLists.txt
@@ -142,9 +142,6 @@ add_dependencies(robotick-engine-static code_policy_check)
 
 if (ROBOTICK_BUILD_TESTS)
     message(STATUS "ROBOTICK_BUILD_TESTS - ON")
-
-    # Enable dynamic model heap helpers during test builds so Model::add() helpers are available.
-    add_compile_definitions(ROBOTICK_ENABLE_MODEL_HEAP)
 
     enable_testing()
     add_subdirectory(tests)

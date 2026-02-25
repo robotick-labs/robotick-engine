@@ -1,4 +1,4 @@
-// Copyright Robotick Labs
+// Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
@@ -24,6 +24,20 @@ namespace robotick
 	struct DataConnectionInfo;
 	struct TickInfo;
 	struct WorkloadInstanceInfo;
+
+	struct EnumValue
+	{
+		StringView name;
+		uint64_t value = 0;
+	};
+
+	struct EnumDescriptor
+	{
+		ArrayView<EnumValue> values;
+		size_t underlying_size = 0;
+		bool is_signed = true;
+		bool is_flags = false;
+	};
 
 	struct FieldDescriptor
 	{
@@ -111,6 +125,7 @@ namespace robotick
 	enum class TypeCategory
 	{
 		Primitive,
+		Enum,
 		Struct,
 		DynamicStruct,
 		Workload
@@ -136,6 +151,7 @@ namespace robotick
 		union TypeCategoryDesc
 		{
 			const void* any_desc; // allows construction from brace-init list pre-C++20
+			const EnumDescriptor* enum_desc;
 			const StructDescriptor* struct_desc;
 			const WorkloadDescriptor* workload_desc;
 			const DynamicStructDescriptor* dynamic_struct_desc;
@@ -150,6 +166,8 @@ namespace robotick
 		{
 			return (type_category == TypeCategory::Workload ? type_category_desc.workload_desc : nullptr);
 		}
+
+		const EnumDescriptor* get_enum_desc() const { return (type_category == TypeCategory::Enum ? type_category_desc.enum_desc : nullptr); }
 
 		const StructDescriptor* get_struct_desc() const { return (type_category == TypeCategory::Struct ? type_category_desc.struct_desc : nullptr); }
 

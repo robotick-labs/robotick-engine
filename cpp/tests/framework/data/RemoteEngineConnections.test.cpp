@@ -1,10 +1,12 @@
-// Copyright Robotick Labs
+// Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "robotick/framework/data/RemoteEngineConnections.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Thread.h"
+#include "robotick/framework/model/DataConnectionSeed.h"
+#include "robotick/framework/data/RemoteEngineConnections.h"
+#include "robotick/framework/model/RemoteModelSeed.h"
 #include "robotick/framework/time/Clock.h"
 
 #include <catch2/catch_all.hpp>
@@ -66,17 +68,46 @@ namespace robotick::test
 		Model sender_model;
 		sender_model.set_model_name("sender_model");
 
-		auto& remote = sender_model.add_remote_model("receiver_model", "ip:127.0.0.1");
-		remote.connect("sender_workload.outputs.local_x", "receiver_workload.inputs.remote_x");
+		static const WorkloadSeed sender_seed{
+			TypeId("TestRemoteWorkload"),
+			StringView("sender_workload"),
+			100.0f,
+			{}, // children
+			{}, // config
+			{}	// inputs
+		};
+		static const WorkloadSeed* const sender_workloads[] = {&sender_seed};
+		static const DataConnectionSeed remote_connection{"sender_workload.outputs.local_x", "receiver_workload.inputs.remote_x"};
+		static const DataConnectionSeed* const remote_connections[] = {&remote_connection};
+		static const RemoteModelSeed remote_receiver = []() {
+			RemoteModelSeed seed{
+				StringView("receiver_model"),
+				ArrayView<const DataConnectionSeed*>(remote_connections)
+			};
+			seed.comms_mode = RemoteModelSeed::Mode::IP;
+			seed.comms_channel = StringView("ip:127.0.0.1");
+			return seed;
+		}();
+		static const RemoteModelSeed* const remote_models[] = {&remote_receiver};
 
-		const auto& sender_seed = sender_model.add("TestRemoteWorkload", "sender_workload").set_tick_rate_hz(100.0f);
+		sender_model.use_workload_seeds(sender_workloads);
+		sender_model.use_remote_models(remote_models);
 		sender_model.set_root_workload(sender_seed);
 
 		// --- Setup receiver
 		Model receiver_model;
 		receiver_model.set_model_name("receiver_model");
-		const auto& receiver_seed = receiver_model.add("TestRemoteWorkload", "receiver_workload").set_tick_rate_hz(100.0f);
+		static const WorkloadSeed receiver_seed{
+			TypeId("TestRemoteWorkload"),
+			StringView("receiver_workload"),
+			100.0f,
+			{}, // children
+			{}, // config
+			{}	// inputs
+		};
+		static const WorkloadSeed* const receiver_workloads[] = {&receiver_seed};
 		receiver_model.set_telemetry_port(7091); // so as to not conflict with the above
+		receiver_model.use_workload_seeds(receiver_workloads);
 		receiver_model.set_root_workload(receiver_seed);
 
 		// --- Load both engines

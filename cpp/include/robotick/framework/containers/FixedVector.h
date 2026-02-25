@@ -1,4 +1,4 @@
-// Copyright Robotick Labs
+// Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
@@ -121,8 +121,9 @@ namespace robotick
 		 */
 		T& operator[](size_t index)
 		{
-			ROBOTICK_ASSERT_MSG(index < Capacity, "Indexing beyond Capacity (non-const [] accessor)");
-			ROBOTICK_ASSERT_MSG(index < count, "Indexing beyond current size of %zu (non-const [] accessor)", static_cast<size_t>(count));
+			ROBOTICK_ASSERT_MSG(
+				index < Capacity, "FixedVector::operator[] (non-const) index beyond capacity [%zu/%zu]", index, static_cast<size_t>(Capacity));
+			ROBOTICK_ASSERT_MSG(index < count, "FixedVector::operator[] (non-const) index beyond size [%zu/%zu]", index, static_cast<size_t>(count));
 			return data_buffer[index];
 		}
 
@@ -131,8 +132,9 @@ namespace robotick
 		 */
 		const T& operator[](size_t index) const
 		{
-			ROBOTICK_ASSERT_MSG(index < Capacity, "Indexing beyond Capacity (const [] accessor)");
-			ROBOTICK_ASSERT_MSG(index < count, "Indexing beyond current size of %zu (const [] accessor)", static_cast<size_t>(count));
+			ROBOTICK_ASSERT_MSG(
+				index < Capacity, "FixedVector::operator[] (const) index beyond capacity [%zu/%zu]", index, static_cast<size_t>(Capacity));
+			ROBOTICK_ASSERT_MSG(index < count, "FixedVector::operator[] (const) index beyond size [%zu/%zu]", index, static_cast<size_t>(count));
 			return data_buffer[index];
 		}
 

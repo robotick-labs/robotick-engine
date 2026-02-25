@@ -1,4 +1,4 @@
-// Copyright Robotick Labs
+// Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/Engine.h"
@@ -461,13 +461,14 @@ namespace robotick
 
 			const auto now_post = Clock::now();
 			const uint32_t duration_ns = detail::clamp_to_uint32(Clock::to_nanoseconds(now_post - now).count());
-			root_info.workload_stats->last_time_delta_ns = ns_since_last;
-
 			const uint64_t budget_ns_raw = Clock::to_nanoseconds(child_tick_interval).count();
 			const uint32_t budget_ns = detail::clamp_to_uint32(budget_ns_raw);
 
+			const uint32_t clamped_delta_ns = detail::clamp_to_uint32(ns_since_last);
+
 			// Update the per-workload stats in-place so telemetry can report overruns without introducing dynamic allocations.
-			root_info.workload_stats->record_tick_duration_ns(duration_ns, budget_ns);
+			root_info.workload_stats->record_tick_sample(duration_ns, clamped_delta_ns, budget_ns);
+			root_info.workload_stats->tick_count++;
 
 			next_tick_time += child_tick_interval;
 			Thread::hybrid_sleep_until(next_tick_time);

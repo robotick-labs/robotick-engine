@@ -1,4 +1,4 @@
-// Copyright Robotick Labs
+// Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/DataConnection.h"
@@ -102,7 +102,7 @@ namespace robotick
 		}
 
 		// Walks a dotted member path inside an already-addressable container (supports static or dynamic structs).
-		// Example: container_ptr=ptr_to_vec2, container_type=Vec2, dotted="x" or "position.x"
+		// Example: container_ptr=ptr_to_vec2, container_type=Vec2f, dotted="x" or "position.x"
 		static bool resolve_nested_member(void* container_ptr,
 			const TypeDescriptor* container_type,
 			const char* dotted,

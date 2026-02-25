@@ -1,4 +1,4 @@
-// Copyright Robotick Labs
+// Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/WorkloadInstanceInfo.h"
@@ -12,13 +12,17 @@
 namespace robotick
 {
 	ROBOTICK_REGISTER_FIXED_VECTOR(TickDurationWindow, uint32_t);
+	ROBOTICK_REGISTER_FIXED_VECTOR(TickDeltaWindow, uint32_t);
 
 	ROBOTICK_REGISTER_STRUCT_BEGIN(WorkloadInstanceStats)
 	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, last_tick_duration_ns)
 	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, last_time_delta_ns)
+	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint64_t, tick_count)
 	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, float, tick_rate_hz)
 	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, TickDurationWindow, duration_window)
-	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, window_index)
+	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, TickDeltaWindow, delta_window)
+	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, duration_window_index)
+	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, delta_window_index)
 	ROBOTICK_STRUCT_FIELD(WorkloadInstanceStats, uint32_t, overrun_count)
 	ROBOTICK_REGISTER_STRUCT_END(WorkloadInstanceStats)
 

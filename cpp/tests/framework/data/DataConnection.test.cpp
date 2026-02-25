@@ -1,4 +1,4 @@
-// Copyright Robotick Labs
+// Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/DataConnection.h"
@@ -18,14 +18,14 @@ namespace robotick::test
 		{
 			int x = 0;
 			double y = 0.0;
-			Vec3 out_vec3;
+			Vec3f out_vec3;
 			Blackboard out_blackboard;
 		};
 		ROBOTICK_REGISTER_STRUCT_BEGIN(DummyAOutput)
 		ROBOTICK_STRUCT_FIELD(DummyAOutput, Blackboard, out_blackboard)
 		ROBOTICK_STRUCT_FIELD(DummyAOutput, int, x)
 		ROBOTICK_STRUCT_FIELD(DummyAOutput, double, y)
-		ROBOTICK_STRUCT_FIELD(DummyAOutput, Vec3, out_vec3)
+		ROBOTICK_STRUCT_FIELD(DummyAOutput, Vec3f, out_vec3)
 		ROBOTICK_REGISTER_STRUCT_END(DummyAOutput)
 
 		struct DummyBInput
@@ -33,13 +33,13 @@ namespace robotick::test
 			Blackboard in_blackboard;
 			double y = 0.0;
 			int x = 0;
-			Vec3 in_vec3;
+			Vec3f in_vec3;
 		};
 		ROBOTICK_REGISTER_STRUCT_BEGIN(DummyBInput)
 		ROBOTICK_STRUCT_FIELD(DummyBInput, Blackboard, in_blackboard)
 		ROBOTICK_STRUCT_FIELD(DummyBInput, double, y)
 		ROBOTICK_STRUCT_FIELD(DummyBInput, int, x)
-		ROBOTICK_STRUCT_FIELD(DummyBInput, Vec3, in_vec3)
+		ROBOTICK_STRUCT_FIELD(DummyBInput, Vec3f, in_vec3)
 		ROBOTICK_REGISTER_STRUCT_END(DummyBInput)
 
 		struct DummyState
@@ -90,6 +90,46 @@ namespace robotick::test
 			}
 		};
 		ROBOTICK_REGISTER_WORKLOAD(DummyB, void, DummyBInput)
+
+		static constexpr float kDummyTickRate = 1.0f;
+
+		static const WorkloadSeed seed_dummy_a{
+			TypeId("DummyA"),
+			StringView("A"),
+			kDummyTickRate,
+			{}, // children
+			{}, // config
+			{}	// inputs
+		};
+
+		static const WorkloadSeed seed_dummy_b{
+			TypeId("DummyB"),
+			StringView("B"),
+			kDummyTickRate,
+			{}, // children
+			{}, // config
+			{}	// inputs
+		};
+
+		static const WorkloadSeed* const root_children[] = {&seed_dummy_a, &seed_dummy_b};
+
+		static const WorkloadSeed seed_group{
+			TypeId("TestSequencedGroupWorkload"),
+			StringView("group"),
+			kDummyTickRate,
+			root_children,
+			{}, // config
+			{}	// inputs
+		};
+
+		static const WorkloadSeed* const all_workloads[] = {&seed_dummy_a, &seed_dummy_b, &seed_group};
+		static const WorkloadSeed* const dummy_a_only[] = {&seed_dummy_a};
+
+		void init_default_model(Model& model)
+		{
+			model.use_workload_seeds(all_workloads);
+			model.set_root_workload(seed_group);
+		}
 	} // namespace
 
 	TEST_CASE("Unit/Framework/Data/Connection")
@@ -97,16 +137,13 @@ namespace robotick::test
 		SECTION("Resolves non-blackboard to non-blackboard")
 		{
 			Model model;
-			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
-			model.set_root_workload(root);
+			init_default_model(model);
 
 			Engine engine;
 			engine.load(model);
 
 			// Modify live instance values
-			auto* a = engine.find_instance<DummyA>(seed_a.unique_name);
+			auto* a = engine.find_instance<DummyA>(seed_dummy_a.unique_name);
 			a->outputs.x = 42;
 			a->outputs.y = 3.14;
 
@@ -131,7 +168,7 @@ namespace robotick::test
 				conn.do_data_copy();
 			}
 
-			const DummyB* b = engine.find_instance<DummyB>(seed_b.unique_name);
+			const DummyB* b = engine.find_instance<DummyB>(seed_dummy_b.unique_name);
 			REQUIRE(b->inputs.x == 42);
 			REQUIRE(b->inputs.y == Catch::Approx(3.14));
 		}
@@ -139,16 +176,13 @@ namespace robotick::test
 		SECTION("Resolves non-blackboard to blackboard")
 		{
 			Model model;
-			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
-			model.set_root_workload(root);
+			init_default_model(model);
 
 			Engine engine;
 			engine.load(model);
 
 			// Modify live instance values
-			auto* a = engine.find_instance<DummyA>(seed_a.unique_name);
+			auto* a = engine.find_instance<DummyA>(seed_dummy_a.unique_name);
 			a->outputs.x = 42;
 			a->outputs.y = 3.14;
 
@@ -167,7 +201,7 @@ namespace robotick::test
 
 			REQUIRE(resolved.size() == 2);
 
-			const DummyB* b = engine.find_instance<DummyB>(seed_b.unique_name);
+			const DummyB* b = engine.find_instance<DummyB>(seed_dummy_b.unique_name);
 
 			// Execute copy
 			for (const auto& conn : resolved)
@@ -182,10 +216,8 @@ namespace robotick::test
 		SECTION("Resolves blackboard to non-blackboard")
 		{
 			Model model;
-			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
-			model.set_root_workload(root);
+			model.use_workload_seeds(all_workloads);
+			model.set_root_workload(seed_group);
 
 			Engine engine;
 			engine.load(model);
@@ -224,16 +256,13 @@ namespace robotick::test
 		SECTION("Resolves blackboard to blackboard")
 		{
 			Model model;
-			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
-			model.set_root_workload(root);
+			init_default_model(model);
 
 			Engine engine;
 			engine.load(model);
 
 			// Modify live instance values
-			auto* a = engine.find_instance<DummyA>("A");
+			auto* a = engine.find_instance<DummyA>(seed_dummy_a.unique_name);
 			a->outputs.out_blackboard.set("x", (int)42);
 			a->outputs.out_blackboard.set("y", (double)3.14);
 
@@ -258,7 +287,7 @@ namespace robotick::test
 				conn.do_data_copy();
 			}
 
-			const DummyB* b = engine.find_instance<DummyB>("B");
+			const DummyB* b = engine.find_instance<DummyB>(seed_dummy_b.unique_name);
 
 			REQUIRE(b->inputs.in_blackboard.get<int>("x") == 42);
 			REQUIRE(b->inputs.in_blackboard.get<double>("y") == Catch::Approx(3.14));
@@ -267,10 +296,7 @@ namespace robotick::test
 		SECTION("Errors on invalid connections")
 		{
 			Model model;
-			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
-			model.set_root_workload(root);
+			init_default_model(model);
 
 			Engine engine;
 			engine.load(model);
@@ -333,8 +359,8 @@ namespace robotick::test
 		SECTION("Blackboard field paths resolve and error")
 		{
 			Model model;
-			const WorkloadSeed& seed = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			model.set_root_workload(seed);
+			model.use_workload_seeds(dummy_a_only);
+			model.set_root_workload(seed_dummy_a);
 
 			Engine engine;
 			engine.load(model);
@@ -357,16 +383,13 @@ namespace robotick::test
 		SECTION("Unidirectional copy (primitive-int)")
 		{
 			Model model;
-			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
-			model.set_root_workload(root);
+			init_default_model(model);
 
 			Engine engine;
 			engine.load(model);
 
-			auto* a = engine.find_instance<DummyA>(seed_a.unique_name);
-			auto* b = engine.find_instance<DummyB>(seed_b.unique_name);
+			auto* a = engine.find_instance<DummyA>(seed_dummy_a.unique_name);
+			auto* b = engine.find_instance<DummyB>(seed_dummy_b.unique_name);
 
 			a->outputs.x = 123;
 			b->inputs.x = 999; // Should get overwritten
@@ -388,19 +411,16 @@ namespace robotick::test
 		SECTION("Unidirectional copy (whole vec3)")
 		{
 			Model model;
-			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
-			model.set_root_workload(root);
+			init_default_model(model);
 
 			Engine engine;
 			engine.load(model);
 
-			auto* a = engine.find_instance<DummyA>(seed_a.unique_name);
-			auto* b = engine.find_instance<DummyB>(seed_b.unique_name);
+			auto* a = engine.find_instance<DummyA>(seed_dummy_a.unique_name);
+			auto* b = engine.find_instance<DummyB>(seed_dummy_b.unique_name);
 
-			a->outputs.out_vec3 = Vec3(1, 2, 3);
-			b->inputs.in_vec3 = Vec3(9, 9, 9); // Should get overwritten
+			a->outputs.out_vec3 = Vec3f(1, 2, 3);
+			b->inputs.in_vec3 = Vec3f(9, 9, 9); // Should get overwritten
 
 			static const DataConnectionSeed conn_1("A.outputs.out_vec3", "B.inputs.in_vec3");
 			static const DataConnectionSeed* connections[] = {&conn_1};
@@ -412,26 +432,23 @@ namespace robotick::test
 			REQUIRE(resolved.size() == 1);
 			resolved[0].do_data_copy();
 
-			REQUIRE(b->inputs.in_vec3 == Vec3(1, 2, 3));
-			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
+			REQUIRE(b->inputs.in_vec3 == Vec3f(1, 2, 3));
+			REQUIRE(a->outputs.out_vec3 == Vec3f(1, 2, 3)); // Confirm unmodified
 		}
 
 		SECTION("Unidirectional copy (per-element vec3)")
 		{
 			Model model;
-			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
-			model.set_root_workload(root);
+			init_default_model(model);
 
 			Engine engine;
 			engine.load(model);
 
-			auto* a = engine.find_instance<DummyA>(seed_a.unique_name);
-			auto* b = engine.find_instance<DummyB>(seed_b.unique_name);
+			auto* a = engine.find_instance<DummyA>(seed_dummy_a.unique_name);
+			auto* b = engine.find_instance<DummyB>(seed_dummy_b.unique_name);
 
-			a->outputs.out_vec3 = Vec3(1, 2, 3);
-			b->inputs.in_vec3 = Vec3(9, 9, 9); // Should get overwritten
+			a->outputs.out_vec3 = Vec3f(1, 2, 3);
+			b->inputs.in_vec3 = Vec3f(9, 9, 9); // Should get overwritten
 
 			static const DataConnectionSeed conn_X("A.outputs.out_vec3.x", "B.inputs.in_vec3.x");
 			static const DataConnectionSeed conn_Y("A.outputs.out_vec3.y", "B.inputs.in_vec3.y");
@@ -445,25 +462,22 @@ namespace robotick::test
 			REQUIRE(resolved.size() == 3);
 
 			resolved[0].do_data_copy();
-			REQUIRE(b->inputs.in_vec3 == Vec3(1, 9, 9));
-			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
+			REQUIRE(b->inputs.in_vec3 == Vec3f(1, 9, 9));
+			REQUIRE(a->outputs.out_vec3 == Vec3f(1, 2, 3)); // Confirm unmodified
 
 			resolved[1].do_data_copy();
-			REQUIRE(b->inputs.in_vec3 == Vec3(1, 2, 9));
-			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
+			REQUIRE(b->inputs.in_vec3 == Vec3f(1, 2, 9));
+			REQUIRE(a->outputs.out_vec3 == Vec3f(1, 2, 3)); // Confirm unmodified
 
 			resolved[2].do_data_copy();
-			REQUIRE(b->inputs.in_vec3 == Vec3(1, 2, 3));
-			REQUIRE(a->outputs.out_vec3 == Vec3(1, 2, 3)); // Confirm unmodified
+			REQUIRE(b->inputs.in_vec3 == Vec3f(1, 2, 3));
+			REQUIRE(a->outputs.out_vec3 == Vec3f(1, 2, 3)); // Confirm unmodified
 		}
 
 		SECTION("Throws for blackboard subfield not found")
 		{
 			Model model;
-			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
-			model.set_root_workload(root);
+			init_default_model(model);
 
 			Engine engine;
 			engine.load(model);
@@ -480,10 +494,7 @@ namespace robotick::test
 		SECTION("Different subfields allowed")
 		{
 			Model model;
-			const WorkloadSeed& seed_a = model.add("DummyA", "A").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& seed_b = model.add("DummyB", "B").set_tick_rate_hz(1.0f);
-			const WorkloadSeed& root = model.add("TestSequencedGroupWorkload", "group").set_tick_rate_hz(1.0f).set_children({&seed_a, &seed_b});
-			model.set_root_workload(root);
+			init_default_model(model);
 
 			Engine engine;
 			engine.load(model);
