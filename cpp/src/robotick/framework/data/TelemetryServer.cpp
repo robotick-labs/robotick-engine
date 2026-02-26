@@ -7,6 +7,7 @@
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/concurrency/Sync.h"
 #include "robotick/framework/containers/HeapVector.h"
+#include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/services/WebServer.h"
@@ -14,11 +15,11 @@
 #include "robotick/framework/strings/StringView.h"
 #include "robotick/framework/time/Clock.h"
 #include "robotick/framework/utility/Algorithm.h"
-#include "robotick/framework/utils/WorkloadFieldsIterator.h"
 
 #include <nlohmann/json.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <unistd.h>
@@ -81,7 +82,52 @@ namespace robotick
 			const StringView& name = type_desc->name;
 			return name == "bool" || name == "int" || name == "float" || name == "double" || name == "uint16_t" || name == "uint32_t";
 		}
-	} // namespace
+
+		static const StructDescriptor* try_get_struct_descriptor(const TypeDescriptor* type_desc, const void* instance_ptr)
+		{
+			if (!type_desc)
+			{
+				return nullptr;
+			}
+			if (const StructDescriptor* struct_desc = type_desc->get_struct_desc())
+			{
+				return struct_desc;
+			}
+			if (const DynamicStructDescriptor* dynamic_struct_desc = type_desc->get_dynamic_struct_desc())
+			{
+				return dynamic_struct_desc->get_struct_descriptor(instance_ptr);
+			}
+			return nullptr;
+		}
+
+		static bool has_incoming_connection_overlap(
+			const HeapVector<DataConnectionInfo>& connections, const void* target_ptr, const size_t target_size)
+		{
+			if (!target_ptr || target_size == 0)
+			{
+				return false;
+			}
+
+			const uintptr_t target_begin = reinterpret_cast<uintptr_t>(target_ptr);
+			const uintptr_t target_end = target_begin + target_size;
+
+			for (const DataConnectionInfo& connection : connections)
+			{
+				if (!connection.dest_ptr || connection.size == 0)
+				{
+					continue;
+				}
+
+				const uintptr_t connection_begin = reinterpret_cast<uintptr_t>(connection.dest_ptr);
+				const uintptr_t connection_end = connection_begin + connection.size;
+				if (target_begin < connection_end && connection_begin < target_end)
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+		} // namespace
 
 	struct TelemetryServer::Impl
 	{
@@ -90,7 +136,7 @@ namespace robotick
 		struct WritableInputField
 		{
 			uint16_t handle = 0;
-			FixedString256 path;
+			FixedString512 path;
 			const TypeDescriptor* type_desc = nullptr;
 			void* target_ptr = nullptr;
 			uint16_t value_size = 0;
@@ -302,53 +348,106 @@ namespace robotick
 
 		WorkloadsBuffer& workloads_buffer = engine->get_workloads_buffer();
 		const auto& instances = engine->get_all_instance_info();
+		const auto& incoming_connections = engine->get_all_data_connections();
+
+		const auto for_each_writable_input_leaf = [&](auto&& on_leaf)
+		{
+			for (const WorkloadInstanceInfo& workload_instance_info : instances)
+			{
+				if (!workload_instance_info.seed || !workload_instance_info.type)
+				{
+					continue;
+				}
+
+				const WorkloadDescriptor* desc = workload_instance_info.type->get_workload_desc();
+				if (!desc || !desc->inputs_desc || desc->inputs_offset == OFFSET_UNBOUND)
+				{
+					continue;
+				}
+
+				const TypeDescriptor* inputs_type = desc->inputs_desc;
+				const uint8_t* workload_ptr = workload_instance_info.get_ptr(workloads_buffer);
+				if (!workload_ptr)
+				{
+					continue;
+				}
+
+				void* inputs_ptr = const_cast<uint8_t*>(workload_ptr) + desc->inputs_offset;
+				if (!workloads_buffer.contains_object_used_space(inputs_ptr, inputs_type->size))
+				{
+					continue;
+				}
+
+				FixedString512 root_path;
+				root_path.format("%s.inputs", workload_instance_info.seed->unique_name.c_str());
+
+				const auto walk_struct = [&](const auto& self,
+											 const TypeDescriptor* struct_type,
+											 void* struct_ptr,
+											 const FixedString512& path_prefix,
+											 auto&& on_leaf_ref) -> void
+				{
+					const StructDescriptor* struct_desc = try_get_struct_descriptor(struct_type, struct_ptr);
+					if (!struct_desc)
+					{
+						return;
+					}
+
+					for (const FieldDescriptor& field_desc : struct_desc->fields)
+					{
+						if (field_desc.element_count != 1)
+						{
+							continue;
+						}
+
+						const TypeDescriptor* field_type = field_desc.find_type_descriptor();
+						if (!field_type)
+						{
+							continue;
+						}
+
+						void* field_ptr = field_desc.get_data_ptr(struct_ptr);
+						if (!field_ptr || !workloads_buffer.contains_object_used_space(field_ptr, field_type->size))
+						{
+							continue;
+						}
+
+						FixedString512 field_path;
+						field_path.format("%s.%s", path_prefix.c_str(), field_desc.name.c_str());
+
+						if (try_get_struct_descriptor(field_type, field_ptr))
+						{
+							self(self, field_type, field_ptr, field_path, on_leaf_ref);
+							continue;
+						}
+
+						if (!is_supported_writable_type(field_type))
+						{
+							continue;
+						}
+						if (field_type->size == 0 || field_type->size > kMaxWritePayloadBytes)
+						{
+							continue;
+						}
+						if (has_incoming_connection_overlap(incoming_connections, field_ptr, field_type->size))
+						{
+							continue;
+						}
+
+						on_leaf_ref(field_path, field_type, field_ptr);
+					}
+				};
+
+				walk_struct(walk_struct, inputs_type, inputs_ptr, root_path, on_leaf);
+			}
+		};
 
 		size_t writable_count = 0;
-		for (const WorkloadInstanceInfo& workload_instance_info : instances)
-		{
-			if (!workload_instance_info.seed || !workload_instance_info.type)
+		for_each_writable_input_leaf(
+			[&](const FixedString512&, const TypeDescriptor*, void*)
 			{
-				continue;
-			}
-
-			const WorkloadDescriptor* desc = workload_instance_info.type->get_workload_desc();
-			if (!desc || !desc->inputs_desc)
-			{
-				continue;
-			}
-
-			const StructDescriptor* inputs_struct = desc->inputs_desc->get_struct_desc();
-			if (!inputs_struct)
-			{
-				continue;
-			}
-
-			for (const FieldDescriptor& field_desc : inputs_struct->fields)
-			{
-				if (field_desc.element_count != 1)
-				{
-					continue;
-				}
-
-				const TypeDescriptor* field_type = field_desc.find_type_descriptor();
-				if (!is_supported_writable_type(field_type))
-				{
-					continue;
-				}
-				if (!field_type || field_type->size == 0 || field_type->size > kMaxWritePayloadBytes)
-				{
-					continue;
-				}
-
-				void* field_ptr = field_desc.get_data_ptr(workloads_buffer, workload_instance_info, *desc->inputs_desc, desc->inputs_offset);
-				if (!workloads_buffer.contains_object_used_space(field_ptr, field_type->size))
-				{
-					continue;
-				}
-
 				++writable_count;
-			}
-		}
+			});
 
 		if (writable_count == 0)
 		{
@@ -367,66 +466,23 @@ namespace robotick
 		pending_input_writes.initialize(writable_count);
 
 		size_t write_index = 0;
-		for (const WorkloadInstanceInfo& workload_instance_info : instances)
-		{
-			if (write_index >= writable_count)
-			{
-				break;
-			}
-			if (!workload_instance_info.seed || !workload_instance_info.type)
-			{
-				continue;
-			}
-
-			const WorkloadDescriptor* desc = workload_instance_info.type->get_workload_desc();
-			if (!desc || !desc->inputs_desc)
-			{
-				continue;
-			}
-
-			const StructDescriptor* inputs_struct = desc->inputs_desc->get_struct_desc();
-			if (!inputs_struct)
-			{
-				continue;
-			}
-
-			for (const FieldDescriptor& field_desc : inputs_struct->fields)
+		for_each_writable_input_leaf(
+			[&](const FixedString512& field_path, const TypeDescriptor* field_type, void* field_ptr)
 			{
 				if (write_index >= writable_count)
 				{
-					break;
-				}
-				if (field_desc.element_count != 1)
-				{
-					continue;
-				}
-
-				const TypeDescriptor* field_type = field_desc.find_type_descriptor();
-				if (!is_supported_writable_type(field_type))
-				{
-					continue;
-				}
-				if (!field_type || field_type->size == 0 || field_type->size > kMaxWritePayloadBytes)
-				{
-					continue;
-				}
-
-				void* field_ptr = field_desc.get_data_ptr(workloads_buffer, workload_instance_info, *desc->inputs_desc, desc->inputs_offset);
-				if (!workloads_buffer.contains_object_used_space(field_ptr, field_type->size))
-				{
-					continue;
+					return;
 				}
 
 				WritableInputField& writable = writable_input_fields[write_index];
 				writable.handle = static_cast<uint16_t>(write_index + 1);
-				writable.path.format("%s.inputs.%s", workload_instance_info.seed->unique_name.c_str(), field_desc.name.c_str());
+				writable.path = field_path.c_str();
 				writable.type_desc = field_type;
 				writable.target_ptr = field_ptr;
-				writable.value_size = static_cast<uint16_t>(field_type->size);
+				writable.value_size = static_cast<uint16_t>(field_type ? field_type->size : 0);
 				pending_input_writes[write_index] = PendingInputWrite{};
 				++write_index;
-			}
-		}
+			});
 	}
 
 	void TelemetryServer::Impl::handle_set_workload_input_field_data(const WebRequest& req, WebResponse& res)
@@ -468,7 +524,7 @@ namespace robotick
 
 		int writable_index = -1;
 		uint16_t writable_handle = 0;
-		FixedString256 requested_path;
+		FixedString512 requested_path;
 
 		if (payload.contains("field_handle") && payload["field_handle"].is_number_integer())
 		{
