@@ -20,6 +20,7 @@ namespace robotick
 		TelemetryServer& operator=(TelemetryServer&&) = delete;
 		TelemetryServer& operator=(const TelemetryServer&) = delete;
 
+		void setup(const Engine& engine);
 		void start(const Engine& engine, const uint16_t telemetry_port);
 		void stop();
 		void apply_pending_input_writes();

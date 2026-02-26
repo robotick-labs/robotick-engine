@@ -382,6 +382,7 @@ namespace robotick
 
 		ROBOTICK_ASSERT(state->model != nullptr);
 		state->remote_engine_connections.setup(*this, *(state->model));
+		state->telemetry_server.setup(*this);
 
 		state->root_instance = root_instance;
 

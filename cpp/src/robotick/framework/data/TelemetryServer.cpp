@@ -6,7 +6,7 @@
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/concurrency/Sync.h"
-#include "robotick/framework/containers/FixedVector.h"
+#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/services/WebServer.h"
@@ -85,7 +85,6 @@ namespace robotick
 
 	struct TelemetryServer::Impl
 	{
-		static constexpr size_t kMaxWritableInputFields = 512;
 		static constexpr size_t kMaxWritePayloadBytes = 256;
 
 		struct WritableInputField
@@ -108,10 +107,11 @@ namespace robotick
 		WebServer web_server;
 		const Engine* engine = nullptr;
 		FixedString64 session_id;
-		FixedVector<WritableInputField, kMaxWritableInputFields> writable_input_fields;
-		FixedVector<PendingInputWrite, kMaxWritableInputFields> pending_input_writes;
+		HeapVector<WritableInputField> writable_input_fields;
+		HeapVector<PendingInputWrite> pending_input_writes;
 		Mutex pending_input_writes_mutex;
 		uint64_t write_seq_counter = 0;
+		bool is_setup = false;
 
 		void rebuild_writable_input_registry();
 		int find_writable_input_index_by_handle(uint16_t handle) const;
@@ -151,16 +151,28 @@ namespace robotick
 #endif
 	}
 
-	void TelemetryServer::start(const Engine& engine_in, const uint16_t telemetry_port)
+	void TelemetryServer::setup(const Engine& engine_in)
 	{
-		if (!impl)
+		if (impl)
 		{
-			impl = new Impl();
+			impl->web_server.stop();
+			delete impl;
+			impl = nullptr;
 		}
-
+		impl = new Impl();
 		impl->engine = &engine_in;
 		build_session_id(engine_in.get_model_name(), impl->session_id);
 		impl->rebuild_writable_input_registry();
+		impl->is_setup = true;
+	}
+
+	void TelemetryServer::start(const Engine& engine_in, const uint16_t telemetry_port)
+	{
+		if (!impl || !impl->is_setup)
+		{
+			setup(engine_in);
+		}
+		impl->engine = &engine_in;
 
 		// WebServer owns the socket lifetime; the handler lambda only decides whether a request belongs to the telemetry API.
 		impl->web_server.start("Telemetry",
@@ -224,7 +236,9 @@ namespace robotick
 		}
 
 		LockGuard lock(impl->pending_input_writes_mutex);
-		const size_t count = min(impl->writable_input_fields.size(), impl->pending_input_writes.size());
+		const size_t writable_count = impl->writable_input_fields.size();
+		const size_t pending_count = impl->pending_input_writes.size();
+		const size_t count = min(writable_count, pending_count);
 		for (size_t i = 0; i < count; ++i)
 		{
 			Impl::PendingInputWrite& pending = impl->pending_input_writes[i];
@@ -279,8 +293,6 @@ namespace robotick
 
 	void TelemetryServer::Impl::rebuild_writable_input_registry()
 	{
-		writable_input_fields.clear();
-		pending_input_writes.clear();
 		write_seq_counter = 0;
 
 		if (!engine)
@@ -290,6 +302,8 @@ namespace robotick
 
 		WorkloadsBuffer& workloads_buffer = engine->get_workloads_buffer();
 		const auto& instances = engine->get_all_instance_info();
+
+		size_t writable_count = 0;
 		for (const WorkloadInstanceInfo& workload_instance_info : instances)
 		{
 			if (!workload_instance_info.seed || !workload_instance_info.type)
@@ -332,24 +346,85 @@ namespace robotick
 					continue;
 				}
 
-				FixedString256 field_path;
-				field_path.format("%s.inputs.%s", workload_instance_info.seed->unique_name.c_str(), field_desc.name.c_str());
+				++writable_count;
+			}
+		}
 
-				if (writable_input_fields.full())
+		if (writable_count == 0)
+		{
+			return;
+		}
+
+		if (writable_count > 0xFFFF)
+		{
+			ROBOTICK_WARNING(
+				"Telemetry writable input registry exceeded handle range (%zu > 65535). Truncating to 65535.",
+				writable_count);
+			writable_count = 0xFFFF;
+		}
+
+		writable_input_fields.initialize(writable_count);
+		pending_input_writes.initialize(writable_count);
+
+		size_t write_index = 0;
+		for (const WorkloadInstanceInfo& workload_instance_info : instances)
+		{
+			if (write_index >= writable_count)
+			{
+				break;
+			}
+			if (!workload_instance_info.seed || !workload_instance_info.type)
+			{
+				continue;
+			}
+
+			const WorkloadDescriptor* desc = workload_instance_info.type->get_workload_desc();
+			if (!desc || !desc->inputs_desc)
+			{
+				continue;
+			}
+
+			const StructDescriptor* inputs_struct = desc->inputs_desc->get_struct_desc();
+			if (!inputs_struct)
+			{
+				continue;
+			}
+
+			for (const FieldDescriptor& field_desc : inputs_struct->fields)
+			{
+				if (write_index >= writable_count)
 				{
-					ROBOTICK_WARNING(
-						"Telemetry writable input registry reached capacity (%zu). Some inputs will not be writable.", kMaxWritableInputFields);
 					break;
 				}
+				if (field_desc.element_count != 1)
+				{
+					continue;
+				}
 
-				WritableInputField writable;
-				writable.handle = static_cast<uint16_t>(writable_input_fields.size() + 1);
-				writable.path = field_path.c_str();
+				const TypeDescriptor* field_type = field_desc.find_type_descriptor();
+				if (!is_supported_writable_type(field_type))
+				{
+					continue;
+				}
+				if (!field_type || field_type->size == 0 || field_type->size > kMaxWritePayloadBytes)
+				{
+					continue;
+				}
+
+				void* field_ptr = field_desc.get_data_ptr(workloads_buffer, workload_instance_info, *desc->inputs_desc, desc->inputs_offset);
+				if (!workloads_buffer.contains_object_used_space(field_ptr, field_type->size))
+				{
+					continue;
+				}
+
+				WritableInputField& writable = writable_input_fields[write_index];
+				writable.handle = static_cast<uint16_t>(write_index + 1);
+				writable.path.format("%s.inputs.%s", workload_instance_info.seed->unique_name.c_str(), field_desc.name.c_str());
 				writable.type_desc = field_type;
 				writable.target_ptr = field_ptr;
 				writable.value_size = static_cast<uint16_t>(field_type->size);
-				writable_input_fields.add(writable);
-				pending_input_writes.add(PendingInputWrite{});
+				pending_input_writes[write_index] = PendingInputWrite{};
+				++write_index;
 			}
 		}
 	}
@@ -740,7 +815,8 @@ namespace robotick
 		nlohmann::ordered_json layout_json = build_workloads_buffer_layout_json(*engine, session_id.c_str());
 		layout_json["writable_inputs"] = nlohmann::ordered_json::array();
 
-		for (size_t i = 0; i < writable_input_fields.size(); ++i)
+		const size_t writable_count = writable_input_fields.size();
+		for (size_t i = 0; i < writable_count; ++i)
 		{
 			const WritableInputField& writable = writable_input_fields[i];
 			nlohmann::ordered_json writable_json;
