@@ -5,7 +5,12 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
+#include "robotick/framework/concurrency/Sync.h"
+#include "robotick/framework/containers/FixedVector.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
+#include "robotick/framework/registry/TypeDescriptor.h"
+#include "robotick/framework/services/WebServer.h"
+#include "robotick/framework/strings/FixedString.h"
 #include "robotick/framework/strings/StringView.h"
 #include "robotick/framework/time/Clock.h"
 #include "robotick/framework/utility/Algorithm.h"
@@ -13,7 +18,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cstddef>
 #include <cstdio>
+#include <cstring>
 #include <unistd.h>
 
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
@@ -24,9 +31,111 @@ namespace robotick
 {
 	nlohmann::ordered_json build_workloads_buffer_layout_json(const Engine& engine, const char* session_id_override);
 
+	namespace
+	{
+		static void set_json_response(WebResponse& res, const int status_code, const nlohmann::ordered_json& payload)
+		{
+			res.set_status_code(status_code);
+			res.set_content_type("application/json");
+			const auto body = payload.dump();
+			res.set_body_string(body.c_str());
+		}
+
+		static bool json_value_to_text(const nlohmann::json& value, FixedString256& out)
+		{
+			if (value.is_string())
+			{
+				out = value.get_ref<const nlohmann::json::string_t&>().c_str();
+				return true;
+			}
+			if (value.is_boolean())
+			{
+				out = value.get<bool>() ? "true" : "false";
+				return true;
+			}
+			if (value.is_number())
+			{
+				out = value.dump().c_str();
+				return true;
+			}
+			return false;
+		}
+
+		static bool is_supported_writable_type(const TypeDescriptor* type_desc)
+		{
+			if (!type_desc)
+			{
+				return false;
+			}
+
+			if (type_desc->get_enum_desc() != nullptr)
+			{
+				return true;
+			}
+
+			if (type_desc->mime_type == "text/plain")
+			{
+				return true;
+			}
+
+			const StringView& name = type_desc->name;
+			return name == "bool" || name == "int" || name == "float" || name == "double" || name == "uint16_t" || name == "uint32_t";
+		}
+	} // namespace
+
+	struct TelemetryServer::Impl
+	{
+		static constexpr size_t kMaxWritableInputFields = 512;
+		static constexpr size_t kMaxWritePayloadBytes = 256;
+
+		struct WritableInputField
+		{
+			uint16_t handle = 0;
+			FixedString256 path;
+			const TypeDescriptor* type_desc = nullptr;
+			void* target_ptr = nullptr;
+			uint16_t value_size = 0;
+		};
+
+		struct PendingInputWrite
+		{
+			bool pending = false;
+			uint64_t seq = 0;
+			uint16_t payload_size = 0;
+			alignas(max_align_t) uint8_t payload[kMaxWritePayloadBytes] = {};
+		};
+
+		WebServer web_server;
+		const Engine* engine = nullptr;
+		FixedString64 session_id;
+		FixedVector<WritableInputField, kMaxWritableInputFields> writable_input_fields;
+		FixedVector<PendingInputWrite, kMaxWritableInputFields> pending_input_writes;
+		Mutex pending_input_writes_mutex;
+		uint64_t write_seq_counter = 0;
+
+		void rebuild_writable_input_registry();
+		int find_writable_input_index_by_handle(uint16_t handle) const;
+		int find_writable_input_index_by_path(const char* path) const;
+		void handle_get_workloads_buffer_layout(const WebRequest& req, WebResponse& res);
+		void handle_get_workloads_buffer_raw(const WebRequest& req, WebResponse& res);
+		void handle_set_workload_input_field_data(const WebRequest& req, WebResponse& res);
+	};
+
+	TelemetryServer::TelemetryServer()
+		: impl(new Impl())
+	{
+	}
+
 	TelemetryServer::~TelemetryServer()
 	{
 		stop();
+		delete impl;
+		impl = nullptr;
+	}
+
+	const char* TelemetryServer::get_session_id() const
+	{
+		return impl ? impl->session_id.c_str() : "";
 	}
 
 	static void build_session_id(const char* model_name, FixedString64& session_id)
@@ -44,54 +153,341 @@ namespace robotick
 
 	void TelemetryServer::start(const Engine& engine_in, const uint16_t telemetry_port)
 	{
-		engine = &engine_in;
+		if (!impl)
+		{
+			impl = new Impl();
+		}
 
-		build_session_id(engine_in.get_model_name(), session_id);
+		impl->engine = &engine_in;
+		build_session_id(engine_in.get_model_name(), impl->session_id);
+		impl->rebuild_writable_input_registry();
 
 		// WebServer owns the socket lifetime; the handler lambda only decides whether a request belongs to the telemetry API.
-		// Health/layout/raw form the entire "handshake": clients first call /health to confirm the engine is alive, then fetch
-		// the static buffer layout before streaming /raw snapshots.  Keeping this in one lambda avoids dangling captures.
-		web_server.start("Telemetry",
+		impl->web_server.start("Telemetry",
 			telemetry_port,
 			nullptr,
 			[this](const WebRequest& req, WebResponse& res)
 			{
-				if (!req.method.equals("GET"))
+				if (!impl || !impl->engine)
 				{
-					return false; // not handled
-				}
-
-				if (!engine)
-				{
-					res.set_content_type("text/plain");
-					res.set_status_code(WebResponseCode::InternalServerError);
-					res.set_body_string("{\"error\":\"no engine available\"}");
+					nlohmann::ordered_json body;
+					body["error"] = "engine_not_available";
+					set_json_response(res, WebResponseCode::ServiceUnavailable, body);
 					return true;
 				}
 
-				if (req.uri.equals("/api/telemetry/health"))
+				if (req.method.equals("GET"))
 				{
-					res.set_status_code(WebResponseCode::OK);
-					return true;
+					if (req.uri.equals("/api/telemetry/health"))
+					{
+						res.set_status_code(WebResponseCode::OK);
+						return true;
+					}
+					if (req.uri.equals("/api/telemetry/workloads_buffer/layout"))
+					{
+						impl->handle_get_workloads_buffer_layout(req, res);
+						return true;
+					}
+					if (req.uri.equals("/api/telemetry/workloads_buffer/raw"))
+					{
+						impl->handle_get_workloads_buffer_raw(req, res);
+						return true;
+					}
 				}
-				else if (req.uri.equals("/api/telemetry/workloads_buffer/layout"))
+				else if (req.method.equals("POST"))
 				{
-					handle_get_workloads_buffer_layout(req, res);
-					return true;
+					if (req.uri.equals("/api/telemetry/set_workload_input_field_data"))
+					{
+						impl->handle_set_workload_input_field_data(req, res);
+						return true;
+					}
 				}
-				else if (req.uri.equals("/api/telemetry/workloads_buffer/raw"))
-				{
-					handle_get_workloads_buffer_raw(req, res);
-					return true;
-				}
-
 				return false;
 			});
 	}
 
 	void TelemetryServer::stop()
 	{
-		web_server.stop();
+		if (!impl)
+		{
+			return;
+		}
+		impl->web_server.stop();
+		impl->engine = nullptr;
+	}
+
+	void TelemetryServer::apply_pending_input_writes()
+	{
+		if (!impl || !impl->engine)
+		{
+			return;
+		}
+
+		LockGuard lock(impl->pending_input_writes_mutex);
+		const size_t count = min(impl->writable_input_fields.size(), impl->pending_input_writes.size());
+		for (size_t i = 0; i < count; ++i)
+		{
+			Impl::PendingInputWrite& pending = impl->pending_input_writes[i];
+			if (!pending.pending)
+			{
+				continue;
+			}
+
+			Impl::WritableInputField& writable = impl->writable_input_fields[i];
+			if (!writable.target_ptr || !writable.type_desc || pending.payload_size != writable.value_size)
+			{
+				pending.pending = false;
+				continue;
+			}
+
+			::memcpy(writable.target_ptr, pending.payload, writable.value_size);
+			pending.pending = false;
+		}
+	}
+
+	int TelemetryServer::Impl::find_writable_input_index_by_handle(const uint16_t handle) const
+	{
+		if (handle == 0)
+		{
+			return -1;
+		}
+		for (size_t i = 0; i < writable_input_fields.size(); ++i)
+		{
+			if (writable_input_fields[i].handle == handle)
+			{
+				return static_cast<int>(i);
+			}
+		}
+		return -1;
+	}
+
+	int TelemetryServer::Impl::find_writable_input_index_by_path(const char* path) const
+	{
+		if (!path || path[0] == '\0')
+		{
+			return -1;
+		}
+		for (size_t i = 0; i < writable_input_fields.size(); ++i)
+		{
+			if (writable_input_fields[i].path == path)
+			{
+				return static_cast<int>(i);
+			}
+		}
+		return -1;
+	}
+
+	void TelemetryServer::Impl::rebuild_writable_input_registry()
+	{
+		writable_input_fields.clear();
+		pending_input_writes.clear();
+		write_seq_counter = 0;
+
+		if (!engine)
+		{
+			return;
+		}
+
+		WorkloadsBuffer& workloads_buffer = engine->get_workloads_buffer();
+		const auto& instances = engine->get_all_instance_info();
+		for (const WorkloadInstanceInfo& workload_instance_info : instances)
+		{
+			if (!workload_instance_info.seed || !workload_instance_info.type)
+			{
+				continue;
+			}
+
+			const WorkloadDescriptor* desc = workload_instance_info.type->get_workload_desc();
+			if (!desc || !desc->inputs_desc)
+			{
+				continue;
+			}
+
+			const StructDescriptor* inputs_struct = desc->inputs_desc->get_struct_desc();
+			if (!inputs_struct)
+			{
+				continue;
+			}
+
+			for (const FieldDescriptor& field_desc : inputs_struct->fields)
+			{
+				if (field_desc.element_count != 1)
+				{
+					continue;
+				}
+
+				const TypeDescriptor* field_type = field_desc.find_type_descriptor();
+				if (!is_supported_writable_type(field_type))
+				{
+					continue;
+				}
+				if (!field_type || field_type->size == 0 || field_type->size > kMaxWritePayloadBytes)
+				{
+					continue;
+				}
+
+				void* field_ptr = field_desc.get_data_ptr(workloads_buffer, workload_instance_info, *desc->inputs_desc, desc->inputs_offset);
+				if (!workloads_buffer.contains_object_used_space(field_ptr, field_type->size))
+				{
+					continue;
+				}
+
+				FixedString256 field_path;
+				field_path.format("%s.inputs.%s", workload_instance_info.seed->unique_name.c_str(), field_desc.name.c_str());
+
+				if (writable_input_fields.full())
+				{
+					ROBOTICK_WARNING(
+						"Telemetry writable input registry reached capacity (%zu). Some inputs will not be writable.", kMaxWritableInputFields);
+					break;
+				}
+
+				WritableInputField writable;
+				writable.handle = static_cast<uint16_t>(writable_input_fields.size() + 1);
+				writable.path = field_path.c_str();
+				writable.type_desc = field_type;
+				writable.target_ptr = field_ptr;
+				writable.value_size = static_cast<uint16_t>(field_type->size);
+				writable_input_fields.add(writable);
+				pending_input_writes.add(PendingInputWrite{});
+			}
+		}
+	}
+
+	void TelemetryServer::Impl::handle_set_workload_input_field_data(const WebRequest& req, WebResponse& res)
+	{
+		nlohmann::ordered_json response_json;
+		if (!engine)
+		{
+			response_json["error"] = "engine_not_available";
+			set_json_response(res, WebResponseCode::ServiceUnavailable, response_json);
+			return;
+		}
+
+		const uint8_t* body_begin = req.body.data();
+		const uint8_t* body_end = body_begin + req.body.size();
+		const nlohmann::json payload = nlohmann::json::parse(body_begin, body_end, nullptr, /*allow_exceptions*/ false);
+		if (payload.is_discarded() || !payload.is_object())
+		{
+			response_json["error"] = "invalid_json";
+			set_json_response(res, WebResponseCode::BadRequest, response_json);
+			return;
+		}
+
+		const nlohmann::json session_node = payload.contains("engine_session_id") ? payload["engine_session_id"] : nlohmann::json();
+		if (!session_node.is_string())
+		{
+			response_json["error"] = "missing_engine_session_id";
+			set_json_response(res, WebResponseCode::BadRequest, response_json);
+			return;
+		}
+
+		const auto& request_session = session_node.get_ref<const nlohmann::json::string_t&>();
+		if (!StringView(session_id.c_str()).equals(request_session.c_str()))
+		{
+			response_json["error"] = "session_mismatch";
+			response_json["engine_session_id"] = session_id.c_str();
+			set_json_response(res, WebResponseCode::PreconditionFailed, response_json);
+			return;
+		}
+
+		int writable_index = -1;
+		uint16_t writable_handle = 0;
+		FixedString256 requested_path;
+
+		if (payload.contains("field_handle") && payload["field_handle"].is_number_integer())
+		{
+			const long long handle_value = payload["field_handle"].get<long long>();
+			if (handle_value <= 0 || handle_value > 0xFFFF)
+			{
+				response_json["error"] = "invalid_field_handle";
+				set_json_response(res, WebResponseCode::BadRequest, response_json);
+				return;
+			}
+			writable_handle = static_cast<uint16_t>(handle_value);
+			writable_index = find_writable_input_index_by_handle(writable_handle);
+		}
+
+		if (payload.contains("field_path") && payload["field_path"].is_string())
+		{
+			requested_path = payload["field_path"].get_ref<const nlohmann::json::string_t&>().c_str();
+
+			const int path_index = find_writable_input_index_by_path(requested_path.c_str());
+			if (path_index >= 0)
+			{
+				if (writable_index >= 0 && static_cast<size_t>(writable_index) != static_cast<size_t>(path_index))
+				{
+					response_json["error"] = "field_handle_path_mismatch";
+					set_json_response(res, WebResponseCode::BadRequest, response_json);
+					return;
+				}
+				writable_index = path_index;
+				writable_handle = writable_input_fields[static_cast<size_t>(writable_index)].handle;
+			}
+		}
+
+		if (writable_index < 0)
+		{
+			response_json["error"] = "writable_input_not_found";
+			set_json_response(res, WebResponseCode::NotFound, response_json);
+			return;
+		}
+
+		if (!payload.contains("value"))
+		{
+			response_json["error"] = "missing_value";
+			set_json_response(res, WebResponseCode::BadRequest, response_json);
+			return;
+		}
+
+		WritableInputField& writable = writable_input_fields[static_cast<size_t>(writable_index)];
+		if (!writable.type_desc || writable.value_size == 0 || writable.value_size > kMaxWritePayloadBytes)
+		{
+			response_json["error"] = "unsupported_target_field";
+			set_json_response(res, WebResponseCode::BadRequest, response_json);
+			return;
+		}
+
+		FixedString256 value_text;
+		if (!json_value_to_text(payload["value"], value_text))
+		{
+			response_json["error"] = "unsupported_value_type";
+			set_json_response(res, WebResponseCode::BadRequest, response_json);
+			return;
+		}
+
+		PendingInputWrite staged;
+		staged.pending = true;
+		staged.payload_size = writable.value_size;
+		::memset(staged.payload, 0, sizeof(staged.payload));
+		if (!writable.type_desc->from_string(value_text.c_str(), staged.payload))
+		{
+			response_json["error"] = "value_parse_failed";
+			set_json_response(res, WebResponseCode::BadRequest, response_json);
+			return;
+		}
+
+		if (payload.contains("seq") && payload["seq"].is_number_integer())
+		{
+			const long long seq_value = payload["seq"].get<long long>();
+			staged.seq = seq_value > 0 ? static_cast<uint64_t>(seq_value) : 0;
+		}
+
+		{
+			LockGuard lock(pending_input_writes_mutex);
+			if (staged.seq == 0)
+			{
+				write_seq_counter += 1;
+				staged.seq = write_seq_counter;
+			}
+			pending_input_writes[static_cast<size_t>(writable_index)] = staged;
+		}
+
+		response_json["status"] = "accepted";
+		response_json["field_handle"] = writable_handle;
+		response_json["field_path"] = writable.path.c_str();
+		response_json["seq"] = staged.seq;
+		set_json_response(res, WebResponseCode::OK, response_json);
 	}
 
 	static bool type_already_emitted(const nlohmann::ordered_json& layout_json, const char* name)
@@ -339,9 +735,21 @@ namespace robotick
 		return layout_json;
 	}
 
-	void TelemetryServer::handle_get_workloads_buffer_layout(const WebRequest& /*req*/, WebResponse& res)
+	void TelemetryServer::Impl::handle_get_workloads_buffer_layout(const WebRequest& /*req*/, WebResponse& res)
 	{
-		nlohmann::ordered_json layout_json = build_workloads_buffer_layout_json(*engine, get_session_id());
+		nlohmann::ordered_json layout_json = build_workloads_buffer_layout_json(*engine, session_id.c_str());
+		layout_json["writable_inputs"] = nlohmann::ordered_json::array();
+
+		for (size_t i = 0; i < writable_input_fields.size(); ++i)
+		{
+			const WritableInputField& writable = writable_input_fields[i];
+			nlohmann::ordered_json writable_json;
+			writable_json["field_handle"] = writable.handle;
+			writable_json["field_path"] = writable.path.c_str();
+			writable_json["type"] = writable.type_desc ? writable.type_desc->name.c_str() : "unknown";
+			writable_json["size"] = writable.value_size;
+			layout_json["writable_inputs"].push_back(writable_json);
+		}
 
 		res.set_status_code(WebResponseCode::OK);
 		res.set_content_type("application/json");
@@ -350,7 +758,7 @@ namespace robotick
 		res.set_body_string(out_str.c_str());
 	}
 
-	void TelemetryServer::handle_get_workloads_buffer_raw(const WebRequest& /*req*/, WebResponse& res)
+	void TelemetryServer::Impl::handle_get_workloads_buffer_raw(const WebRequest& /*req*/, WebResponse& res)
 	{
 		const WorkloadsBuffer& workloads_buffer = engine->get_workloads_buffer();
 
@@ -359,8 +767,12 @@ namespace robotick
 
 		// Attach the session ID as a custom response header
 		FixedString256 session_header;
-		session_header.format("X-Robotick-Session-Id:%s", get_session_id());
+		session_header.format("X-Robotick-Session-Id:%s", session_id.c_str());
 		res.add_header(session_header.c_str());
+
+		FixedString256 frame_seq_header;
+		frame_seq_header.format("X-Robotick-Frame-Seq:%u", static_cast<unsigned int>(workloads_buffer.get_telemetry_frame_seq()));
+		res.add_header(frame_seq_header.c_str());
 
 		res.set_body(workloads_buffer.raw_ptr(), workloads_buffer.get_size_used());
 	}

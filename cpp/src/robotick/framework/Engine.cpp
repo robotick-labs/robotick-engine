@@ -445,6 +445,9 @@ namespace robotick
 
 			last_tick_time = now;
 
+			// Open the seqlock window before mutating workload memory so telemetry readers can detect "write in progress" (odd seq).
+			state->workloads_buffer.mark_frame_write_begin();
+
 			// update remote data-connections
 			state->remote_engine_connections.tick(tick_info);
 
@@ -453,6 +456,9 @@ namespace robotick
 			{
 				data_connection->do_data_copy();
 			}
+
+			// Apply pending telemetry-originated input writes after connection propagation and before tick.
+			state->telemetry_server.apply_pending_input_writes();
 
 			// Ensure all published data writes are visible before workloads read them (cross-thread barrier via Atomic helpers)
 			thread_fence_release();
@@ -469,6 +475,9 @@ namespace robotick
 			// Update the per-workload stats in-place so telemetry can report overruns without introducing dynamic allocations.
 			root_info.workload_stats->record_tick_sample(duration_ns, clamped_delta_ns, budget_ns);
 			root_info.workload_stats->tick_count++;
+
+			// Close the seqlock window after all tick writes so telemetry readers can treat this frame as stable (even seq).
+			state->workloads_buffer.mark_frame_write_end();
 
 			next_tick_time += child_tick_interval;
 			Thread::hybrid_sleep_until(next_tick_time);
