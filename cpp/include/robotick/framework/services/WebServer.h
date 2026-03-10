@@ -46,6 +46,7 @@ namespace robotick
 		static constexpr int NotFound = 404;
 		static constexpr int MethodNotAllowed = 405;
 		static constexpr int Conflict = 409;
+		static constexpr int PreconditionFailed = 412;
 		static constexpr int InternalServerError = 500;
 		static constexpr int NotImplemented = 501;
 		static constexpr int ServiceUnavailable = 503;

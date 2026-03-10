@@ -111,4 +111,34 @@ TEST_CASE("Unit/Framework/Data/Buffer")
 			}
 		}
 	}
+
+	SECTION("WorkloadsBuffer telemetry frame sequence follows odd/even write protocol", "[buffer][telemetry_seq]")
+	{
+		WorkloadsBuffer buffer(64);
+		REQUIRE(buffer.get_telemetry_frame_seq() == 0);
+
+		buffer.mark_frame_write_begin();
+		REQUIRE((buffer.get_telemetry_frame_seq() % 2) == 1);
+
+		buffer.mark_frame_write_end();
+		REQUIRE((buffer.get_telemetry_frame_seq() % 2) == 0);
+
+		const uint32_t after_first_frame = buffer.get_telemetry_frame_seq();
+		buffer.mark_frame_write_begin();
+		buffer.mark_frame_write_end();
+		REQUIRE(buffer.get_telemetry_frame_seq() > after_first_frame);
+		REQUIRE((buffer.get_telemetry_frame_seq() % 2) == 0);
+	}
+
+	SECTION("WorkloadsBuffer move preserves used size and sequence state", "[buffer][move]")
+	{
+		WorkloadsBuffer source(64);
+		source.set_size_used(32);
+		source.mark_frame_write_begin();
+		source.mark_frame_write_end();
+
+		WorkloadsBuffer moved = robotick::move(source);
+		REQUIRE(moved.get_size_used() == 32);
+		REQUIRE((moved.get_telemetry_frame_seq() % 2) == 0);
+	}
 }

@@ -4,14 +4,11 @@
 #pragma once
 
 #include "robotick/api_base.h"
+#include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/memory/Memory.h"
 
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
-#include <new> // operator new/delete with alignment
-#include <stdexcept>
 
 namespace robotick
 {
@@ -22,63 +19,24 @@ namespace robotick
 		RawBuffer() = default;
 		RawBuffer(RawBuffer&&) noexcept = default;
 
-		explicit RawBuffer(size_t size)
-			: size(size)
-		{
-			allocate_aligned(size);
-		}
+		explicit RawBuffer(size_t size);
 
 		RawBuffer(const RawBuffer&) = delete;
 		RawBuffer& operator=(const RawBuffer&) = delete;
 
-		RawBuffer& operator=(RawBuffer&& other) noexcept
-		{
-			if (this != &other)
-			{
-				size = other.size;
-				data = robotick::move(other.data);
-				other.size = 0;
-			}
-			return *this;
-		}
+		RawBuffer& operator=(RawBuffer&& other) noexcept;
 
-		uint8_t* raw_ptr() { return data.get(); }
-		const uint8_t* raw_ptr() const { return data.get(); }
-		size_t get_size() const { return size; }
+		uint8_t* raw_ptr();
+		const uint8_t* raw_ptr() const;
+		size_t get_size() const;
 
-		bool contains_object(const uint8_t* query_ptr, const size_t query_size) const
-		{
-			const uint8_t* buffer_start = raw_ptr();
-			const uint8_t* buffer_end = raw_ptr() + get_size();
+		bool contains_object(const uint8_t* query_ptr, const size_t query_size) const;
 
-			return (query_ptr >= buffer_start) && (query_size <= get_size()) && (query_ptr + query_size <= buffer_end);
-		}
+		bool contains_object(const void* query_ptr, const size_t query_size) const;
 
-		bool contains_object(const void* query_ptr, const size_t query_size) const
-		{
-			return contains_object(static_cast<const uint8_t*>(query_ptr), query_size);
-		}
+		void create_mirror_from(const RawBuffer& source);
 
-		void create_mirror_from(const RawBuffer& source)
-		{
-			if (data.is_allocated())
-				ROBOTICK_FATAL_EXIT("RawBuffer::create_mirror_from: buffer already allocated");
-
-			size = source.size;
-			allocate_aligned(size);
-			update_mirror_from(source);
-		}
-
-		void update_mirror_from(const RawBuffer& source)
-		{
-			if (!data.is_allocated() || size == 0)
-				ROBOTICK_FATAL_EXIT("RawBuffer::mirror_from: destination buffer not initialized");
-
-			if (size != source.size)
-				ROBOTICK_FATAL_EXIT("RawBuffer::update_mirror_from: size mismatch");
-
-			::memcpy(data.get(), source.data.get(), size);
-		}
+		void update_mirror_from(const RawBuffer& source);
 
 		template <typename T> T* as(size_t offset = 0)
 		{
@@ -110,57 +68,22 @@ namespace robotick
 		struct AlignedStorage
 		{
 			AlignedStorage() = default;
-			AlignedStorage(AlignedStorage&& other) noexcept
-				: ptr(other.ptr)
-				, size(other.size)
-			{
-				other.ptr = nullptr;
-				other.size = 0;
-			}
+			AlignedStorage(AlignedStorage&& other) noexcept;
 
-			AlignedStorage& operator=(AlignedStorage&& other) noexcept
-			{
-				if (this != &other)
-				{
-					release();
-					ptr = other.ptr;
-					size = other.size;
-					other.ptr = nullptr;
-					other.size = 0;
-				}
-				return *this;
-			}
+			AlignedStorage& operator=(AlignedStorage&& other) noexcept;
 
 			AlignedStorage(const AlignedStorage&) = delete;
 			AlignedStorage& operator=(const AlignedStorage&) = delete;
 
-			~AlignedStorage() { release(); }
+			~AlignedStorage();
 
-			uint8_t* get() { return ptr; }
-			const uint8_t* get() const { return ptr; }
+			uint8_t* get();
+			const uint8_t* get() const;
 
-			bool is_allocated() const { return ptr != nullptr; }
+			bool is_allocated() const;
 
-			void allocate(size_t alloc_size)
-			{
-				if (ptr != nullptr)
-					ROBOTICK_FATAL_EXIT("AlignedStorage: attempt to allocate twice");
-
-				void* raw = ::operator new(alloc_size, robotick::align_val_t{alignof(max_align_t)});
-				::memset(raw, 0, alloc_size);
-				ptr = static_cast<uint8_t*>(raw);
-				size = alloc_size;
-			}
-
-			void release()
-			{
-				if (ptr)
-				{
-					::operator delete(ptr, robotick::align_val_t{alignof(max_align_t)});
-					ptr = nullptr;
-					size = 0;
-				}
-			}
+			void allocate(size_t alloc_size);
+			void release();
 
 			uint8_t* ptr = nullptr;
 			size_t size = 0;
@@ -168,7 +91,7 @@ namespace robotick
 
 		AlignedStorage data;
 
-		void allocate_aligned(size_t alloc_size) { data.allocate(alloc_size); }
+		void allocate_aligned(size_t alloc_size);
 	};
 
 	class WorkloadsBuffer : public RawBuffer
@@ -176,24 +99,52 @@ namespace robotick
 	  public:
 		using RawBuffer::RawBuffer;
 
-		void set_size_used(const size_t value) { size_used = value; }
-		size_t get_size_used() const { return size_used; };
+		WorkloadsBuffer() = default;
 
-		bool contains_object_used_space(const uint8_t* query_ptr, const size_t query_size) const
+		WorkloadsBuffer(WorkloadsBuffer&& other) noexcept;
+
+		WorkloadsBuffer& operator=(WorkloadsBuffer&& other) noexcept;
+
+		void set_size_used(const size_t value);
+		size_t get_size_used() const;
+
+		bool contains_object_used_space(const uint8_t* query_ptr, const size_t query_size) const;
+
+		bool contains_object_used_space(const void* query_ptr, const size_t query_size) const;
+
+		// Telemetry frame sequence (seqlock-style):
+		// odd = write in progress, even = stable snapshot.
+		inline void mark_frame_write_begin()
 		{
-			const uint8_t* buffer_start = raw_ptr();
-			const uint8_t* buffer_end = raw_ptr() + get_size_used();
+			uint32_t seq = telemetry_frame_seq.load();
+			if ((seq & 1u) == 0u)
+			{
+				telemetry_frame_seq.store(seq + 1u);
+				return;
+			}
 
-			return (query_ptr >= buffer_start) && (query_size <= get_size_used()) && (query_ptr + query_size <= buffer_end);
+			// Already odd (unexpected but safe): move to next odd value.
+			telemetry_frame_seq.store(seq + 2u);
 		}
 
-		bool contains_object_used_space(const void* query_ptr, const size_t query_size) const
+		inline void mark_frame_write_end()
 		{
-			return contains_object_used_space(static_cast<const uint8_t*>(query_ptr), query_size);
+			uint32_t seq = telemetry_frame_seq.load();
+			if ((seq & 1u) != 0u)
+			{
+				telemetry_frame_seq.store(seq + 1u);
+				return;
+			}
+
+			// Already even (unexpected but safe): move to next even value.
+			telemetry_frame_seq.store(seq + 2u);
 		}
+
+		inline uint32_t get_telemetry_frame_seq() const { return telemetry_frame_seq.load(); }
 
 	  private:
 		size_t size_used = 0;
+		AtomicValue<uint32_t> telemetry_frame_seq{0};
 	};
 
 } // namespace robotick
