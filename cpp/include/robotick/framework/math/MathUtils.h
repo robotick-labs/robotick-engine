@@ -63,6 +63,11 @@ namespace robotick
 		return robotick::clamp(v, T(0), T(1));
 	}
 
+	template <typename T> inline T clamp11(T v)
+	{
+		return robotick::clamp(v, T(-1), T(1));
+	}
+
 	inline float lerp(float a, float b, float t)
 	{
 		t = clamp01(t);
