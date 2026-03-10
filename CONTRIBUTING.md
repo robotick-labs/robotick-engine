@@ -1,8 +1,8 @@
 # Contributing to Robotick
 
-Robotick is currently a solo, spare-time hobby project. This repository is public mainly for visibility, documentation, and easy sharing of experiments. It is not being run as a collaborative project.
+Robotick is currently a solo, spare-time hobby project. This repository is public mainly for visibility, documentation, and easy sharing of experiments.
 
-I really do appreciate people taking an interest in the project. For now though, I am keeping it as a simple one-person hobby project and do not have the spare time to take on external contributions, bug reports, support requests, or general coordination.
+I really do appreciate people taking an interest in the project. For now though, I’m keeping it as a simple one-person hobby project and do not have the spare time to take on external contributions, bug reports, support requests, or general coordination.
 
 ## Current Contribution Posture
 

@@ -188,6 +188,6 @@ Licensed under the **Apache 2.0 License** – free to use, adapt, and build upon
 
 ## 💬 Feedback
 
-This repository is public so people can follow along, but I am keeping it as a simple solo project for now and am not currently taking on outside bug reports or contribution flow.
+This repository is public so people can follow along, but I’m keeping it as a simple one-person project for now and am not currently taking on outside bug reports or contribution flow.
 
 Visit [https://robotick.org](https://robotick.org) for broader project context.
