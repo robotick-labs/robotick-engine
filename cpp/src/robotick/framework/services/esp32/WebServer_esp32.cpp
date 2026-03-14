@@ -270,10 +270,9 @@ namespace robotick
 		httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 		config.server_port = port;
 		config.uri_match_fn = httpd_uri_match_wildcard;
-		+
-			// Telemetry layout generation can recurse through reflected types and build
-			// a sizeable JSON payload before chunked sending begins.
-			config.stack_size = 32768;
+		// Telemetry layout generation can recurse through reflected types and build
+		// a sizeable JSON payload before chunked sending begins.
+		config.stack_size = 32768;
 
 		if (httpd_start(&s->handle, &config) != ESP_OK)
 		{
