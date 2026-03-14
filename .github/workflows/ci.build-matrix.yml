@@ -45,8 +45,8 @@ jobs:
           if [ '${{ matrix.platform }}' = 'esp32s3' ]; then
             docker build \
               -t ${{ matrix.docker_image }} \
-              -f tools/docker/esp32s3/Dockerfile \
-              tools/docker/esp32s3
+              -f tools/docker/esp32s3.Dockerfile \
+              .
           else
             docker pull ${{ matrix.docker_image }}
           fi

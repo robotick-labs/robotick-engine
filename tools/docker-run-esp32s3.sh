@@ -10,14 +10,14 @@ if [[ -z "$REPO_ROOT" ]]; then
 fi
 
 IMAGE_NAME="robotick-engine-esp32s3"
-DOCKERFILE="$SCRIPT_DIR/docker/esp32s3/Dockerfile"
+DOCKERFILE="$SCRIPT_DIR/docker/esp32s3.Dockerfile"
 CONTAINER_NAME="robotick-engine-dev-esp32s3"
 
 echo "🐳 Building image: $IMAGE_NAME"
 docker build \
   -t "$IMAGE_NAME" \
   -f "$DOCKERFILE" \
-  "$(dirname "$DOCKERFILE")"
+  "$REPO_ROOT"
 
 if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
   echo "🧼 Removing existing container '${CONTAINER_NAME}'..."
