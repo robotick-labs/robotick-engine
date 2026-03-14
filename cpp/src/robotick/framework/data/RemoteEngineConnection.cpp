@@ -178,6 +178,12 @@ namespace robotick
 	void RemoteEngineConnection::configure_receiver(const char* in_my_model_name)
 	{
 		mode = Mode::Receiver;
+		fields.reset();
+		pending_receiver_fields.clear();
+		field_count = 0;
+		handshake_path_total_length = 0;
+		handshake_payload_capacity = sizeof(uint32_t);
+		field_payload_capacity = 0;
 		my_model_name = in_my_model_name;
 		target_model_name = ""; // receivers don't target
 		listen_port = 0;		// we'll bind(0) and discover the port
@@ -430,18 +436,31 @@ namespace robotick
 
 	void RemoteEngineConnection::add_field(const Field& field, bool update_handshake_stats)
 	{
-		if (fields.size() == 0)
+		if (mode == Mode::Receiver)
 		{
-			fields.initialize(MAX_REMOTE_FIELDS);
-		}
+			if (pending_receiver_fields.size() >= MAX_REMOTE_FIELDS)
+			{
+				ROBOTICK_FATAL_EXIT("RemoteEngineConnection exceeded max fields capacity (%zu)", (size_t)MAX_REMOTE_FIELDS);
+			}
 
-		if (field_count >= fields.size())
+			pending_receiver_fields.push_back(field);
+			field_count = pending_receiver_fields.size();
+		}
+		else
 		{
-			ROBOTICK_FATAL_EXIT("RemoteEngineConnection exceeded max fields capacity (%zu)", fields.size());
-		}
+			if (fields.size() == 0)
+			{
+				fields.initialize(MAX_REMOTE_FIELDS);
+			}
 
-		fields[field_count] = field;
-		field_count += 1;
+			if (field_count >= fields.size())
+			{
+				ROBOTICK_FATAL_EXIT("RemoteEngineConnection exceeded max fields capacity (%zu)", fields.size());
+			}
+
+			fields[field_count] = field;
+			field_count += 1;
+		}
 		field_payload_capacity += field.size;
 
 		if (update_handshake_stats)
@@ -631,6 +650,8 @@ namespace robotick
 		if (in_progress_message_in.is_vacant())
 		{
 			handshake_receive_state = {};
+			fields.reset();
+			pending_receiver_fields.clear();
 			field_count = 0;
 			field_payload_capacity = 0;
 			handshake_path_total_length = 0;
@@ -778,6 +799,19 @@ namespace robotick
 			{
 				ROBOTICK_FATAL_EXIT("Failed to bind %zu fields - disconnecting", handshake_receive_state.failed_count);
 			}
+
+			fields.reset();
+			if (!pending_receiver_fields.empty())
+			{
+				fields.initialize(pending_receiver_fields.size());
+				size_t index = 0;
+				for (const auto& pending_field : pending_receiver_fields)
+				{
+					fields[index++] = pending_field;
+				}
+			}
+			pending_receiver_fields.clear();
+			field_count = fields.size();
 
 			in_progress_message_in.vacate(); // ready for next message
 
@@ -1078,6 +1112,8 @@ namespace robotick
 		if (mode == Mode::Receiver)
 		{
 			// receiver gets told what fields to use by sender, on handshake.  We should therefore clear then whenever we disconnect
+			fields.reset();
+			pending_receiver_fields.clear();
 			field_count = 0;
 			field_payload_capacity = 0;
 		}

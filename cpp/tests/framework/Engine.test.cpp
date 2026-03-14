@@ -14,6 +14,7 @@
 #include <atomic>
 #include <catch2/catch_all.hpp>
 #include <chrono>
+#include <curl/curl.h>
 #include <netinet/in.h>
 #include <nlohmann/json.hpp>
 #include <sys/socket.h>
@@ -27,6 +28,98 @@ namespace robotick::test
 {
 	namespace
 	{
+		struct HttpTextBuffer
+		{
+			char data[16384] = {};
+			size_t len = 0;
+
+			void append(const char* src, size_t count)
+			{
+				if (!src || count == 0)
+					return;
+				const size_t cap = sizeof(data) - 1;
+				const size_t room = len < cap ? cap - len : 0;
+				const size_t to_copy = room < count ? room : count;
+				if (to_copy > 0)
+				{
+					::memcpy(data + len, src, to_copy);
+					len += to_copy;
+					data[len] = '\0';
+				}
+			}
+		};
+
+		struct HttpResponse
+		{
+			long status_code = 0;
+			HttpTextBuffer body;
+			HttpTextBuffer session_id;
+		};
+
+		size_t curl_write_to_text(char* ptr, size_t size, size_t nmemb, void* userdata)
+		{
+			auto& out = *static_cast<HttpTextBuffer*>(userdata);
+			const size_t bytes = size * nmemb;
+			out.append(ptr, bytes);
+			return bytes;
+		}
+
+		size_t curl_capture_headers(char* ptr, size_t size, size_t nmemb, void* userdata)
+		{
+			auto& response = *static_cast<HttpResponse*>(userdata);
+			const size_t bytes = size * nmemb;
+			const char* prefix = "X-Robotick-Session-Id:";
+			if (bytes > ::strlen(prefix) && ::strncasecmp(ptr, prefix, ::strlen(prefix)) == 0)
+			{
+				const char* value = ptr + ::strlen(prefix);
+				while (*value == ' ' || *value == '\t')
+					++value;
+				const char* end = value + bytes;
+				while (end > value && (end[-1] == '\r' || end[-1] == '\n'))
+					--end;
+				response.session_id.append(value, static_cast<size_t>(end - value));
+			}
+			return bytes;
+		}
+
+		bool contains_text(const char* haystack, const char* needle)
+		{
+			return haystack && needle && ::strstr(haystack, needle) != nullptr;
+		}
+
+		HttpResponse http_request(const char* url, const char* method = "GET", const char* body = nullptr)
+		{
+			CURL* curl = curl_easy_init();
+			REQUIRE(curl != nullptr);
+
+			HttpResponse response;
+			curl_easy_setopt(curl, CURLOPT_URL, url);
+			curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_to_text);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response.body);
+			curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curl_capture_headers);
+			curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response);
+			if (::strcmp(method, "POST") == 0)
+			{
+				curl_easy_setopt(curl, CURLOPT_POST, 1L);
+				curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body ? body : "");
+				curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, body ? static_cast<long>(::strlen(body)) : 0L);
+				struct curl_slist* headers = nullptr;
+				headers = curl_slist_append(headers, "Content-Type: application/json");
+				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+				curl_easy_perform(curl);
+				curl_slist_free_all(headers);
+			}
+			else
+			{
+				curl_easy_perform(curl);
+			}
+
+			curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.status_code);
+			curl_easy_cleanup(curl);
+			return response;
+		}
+
 		struct EngineRunContext
 		{
 			Engine* engine = nullptr;
@@ -521,6 +614,216 @@ namespace robotick::test
 			REQUIRE(info->tick_count.load() > 0);
 			CHECK(info->start_thread == info->first_tick_thread);
 			CHECK(info->start_thread != Thread::ThreadId{});
+		}
+
+		SECTION("Telemetry gateway routes local and peer telemetry")
+		{
+			const uint16_t peer_port = choose_telemetry_port();
+			const uint16_t gateway_port = choose_telemetry_port();
+			REQUIRE(peer_port != 0);
+			REQUIRE(gateway_port != 0);
+			REQUIRE(peer_port != gateway_port);
+
+				Model peer_model;
+				peer_model.set_model_name("peer-model");
+				peer_model.set_telemetry_port(peer_port);
+				static const FieldConfigEntry peer_inputs[] = {{"input_float", "1.0"}, {"input_string_64", "hello"}};
+				static const WorkloadSeed peer_root{
+					TypeId("TickCounterWorkload"),
+					StringView("peer_root"),
+					30.0f,
+					{},
+					{},
+					{}};
+				static const WorkloadSeed peer_workload{
+					TypeId("DummyWorkload"),
+					StringView("peer_dummy"),
+					30.0f,
+					{},
+					{},
+					peer_inputs};
+				static const WorkloadSeed* const peer_workloads[] = {&peer_workload, &peer_root};
+				peer_model.use_workload_seeds(peer_workloads);
+				peer_model.set_root_workload(peer_root);
+
+			Model gateway_model;
+			gateway_model.set_model_name("gateway-model");
+			gateway_model.set_telemetry_port(gateway_port);
+			gateway_model.set_telemetry_is_gateway(true);
+				static const WorkloadSeed gateway_workload{
+					TypeId("TickCounterWorkload"),
+					StringView("gateway_counter"),
+					30.0f,
+					{},
+					{},
+					{}};
+				static const WorkloadSeed gateway_root{
+					TypeId("TickCounterWorkload"),
+					StringView("gateway_root"),
+					30.0f,
+					{},
+					{},
+					{}};
+				static const WorkloadSeed* const gateway_workloads[] = {&gateway_workload, &gateway_root};
+			static const TelemetryPeerSeed telemetry_peer{
+				StringView("peer-model"),
+				StringView("127.0.0.1"),
+				peer_port,
+				false};
+			static const TelemetryPeerSeed* const gateway_peers[] = {&telemetry_peer};
+			gateway_model.use_workload_seeds(gateway_workloads);
+			gateway_model.use_telemetry_peer_seeds(gateway_peers);
+			gateway_model.set_root_workload(gateway_root);
+
+			Engine peer_engine;
+			peer_engine.load(peer_model);
+			AtomicFlag peer_stop{false};
+			EngineRunThread peer_runner(peer_engine, peer_stop);
+
+			Engine gateway_engine;
+			gateway_engine.load(gateway_model);
+			AtomicFlag gateway_stop{false};
+			EngineRunThread gateway_runner(gateway_engine, gateway_stop);
+
+			Thread::sleep_ms(100);
+
+			char url[256];
+			::snprintf(url, sizeof(url), "http://127.0.0.1:%u/api/telemetry-gateway/models", static_cast<unsigned int>(gateway_port));
+			const HttpResponse models_response = http_request(url);
+			REQUIRE(models_response.status_code == 200);
+			const auto models_json = nlohmann::json::parse(models_response.body.data, nullptr, false);
+			REQUIRE(models_json.is_object());
+			REQUIRE(models_json.contains("models"));
+			const auto models_dump = models_json["models"].dump();
+			REQUIRE(contains_text(models_dump.c_str(), "gateway-model"));
+			REQUIRE(contains_text(models_dump.c_str(), "peer-model"));
+
+			::snprintf(
+				url,
+				sizeof(url),
+				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/workloads_buffer/layout",
+				static_cast<unsigned int>(gateway_port));
+			const HttpResponse layout_response = http_request(url);
+			REQUIRE(layout_response.status_code == 200);
+			const auto layout_json = nlohmann::json::parse(layout_response.body.data, nullptr, false);
+			REQUIRE(layout_json.is_object());
+			REQUIRE(layout_json.contains("engine_session_id"));
+			REQUIRE(layout_json.contains("writable_inputs"));
+
+			const auto& writable_inputs = layout_json["writable_inputs"];
+			REQUIRE(writable_inputs.is_array());
+			const nlohmann::json* target_writable = nullptr;
+			for (const auto& writable : writable_inputs)
+			{
+				if (writable.contains("field_path")
+					&& contains_text(writable["field_path"].get_ref<const nlohmann::json::string_t&>().c_str(), "input_float"))
+				{
+					target_writable = &writable;
+					break;
+				}
+			}
+			REQUIRE(target_writable != nullptr);
+
+			char body[512];
+			::snprintf(
+				body,
+				sizeof(body),
+				"{\"engine_session_id\":\"%s\",\"field_handle\":%u,\"value\":42.25}",
+				layout_json["engine_session_id"].get_ref<const nlohmann::json::string_t&>().c_str(),
+				target_writable->value("field_handle", 0));
+			::snprintf(
+				url,
+				sizeof(url),
+				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/set_workload_input_field_data",
+				static_cast<unsigned int>(gateway_port));
+			const HttpResponse write_response = http_request(url, "POST", body);
+			REQUIRE(write_response.status_code == 200);
+
+			Thread::sleep_ms(50);
+			const DummyWorkload* peer_instance = peer_engine.find_instance<DummyWorkload>("peer_dummy");
+			REQUIRE(peer_instance != nullptr);
+			CHECK(peer_instance->inputs.input_float == Catch::Approx(42.25f));
+
+			gateway_stop.set();
+			peer_stop.set();
+		}
+
+		SECTION("Telemetry gateway peer route can be refreshed at runtime")
+		{
+			const uint16_t peer_port = choose_telemetry_port();
+			const uint16_t gateway_port = choose_telemetry_port();
+			const uint16_t stale_peer_port = choose_telemetry_port();
+			REQUIRE(peer_port != 0);
+			REQUIRE(gateway_port != 0);
+			REQUIRE(stale_peer_port != 0);
+			REQUIRE(peer_port != gateway_port);
+			REQUIRE(peer_port != stale_peer_port);
+			REQUIRE(gateway_port != stale_peer_port);
+
+			Model peer_model;
+			peer_model.set_model_name("peer-model");
+			peer_model.set_telemetry_port(peer_port);
+			static const WorkloadSeed peer_root{
+				TypeId("TickCounterWorkload"),
+				StringView("peer_root"),
+				30.0f,
+				{},
+				{},
+				{}};
+			static const WorkloadSeed* const peer_workloads[] = {&peer_root};
+			peer_model.use_workload_seeds(peer_workloads);
+			peer_model.set_root_workload(peer_root);
+
+			Model gateway_model;
+			gateway_model.set_model_name("gateway-model");
+			gateway_model.set_telemetry_port(gateway_port);
+			gateway_model.set_telemetry_is_gateway(true);
+			static const WorkloadSeed gateway_root{
+				TypeId("TickCounterWorkload"),
+				StringView("gateway_root"),
+				30.0f,
+				{},
+				{},
+				{}};
+			static const WorkloadSeed* const gateway_workloads[] = {&gateway_root};
+			static const TelemetryPeerSeed stale_peer{
+				StringView("peer-model"),
+				StringView("127.0.0.1"),
+				stale_peer_port,
+				false};
+			static const TelemetryPeerSeed* const gateway_peers[] = {&stale_peer};
+			gateway_model.use_workload_seeds(gateway_workloads);
+			gateway_model.use_telemetry_peer_seeds(gateway_peers);
+			gateway_model.set_root_workload(gateway_root);
+
+			Engine peer_engine;
+			peer_engine.load(peer_model);
+			AtomicFlag peer_stop{false};
+			EngineRunThread peer_runner(peer_engine, peer_stop);
+
+			Engine gateway_engine;
+			gateway_engine.load(gateway_model);
+			AtomicFlag gateway_stop{false};
+			EngineRunThread gateway_runner(gateway_engine, gateway_stop);
+
+			Thread::sleep_ms(100);
+
+			char url[256];
+			::snprintf(
+				url,
+				sizeof(url),
+				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/workloads_buffer/layout",
+				static_cast<unsigned int>(gateway_port));
+			const HttpResponse stale_response = http_request(url);
+			REQUIRE(stale_response.status_code == 503);
+
+			gateway_engine.get_telemetry_server().update_peer_route("peer-model", "127.0.0.1", peer_port, false);
+
+			const HttpResponse refreshed_response = http_request(url);
+			REQUIRE(refreshed_response.status_code == 200);
+
+			gateway_stop.set();
+			peer_stop.set();
 		}
 	}
 

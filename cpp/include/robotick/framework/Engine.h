@@ -12,6 +12,7 @@ namespace robotick
 {
 	class AtomicFlag;
 	class Model;
+	class TelemetryServer;
 	class WorkloadsBuffer;
 	struct DataConnectionInfo;
 	struct StructDescriptor;
@@ -36,6 +37,7 @@ namespace robotick
 
 	  public: // internal public accessors
 		const WorkloadInstanceInfo* get_root_instance_info() const;
+		const Model& get_model() const;
 
 		const WorkloadInstanceInfo* find_instance_info(const char* unique_name) const;
 		void* find_instance(const char* unique_name) const;
@@ -53,6 +55,7 @@ namespace robotick
 		const HeapVector<DataConnectionInfo>& get_all_data_connections() const;
 
 		WorkloadsBuffer& get_workloads_buffer() const;
+		TelemetryServer& get_telemetry_server() const;
 
 	  private:
 		void bind_blackboards_in_struct(WorkloadInstanceInfo& workload_instance_info,

@@ -22,7 +22,12 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <strings.h>
 #include <unistd.h>
+
+#if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+#include <curl/curl.h>
+#endif
 
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
 #include <esp_random.h>
@@ -127,7 +132,180 @@ namespace robotick
 			}
 			return false;
 		}
-		} // namespace
+
+		static bool uri_equals(const char* lhs, const char* rhs)
+		{
+			return lhs && rhs && StringView(lhs).equals(rhs);
+		}
+
+		static bool starts_with(const char* text, const char* prefix)
+		{
+			return text && prefix && ::strncmp(text, prefix, ::strlen(prefix)) == 0;
+		}
+
+		static const char* skip_prefix(const char* text, const char* prefix)
+		{
+			return starts_with(text, prefix) ? text + ::strlen(prefix) : nullptr;
+		}
+
+		static bool try_parse_model_routed_uri(const char* uri, FixedString64& model_id, FixedString128& suffix_uri)
+		{
+			constexpr const char* prefix = "/api/telemetry-gateway/";
+			const char* rest = skip_prefix(uri, prefix);
+			if (!rest || *rest == '\0')
+			{
+				return false;
+			}
+
+			if (StringView(rest).equals("models"))
+			{
+				return false;
+			}
+
+			const char* slash = ::strchr(rest, '/');
+			if (!slash || slash == rest)
+			{
+				return false;
+			}
+
+			model_id.assign(rest, static_cast<size_t>(slash - rest));
+			suffix_uri = slash;
+			return !model_id.empty() && !suffix_uri.empty();
+		}
+
+#if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+		struct ForwardHttpResult
+		{
+			int status_code = WebResponseCode::ServiceUnavailable;
+			bool transport_ok = false;
+			FixedString128 content_type;
+			FixedString128 session_header;
+			FixedString128 frame_seq_header;
+			HeapVector<uint8_t> body;
+		};
+
+		struct ForwardHttpBuffer
+		{
+			FILE* file = nullptr;
+			ForwardHttpResult* result = nullptr;
+		};
+
+		static size_t curl_write_callback(char* ptr, size_t size, size_t nmemb, void* userdata)
+		{
+			ForwardHttpBuffer* buffer = static_cast<ForwardHttpBuffer*>(userdata);
+			if (!buffer || !buffer->file)
+			{
+				return 0;
+			}
+			return ::fwrite(ptr, size, nmemb, buffer->file) * size;
+		}
+
+		static void try_store_header_value(const char* line, const char* header_name, FixedString128& target)
+		{
+			const size_t header_len = ::strlen(header_name);
+			if (::strncasecmp(line, header_name, header_len) != 0)
+			{
+				return;
+			}
+			const char* value = line + header_len;
+			while (*value == ' ' || *value == '\t')
+			{
+				++value;
+			}
+			const char* end = value + ::strlen(value);
+			while (end > value && (end[-1] == '\r' || end[-1] == '\n'))
+			{
+				--end;
+			}
+			target.assign(value, static_cast<size_t>(end - value));
+		}
+
+		static size_t curl_header_callback(char* buffer, size_t size, size_t nitems, void* userdata)
+		{
+			ForwardHttpResult* result = static_cast<ForwardHttpResult*>(userdata);
+			const size_t total = size * nitems;
+			if (!result || total == 0)
+			{
+				return total;
+			}
+
+			FixedString256 line;
+			line.assign(buffer, total);
+			try_store_header_value(line.c_str(), "Content-Type:", result->content_type);
+			try_store_header_value(line.c_str(), "X-Robotick-Session-Id:", result->session_header);
+			try_store_header_value(line.c_str(), "X-Robotick-Frame-Seq:", result->frame_seq_header);
+			return total;
+		}
+
+		static bool perform_forwarded_http_request(const char* method, const char* url, const WebRequest& request, ForwardHttpResult& out_result)
+		{
+			CURL* curl = curl_easy_init();
+			if (!curl)
+			{
+				return false;
+			}
+
+			FILE* tmp = ::tmpfile();
+			if (!tmp)
+			{
+				curl_easy_cleanup(curl);
+				return false;
+			}
+
+			ForwardHttpBuffer buffer;
+			buffer.file = tmp;
+			buffer.result = &out_result;
+
+			curl_easy_setopt(curl, CURLOPT_URL, url);
+			curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
+			curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_callback);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buffer);
+			curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, curl_header_callback);
+			curl_easy_setopt(curl, CURLOPT_HEADERDATA, &out_result);
+
+			if (StringView(method).equals("POST"))
+			{
+				curl_easy_setopt(curl, CURLOPT_POST, 1L);
+				curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.size() > 0 ? reinterpret_cast<const char*>(request.body.data()) : "");
+				curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(request.body.size()));
+			}
+
+			const CURLcode curl_code = curl_easy_perform(curl);
+			long response_code = 0;
+			curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+			curl_easy_cleanup(curl);
+
+			if (curl_code != CURLE_OK)
+			{
+				::fclose(tmp);
+				return false;
+			}
+
+			out_result.transport_ok = true;
+			out_result.status_code = response_code > 0 ? static_cast<int>(response_code) : WebResponseCode::OK;
+
+			if (::fseek(tmp, 0, SEEK_END) != 0)
+			{
+				::fclose(tmp);
+				return true;
+			}
+			const long file_size = ::ftell(tmp);
+			if (file_size > 0)
+			{
+				::rewind(tmp);
+				out_result.body.initialize(static_cast<size_t>(file_size));
+				const size_t bytes_read = ::fread(out_result.body.data(), 1, static_cast<size_t>(file_size), tmp);
+				if (bytes_read != static_cast<size_t>(file_size))
+				{
+					out_result.transport_ok = false;
+				}
+			}
+			::fclose(tmp);
+			return true;
+		}
+#endif
+	} // namespace
 
 	struct TelemetryServer::Impl
 	{
@@ -150,6 +328,14 @@ namespace robotick
 			alignas(max_align_t) uint8_t payload[kMaxWritePayloadBytes] = {};
 		};
 
+		struct TelemetryPeerRoute
+		{
+			FixedString64 model_id;
+			FixedString128 host;
+			uint16_t telemetry_port = 0;
+			bool is_gateway = false;
+		};
+
 		WebServer web_server;
 		const Engine* engine = nullptr;
 		FixedString64 session_id;
@@ -158,10 +344,17 @@ namespace robotick
 		Mutex pending_input_writes_mutex;
 		uint64_t write_seq_counter = 0;
 		bool is_setup = false;
+		bool is_gateway = false;
+		HeapVector<TelemetryPeerRoute> telemetry_peers;
 
 		void rebuild_writable_input_registry();
 		int find_writable_input_index_by_handle(uint16_t handle) const;
 		int find_writable_input_index_by_path(const char* path) const;
+		int find_telemetry_peer_index_by_model_id(const char* model_id) const;
+		void rebuild_telemetry_peer_registry();
+		bool handle_local_telemetry_request(const WebRequest& req, WebResponse& res, const char* effective_uri);
+		void handle_get_gateway_models(WebResponse& res);
+		void handle_forwarded_telemetry_request(const WebRequest& req, WebResponse& res, const TelemetryPeerRoute& peer, const char* suffix_uri);
 		void handle_get_workloads_buffer_layout(const WebRequest& req, WebResponse& res);
 		void handle_get_workloads_buffer_raw(const WebRequest& req, WebResponse& res);
 		void handle_set_workload_input_field_data(const WebRequest& req, WebResponse& res);
@@ -207,8 +400,10 @@ namespace robotick
 		}
 		impl = new Impl();
 		impl->engine = &engine_in;
+		impl->is_gateway = engine_in.get_model().get_telemetry_is_gateway();
 		build_session_id(engine_in.get_model_name(), impl->session_id);
 		impl->rebuild_writable_input_registry();
+		impl->rebuild_telemetry_peer_registry();
 		impl->is_setup = true;
 	}
 
@@ -234,33 +429,40 @@ namespace robotick
 					return true;
 				}
 
-				if (req.method.equals("GET"))
+				if (impl->is_gateway && req.method.equals("GET") && req.uri.equals("/api/telemetry-gateway/models"))
 				{
-					if (req.uri.equals("/api/telemetry/health"))
+					impl->handle_get_gateway_models(res);
+					return true;
+				}
+
+				if (impl->is_gateway)
+				{
+					FixedString64 routed_model_id;
+					FixedString128 routed_suffix_uri;
+					if (try_parse_model_routed_uri(req.uri.c_str(), routed_model_id, routed_suffix_uri))
 					{
-						res.set_status_code(WebResponseCode::OK);
-						return true;
-					}
-					if (req.uri.equals("/api/telemetry/workloads_buffer/layout"))
-					{
-						impl->handle_get_workloads_buffer_layout(req, res);
-						return true;
-					}
-					if (req.uri.equals("/api/telemetry/workloads_buffer/raw"))
-					{
-						impl->handle_get_workloads_buffer_raw(req, res);
+						if (routed_model_id == impl->engine->get_model_name())
+						{
+							return impl->handle_local_telemetry_request(req, res, routed_suffix_uri.c_str());
+						}
+
+						const int peer_index = impl->find_telemetry_peer_index_by_model_id(routed_model_id.c_str());
+						if (peer_index >= 0)
+						{
+							impl->handle_forwarded_telemetry_request(
+								req, res, impl->telemetry_peers[static_cast<size_t>(peer_index)], routed_suffix_uri.c_str());
+							return true;
+						}
+
+						nlohmann::ordered_json body;
+						body["error"] = "telemetry_peer_not_found";
+						body["model_id"] = routed_model_id.c_str();
+						set_json_response(res, WebResponseCode::NotFound, body);
 						return true;
 					}
 				}
-				else if (req.method.equals("POST"))
-				{
-					if (req.uri.equals("/api/telemetry/set_workload_input_field_data"))
-					{
-						impl->handle_set_workload_input_field_data(req, res);
-						return true;
-					}
-				}
-				return false;
+
+				return impl->handle_local_telemetry_request(req, res, req.uri.c_str());
 			});
 	}
 
@@ -305,6 +507,25 @@ namespace robotick
 		}
 	}
 
+	void TelemetryServer::update_peer_route(const char* model_id, const char* host, const uint16_t telemetry_port, const bool is_gateway)
+	{
+		if (!impl || !model_id || !host || model_id[0] == '\0' || host[0] == '\0' || telemetry_port == 0)
+		{
+			return;
+		}
+
+		const int peer_index = impl->find_telemetry_peer_index_by_model_id(model_id);
+		if (peer_index < 0)
+		{
+			return;
+		}
+
+		Impl::TelemetryPeerRoute& peer = impl->telemetry_peers[static_cast<size_t>(peer_index)];
+		peer.host = host;
+		peer.telemetry_port = telemetry_port;
+		peer.is_gateway = is_gateway;
+	}
+
 	int TelemetryServer::Impl::find_writable_input_index_by_handle(const uint16_t handle) const
 	{
 		if (handle == 0)
@@ -335,6 +556,160 @@ namespace robotick
 			}
 		}
 		return -1;
+	}
+
+	int TelemetryServer::Impl::find_telemetry_peer_index_by_model_id(const char* model_id) const
+	{
+		if (!model_id || model_id[0] == '\0')
+		{
+			return -1;
+		}
+		for (size_t i = 0; i < telemetry_peers.size(); ++i)
+		{
+			if (telemetry_peers[i].model_id == model_id)
+			{
+				return static_cast<int>(i);
+			}
+		}
+		return -1;
+	}
+
+	void TelemetryServer::Impl::rebuild_telemetry_peer_registry()
+	{
+		if (!engine)
+		{
+			return;
+		}
+
+		const auto& peers = engine->get_model().get_telemetry_peers();
+		if (peers.empty())
+		{
+			return;
+		}
+
+		telemetry_peers.initialize(peers.size());
+		for (size_t i = 0; i < peers.size(); ++i)
+		{
+			const TelemetryPeerSeed* seed = peers[i];
+			if (!seed)
+			{
+				continue;
+			}
+			TelemetryPeerRoute& route = telemetry_peers[i];
+			route.model_id = seed->model_name.c_str();
+			route.host = seed->host.c_str();
+			route.telemetry_port = seed->telemetry_port;
+			route.is_gateway = seed->is_gateway;
+		}
+	}
+
+	bool TelemetryServer::Impl::handle_local_telemetry_request(const WebRequest& req, WebResponse& res, const char* effective_uri)
+	{
+		if (req.method.equals("GET"))
+		{
+			if (uri_equals(effective_uri, "/api/telemetry/health") || uri_equals(effective_uri, "/health"))
+			{
+				res.set_status_code(WebResponseCode::OK);
+				res.set_body(nullptr, 0);
+				return true;
+			}
+			if (uri_equals(effective_uri, "/api/telemetry/workloads_buffer/layout") || uri_equals(effective_uri, "/workloads_buffer/layout"))
+			{
+				handle_get_workloads_buffer_layout(req, res);
+				return true;
+			}
+			if (uri_equals(effective_uri, "/api/telemetry/workloads_buffer/raw") || uri_equals(effective_uri, "/workloads_buffer/raw"))
+			{
+				handle_get_workloads_buffer_raw(req, res);
+				return true;
+			}
+		}
+		else if (req.method.equals("POST"))
+		{
+			if (uri_equals(effective_uri, "/api/telemetry/set_workload_input_field_data") ||
+				uri_equals(effective_uri, "/set_workload_input_field_data"))
+			{
+				handle_set_workload_input_field_data(req, res);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void TelemetryServer::Impl::handle_get_gateway_models(WebResponse& res)
+	{
+		nlohmann::ordered_json response_json;
+		response_json["gateway_model_id"] = engine ? engine->get_model_name() : "";
+		response_json["models"] = nlohmann::ordered_json::array();
+
+		nlohmann::ordered_json local_model_json;
+		local_model_json["model_id"] = engine ? engine->get_model_name() : "";
+		local_model_json["is_local"] = true;
+		local_model_json["is_gateway"] = true;
+		FixedString128 local_path;
+		local_path.format("/api/telemetry-gateway/%s", engine ? engine->get_model_name() : "");
+		local_model_json["telemetry_path"] = local_path.c_str();
+		response_json["models"].push_back(local_model_json);
+
+		for (const TelemetryPeerRoute& peer : telemetry_peers)
+		{
+			nlohmann::ordered_json peer_json;
+			peer_json["model_id"] = peer.model_id.c_str();
+			peer_json["is_local"] = false;
+			peer_json["is_gateway"] = peer.is_gateway;
+			FixedString128 path;
+			path.format("/api/telemetry-gateway/%s", peer.model_id.c_str());
+			peer_json["telemetry_path"] = path.c_str();
+			response_json["models"].push_back(peer_json);
+		}
+
+		set_json_response(res, WebResponseCode::OK, response_json);
+	}
+
+	void TelemetryServer::Impl::handle_forwarded_telemetry_request(
+		const WebRequest& req, WebResponse& res, const TelemetryPeerRoute& peer, const char* suffix_uri)
+	{
+#if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+		FixedString256 url;
+		url.format("http://%s:%u/api/telemetry%s", peer.host.c_str(), static_cast<unsigned int>(peer.telemetry_port), suffix_uri);
+
+		ForwardHttpResult forwarded;
+		if (!perform_forwarded_http_request(req.method.c_str(), url.c_str(), req, forwarded) || !forwarded.transport_ok)
+		{
+			nlohmann::ordered_json error_json;
+			error_json["error"] = "telemetry_forward_failed";
+			error_json["model_id"] = peer.model_id.c_str();
+			error_json["target_url"] = url.c_str();
+			set_json_response(res, WebResponseCode::ServiceUnavailable, error_json);
+			return;
+		}
+
+		res.set_status_code(forwarded.status_code);
+		if (!forwarded.content_type.empty())
+		{
+			res.set_content_type(forwarded.content_type.c_str());
+		}
+		if (!forwarded.session_header.empty())
+		{
+			FixedString256 header;
+			header.format("X-Robotick-Session-Id:%s", forwarded.session_header.c_str());
+			res.add_header(header.c_str());
+		}
+		if (!forwarded.frame_seq_header.empty())
+		{
+			FixedString256 header;
+			header.format("X-Robotick-Frame-Seq:%s", forwarded.frame_seq_header.c_str());
+			res.add_header(header.c_str());
+		}
+		res.set_body(forwarded.body.size() > 0 ? reinterpret_cast<const void*>(forwarded.body.data()) : nullptr, forwarded.body.size());
+#else
+		(void)req;
+		(void)peer;
+		(void)suffix_uri;
+		nlohmann::ordered_json error_json;
+		error_json["error"] = "telemetry_forwarding_not_supported_on_this_platform";
+		set_json_response(res, WebResponseCode::NotImplemented, error_json);
+#endif
 	}
 
 	void TelemetryServer::Impl::rebuild_writable_input_registry()
@@ -456,9 +831,7 @@ namespace robotick
 
 		if (writable_count > 0xFFFF)
 		{
-			ROBOTICK_WARNING(
-				"Telemetry writable input registry exceeded handle range (%zu > 65535). Truncating to 65535.",
-				writable_count);
+			ROBOTICK_WARNING("Telemetry writable input registry exceeded handle range (%zu > 65535). Truncating to 65535.", writable_count);
 			writable_count = 0xFFFF;
 		}
 
@@ -886,7 +1259,7 @@ namespace robotick
 		res.set_status_code(WebResponseCode::OK);
 		res.set_content_type("application/json");
 
-		auto out_str = layout_json.dump(2); // Pretty print
+		auto out_str = layout_json.dump();
 		res.set_body_string(out_str.c_str());
 	}
 

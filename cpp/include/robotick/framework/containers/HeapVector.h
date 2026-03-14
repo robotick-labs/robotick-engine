@@ -165,6 +165,8 @@ namespace robotick
 		const T* begin() const { return data_; }
 		const T* end() const { return data_ + size_; }
 
+		void reset() { destroy(); }
+
 	  private:
 		void destroy()
 		{

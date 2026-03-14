@@ -27,7 +27,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		RemoteEngineDiscoverer receiver;
 
 		sender.initialize_sender(sender_model, model_to_find);
-		receiver.initialize_receiver(model_to_find);
+		receiver.initialize_receiver(model_to_find, 7104, true);
 
 		receiver.set_on_incoming_connection_requested(
 			[&](const char* source_id, uint16_t& port_out)
@@ -40,7 +40,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 			[&](const RemoteEngineDiscoverer::PeerInfo& info)
 			{
 				discovered.store(true);
-				if (info.model_id == model_to_find && info.port == 7263)
+				if (info.model_id == model_to_find && info.port == 7263 && info.telemetry_port == 7104 && info.is_gateway)
 					correct_info.store(true);
 			});
 
@@ -63,7 +63,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		RemoteEngineDiscoverer receiver;
 		RemoteEngineDiscoverer sender;
 
-		receiver.initialize_receiver("receiver-model");
+		receiver.initialize_receiver("receiver-model", 7101, false);
 		sender.initialize_sender("sender-model", "nonexistent-model");
 
 		receiver.set_on_incoming_connection_requested(
@@ -103,9 +103,9 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		RemoteEngineDiscoverer recv_a, send_a;
 		RemoteEngineDiscoverer recv_b, send_b;
 
-		recv_a.initialize_receiver(model_a);
+		recv_a.initialize_receiver(model_a, port_a + 1, false);
 		send_a.initialize_sender(model_a, model_b);
-		recv_b.initialize_receiver(model_b);
+		recv_b.initialize_receiver(model_b, port_b + 1, true);
 		send_b.initialize_sender(model_b, model_a);
 
 		recv_a.set_on_incoming_connection_requested(
@@ -125,14 +125,14 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 			[&](const auto& info)
 			{
 				a_discovered.store(true);
-				if (info.model_id == model_b && info.port == port_b)
+				if (info.model_id == model_b && info.port == port_b && info.telemetry_port == port_b + 1 && info.is_gateway)
 					a_correct.store(true);
 			});
 		send_b.set_on_remote_model_discovered(
 			[&](const auto& info)
 			{
 				b_discovered.store(true);
-				if (info.model_id == model_a && info.port == port_a)
+				if (info.model_id == model_a && info.port == port_a && info.telemetry_port == port_a + 1 && !info.is_gateway)
 					b_correct.store(true);
 			});
 
@@ -162,7 +162,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		RemoteEngineDiscoverer recv;
 		RemoteEngineDiscoverer send;
 
-		recv.initialize_receiver(model_self);
+		recv.initialize_receiver(model_self, 7303, false);
 		send.initialize_sender(model_peer, model_self);
 
 		recv.set_on_incoming_connection_requested(
@@ -196,5 +196,44 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineDiscoverer")
 		}
 
 		REQUIRE(discovery_count.load() >= 2);
+	}
+
+	SECTION("Sender can use an explicit target IP instead of multicast")
+	{
+		const char* model_to_find = "direct-target";
+		const char* sender_model = "direct-sender";
+
+		AtomicValue<bool> discovered(false);
+		AtomicValue<bool> correct_info(false);
+
+		RemoteEngineDiscoverer sender;
+		RemoteEngineDiscoverer receiver;
+
+		sender.initialize_sender(sender_model, model_to_find, "127.0.0.1");
+		receiver.initialize_receiver(model_to_find, 8124, false);
+
+		receiver.set_on_incoming_connection_requested(
+			[&](const char* source_id, uint16_t& port_out)
+			{
+				REQUIRE(string_equals(source_id, sender_model));
+				port_out = 8123;
+			});
+		sender.set_on_remote_model_discovered(
+			[&](const RemoteEngineDiscoverer::PeerInfo& info)
+			{
+				discovered.store(true);
+				if (info.model_id == model_to_find && info.port == 8123 && info.ip == "127.0.0.1" && info.telemetry_port == 8124)
+					correct_info.store(true);
+			});
+
+		for (int i = 0; i < 200 && !discovered.load(); ++i)
+		{
+			sender.tick(TICK_INFO_FIRST_10MS_100HZ);
+			receiver.tick(TICK_INFO_FIRST_10MS_100HZ);
+			Thread::sleep_ms(10);
+		}
+
+		REQUIRE(discovered.load());
+		REQUIRE(correct_info.load());
 	}
 }

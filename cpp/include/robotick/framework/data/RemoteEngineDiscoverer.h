@@ -20,6 +20,8 @@ namespace robotick
 			FixedString64 model_id;
 			FixedString64 ip; // e.g. "192.168.1.42"
 			uint16_t port;
+			uint16_t telemetry_port = 0;
+			bool is_gateway = false;
 		};
 
 		// Callback fired on sender when a receiver responds to our discovery broadcast
@@ -32,8 +34,8 @@ namespace robotick
 		RemoteEngineDiscoverer();
 		~RemoteEngineDiscoverer();
 
-		void initialize_sender(const char* my_model_name, const char* target_model_name);
-		void initialize_receiver(const char* my_model_name);
+		void initialize_sender(const char* my_model_name, const char* target_model_name, const char* target_address = nullptr);
+		void initialize_receiver(const char* my_model_name, uint16_t telemetry_port = 0, bool is_gateway = false);
 
 		// Register callbacks for sender/receiver mode
 		void set_on_incoming_connection_requested(OnIncomingConnectionRequested cb);
@@ -75,9 +77,12 @@ namespace robotick
 		int reply_fd = -1; // Sender uses this to receive unicast replies
 		uint16_t sender_reply_port = 0;
 		uint16_t listen_port = 0; // Service port used in replies from receiver
+		uint16_t telemetry_port = 0;
+		bool is_gateway = false;
 
 		FixedString64 my_model_id;
 		FixedString64 target_model_id;
+		FixedString64 target_address;
 
 		OnRemoteModelDiscovered on_discovered_cb = nullptr;
 		OnIncomingConnectionRequested on_requested_cb = nullptr;
