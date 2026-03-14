@@ -32,7 +32,7 @@ jobs:
             docker_image: mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04
           - platform: esp32s3
             preset: esp32s3
-            docker_image: espressif/idf:release-v5.4
+            docker_image: robotick-engine-ci-esp32s3
 
     steps:
       - name: Checkout repository
@@ -40,8 +40,16 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Pull Docker image
-        run: docker pull ${{ matrix.docker_image }}
+      - name: Prepare Docker image
+        run: |
+          if [ '${{ matrix.platform }}' = 'esp32s3' ]; then
+            docker build \
+              -t ${{ matrix.docker_image }} \
+              -f tools/docker/esp32s3/Dockerfile \
+              tools/docker/esp32s3
+          else
+            docker pull ${{ matrix.docker_image }}
+          fi
 
       - name: Run Build inside Docker
         run: |
