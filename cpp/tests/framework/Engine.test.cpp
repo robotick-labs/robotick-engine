@@ -744,6 +744,27 @@ namespace robotick::test
 			REQUIRE(peer_instance != nullptr);
 			CHECK(peer_instance->inputs.input_float == Catch::Approx(42.25f));
 
+			::snprintf(
+				body,
+				sizeof(body),
+				"{\"engine_session_id\":\"%s\",\"field_handle\":%u,\"value\":11.0,\"seq\":100}",
+				layout_json["engine_session_id"].get_ref<const nlohmann::json::string_t&>().c_str(),
+				target_writable->value("field_handle", 0));
+			const HttpResponse latest_write_response = http_request(url, "POST", body);
+			REQUIRE(latest_write_response.status_code == 200);
+
+			::snprintf(
+				body,
+				sizeof(body),
+				"{\"engine_session_id\":\"%s\",\"field_handle\":%u,\"value\":-99.0,\"seq\":99}",
+				layout_json["engine_session_id"].get_ref<const nlohmann::json::string_t&>().c_str(),
+				target_writable->value("field_handle", 0));
+			const HttpResponse stale_write_response = http_request(url, "POST", body);
+			REQUIRE(stale_write_response.status_code == 200);
+
+			Thread::sleep_ms(50);
+			CHECK(peer_instance->inputs.input_float == Catch::Approx(11.0f));
+
 			gateway_stop.set();
 			peer_stop.set();
 		}

@@ -984,7 +984,20 @@ namespace robotick
 				write_seq_counter += 1;
 				staged.seq = write_seq_counter;
 			}
-			pending_input_writes[static_cast<size_t>(writable_index)] = staged;
+
+			PendingInputWrite& pending = pending_input_writes[static_cast<size_t>(writable_index)];
+			if (pending.seq != 0 && staged.seq <= pending.seq)
+			{
+				response_json["status"] = "ignored_stale";
+				response_json["field_handle"] = writable_handle;
+				response_json["field_path"] = writable.path.c_str();
+				response_json["seq"] = staged.seq;
+				response_json["latest_seq"] = pending.seq;
+				set_json_response(res, WebResponseCode::OK, response_json);
+				return;
+			}
+
+			pending = staged;
 		}
 
 		response_json["status"] = "accepted";
