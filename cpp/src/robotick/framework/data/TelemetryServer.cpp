@@ -6,6 +6,7 @@
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/concurrency/Sync.h"
+#include "robotick/framework/containers/FixedVector.h"
 #include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
@@ -141,6 +142,579 @@ namespace robotick
 			return starts_with(text, prefix) ? text + ::strlen(prefix) : nullptr;
 		}
 
+		struct TelemetryWriteRequestEntry
+		{
+			bool has_field_handle = false;
+			uint16_t field_handle = 0;
+			bool has_field_path = false;
+			FixedString512 field_path;
+			bool has_value = false;
+			FixedString256 value_text;
+			bool has_seq = false;
+			uint64_t seq = 0;
+		};
+
+		struct TelemetryWriteRequestPayload
+		{
+			bool has_engine_session_id = false;
+			FixedString64 engine_session_id;
+			bool has_writes = false;
+			HeapVector<TelemetryWriteRequestEntry> writes;
+			size_t write_count = 0;
+		};
+
+		class JsonCursor
+		{
+		  public:
+			JsonCursor(const char* text, const size_t size)
+				: cur(text)
+				, end(text ? text + size : nullptr)
+			{
+			}
+
+			bool parse_write_request(TelemetryWriteRequestPayload& out_payload)
+			{
+				skip_ws();
+				if (!consume('{'))
+				{
+					return false;
+				}
+
+				skip_ws();
+				if (consume('}'))
+				{
+					return true;
+				}
+
+				while (!is_at_end())
+				{
+					FixedString64 key;
+					if (!parse_string(key))
+					{
+						return false;
+					}
+					skip_ws();
+					if (!consume(':'))
+					{
+						return false;
+					}
+					skip_ws();
+
+					if (key == "engine_session_id")
+					{
+						out_payload.has_engine_session_id = parse_string(out_payload.engine_session_id);
+						if (!out_payload.has_engine_session_id)
+						{
+							return false;
+						}
+					}
+					else if (key == "writes")
+					{
+						out_payload.has_writes = true;
+						if (!parse_writes_array(out_payload.writes, out_payload.write_count))
+						{
+							return false;
+						}
+					}
+					else if (!skip_value())
+					{
+						return false;
+					}
+
+					skip_ws();
+					if (consume('}'))
+					{
+						return true;
+					}
+					if (!consume(','))
+					{
+						return false;
+					}
+					skip_ws();
+				}
+
+				return false;
+			}
+
+		  private:
+			const char* cur = nullptr;
+			const char* end = nullptr;
+
+			bool is_at_end() const { return !cur || !end || cur >= end; }
+
+			void skip_ws()
+			{
+				while (!is_at_end())
+				{
+					const char ch = *cur;
+					if (ch != ' ' && ch != '\n' && ch != '\r' && ch != '\t')
+					{
+						break;
+					}
+					++cur;
+				}
+			}
+
+			bool consume(const char expected)
+			{
+				if (is_at_end() || *cur != expected)
+				{
+					return false;
+				}
+				++cur;
+				return true;
+			}
+
+			bool matches_literal(const char* literal) const
+			{
+				if (!literal || is_at_end())
+				{
+					return false;
+				}
+				const size_t literal_length = ::strlen(literal);
+				return static_cast<size_t>(end - cur) >= literal_length && ::strncmp(cur, literal, literal_length) == 0;
+			}
+
+			template <size_t N> bool parse_string(FixedString<N>& out)
+			{
+				if (!consume('"'))
+				{
+					return false;
+				}
+
+				size_t out_len = 0;
+				while (!is_at_end())
+				{
+					const char ch = *cur++;
+					if (ch == '"')
+					{
+						out.data[out_len] = '\0';
+						return true;
+					}
+					if (ch == '\\')
+					{
+						if (is_at_end())
+						{
+							return false;
+						}
+						const char escaped = *cur++;
+						char decoded = '\0';
+						switch (escaped)
+						{
+						case '"':
+						case '\\':
+						case '/':
+							decoded = escaped;
+							break;
+						case 'b':
+							decoded = '\b';
+							break;
+						case 'f':
+							decoded = '\f';
+							break;
+						case 'n':
+							decoded = '\n';
+							break;
+						case 'r':
+							decoded = '\r';
+							break;
+						case 't':
+							decoded = '\t';
+							break;
+						default:
+							return false;
+						}
+						if (out_len + 1 >= N)
+						{
+							return false;
+						}
+						out.data[out_len++] = decoded;
+						continue;
+					}
+
+					if (out_len + 1 >= N)
+					{
+						return false;
+					}
+					out.data[out_len++] = ch;
+				}
+
+				return false;
+			}
+
+			bool parse_integer(int64_t& out_value)
+			{
+				if (is_at_end())
+				{
+					return false;
+				}
+
+				FixedString32 token;
+				size_t token_len = 0;
+
+				if (*cur == '-')
+				{
+					token.data[token_len++] = *cur++;
+				}
+				if (is_at_end() || *cur < '0' || *cur > '9')
+				{
+					return false;
+				}
+				while (!is_at_end() && *cur >= '0' && *cur <= '9')
+				{
+					if (token_len + 1 >= token.capacity())
+					{
+						return false;
+					}
+					token.data[token_len++] = *cur++;
+				}
+				token.data[token_len] = '\0';
+
+				long long parsed = 0;
+				if (::sscanf(token.c_str(), "%lld", &parsed) != 1)
+				{
+					return false;
+				}
+				out_value = static_cast<int64_t>(parsed);
+				return true;
+			}
+
+			bool parse_number_token(FixedString256& out)
+			{
+				if (is_at_end())
+				{
+					return false;
+				}
+
+				const char* start = cur;
+				if (*cur == '-')
+				{
+					++cur;
+				}
+				if (is_at_end() || *cur < '0' || *cur > '9')
+				{
+					return false;
+				}
+				if (*cur == '0')
+				{
+					++cur;
+				}
+				else
+				{
+					while (!is_at_end() && *cur >= '0' && *cur <= '9')
+					{
+						++cur;
+					}
+				}
+				if (!is_at_end() && *cur == '.')
+				{
+					++cur;
+					if (is_at_end() || *cur < '0' || *cur > '9')
+					{
+						return false;
+					}
+					while (!is_at_end() && *cur >= '0' && *cur <= '9')
+					{
+						++cur;
+					}
+				}
+				if (!is_at_end() && (*cur == 'e' || *cur == 'E'))
+				{
+					++cur;
+					if (!is_at_end() && (*cur == '+' || *cur == '-'))
+					{
+						++cur;
+					}
+					if (is_at_end() || *cur < '0' || *cur > '9')
+					{
+						return false;
+					}
+					while (!is_at_end() && *cur >= '0' && *cur <= '9')
+					{
+						++cur;
+					}
+				}
+
+				out.assign(start, static_cast<size_t>(cur - start));
+				return true;
+			}
+
+			bool skip_string()
+			{
+				if (!consume('"'))
+				{
+					return false;
+				}
+				while (!is_at_end())
+				{
+					const char ch = *cur++;
+					if (ch == '"')
+					{
+						return true;
+					}
+					if (ch == '\\')
+					{
+						if (is_at_end())
+						{
+							return false;
+						}
+						++cur;
+					}
+				}
+				return false;
+			}
+
+			bool skip_value()
+			{
+				skip_ws();
+				if (is_at_end())
+				{
+					return false;
+				}
+
+				if (*cur == '"')
+				{
+					return skip_string();
+				}
+				if (*cur == '{')
+				{
+					++cur;
+					skip_ws();
+					if (consume('}'))
+					{
+						return true;
+					}
+					while (!is_at_end())
+					{
+						if (!skip_string())
+						{
+							return false;
+						}
+						skip_ws();
+						if (!consume(':'))
+						{
+							return false;
+						}
+						skip_ws();
+						if (!skip_value())
+						{
+							return false;
+						}
+						skip_ws();
+						if (consume('}'))
+						{
+							return true;
+						}
+						if (!consume(','))
+						{
+							return false;
+						}
+						skip_ws();
+					}
+					return false;
+				}
+				if (*cur == '[')
+				{
+					++cur;
+					skip_ws();
+					if (consume(']'))
+					{
+						return true;
+					}
+					while (!is_at_end())
+					{
+						if (!skip_value())
+						{
+							return false;
+						}
+						skip_ws();
+						if (consume(']'))
+						{
+							return true;
+						}
+						if (!consume(','))
+						{
+							return false;
+						}
+						skip_ws();
+					}
+					return false;
+				}
+
+				FixedString256 scalar;
+				if (parse_number_token(scalar))
+				{
+					return true;
+				}
+				if (matches_literal("true"))
+				{
+					cur += 4;
+					return true;
+				}
+				if (matches_literal("false"))
+				{
+					cur += 5;
+					return true;
+				}
+				if (matches_literal("null"))
+				{
+					cur += 4;
+					return true;
+				}
+				return false;
+			}
+
+			bool parse_scalar(FixedString256& out)
+			{
+				skip_ws();
+				if (is_at_end())
+				{
+					return false;
+				}
+				if (*cur == '"')
+				{
+					return parse_string(out);
+				}
+				if (matches_literal("true"))
+				{
+					out = "true";
+					cur += 4;
+					return true;
+				}
+				if (matches_literal("false"))
+				{
+					out = "false";
+					cur += 5;
+					return true;
+				}
+				return parse_number_token(out);
+			}
+
+			bool parse_single_write(TelemetryWriteRequestEntry& out_entry)
+			{
+				if (!consume('{'))
+				{
+					return false;
+				}
+				skip_ws();
+				if (consume('}'))
+				{
+					return true;
+				}
+
+				while (!is_at_end())
+				{
+					FixedString64 key;
+					if (!parse_string(key))
+					{
+						return false;
+					}
+					skip_ws();
+					if (!consume(':'))
+					{
+						return false;
+					}
+					skip_ws();
+
+					if (key == "field_handle")
+					{
+						int64_t parsed_handle = 0;
+						if (!parse_integer(parsed_handle) || parsed_handle <= 0 || parsed_handle > 0xFFFF)
+						{
+							return false;
+						}
+						out_entry.has_field_handle = true;
+						out_entry.field_handle = static_cast<uint16_t>(parsed_handle);
+					}
+					else if (key == "field_path")
+					{
+						out_entry.has_field_path = parse_string(out_entry.field_path);
+						if (!out_entry.has_field_path)
+						{
+							return false;
+						}
+					}
+					else if (key == "value")
+					{
+						out_entry.has_value = parse_scalar(out_entry.value_text);
+						if (!out_entry.has_value)
+						{
+							return false;
+						}
+					}
+					else if (key == "seq")
+					{
+						int64_t parsed_seq = 0;
+						if (!parse_integer(parsed_seq))
+						{
+							return false;
+						}
+						out_entry.has_seq = true;
+						out_entry.seq = parsed_seq > 0 ? static_cast<uint64_t>(parsed_seq) : 0;
+					}
+					else if (!skip_value())
+					{
+						return false;
+					}
+
+					skip_ws();
+					if (consume('}'))
+					{
+						return true;
+					}
+					if (!consume(','))
+					{
+						return false;
+					}
+					skip_ws();
+				}
+
+				return false;
+			}
+
+			bool parse_writes_array(HeapVector<TelemetryWriteRequestEntry>& out_writes, size_t& out_count)
+			{
+				if (!consume('['))
+				{
+					return false;
+				}
+
+				skip_ws();
+				if (consume(']'))
+				{
+					return true;
+				}
+
+				while (!is_at_end())
+				{
+					if (out_count >= out_writes.size())
+					{
+						return false;
+					}
+
+					TelemetryWriteRequestEntry entry;
+					if (!parse_single_write(entry))
+					{
+						return false;
+					}
+					out_writes[out_count++] = entry;
+
+					skip_ws();
+					if (consume(']'))
+					{
+						return true;
+					}
+					if (!consume(','))
+					{
+						return false;
+					}
+					skip_ws();
+				}
+
+				return false;
+			}
+		};
+
 		static bool try_parse_model_routed_uri(const char* uri, FixedString64& model_id, FixedString128& suffix_uri)
 		{
 			constexpr const char* prefix = "/api/telemetry-gateway/";
@@ -176,6 +750,53 @@ namespace robotick
 			FixedString128 frame_seq_header;
 			HeapVector<uint8_t> body;
 		};
+
+		static void reset_forward_http_result(ForwardHttpResult& result)
+		{
+			result.status_code = WebResponseCode::ServiceUnavailable;
+			result.transport_ok = false;
+			result.content_type.clear();
+			result.session_header.clear();
+			result.frame_seq_header.clear();
+			result.body.reset();
+		}
+
+		static void copy_forward_http_result(const ForwardHttpResult& src, ForwardHttpResult& dst)
+		{
+			reset_forward_http_result(dst);
+			dst.status_code = src.status_code;
+			dst.transport_ok = src.transport_ok;
+			dst.content_type = src.content_type;
+			dst.session_header = src.session_header;
+			dst.frame_seq_header = src.frame_seq_header;
+			if (src.body.size() > 0)
+			{
+				dst.body.initialize(src.body.size());
+				::memcpy(dst.body.data(), src.body.data(), src.body.size());
+			}
+		}
+
+		static void apply_forward_http_result_to_response(const ForwardHttpResult& forwarded, WebResponse& res)
+		{
+			res.set_status_code(forwarded.status_code);
+			if (!forwarded.content_type.empty())
+			{
+				res.set_content_type(forwarded.content_type.c_str());
+			}
+			if (!forwarded.session_header.empty())
+			{
+				FixedString256 header;
+				header.format("X-Robotick-Session-Id:%s", forwarded.session_header.c_str());
+				res.add_header(header.c_str());
+			}
+			if (!forwarded.frame_seq_header.empty())
+			{
+				FixedString256 header;
+				header.format("X-Robotick-Frame-Seq:%s", forwarded.frame_seq_header.c_str());
+				res.add_header(header.c_str());
+			}
+			res.set_body(forwarded.body.size() > 0 ? reinterpret_cast<const void*>(forwarded.body.data()) : nullptr, forwarded.body.size());
+		}
 
 		struct ForwardHttpBuffer
 		{
@@ -327,6 +948,19 @@ namespace robotick
 			FixedString128 host;
 			uint16_t telemetry_port = 0;
 			bool is_gateway = false;
+#if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+			Mutex forwarded_request_mutex;
+			Mutex forwarded_raw_mutex;
+			Mutex forwarded_layout_mutex;
+			Mutex forwarded_write_mutex;
+			ForwardHttpResult cached_raw;
+			ForwardHttpResult cached_layout;
+			Clock::time_point cached_raw_at{};
+			bool has_cached_raw = false;
+			bool has_cached_layout = false;
+			FixedString64 last_seen_session_id;
+			FixedString64 cached_layout_session_id;
+#endif
 		};
 
 		WebServer web_server;
@@ -686,11 +1320,151 @@ namespace robotick
 		const WebRequest& req, WebResponse& res, const TelemetryPeerRoute& peer, const char* suffix_uri)
 	{
 #if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+		const auto forwarded_raw_cache_duration = Clock::from_seconds(0.1);
+
 		FixedString256 url;
 		url.format("http://%s:%u/api/telemetry%s", peer.host.c_str(), static_cast<unsigned int>(peer.telemetry_port), suffix_uri);
 
 		ForwardHttpResult forwarded;
-		if (!perform_forwarded_http_request(req.method.c_str(), url.c_str(), req, forwarded) || !forwarded.transport_ok)
+		const bool is_get = req.method.equals("GET");
+		const bool is_post = req.method.equals("POST");
+		const bool is_layout_request = is_get && StringView(suffix_uri).equals("/workloads_buffer/layout");
+		const bool is_raw_request = is_get && StringView(suffix_uri).equals("/workloads_buffer/raw");
+		const bool is_write_request = is_post && StringView(suffix_uri).equals("/set_workload_input_fields_data");
+
+		auto forward_or_error = [&](ForwardHttpResult& out_result) -> bool
+		{
+			LockGuard request_lock(const_cast<Mutex&>(peer.forwarded_request_mutex));
+			return perform_forwarded_http_request(req.method.c_str(), url.c_str(), req, out_result) && out_result.transport_ok;
+		};
+
+		if (is_layout_request)
+		{
+			LockGuard lock(const_cast<Mutex&>(peer.forwarded_layout_mutex));
+			if (peer.has_cached_layout)
+			{
+				apply_forward_http_result_to_response(peer.cached_layout, res);
+				return;
+			}
+			if (!forward_or_error(forwarded))
+			{
+				set_json_response(res,
+					WebResponseCode::ServiceUnavailable,
+					[&](auto& writer)
+					{
+						writer.start_object();
+						writer.key("error");
+						writer.string("telemetry_forward_failed");
+						writer.key("model_id");
+						writer.string(peer.model_id);
+						writer.key("target_url");
+						writer.string(url);
+						writer.end_object();
+					});
+				return;
+			}
+
+			copy_forward_http_result(forwarded, const_cast<ForwardHttpResult&>(peer.cached_layout));
+			const_cast<TelemetryPeerRoute&>(peer).has_cached_layout = true;
+			const_cast<TelemetryPeerRoute&>(peer).cached_layout_session_id = peer.last_seen_session_id;
+			apply_forward_http_result_to_response(forwarded, res);
+			return;
+		}
+
+		if (is_raw_request)
+		{
+			LockGuard lock(const_cast<Mutex&>(peer.forwarded_raw_mutex));
+			const Clock::time_point now = Clock::now();
+			if (peer.has_cached_raw && (now - peer.cached_raw_at) < forwarded_raw_cache_duration)
+			{
+				apply_forward_http_result_to_response(peer.cached_raw, res);
+				return;
+			}
+
+			UniqueLock request_lock(const_cast<Mutex&>(peer.forwarded_request_mutex), std_approved::defer_lock);
+			if (!request_lock.try_lock())
+			{
+				if (peer.has_cached_raw)
+				{
+					apply_forward_http_result_to_response(peer.cached_raw, res);
+					return;
+				}
+				request_lock.lock();
+			}
+
+			if (!(perform_forwarded_http_request(req.method.c_str(), url.c_str(), req, forwarded) && forwarded.transport_ok))
+			{
+				if (peer.has_cached_raw)
+				{
+					apply_forward_http_result_to_response(peer.cached_raw, res);
+					return;
+				}
+				set_json_response(res,
+					WebResponseCode::ServiceUnavailable,
+					[&](auto& writer)
+					{
+						writer.start_object();
+						writer.key("error");
+						writer.string("telemetry_forward_failed");
+						writer.key("model_id");
+						writer.string(peer.model_id);
+						writer.key("target_url");
+						writer.string(url);
+						writer.end_object();
+					});
+				return;
+			}
+
+			TelemetryPeerRoute& mutable_peer = const_cast<TelemetryPeerRoute&>(peer);
+			if (!forwarded.session_header.empty())
+			{
+				if (!mutable_peer.last_seen_session_id.empty() && mutable_peer.last_seen_session_id != forwarded.session_header)
+				{
+					reset_forward_http_result(mutable_peer.cached_layout);
+					mutable_peer.has_cached_layout = false;
+					mutable_peer.cached_layout_session_id.clear();
+				}
+				mutable_peer.last_seen_session_id = forwarded.session_header;
+			}
+			copy_forward_http_result(forwarded, mutable_peer.cached_raw);
+			mutable_peer.cached_raw_at = now;
+			mutable_peer.has_cached_raw = true;
+			if (!mutable_peer.cached_layout_session_id.empty() && !mutable_peer.last_seen_session_id.empty() &&
+				mutable_peer.cached_layout_session_id != mutable_peer.last_seen_session_id)
+			{
+				reset_forward_http_result(mutable_peer.cached_layout);
+				mutable_peer.has_cached_layout = false;
+				mutable_peer.cached_layout_session_id.clear();
+			}
+			apply_forward_http_result_to_response(forwarded, res);
+			return;
+		}
+
+		if (is_write_request)
+		{
+			LockGuard lock(const_cast<Mutex&>(peer.forwarded_write_mutex));
+			if (!forward_or_error(forwarded))
+			{
+				set_json_response(res,
+					WebResponseCode::ServiceUnavailable,
+					[&](auto& writer)
+					{
+						writer.start_object();
+						writer.key("error");
+						writer.string("telemetry_forward_failed");
+						writer.key("model_id");
+						writer.string(peer.model_id);
+						writer.key("target_url");
+						writer.string(url);
+						writer.end_object();
+					});
+				return;
+			}
+			apply_forward_http_result_to_response(forwarded, res);
+			return;
+		}
+
+		if (!forward_or_error(forwarded))
 		{
 			set_json_response(res,
 				WebResponseCode::ServiceUnavailable,
@@ -707,25 +1481,7 @@ namespace robotick
 				});
 			return;
 		}
-
-		res.set_status_code(forwarded.status_code);
-		if (!forwarded.content_type.empty())
-		{
-			res.set_content_type(forwarded.content_type.c_str());
-		}
-		if (!forwarded.session_header.empty())
-		{
-			FixedString256 header;
-			header.format("X-Robotick-Session-Id:%s", forwarded.session_header.c_str());
-			res.add_header(header.c_str());
-		}
-		if (!forwarded.frame_seq_header.empty())
-		{
-			FixedString256 header;
-			header.format("X-Robotick-Frame-Seq:%s", forwarded.frame_seq_header.c_str());
-			res.add_header(header.c_str());
-		}
-		res.set_body(forwarded.body.size() > 0 ? reinterpret_cast<const void*>(forwarded.body.data()) : nullptr, forwarded.body.size());
+		apply_forward_http_result_to_response(forwarded, res);
 #else
 		(void)req;
 		(void)peer;
@@ -895,156 +1651,119 @@ namespace robotick
 			return;
 		}
 
-		json::Document payload_document;
-		if (!payload_document.parse(req.body.data(), req.body.size()))
+		TelemetryWriteRequestPayload payload;
+		payload.writes.initialize(writable_input_fields.size() > 0 ? writable_input_fields.size() : 1);
+
+		JsonCursor cursor(reinterpret_cast<const char*>(req.body.data()), req.body.size());
+		if (!cursor.parse_write_request(payload))
 		{
 			set_error_response(res, WebResponseCode::BadRequest, "invalid_json");
 			return;
 		}
-		const json::Value payload = payload_document.root();
 
-		const json::Value session_node = payload["engine_session_id"];
-		if (!session_node.is_string())
-		{
-			set_error_response(res, WebResponseCode::BadRequest, "missing_engine_session_id");
-			return;
-		}
+		const bool session_matches =
+			!payload.has_engine_session_id || StringView(session_id.c_str()).equals(payload.engine_session_id.c_str());
 
-		if (!StringView(session_id.c_str()).equals(session_node.get_c_string()))
-		{
-			set_json_response(res,
-				WebResponseCode::PreconditionFailed,
-				[&](auto& writer)
-				{
-					writer.start_object();
-					writer.key("error");
-					writer.string("session_mismatch");
-					writer.key("engine_session_id");
-					writer.string(session_id.c_str());
-					writer.end_object();
-				});
-			return;
-		}
-
-		const json::Value writes_node = payload["writes"];
-		if (!writes_node.is_array() || writes_node.size() == 0)
+		if (!payload.has_writes || payload.write_count == 0)
 		{
 			set_error_response(res, WebResponseCode::BadRequest, "missing_writes");
 			return;
 		}
 
 		HeapVector<ParsedWrite> parsed_writes;
-		parsed_writes.initialize(writes_node.size());
+		parsed_writes.initialize(payload.write_count);
 		size_t parsed_count = 0;
 
 		bool parse_failed = false;
 		int parse_failed_status = WebResponseCode::BadRequest;
 		const char* parse_failed_error = nullptr;
 
-		writes_node.for_each_array(
-			[&](const json::Value write_payload)
+		for (size_t write_payload_index = 0; write_payload_index < payload.write_count; ++write_payload_index)
+		{
+			const TelemetryWriteRequestEntry& write_payload = payload.writes[write_payload_index];
+			if (parse_failed)
 			{
-				if (parse_failed)
-				{
-					return;
-				}
+				break;
+			}
 
-				if (!write_payload.is_object())
-				{
-					parse_failed = true;
-					parse_failed_error = "invalid_write_entry";
-					return;
-				}
+			if (!session_matches && !write_payload.has_field_path)
+			{
+				parse_failed = true;
+				parse_failed_status = WebResponseCode::PreconditionFailed;
+				parse_failed_error = "field_path_required_for_stale_session_write";
+				break;
+			}
 
-				int writable_index = -1;
-				uint16_t writable_handle = 0;
-				FixedString512 requested_path;
+			int writable_index = -1;
+			uint16_t writable_handle = 0;
+			FixedString512 requested_path;
 
-				const json::Value field_handle_node = write_payload["field_handle"];
-				if (field_handle_node.is_integer())
+			if (write_payload.has_field_handle)
+			{
+				writable_handle = write_payload.field_handle;
+				writable_index = find_writable_input_index_by_handle(writable_handle);
+			}
+
+			if (write_payload.has_field_path)
+			{
+				requested_path = write_payload.field_path.c_str();
+				const int path_index = find_writable_input_index_by_path(requested_path.c_str());
+				if (path_index >= 0)
 				{
-					const int64_t handle_value = field_handle_node.get_int64();
-					if (handle_value <= 0 || handle_value > 0xFFFF)
+					if (writable_index >= 0 && static_cast<size_t>(writable_index) != static_cast<size_t>(path_index))
 					{
 						parse_failed = true;
-						parse_failed_error = "invalid_field_handle";
-						return;
+						parse_failed_error = "field_handle_path_mismatch";
+						break;
 					}
-					writable_handle = static_cast<uint16_t>(handle_value);
-					writable_index = find_writable_input_index_by_handle(writable_handle);
+					writable_index = path_index;
+					writable_handle = writable_input_fields[static_cast<size_t>(writable_index)].handle;
 				}
+			}
 
-				const json::Value field_path_node = write_payload["field_path"];
-				if (field_path_node.is_string())
-				{
-					requested_path = field_path_node.get_c_string();
-					const int path_index = find_writable_input_index_by_path(requested_path.c_str());
-					if (path_index >= 0)
-					{
-						if (writable_index >= 0 && static_cast<size_t>(writable_index) != static_cast<size_t>(path_index))
-						{
-							parse_failed = true;
-							parse_failed_error = "field_handle_path_mismatch";
-							return;
-						}
-						writable_index = path_index;
-						writable_handle = writable_input_fields[static_cast<size_t>(writable_index)].handle;
-					}
-				}
+			if (writable_index < 0)
+			{
+				parse_failed = true;
+				parse_failed_status = WebResponseCode::NotFound;
+				parse_failed_error = "writable_input_not_found";
+				break;
+			}
 
-				if (writable_index < 0)
-				{
-					parse_failed = true;
-					parse_failed_status = WebResponseCode::NotFound;
-					parse_failed_error = "writable_input_not_found";
-					return;
-				}
+			if (!write_payload.has_value)
+			{
+				parse_failed = true;
+				parse_failed_error = "missing_value";
+				break;
+			}
 
-				if (!write_payload.contains("value"))
-				{
-					parse_failed = true;
-					parse_failed_error = "missing_value";
-					return;
-				}
+			WritableInputField& writable = writable_input_fields[static_cast<size_t>(writable_index)];
+			if (!writable.type_desc || writable.value_size == 0 || writable.value_size > kMaxWritePayloadBytes)
+			{
+				parse_failed = true;
+				parse_failed_error = "unsupported_target_field";
+				break;
+			}
 
-				WritableInputField& writable = writable_input_fields[static_cast<size_t>(writable_index)];
-				if (!writable.type_desc || writable.value_size == 0 || writable.value_size > kMaxWritePayloadBytes)
-				{
-					parse_failed = true;
-					parse_failed_error = "unsupported_target_field";
-					return;
-				}
+			ParsedWrite& parsed = parsed_writes[parsed_count];
+			parsed.writable_index = static_cast<size_t>(writable_index);
+			parsed.writable_handle = writable_handle;
+			parsed.staged.pending = true;
+			parsed.staged.payload_size = writable.value_size;
+			::memset(parsed.staged.payload, 0, sizeof(parsed.staged.payload));
+			if (!writable.type_desc->from_string(write_payload.value_text.c_str(), parsed.staged.payload))
+			{
+				parse_failed = true;
+				parse_failed_error = "value_parse_failed";
+				break;
+			}
 
-				FixedString256 value_text;
-				if (!json::scalar_to_fixed_string(write_payload["value"], value_text))
-				{
-					parse_failed = true;
-					parse_failed_error = "unsupported_value_type";
-					return;
-				}
+			if (write_payload.has_seq)
+			{
+				parsed.staged.seq = write_payload.seq;
+			}
 
-				ParsedWrite& parsed = parsed_writes[parsed_count];
-				parsed.writable_index = static_cast<size_t>(writable_index);
-				parsed.writable_handle = writable_handle;
-				parsed.staged.pending = true;
-				parsed.staged.payload_size = writable.value_size;
-				::memset(parsed.staged.payload, 0, sizeof(parsed.staged.payload));
-				if (!writable.type_desc->from_string(value_text.c_str(), parsed.staged.payload))
-				{
-					parse_failed = true;
-					parse_failed_error = "value_parse_failed";
-					return;
-				}
-
-				const json::Value seq_node = write_payload["seq"];
-				if (seq_node.is_integer())
-				{
-					const int64_t seq_value = seq_node.get_int64();
-					parsed.staged.seq = seq_value > 0 ? static_cast<uint64_t>(seq_value) : 0;
-				}
-
-				parsed_count += 1;
-			});
+			parsed_count += 1;
+		}
 
 		if (parse_failed)
 		{
@@ -1108,6 +1827,8 @@ namespace robotick
 				writer.start_object();
 				writer.key("status");
 				writer.string("processed");
+				writer.key("engine_session_id");
+				writer.string(session_id.c_str());
 				writer.key("writes");
 				writer.start_array();
 				for (size_t i = 0; i < parsed_count; ++i)
@@ -1184,20 +1905,17 @@ namespace robotick
 
 	struct EmittedTypeNames
 	{
-		HeapVector<FixedString256> names;
-		size_t count = 0;
+		static constexpr size_t capacity = 512;
+		FixedVector<uint32_t, capacity> hashes;
 
-		void initialize(const size_t capacity)
-		{
-			names.initialize(capacity);
-			count = 0;
-		}
+		void clear() { hashes.clear(); }
 
 		bool contains(const char* name) const
 		{
-			for (size_t i = 0; i < count; ++i)
+			const uint32_t target_hash = hash_string(name ? name : "");
+			for (size_t i = 0; i < hashes.size(); ++i)
 			{
-				if (names[i] == name)
+				if (hashes[i] == target_hash)
 				{
 					return true;
 				}
@@ -1207,8 +1925,8 @@ namespace robotick
 
 		void add(const char* name)
 		{
-			ROBOTICK_ASSERT_MSG(count < names.size(), "Telemetry layout emitted type capacity exceeded");
-			names[count++] = name ? name : "";
+			ROBOTICK_ASSERT_MSG(!hashes.full(), "Telemetry layout emitted type capacity exceeded");
+			hashes.add(hash_string(name ? name : ""));
 		}
 	};
 
@@ -1400,9 +2118,8 @@ namespace robotick
 		}
 		writer.end_array();
 
-		const size_t emitted_type_capacity = TypeRegistry::get().get_registered_count() + (instances.size() * 4) + 16;
 		EmittedTypeNames emitted_type_names;
-		emitted_type_names.initialize(emitted_type_capacity);
+		emitted_type_names.clear();
 
 		writer.key("types");
 		writer.start_array();

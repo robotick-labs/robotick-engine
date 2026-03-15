@@ -265,11 +265,18 @@ namespace robotick::json
 			return !document.HasParseError();
 		}
 
+		bool parse_in_situ(char* text)
+		{
+			document.ParseInsitu(text ? text : empty_buffer);
+			return !document.HasParseError();
+		}
+
 		Value root() const { return document.HasParseError() ? Value() : Value(&document); }
 
 		size_t get_error_offset() const { return document.HasParseError() ? document.GetErrorOffset() : 0; }
 
 	  private:
+		char empty_buffer[1] = {'\0'};
 		rapidjson::Document document;
 	};
 

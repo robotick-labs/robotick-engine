@@ -247,13 +247,25 @@ namespace robotick
 		// Body read (ESP32 doesn't support chunked POST in this setup)
 		if (req->content_len > 0)
 		{
-			size_t to_read = req->content_len;
-			char buf[1024];
-			int rd = httpd_req_recv(req, buf, to_read);
-			if (rd > 0)
+			if (req->content_len > static_cast<int>(r.body.capacity()))
 			{
-				r.body.set_bytes(buf, rd);
+				httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Request body too large");
+				return ESP_OK;
 			}
+
+			size_t total_read = 0;
+			while (total_read < static_cast<size_t>(req->content_len))
+			{
+				const size_t remaining = static_cast<size_t>(req->content_len) - total_read;
+				const int rd = httpd_req_recv(req, reinterpret_cast<char*>(r.body.data()) + total_read, static_cast<int>(remaining));
+				if (rd <= 0)
+				{
+					httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to read request body");
+					return ESP_OK;
+				}
+				total_read += static_cast<size_t>(rd);
+			}
+			r.body.set_size(total_read);
 		}
 
 		// Dynamic handler, skip static file logic (ESP-side)

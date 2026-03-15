@@ -770,6 +770,24 @@ namespace robotick::test
 			Thread::sleep_ms(50);
 			CHECK(peer_instance->inputs.input_float == Catch::Approx(11.0f));
 
+			::snprintf(body,
+				sizeof(body),
+				"{\"engine_session_id\":\"stale-session\",\"writes\":[{\"field_handle\":%u,\"field_path\":\"%s\",\"value\":21.5}]}",
+				static_cast<unsigned>(target_float_writable["field_handle"].get_uint64()),
+				target_float_writable["field_path"].get_c_string());
+			const HttpResponse stale_session_with_path_response = http_request(url, "POST", body);
+			REQUIRE(stale_session_with_path_response.status_code == 200);
+
+			Thread::sleep_ms(50);
+			CHECK(peer_instance->inputs.input_float == Catch::Approx(21.5f));
+
+			::snprintf(body,
+				sizeof(body),
+				"{\"engine_session_id\":\"stale-session\",\"writes\":[{\"field_handle\":%u,\"value\":33.0}]}",
+				static_cast<unsigned>(target_float_writable["field_handle"].get_uint64()));
+			const HttpResponse stale_session_handle_only_response = http_request(url, "POST", body);
+			REQUIRE(stale_session_handle_only_response.status_code == 412);
+
 			gateway_stop.set();
 			peer_stop.set();
 		}
@@ -833,6 +851,65 @@ namespace robotick::test
 
 			gateway_stop.set();
 			peer_stop.set();
+		}
+
+		SECTION("Telemetry gateway caches peer layout by session")
+		{
+			const uint16_t peer_port = choose_telemetry_port();
+			const uint16_t gateway_port = choose_telemetry_port();
+			REQUIRE(peer_port != 0);
+			REQUIRE(gateway_port != 0);
+			REQUIRE(peer_port != gateway_port);
+
+			Model peer_model;
+			peer_model.set_model_name("peer-model");
+			peer_model.set_telemetry_port(peer_port);
+			static const WorkloadSeed peer_root{TypeId("TickCounterWorkload"), StringView("peer_root"), 30.0f, {}, {}, {}};
+			static const WorkloadSeed* const peer_workloads[] = {&peer_root};
+			peer_model.use_workload_seeds(peer_workloads);
+			peer_model.set_root_workload(peer_root);
+
+			Model gateway_model;
+			gateway_model.set_model_name("gateway-model");
+			gateway_model.set_telemetry_port(gateway_port);
+			gateway_model.set_telemetry_is_gateway(true);
+			static const WorkloadSeed gateway_root{TypeId("TickCounterWorkload"), StringView("gateway_root"), 30.0f, {}, {}, {}};
+			static const WorkloadSeed* const gateway_workloads[] = {&gateway_root};
+			static const TelemetryPeerSeed telemetry_peer{StringView("peer-model"), StringView("127.0.0.1"), peer_port, false};
+			static const TelemetryPeerSeed* const gateway_peers[] = {&telemetry_peer};
+			gateway_model.use_workload_seeds(gateway_workloads);
+			gateway_model.use_telemetry_peer_seeds(gateway_peers);
+			gateway_model.set_root_workload(gateway_root);
+
+			Engine peer_engine;
+			peer_engine.load(peer_model);
+			AtomicFlag peer_stop{false};
+			EngineRunThread peer_runner(peer_engine, peer_stop);
+
+			Engine gateway_engine;
+			gateway_engine.load(gateway_model);
+			AtomicFlag gateway_stop{false};
+			EngineRunThread gateway_runner(gateway_engine, gateway_stop);
+
+			Thread::sleep_ms(100);
+
+			char url[256];
+			::snprintf(url,
+				sizeof(url),
+				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/workloads_buffer/layout",
+				static_cast<unsigned int>(gateway_port));
+
+			const HttpResponse initial_layout = http_request(url);
+			REQUIRE(initial_layout.status_code == 200);
+
+			peer_stop.set();
+			Thread::sleep_ms(100);
+
+			const HttpResponse cached_layout = http_request(url);
+			REQUIRE(cached_layout.status_code == 200);
+			CHECK(StringView(cached_layout.body.data).equals(initial_layout.body.data));
+
+			gateway_stop.set();
 		}
 	}
 
