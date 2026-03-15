@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <csignal> // For signal(), SIGPIPE, SIG_IGN
 #include <cstring>
+#include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -97,7 +98,7 @@ namespace robotick
 			int fd = socket(AF_INET, SOCK_STREAM, 0);
 			if (fd < 0)
 			{
-				ROBOTICK_WARNING("Failed to create socket");
+				ROBOTICK_WARNING("Failed to create socket: errno=%d (%s)", errno, strerror(errno));
 				return -1;
 			}
 
@@ -106,15 +107,19 @@ namespace robotick
 			// Allow address reuse
 			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
 			{
+				const int err = errno;
 				close(fd);
-				ROBOTICK_WARNING("Failed to set SO_REUSEADDR on socket");
+				ROBOTICK_WARNING("Failed to set SO_REUSEADDR on socket: errno=%d (%s)", err, strerror(err));
+				return -1;
 			}
 
 			// Disable Nagle's algorithm (batches up messages) — send every message immediately (essential for real-time control)
 			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0)
 			{
+				const int err = errno;
 				close(fd);
-				ROBOTICK_WARNING("Failed to set TCP_NODELAY on socket");
+				ROBOTICK_WARNING("Failed to set TCP_NODELAY on socket: errno=%d (%s)", err, strerror(err));
+				return -1;
 			}
 
 			// Set non-blocking

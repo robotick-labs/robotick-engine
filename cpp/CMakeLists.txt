@@ -60,12 +60,6 @@ file(GLOB_RECURSE ALL_CPP_SOURCES CONFIGURE_DEPENDS
 list(LENGTH ALL_CPP_SOURCES ALL_CPP_SOURCES_COUNT)
 message(STATUS "ALL_CPP_SOURCES: ${ALL_CPP_SOURCES_COUNT}")
 
-# ============================
-# Dependencies
-# ============================
-
-add_subdirectory(lib/json)
-
 # Minimal civetweb (added before linking)
 add_library(civetweb STATIC lib/civetweb/src/civetweb.c)
 target_include_directories(civetweb PUBLIC lib/civetweb/include)
@@ -83,10 +77,7 @@ target_compile_options(robotick-engine PRIVATE -fno-exceptions)
 
 target_include_directories(robotick-engine PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/include
-)
-
-target_link_libraries(robotick-engine PUBLIC
-    nlohmann_json::nlohmann_json
+    ${CMAKE_CURRENT_LIST_DIR}/lib/rapidjson/include
 )
 
 if (DEFINED ROBOTICK_PLATFORM_LINUX OR DEFINED ROBOTICK_PLATFORM_DESKTOP)
@@ -119,10 +110,7 @@ target_compile_options(robotick-engine-static PRIVATE -fno-exceptions)
 
 target_include_directories(robotick-engine-static PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/include
-)
-
-target_link_libraries(robotick-engine-static PUBLIC
-    nlohmann_json::nlohmann_json
+    ${CMAKE_CURRENT_LIST_DIR}/lib/rapidjson/include
 )
 
 if (DEFINED ROBOTICK_PLATFORM_LINUX OR DEFINED ROBOTICK_PLATFORM_DESKTOP)

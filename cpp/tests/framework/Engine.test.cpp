@@ -8,6 +8,7 @@
 #include "robotick/framework/concurrency/Thread.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/data/TelemetryServer.h"
+#include "robotick/framework/json/Json.h"
 
 #include <algorithm>
 #include <arpa/inet.h>
@@ -16,13 +17,7 @@
 #include <chrono>
 #include <curl/curl.h>
 #include <netinet/in.h>
-#include <nlohmann/json.hpp>
 #include <sys/socket.h>
-
-namespace robotick
-{
-	nlohmann::ordered_json build_workloads_buffer_layout_json(const Engine& engine, const char* session_id_override);
-}
 
 namespace robotick::test
 {
@@ -546,42 +541,57 @@ namespace robotick::test
 		SECTION("Telemetry layout emits enum metadata")
 		{
 			Model model;
-			model.set_telemetry_port(choose_telemetry_port());
-			static const WorkloadSeed workload_seed{TypeId("LayoutEnumWorkload"), StringView("layout_enum"), 30.0f, {}, {}, {}};
-			static const WorkloadSeed* const workloads[] = {&workload_seed};
+			const uint16_t telemetry_port = choose_telemetry_port();
+			model.set_telemetry_port(telemetry_port);
+			static const WorkloadSeed layout_workload_seed{TypeId("LayoutEnumWorkload"), StringView("layout_enum"), 30.0f, {}, {}, {}};
+			static const WorkloadSeed root_workload_seed{TypeId("TickCounterWorkload"), StringView("layout_root"), 30.0f, {}, {}, {}};
+			static const WorkloadSeed* const workloads[] = {&layout_workload_seed, &root_workload_seed};
 			model.use_workload_seeds(workloads);
-			model.set_root_workload(workload_seed);
+			model.set_root_workload(root_workload_seed);
 
 			Engine engine;
 			engine.load(model);
+			AtomicFlag stop_flag{false};
+			EngineRunThread runner(engine, stop_flag);
 
-			nlohmann::ordered_json layout = build_workloads_buffer_layout_json(engine, "test");
+			char url[256];
+			::snprintf(url, sizeof(url), "http://127.0.0.1:%u/api/telemetry/workloads_buffer/layout", static_cast<unsigned int>(telemetry_port));
+			Thread::sleep_ms(50);
+			const HttpResponse layout_response = http_request(url);
+			REQUIRE(layout_response.status_code == 200);
 
+			json::Document layout_document;
+			REQUIRE(layout_document.parse(layout_response.body.data));
+			const json::Value layout = layout_document.root();
 			REQUIRE(layout.contains("types"));
-			const auto& types = layout["types"];
-			const nlohmann::ordered_json* enum_it = nullptr;
-			for (const auto& type_json : types)
-			{
-				if (type_json.contains("name") && type_json["name"] == "LayoutTestEnum")
+			const json::Value types = layout["types"];
+			REQUIRE(types.is_array());
+
+			json::Value enum_it;
+			types.for_each_array(
+				[&](const json::Value type_json)
 				{
-					enum_it = &type_json;
-					break;
-				}
-			}
-			REQUIRE(enum_it != nullptr);
+					if (!enum_it.is_valid() && type_json.contains("name") && type_json["name"].equals("LayoutTestEnum"))
+					{
+						enum_it = type_json;
+					}
+				});
+			REQUIRE(enum_it.is_valid());
 
-			REQUIRE(enum_it->contains("enum_values"));
-			const auto& enum_values = (*enum_it)["enum_values"];
+			REQUIRE(enum_it.contains("enum_values"));
+			const json::Value enum_values = enum_it["enum_values"];
 			REQUIRE(enum_values.size() == 3);
-			CHECK(enum_values[0]["name"] == "Alpha");
-			CHECK(enum_values[0]["value"] == 0);
-			CHECK(enum_values[1]["name"] == "Beta");
-			CHECK(enum_values[1]["value"] == 1);
-			CHECK(enum_values[2]["name"] == "Gamma");
-			CHECK(enum_values[2]["value"] == 2);
+			CHECK(enum_values[static_cast<size_t>(0)]["name"].equals("Alpha"));
+			CHECK(enum_values[static_cast<size_t>(0)]["value"].get_int64() == 0);
+			CHECK(enum_values[static_cast<size_t>(1)]["name"].equals("Beta"));
+			CHECK(enum_values[static_cast<size_t>(1)]["value"].get_int64() == 1);
+			CHECK(enum_values[static_cast<size_t>(2)]["name"].equals("Gamma"));
+			CHECK(enum_values[static_cast<size_t>(2)]["value"].get_int64() == 2);
 
-			CHECK((*enum_it)["enum_underlying_size"] == sizeof(LayoutTestEnum));
-			CHECK((*enum_it)["enum_is_flags"] == false);
+			CHECK(enum_it["enum_underlying_size"].get_int64() == sizeof(LayoutTestEnum));
+			CHECK(enum_it["enum_is_flags"].get_bool() == false);
+
+			stop_flag.set();
 		}
 
 		SECTION("start_fn executes on same thread as tick_fn")
@@ -624,52 +634,24 @@ namespace robotick::test
 			REQUIRE(gateway_port != 0);
 			REQUIRE(peer_port != gateway_port);
 
-				Model peer_model;
-				peer_model.set_model_name("peer-model");
-				peer_model.set_telemetry_port(peer_port);
-				static const FieldConfigEntry peer_inputs[] = {{"input_float", "1.0"}, {"input_string_64", "hello"}};
-				static const WorkloadSeed peer_root{
-					TypeId("TickCounterWorkload"),
-					StringView("peer_root"),
-					30.0f,
-					{},
-					{},
-					{}};
-				static const WorkloadSeed peer_workload{
-					TypeId("DummyWorkload"),
-					StringView("peer_dummy"),
-					30.0f,
-					{},
-					{},
-					peer_inputs};
-				static const WorkloadSeed* const peer_workloads[] = {&peer_workload, &peer_root};
-				peer_model.use_workload_seeds(peer_workloads);
-				peer_model.set_root_workload(peer_root);
+			Model peer_model;
+			peer_model.set_model_name("peer-model");
+			peer_model.set_telemetry_port(peer_port);
+			static const FieldConfigEntry peer_inputs[] = {{"input_float", "1.0"}, {"input_string_64", "hello"}};
+			static const WorkloadSeed peer_root{TypeId("TickCounterWorkload"), StringView("peer_root"), 30.0f, {}, {}, {}};
+			static const WorkloadSeed peer_workload{TypeId("DummyWorkload"), StringView("peer_dummy"), 30.0f, {}, {}, peer_inputs};
+			static const WorkloadSeed* const peer_workloads[] = {&peer_workload, &peer_root};
+			peer_model.use_workload_seeds(peer_workloads);
+			peer_model.set_root_workload(peer_root);
 
 			Model gateway_model;
 			gateway_model.set_model_name("gateway-model");
 			gateway_model.set_telemetry_port(gateway_port);
 			gateway_model.set_telemetry_is_gateway(true);
-				static const WorkloadSeed gateway_workload{
-					TypeId("TickCounterWorkload"),
-					StringView("gateway_counter"),
-					30.0f,
-					{},
-					{},
-					{}};
-				static const WorkloadSeed gateway_root{
-					TypeId("TickCounterWorkload"),
-					StringView("gateway_root"),
-					30.0f,
-					{},
-					{},
-					{}};
-				static const WorkloadSeed* const gateway_workloads[] = {&gateway_workload, &gateway_root};
-			static const TelemetryPeerSeed telemetry_peer{
-				StringView("peer-model"),
-				StringView("127.0.0.1"),
-				peer_port,
-				false};
+			static const WorkloadSeed gateway_workload{TypeId("TickCounterWorkload"), StringView("gateway_counter"), 30.0f, {}, {}, {}};
+			static const WorkloadSeed gateway_root{TypeId("TickCounterWorkload"), StringView("gateway_root"), 30.0f, {}, {}, {}};
+			static const WorkloadSeed* const gateway_workloads[] = {&gateway_workload, &gateway_root};
+			static const TelemetryPeerSeed telemetry_peer{StringView("peer-model"), StringView("127.0.0.1"), peer_port, false};
 			static const TelemetryPeerSeed* const gateway_peers[] = {&telemetry_peer};
 			gateway_model.use_workload_seeds(gateway_workloads);
 			gateway_model.use_telemetry_peer_seeds(gateway_peers);
@@ -691,55 +673,72 @@ namespace robotick::test
 			::snprintf(url, sizeof(url), "http://127.0.0.1:%u/api/telemetry-gateway/models", static_cast<unsigned int>(gateway_port));
 			const HttpResponse models_response = http_request(url);
 			REQUIRE(models_response.status_code == 200);
-			const auto models_json = nlohmann::json::parse(models_response.body.data, nullptr, false);
+			json::Document models_document;
+			REQUIRE(models_document.parse(models_response.body.data));
+			const json::Value models_json = models_document.root();
 			REQUIRE(models_json.is_object());
 			REQUIRE(models_json.contains("models"));
-			const auto models_dump = models_json["models"].dump();
-			REQUIRE(contains_text(models_dump.c_str(), "gateway-model"));
-			REQUIRE(contains_text(models_dump.c_str(), "peer-model"));
+			const json::Value models = models_json["models"];
+			bool saw_gateway_model = false;
+			bool saw_peer_model = false;
+			models.for_each_array(
+				[&](const json::Value model_json)
+				{
+					if (model_json["model_id"].equals("gateway-model"))
+					{
+						saw_gateway_model = true;
+					}
+					if (model_json["model_id"].equals("peer-model"))
+					{
+						saw_peer_model = true;
+					}
+				});
+			REQUIRE(saw_gateway_model);
+			REQUIRE(saw_peer_model);
 
-			::snprintf(
-				url,
+			::snprintf(url,
 				sizeof(url),
 				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/workloads_buffer/layout",
 				static_cast<unsigned int>(gateway_port));
 			const HttpResponse layout_response = http_request(url);
 			REQUIRE(layout_response.status_code == 200);
-			const auto layout_json = nlohmann::json::parse(layout_response.body.data, nullptr, false);
+			json::Document layout_document;
+			REQUIRE(layout_document.parse(layout_response.body.data));
+			const json::Value layout_json = layout_document.root();
 			REQUIRE(layout_json.is_object());
 			REQUIRE(layout_json.contains("engine_session_id"));
 			REQUIRE(layout_json.contains("writable_inputs"));
 
-			const auto& writable_inputs = layout_json["writable_inputs"];
+			const json::Value writable_inputs = layout_json["writable_inputs"];
 			REQUIRE(writable_inputs.is_array());
-			const nlohmann::json* target_float_writable = nullptr;
-			const nlohmann::json* target_string_writable = nullptr;
-			for (const auto& writable : writable_inputs)
-			{
-				if (writable.contains("field_path")
-					&& contains_text(writable["field_path"].get_ref<const nlohmann::json::string_t&>().c_str(), "input_float"))
+			json::Value target_float_writable;
+			json::Value target_string_writable;
+			writable_inputs.for_each_array(
+				[&](const json::Value writable)
 				{
-					target_float_writable = &writable;
-				}
-				if (writable.contains("field_path")
-					&& contains_text(writable["field_path"].get_ref<const nlohmann::json::string_t&>().c_str(), "input_string_64"))
-				{
-					target_string_writable = &writable;
-				}
-			}
-			REQUIRE(target_float_writable != nullptr);
-			REQUIRE(target_string_writable != nullptr);
+					if (!target_float_writable.is_valid() && writable.contains("field_path") &&
+						contains_text(writable["field_path"].get_c_string(), "input_float"))
+					{
+						target_float_writable = writable;
+					}
+					if (!target_string_writable.is_valid() && writable.contains("field_path") &&
+						contains_text(writable["field_path"].get_c_string(), "input_string_64"))
+					{
+						target_string_writable = writable;
+					}
+				});
+			REQUIRE(target_float_writable.is_valid());
+			REQUIRE(target_string_writable.is_valid());
 
 			char body[512];
-			::snprintf(
-				body,
+			::snprintf(body,
 				sizeof(body),
-				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":42.25},{\"field_handle\":%u,\"value\":\"updated via batch\"}]}",
-				layout_json["engine_session_id"].get_ref<const nlohmann::json::string_t&>().c_str(),
-				target_float_writable->value("field_handle", 0),
-				target_string_writable->value("field_handle", 0));
-			::snprintf(
-				url,
+				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":42.25},{\"field_handle\":%u,\"value\":\"updated via "
+				"batch\"}]}",
+				layout_json["engine_session_id"].get_c_string(),
+				static_cast<unsigned>(target_float_writable["field_handle"].get_uint64()),
+				static_cast<unsigned>(target_string_writable["field_handle"].get_uint64()));
+			::snprintf(url,
 				sizeof(url),
 				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/set_workload_input_fields_data",
 				static_cast<unsigned int>(gateway_port));
@@ -752,21 +751,19 @@ namespace robotick::test
 			CHECK(peer_instance->inputs.input_float == Catch::Approx(42.25f));
 			CHECK(peer_instance->inputs.input_string_64 == "updated via batch");
 
-			::snprintf(
-				body,
+			::snprintf(body,
 				sizeof(body),
 				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":11.0,\"seq\":100}]}",
-				layout_json["engine_session_id"].get_ref<const nlohmann::json::string_t&>().c_str(),
-				target_float_writable->value("field_handle", 0));
+				layout_json["engine_session_id"].get_c_string(),
+				static_cast<unsigned>(target_float_writable["field_handle"].get_uint64()));
 			const HttpResponse latest_write_response = http_request(url, "POST", body);
 			REQUIRE(latest_write_response.status_code == 200);
 
-			::snprintf(
-				body,
+			::snprintf(body,
 				sizeof(body),
 				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":-99.0,\"seq\":99}]}",
-				layout_json["engine_session_id"].get_ref<const nlohmann::json::string_t&>().c_str(),
-				target_float_writable->value("field_handle", 0));
+				layout_json["engine_session_id"].get_c_string(),
+				static_cast<unsigned>(target_float_writable["field_handle"].get_uint64()));
 			const HttpResponse stale_write_response = http_request(url, "POST", body);
 			REQUIRE(stale_write_response.status_code == 200);
 
@@ -792,13 +789,7 @@ namespace robotick::test
 			Model peer_model;
 			peer_model.set_model_name("peer-model");
 			peer_model.set_telemetry_port(peer_port);
-			static const WorkloadSeed peer_root{
-				TypeId("TickCounterWorkload"),
-				StringView("peer_root"),
-				30.0f,
-				{},
-				{},
-				{}};
+			static const WorkloadSeed peer_root{TypeId("TickCounterWorkload"), StringView("peer_root"), 30.0f, {}, {}, {}};
 			static const WorkloadSeed* const peer_workloads[] = {&peer_root};
 			peer_model.use_workload_seeds(peer_workloads);
 			peer_model.set_root_workload(peer_root);
@@ -807,19 +798,9 @@ namespace robotick::test
 			gateway_model.set_model_name("gateway-model");
 			gateway_model.set_telemetry_port(gateway_port);
 			gateway_model.set_telemetry_is_gateway(true);
-			static const WorkloadSeed gateway_root{
-				TypeId("TickCounterWorkload"),
-				StringView("gateway_root"),
-				30.0f,
-				{},
-				{},
-				{}};
+			static const WorkloadSeed gateway_root{TypeId("TickCounterWorkload"), StringView("gateway_root"), 30.0f, {}, {}, {}};
 			static const WorkloadSeed* const gateway_workloads[] = {&gateway_root};
-			static const TelemetryPeerSeed stale_peer{
-				StringView("peer-model"),
-				StringView("127.0.0.1"),
-				stale_peer_port,
-				false};
+			static const TelemetryPeerSeed stale_peer{StringView("peer-model"), StringView("127.0.0.1"), stale_peer_port, false};
 			static const TelemetryPeerSeed* const gateway_peers[] = {&stale_peer};
 			gateway_model.use_workload_seeds(gateway_workloads);
 			gateway_model.use_telemetry_peer_seeds(gateway_peers);
@@ -838,8 +819,7 @@ namespace robotick::test
 			Thread::sleep_ms(100);
 
 			char url[256];
-			::snprintf(
-				url,
+			::snprintf(url,
 				sizeof(url),
 				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/workloads_buffer/layout",
 				static_cast<unsigned int>(gateway_port));

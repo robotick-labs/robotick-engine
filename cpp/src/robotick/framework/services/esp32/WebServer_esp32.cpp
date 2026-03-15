@@ -16,14 +16,52 @@ namespace robotick
 		httpd_handle_t handle = nullptr;
 	};
 
+	namespace
+	{
+		const char* get_reason_phrase(const int status_code)
+		{
+			switch (status_code)
+			{
+			case 200:
+				return "OK";
+			case 201:
+				return "Created";
+			case 204:
+				return "No Content";
+			case 400:
+				return "Bad Request";
+			case 401:
+				return "Unauthorized";
+			case 403:
+				return "Forbidden";
+			case 404:
+				return "Not Found";
+			case 405:
+				return "Method Not Allowed";
+			case 409:
+				return "Conflict";
+			case 412:
+				return "Precondition Failed";
+			case 500:
+				return "Internal Server Error";
+			case 501:
+				return "Not Implemented";
+			case 503:
+				return "Service Unavailable";
+			default:
+				return "OK";
+			}
+		}
+	} // namespace
+
 	// ----------------------------------------
 	//  Write utilities
 	// ----------------------------------------
 
 	static inline void write_status_and_cors(httpd_req_t* req, int status_code)
 	{
-		char status_line[32];
-		snprintf(status_line, sizeof(status_line), "%d OK", status_code);
+		char status_line[64];
+		snprintf(status_line, sizeof(status_line), "%d %s", status_code, get_reason_phrase(status_code));
 		httpd_resp_set_status(req, status_line);
 
 		httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
@@ -270,13 +308,15 @@ namespace robotick
 		httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 		config.server_port = port;
 		config.uri_match_fn = httpd_uri_match_wildcard;
-		// Telemetry layout generation can recurse through reflected types and build
-		// a sizeable JSON payload before chunked sending begins.
-		config.stack_size = 32768;
+		config.max_open_sockets = 7;
+		config.lru_purge_enable = true;
+		config.task_caps = MALLOC_CAP_8BIT;
+		config.stack_size = 12288;
 
-		if (httpd_start(&s->handle, &config) != ESP_OK)
+		const esp_err_t start_err = httpd_start(&s->handle, &config);
+		if (start_err != ESP_OK)
 		{
-			ROBOTICK_FATAL_EXIT("Failed to start ESP32 WebServer");
+			ROBOTICK_FATAL_EXIT("Failed to start ESP32 WebServer: %s", esp_err_to_name(start_err));
 		}
 
 		httpd_uri_t get_uri = {.uri = "/*", .method = HTTP_GET, .handler = esp32_handler, .user_ctx = this};

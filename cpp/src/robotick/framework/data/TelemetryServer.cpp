@@ -9,14 +9,13 @@
 #include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
+#include "robotick/framework/json/Json.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/services/WebServer.h"
 #include "robotick/framework/strings/FixedString.h"
 #include "robotick/framework/strings/StringView.h"
 #include "robotick/framework/time/Clock.h"
 #include "robotick/framework/utility/Algorithm.h"
-
-#include <nlohmann/json.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -35,36 +34,30 @@
 
 namespace robotick
 {
-	nlohmann::ordered_json build_workloads_buffer_layout_json(const Engine& engine, const char* session_id_override);
-
 	namespace
 	{
-		static void set_json_response(WebResponse& res, const int status_code, const nlohmann::ordered_json& payload)
+		template <typename BuildFn> static void set_json_response(WebResponse& res, const int status_code, BuildFn&& build_json)
 		{
+			json::StringSink sink;
+			json::Writer<json::StringSink> writer(sink);
+			build_json(writer);
+			writer.flush();
 			res.set_status_code(status_code);
 			res.set_content_type("application/json");
-			const auto body = payload.dump();
-			res.set_body_string(body.c_str());
+			res.set_body(sink.c_str(), sink.size());
 		}
 
-		static bool json_value_to_text(const nlohmann::json& value, FixedString256& out)
+		static void set_error_response(WebResponse& res, const int status_code, const char* error_text)
 		{
-			if (value.is_string())
-			{
-				out = value.get_ref<const nlohmann::json::string_t&>().c_str();
-				return true;
-			}
-			if (value.is_boolean())
-			{
-				out = value.get<bool>() ? "true" : "false";
-				return true;
-			}
-			if (value.is_number())
-			{
-				out = value.dump().c_str();
-				return true;
-			}
-			return false;
+			set_json_response(res,
+				status_code,
+				[&](auto& writer)
+				{
+					writer.start_object();
+					writer.key("error");
+					writer.string(error_text);
+					writer.end_object();
+				});
 		}
 
 		static bool is_supported_writable_type(const TypeDescriptor* type_desc)
@@ -423,9 +416,7 @@ namespace robotick
 			{
 				if (!impl || !impl->engine)
 				{
-					nlohmann::ordered_json body;
-					body["error"] = "engine_not_available";
-					set_json_response(res, WebResponseCode::ServiceUnavailable, body);
+					set_error_response(res, WebResponseCode::ServiceUnavailable, "engine_not_available");
 					return true;
 				}
 
@@ -454,10 +445,17 @@ namespace robotick
 							return true;
 						}
 
-						nlohmann::ordered_json body;
-						body["error"] = "telemetry_peer_not_found";
-						body["model_id"] = routed_model_id.c_str();
-						set_json_response(res, WebResponseCode::NotFound, body);
+						set_json_response(res,
+							WebResponseCode::NotFound,
+							[&](auto& writer)
+							{
+								writer.start_object();
+								writer.key("error");
+								writer.string("telemetry_peer_not_found");
+								writer.key("model_id");
+								writer.string(routed_model_id.c_str());
+								writer.end_object();
+							});
 						return true;
 					}
 				}
@@ -638,32 +636,50 @@ namespace robotick
 
 	void TelemetryServer::Impl::handle_get_gateway_models(WebResponse& res)
 	{
-		nlohmann::ordered_json response_json;
-		response_json["gateway_model_id"] = engine ? engine->get_model_name() : "";
-		response_json["models"] = nlohmann::ordered_json::array();
+		set_json_response(res,
+			WebResponseCode::OK,
+			[&](auto& writer)
+			{
+				writer.start_object();
+				writer.key("gateway_model_id");
+				writer.string(engine ? engine->get_model_name() : "");
+				writer.key("models");
+				writer.start_array();
 
-		nlohmann::ordered_json local_model_json;
-		local_model_json["model_id"] = engine ? engine->get_model_name() : "";
-		local_model_json["is_local"] = true;
-		local_model_json["is_gateway"] = true;
-		FixedString128 local_path;
-		local_path.format("/api/telemetry-gateway/%s", engine ? engine->get_model_name() : "");
-		local_model_json["telemetry_path"] = local_path.c_str();
-		response_json["models"].push_back(local_model_json);
+				FixedString128 local_path;
+				local_path.format("/api/telemetry-gateway/%s", engine ? engine->get_model_name() : "");
 
-		for (const TelemetryPeerRoute& peer : telemetry_peers)
-		{
-			nlohmann::ordered_json peer_json;
-			peer_json["model_id"] = peer.model_id.c_str();
-			peer_json["is_local"] = false;
-			peer_json["is_gateway"] = peer.is_gateway;
-			FixedString128 path;
-			path.format("/api/telemetry-gateway/%s", peer.model_id.c_str());
-			peer_json["telemetry_path"] = path.c_str();
-			response_json["models"].push_back(peer_json);
-		}
+				writer.start_object();
+				writer.key("model_id");
+				writer.string(engine ? engine->get_model_name() : "");
+				writer.key("is_local");
+				writer.boolean(true);
+				writer.key("is_gateway");
+				writer.boolean(true);
+				writer.key("telemetry_path");
+				writer.string(local_path);
+				writer.end_object();
 
-		set_json_response(res, WebResponseCode::OK, response_json);
+				for (const TelemetryPeerRoute& peer : telemetry_peers)
+				{
+					FixedString128 path;
+					path.format("/api/telemetry-gateway/%s", peer.model_id.c_str());
+
+					writer.start_object();
+					writer.key("model_id");
+					writer.string(peer.model_id);
+					writer.key("is_local");
+					writer.boolean(false);
+					writer.key("is_gateway");
+					writer.boolean(peer.is_gateway);
+					writer.key("telemetry_path");
+					writer.string(path);
+					writer.end_object();
+				}
+
+				writer.end_array();
+				writer.end_object();
+			});
 	}
 
 	void TelemetryServer::Impl::handle_forwarded_telemetry_request(
@@ -676,11 +692,19 @@ namespace robotick
 		ForwardHttpResult forwarded;
 		if (!perform_forwarded_http_request(req.method.c_str(), url.c_str(), req, forwarded) || !forwarded.transport_ok)
 		{
-			nlohmann::ordered_json error_json;
-			error_json["error"] = "telemetry_forward_failed";
-			error_json["model_id"] = peer.model_id.c_str();
-			error_json["target_url"] = url.c_str();
-			set_json_response(res, WebResponseCode::ServiceUnavailable, error_json);
+			set_json_response(res,
+				WebResponseCode::ServiceUnavailable,
+				[&](auto& writer)
+				{
+					writer.start_object();
+					writer.key("error");
+					writer.string("telemetry_forward_failed");
+					writer.key("model_id");
+					writer.string(peer.model_id);
+					writer.key("target_url");
+					writer.string(url);
+					writer.end_object();
+				});
 			return;
 		}
 
@@ -706,9 +730,7 @@ namespace robotick
 		(void)req;
 		(void)peer;
 		(void)suffix_uri;
-		nlohmann::ordered_json error_json;
-		error_json["error"] = "telemetry_forwarding_not_supported_on_this_platform";
-		set_json_response(res, WebResponseCode::NotImplemented, error_json);
+		set_error_response(res, WebResponseCode::NotImplemented, "telemetry_forwarding_not_supported_on_this_platform");
 #endif
 	}
 
@@ -867,46 +889,47 @@ namespace robotick
 			PendingInputWrite staged;
 		};
 
-		nlohmann::ordered_json response_json;
 		if (!engine)
 		{
-			response_json["error"] = "engine_not_available";
-			set_json_response(res, WebResponseCode::ServiceUnavailable, response_json);
+			set_error_response(res, WebResponseCode::ServiceUnavailable, "engine_not_available");
 			return;
 		}
 
-		const uint8_t* body_begin = req.body.data();
-		const uint8_t* body_end = body_begin + req.body.size();
-		const nlohmann::json payload = nlohmann::json::parse(body_begin, body_end, nullptr, /*allow_exceptions*/ false);
-		if (payload.is_discarded() || !payload.is_object())
+		json::Document payload_document;
+		if (!payload_document.parse(req.body.data(), req.body.size()))
 		{
-			response_json["error"] = "invalid_json";
-			set_json_response(res, WebResponseCode::BadRequest, response_json);
+			set_error_response(res, WebResponseCode::BadRequest, "invalid_json");
 			return;
 		}
+		const json::Value payload = payload_document.root();
 
-		const nlohmann::json session_node = payload.contains("engine_session_id") ? payload["engine_session_id"] : nlohmann::json();
+		const json::Value session_node = payload["engine_session_id"];
 		if (!session_node.is_string())
 		{
-			response_json["error"] = "missing_engine_session_id";
-			set_json_response(res, WebResponseCode::BadRequest, response_json);
+			set_error_response(res, WebResponseCode::BadRequest, "missing_engine_session_id");
 			return;
 		}
 
-		const auto& request_session = session_node.get_ref<const nlohmann::json::string_t&>();
-		if (!StringView(session_id.c_str()).equals(request_session.c_str()))
+		if (!StringView(session_id.c_str()).equals(session_node.get_c_string()))
 		{
-			response_json["error"] = "session_mismatch";
-			response_json["engine_session_id"] = session_id.c_str();
-			set_json_response(res, WebResponseCode::PreconditionFailed, response_json);
+			set_json_response(res,
+				WebResponseCode::PreconditionFailed,
+				[&](auto& writer)
+				{
+					writer.start_object();
+					writer.key("error");
+					writer.string("session_mismatch");
+					writer.key("engine_session_id");
+					writer.string(session_id.c_str());
+					writer.end_object();
+				});
 			return;
 		}
 
-		const nlohmann::json writes_node = payload.contains("writes") ? payload["writes"] : nlohmann::json();
-		if (!writes_node.is_array() || writes_node.empty())
+		const json::Value writes_node = payload["writes"];
+		if (!writes_node.is_array() || writes_node.size() == 0)
 		{
-			response_json["error"] = "missing_writes";
-			set_json_response(res, WebResponseCode::BadRequest, response_json);
+			set_error_response(res, WebResponseCode::BadRequest, "missing_writes");
 			return;
 		}
 
@@ -914,103 +937,133 @@ namespace robotick
 		parsed_writes.initialize(writes_node.size());
 		size_t parsed_count = 0;
 
-		for (const nlohmann::json& write_payload : writes_node)
-		{
-			if (!write_payload.is_object())
-			{
-				response_json["error"] = "invalid_write_entry";
-				set_json_response(res, WebResponseCode::BadRequest, response_json);
-				return;
-			}
+		bool parse_failed = false;
+		int parse_failed_status = WebResponseCode::BadRequest;
+		const char* parse_failed_error = nullptr;
 
-			int writable_index = -1;
-			uint16_t writable_handle = 0;
-			FixedString512 requested_path;
-
-			if (write_payload.contains("field_handle") && write_payload["field_handle"].is_number_integer())
+		writes_node.for_each_array(
+			[&](const json::Value write_payload)
 			{
-				const long long handle_value = write_payload["field_handle"].get<long long>();
-				if (handle_value <= 0 || handle_value > 0xFFFF)
+				if (parse_failed)
 				{
-					response_json["error"] = "invalid_field_handle";
-					set_json_response(res, WebResponseCode::BadRequest, response_json);
 					return;
 				}
-				writable_handle = static_cast<uint16_t>(handle_value);
-				writable_index = find_writable_input_index_by_handle(writable_handle);
-			}
 
-			if (write_payload.contains("field_path") && write_payload["field_path"].is_string())
-			{
-				requested_path = write_payload["field_path"].get_ref<const nlohmann::json::string_t&>().c_str();
-				const int path_index = find_writable_input_index_by_path(requested_path.c_str());
-				if (path_index >= 0)
+				if (!write_payload.is_object())
 				{
-					if (writable_index >= 0 && static_cast<size_t>(writable_index) != static_cast<size_t>(path_index))
+					parse_failed = true;
+					parse_failed_error = "invalid_write_entry";
+					return;
+				}
+
+				int writable_index = -1;
+				uint16_t writable_handle = 0;
+				FixedString512 requested_path;
+
+				const json::Value field_handle_node = write_payload["field_handle"];
+				if (field_handle_node.is_integer())
+				{
+					const int64_t handle_value = field_handle_node.get_int64();
+					if (handle_value <= 0 || handle_value > 0xFFFF)
 					{
-						response_json["error"] = "field_handle_path_mismatch";
-						set_json_response(res, WebResponseCode::BadRequest, response_json);
+						parse_failed = true;
+						parse_failed_error = "invalid_field_handle";
 						return;
 					}
-					writable_index = path_index;
-					writable_handle = writable_input_fields[static_cast<size_t>(writable_index)].handle;
+					writable_handle = static_cast<uint16_t>(handle_value);
+					writable_index = find_writable_input_index_by_handle(writable_handle);
 				}
-			}
 
-			if (writable_index < 0)
-			{
-				response_json["error"] = "writable_input_not_found";
-				set_json_response(res, WebResponseCode::NotFound, response_json);
-				return;
-			}
+				const json::Value field_path_node = write_payload["field_path"];
+				if (field_path_node.is_string())
+				{
+					requested_path = field_path_node.get_c_string();
+					const int path_index = find_writable_input_index_by_path(requested_path.c_str());
+					if (path_index >= 0)
+					{
+						if (writable_index >= 0 && static_cast<size_t>(writable_index) != static_cast<size_t>(path_index))
+						{
+							parse_failed = true;
+							parse_failed_error = "field_handle_path_mismatch";
+							return;
+						}
+						writable_index = path_index;
+						writable_handle = writable_input_fields[static_cast<size_t>(writable_index)].handle;
+					}
+				}
 
-			if (!write_payload.contains("value"))
-			{
-				response_json["error"] = "missing_value";
-				set_json_response(res, WebResponseCode::BadRequest, response_json);
-				return;
-			}
+				if (writable_index < 0)
+				{
+					parse_failed = true;
+					parse_failed_status = WebResponseCode::NotFound;
+					parse_failed_error = "writable_input_not_found";
+					return;
+				}
 
-			WritableInputField& writable = writable_input_fields[static_cast<size_t>(writable_index)];
-			if (!writable.type_desc || writable.value_size == 0 || writable.value_size > kMaxWritePayloadBytes)
-			{
-				response_json["error"] = "unsupported_target_field";
-				set_json_response(res, WebResponseCode::BadRequest, response_json);
-				return;
-			}
+				if (!write_payload.contains("value"))
+				{
+					parse_failed = true;
+					parse_failed_error = "missing_value";
+					return;
+				}
 
-			FixedString256 value_text;
-			if (!json_value_to_text(write_payload["value"], value_text))
-			{
-				response_json["error"] = "unsupported_value_type";
-				set_json_response(res, WebResponseCode::BadRequest, response_json);
-				return;
-			}
+				WritableInputField& writable = writable_input_fields[static_cast<size_t>(writable_index)];
+				if (!writable.type_desc || writable.value_size == 0 || writable.value_size > kMaxWritePayloadBytes)
+				{
+					parse_failed = true;
+					parse_failed_error = "unsupported_target_field";
+					return;
+				}
 
-			ParsedWrite& parsed = parsed_writes[parsed_count];
-			parsed.writable_index = static_cast<size_t>(writable_index);
-			parsed.writable_handle = writable_handle;
-			parsed.staged.pending = true;
-			parsed.staged.payload_size = writable.value_size;
-			::memset(parsed.staged.payload, 0, sizeof(parsed.staged.payload));
-			if (!writable.type_desc->from_string(value_text.c_str(), parsed.staged.payload))
-			{
-				response_json["error"] = "value_parse_failed";
-				set_json_response(res, WebResponseCode::BadRequest, response_json);
-				return;
-			}
+				FixedString256 value_text;
+				if (!json::scalar_to_fixed_string(write_payload["value"], value_text))
+				{
+					parse_failed = true;
+					parse_failed_error = "unsupported_value_type";
+					return;
+				}
 
-			if (write_payload.contains("seq") && write_payload["seq"].is_number_integer())
-			{
-				const long long seq_value = write_payload["seq"].get<long long>();
-				parsed.staged.seq = seq_value > 0 ? static_cast<uint64_t>(seq_value) : 0;
-			}
+				ParsedWrite& parsed = parsed_writes[parsed_count];
+				parsed.writable_index = static_cast<size_t>(writable_index);
+				parsed.writable_handle = writable_handle;
+				parsed.staged.pending = true;
+				parsed.staged.payload_size = writable.value_size;
+				::memset(parsed.staged.payload, 0, sizeof(parsed.staged.payload));
+				if (!writable.type_desc->from_string(value_text.c_str(), parsed.staged.payload))
+				{
+					parse_failed = true;
+					parse_failed_error = "value_parse_failed";
+					return;
+				}
 
-			parsed_count += 1;
+				const json::Value seq_node = write_payload["seq"];
+				if (seq_node.is_integer())
+				{
+					const int64_t seq_value = seq_node.get_int64();
+					parsed.staged.seq = seq_value > 0 ? static_cast<uint64_t>(seq_value) : 0;
+				}
+
+				parsed_count += 1;
+			});
+
+		if (parse_failed)
+		{
+			set_error_response(res, parse_failed_status, parse_failed_error);
+			return;
 		}
 
-		response_json["status"] = "processed";
-		response_json["writes"] = nlohmann::ordered_json::array();
+		struct WriteResult
+		{
+			uint16_t field_handle = 0;
+			FixedString512 field_path;
+			uint64_t seq = 0;
+			const char* status = "";
+			uint64_t latest_seq = 0;
+			bool has_latest_seq = false;
+		};
+
+		HeapVector<WriteResult> write_results;
+		write_results.initialize(parsed_count);
 		size_t accepted_count = 0;
 		size_t ignored_stale_count = 0;
 
@@ -1027,44 +1080,62 @@ namespace robotick
 				}
 
 				PendingInputWrite& pending = pending_input_writes[parsed.writable_index];
-				nlohmann::ordered_json write_result;
-				write_result["field_handle"] = parsed.writable_handle;
-				write_result["field_path"] = writable.path.c_str();
-				write_result["seq"] = parsed.staged.seq;
+				WriteResult& write_result = write_results[i];
+				write_result.field_handle = parsed.writable_handle;
+				write_result.field_path = writable.path.c_str();
+				write_result.seq = parsed.staged.seq;
 
 				if (pending.seq != 0 && parsed.staged.seq <= pending.seq)
 				{
-					write_result["status"] = "ignored_stale";
-					write_result["latest_seq"] = pending.seq;
+					write_result.status = "ignored_stale";
+					write_result.latest_seq = pending.seq;
+					write_result.has_latest_seq = true;
 					ignored_stale_count += 1;
 				}
 				else
 				{
 					pending = parsed.staged;
-					write_result["status"] = "accepted";
+					write_result.status = "accepted";
 					accepted_count += 1;
 				}
-
-				response_json["writes"].push_back(write_result);
 			}
 		}
 
-		response_json["accepted_count"] = accepted_count;
-		response_json["ignored_stale_count"] = ignored_stale_count;
-		set_json_response(res, WebResponseCode::OK, response_json);
-	}
-
-	static bool type_already_emitted(const nlohmann::ordered_json& layout_json, const char* name)
-	{
-		const auto& types_array = layout_json["types"];
-		for (const auto& type_json : types_array)
-		{
-			if (type_json.contains("name") && type_json["name"] == name)
+		set_json_response(res,
+			WebResponseCode::OK,
+			[&](auto& writer)
 			{
-				return true;
-			}
-		}
-		return false;
+				writer.start_object();
+				writer.key("status");
+				writer.string("processed");
+				writer.key("writes");
+				writer.start_array();
+				for (size_t i = 0; i < parsed_count; ++i)
+				{
+					const WriteResult& write_result = write_results[i];
+					writer.start_object();
+					writer.key("field_handle");
+					writer.uint64(write_result.field_handle);
+					writer.key("field_path");
+					writer.string(write_result.field_path);
+					writer.key("seq");
+					writer.uint64(write_result.seq);
+					writer.key("status");
+					writer.string(write_result.status);
+					if (write_result.has_latest_seq)
+					{
+						writer.key("latest_seq");
+						writer.uint64(write_result.latest_seq);
+					}
+					writer.end_object();
+				}
+				writer.end_array();
+				writer.key("accepted_count");
+				writer.uint64(accepted_count);
+				writer.key("ignored_stale_count");
+				writer.uint64(ignored_stale_count);
+				writer.end_object();
+			});
 	}
 
 	static FixedString64 make_blackboard_type_name(const DynamicStructDescriptor& desc, void* data_ptr)
@@ -1111,8 +1182,54 @@ namespace robotick
 		return type_name;
 	}
 
-	static void emit_type_info(
-		nlohmann::ordered_json& layout_json, const WorkloadsBuffer& workloads_buffer, void* data_ptr, const TypeDescriptor* type_desc)
+	struct EmittedTypeNames
+	{
+		HeapVector<FixedString256> names;
+		size_t count = 0;
+
+		void initialize(const size_t capacity)
+		{
+			names.initialize(capacity);
+			count = 0;
+		}
+
+		bool contains(const char* name) const
+		{
+			for (size_t i = 0; i < count; ++i)
+			{
+				if (names[i] == name)
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		void add(const char* name)
+		{
+			ROBOTICK_ASSERT_MSG(count < names.size(), "Telemetry layout emitted type capacity exceeded");
+			names[count++] = name ? name : "";
+		}
+	};
+
+	static size_t get_process_memory_used();
+
+	template <typename Writer> static void write_json_struct_ref(Writer& writer, const char* type_name, const size_t offset_within_container)
+	{
+		writer.start_object();
+		writer.key("type");
+		writer.string(type_name ? type_name : "null");
+		writer.key("offset_within_container");
+		writer.int32(static_cast<int>(offset_within_container));
+		writer.end_object();
+	}
+
+	template <typename Writer>
+	static void emit_type_info_stream(Writer& writer,
+		const WorkloadsBuffer& workloads_buffer,
+		void* data_ptr,
+		const TypeDescriptor* type_desc,
+		EmittedTypeNames& emitted_type_names)
 	{
 		if (!type_desc)
 		{
@@ -1120,36 +1237,50 @@ namespace robotick
 		}
 
 		const FixedString256 type_name = get_type_name(*type_desc, data_ptr);
-		if (type_already_emitted(layout_json, type_name.c_str()))
+		if (emitted_type_names.contains(type_name.c_str()))
 		{
 			return;
 		}
+		emitted_type_names.add(type_name.c_str());
 
-		nlohmann::ordered_json type_json;
-		type_json["name"] = type_name.c_str();
-		type_json["size"] = type_desc->size;
-		type_json["alignment"] = type_desc->alignment;
-		type_json["type_category"] = type_desc->type_category;
+		writer.start_object();
+		writer.key("name");
+		writer.string(type_name.c_str());
+		writer.key("size");
+		writer.uint64(static_cast<uint64_t>(type_desc->size));
+		writer.key("alignment");
+		writer.uint64(static_cast<uint64_t>(type_desc->alignment));
+		writer.key("type_category");
+		writer.int32(static_cast<int>(type_desc->type_category));
 
 		if (!type_desc->mime_type.empty())
 		{
-			type_json["mime_type"] = type_desc->mime_type.c_str();
+			writer.key("mime_type");
+			writer.string(type_desc->mime_type.c_str());
 		}
 
 		const EnumDescriptor* enum_desc = type_desc->get_enum_desc();
 		if (enum_desc)
 		{
-			type_json["enum_values"] = nlohmann::ordered_json::array();
+			writer.key("enum_values");
+			writer.start_array();
 			for (const EnumValue& enum_value : enum_desc->values)
 			{
-				nlohmann::ordered_json enum_json;
-				enum_json["name"] = enum_value.name.c_str();
-				enum_json["value"] = enum_value.value;
-				type_json["enum_values"].push_back(enum_json);
+				writer.start_object();
+				writer.key("name");
+				writer.string(enum_value.name.c_str());
+				writer.key("value");
+				writer.int64(static_cast<int64_t>(enum_value.value));
+				writer.end_object();
 			}
-			type_json["enum_underlying_size"] = static_cast<int>(enum_desc->underlying_size);
-			type_json["enum_is_signed"] = enum_desc->is_signed;
-			type_json["enum_is_flags"] = enum_desc->is_flags;
+			writer.end_array();
+
+			writer.key("enum_underlying_size");
+			writer.int32(static_cast<int>(enum_desc->underlying_size));
+			writer.key("enum_is_signed");
+			writer.boolean(enum_desc->is_signed);
+			writer.key("enum_is_flags");
+			writer.boolean(enum_desc->is_flags);
 		}
 
 		const DynamicStructDescriptor* dynamic_struct_desc = type_desc->get_dynamic_struct_desc();
@@ -1158,8 +1289,8 @@ namespace robotick
 
 		if (struct_desc)
 		{
-			type_json["fields"] = nlohmann::ordered_json::array();
-
+			writer.key("fields");
+			writer.start_array();
 			for (const FieldDescriptor& field_desc : struct_desc->fields)
 			{
 				const TypeDescriptor* field_type = field_desc.find_type_descriptor();
@@ -1169,46 +1300,165 @@ namespace robotick
 				}
 
 				void* field_data_ptr = field_desc.get_data_ptr(data_ptr);
-
 				ROBOTICK_ASSERT(workloads_buffer.contains_object_used_space(field_data_ptr, field_type->size));
 
-				nlohmann::ordered_json field_json;
-				field_json["name"] = field_desc.name;
-				field_json["offset_within_container"] = static_cast<int>(field_desc.offset_within_container);
-				field_json["type"] = get_type_name(*field_type, field_data_ptr);
-				field_json["element_count"] = static_cast<int>(field_desc.element_count);
+				writer.start_object();
+				writer.key("name");
+				writer.string(field_desc.name.c_str());
+				writer.key("offset_within_container");
+				writer.int32(static_cast<int>(field_desc.offset_within_container));
+				writer.key("type");
+				const FixedString256 field_type_name = get_type_name(*field_type, field_data_ptr);
+				writer.string(field_type_name.c_str());
+				writer.key("element_count");
+				writer.int32(static_cast<int>(field_desc.element_count));
+				writer.end_object();
+			}
+			writer.end_array();
+		}
 
-				type_json["fields"].push_back(field_json);
+		writer.end_object();
 
-				emit_type_info(layout_json, workloads_buffer, field_data_ptr, field_type);
+		if (struct_desc)
+		{
+			for (const FieldDescriptor& field_desc : struct_desc->fields)
+			{
+				const TypeDescriptor* field_type = field_desc.find_type_descriptor();
+				if (!field_type)
+				{
+					continue;
+				}
+
+				void* field_data_ptr = field_desc.get_data_ptr(data_ptr);
+				ROBOTICK_ASSERT(workloads_buffer.contains_object_used_space(field_data_ptr, field_type->size));
+				emit_type_info_stream(writer, workloads_buffer, field_data_ptr, field_type, emitted_type_names);
 			}
 		}
-
-		layout_json["types"].push_back(type_json);
 	}
 
-	static void emit_struct_info(nlohmann::ordered_json& layout_json,
-		nlohmann::ordered_json& workload_json,
-		const WorkloadsBuffer& workloads_buffer,
-		void* workload_ptr,
-		const char* struct_name,
-		const TypeDescriptor* struct_desc,
-		const size_t base_offset)
+	template <typename Writer, typename WritableInputFields>
+	static void write_layout_json_stream(
+		Writer& writer, const Engine& engine, const char* session_id_override, const WritableInputFields& writable_input_fields)
 	{
-		if (!struct_desc || !workload_ptr)
+		WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
+		const auto& instances = engine.get_all_instance_info();
+		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
+		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
+
+		writer.start_object();
+		writer.key("workloads_buffer_size_used");
+		writer.uint64(static_cast<uint64_t>(workloads_buffer.get_size_used()));
+		writer.key("process_memory_used");
+		writer.uint64(static_cast<uint64_t>(get_process_memory_used()));
+
+		writer.key("workloads");
+		writer.start_array();
+		for (const WorkloadInstanceInfo& workload_instance_info : instances)
 		{
-			return;
+			if (workload_instance_info.seed == nullptr || workload_instance_info.type == nullptr)
+			{
+				ROBOTICK_WARNING("TelemetryServer: Null workload seed or type, skipping...");
+				continue;
+			}
+
+			const WorkloadDescriptor* desc = workload_instance_info.type->get_workload_desc();
+			if (desc == nullptr)
+			{
+				ROBOTICK_WARNING(
+					"TelemetryServer: WorkloadDescriptor is null for '%s', skipping...", workload_instance_info.seed->unique_name.c_str());
+				continue;
+			}
+
+			writer.start_object();
+			writer.key("name");
+			writer.string(workload_instance_info.seed->unique_name.c_str());
+			writer.key("type");
+			writer.string(workload_instance_info.type->name.c_str());
+			writer.key("offset_within_container");
+			writer.int32(static_cast<int>(workload_instance_info.offset_in_workloads_buffer));
+
+			void* workload_ptr = (void*)workload_instance_info.get_ptr(workloads_buffer);
+			if (desc->config_desc && workload_ptr)
+			{
+				writer.key("config");
+				write_json_struct_ref(writer, desc->config_desc->name.c_str(), desc->config_offset);
+			}
+			if (desc->inputs_desc && workload_ptr)
+			{
+				writer.key("inputs");
+				write_json_struct_ref(writer, desc->inputs_desc->name.c_str(), desc->inputs_offset);
+			}
+			if (desc->outputs_desc && workload_ptr)
+			{
+				writer.key("outputs");
+				write_json_struct_ref(writer, desc->outputs_desc->name.c_str(), desc->outputs_offset);
+			}
+
+			writer.key("stats_offset_within_container");
+			writer.int32(static_cast<int>((uint8_t*)workload_instance_info.workload_stats - workloads_buffer.raw_ptr()));
+			writer.end_object();
 		}
+		writer.end_array();
 
-		nlohmann::ordered_json struct_json;
-		struct_json["type"] = struct_desc ? struct_desc->name.c_str() : "null";
-		struct_json["offset_within_container"] = static_cast<int>(base_offset);
+		const size_t emitted_type_capacity = TypeRegistry::get().get_registered_count() + (instances.size() * 4) + 16;
+		EmittedTypeNames emitted_type_names;
+		emitted_type_names.initialize(emitted_type_capacity);
 
-		workload_json[struct_name] = struct_json;
+		writer.key("types");
+		writer.start_array();
+		for (const WorkloadInstanceInfo& workload_instance_info : instances)
+		{
+			if (workload_instance_info.seed == nullptr || workload_instance_info.type == nullptr)
+			{
+				continue;
+			}
 
-		void* data_ptr = (uint8_t*)workload_ptr + base_offset;
+			const WorkloadDescriptor* desc = workload_instance_info.type->get_workload_desc();
+			if (desc == nullptr)
+			{
+				continue;
+			}
 
-		emit_type_info(layout_json, workloads_buffer, data_ptr, struct_desc);
+			void* workload_ptr = (void*)workload_instance_info.get_ptr(workloads_buffer);
+			if (desc->config_desc && workload_ptr)
+			{
+				emit_type_info_stream(writer, workloads_buffer, (uint8_t*)workload_ptr + desc->config_offset, desc->config_desc, emitted_type_names);
+			}
+			if (desc->inputs_desc && workload_ptr)
+			{
+				emit_type_info_stream(writer, workloads_buffer, (uint8_t*)workload_ptr + desc->inputs_offset, desc->inputs_desc, emitted_type_names);
+			}
+			if (desc->outputs_desc && workload_ptr)
+			{
+				emit_type_info_stream(
+					writer, workloads_buffer, (uint8_t*)workload_ptr + desc->outputs_offset, desc->outputs_desc, emitted_type_names);
+			}
+
+			emit_type_info_stream(writer, workloads_buffer, workload_instance_info.workload_stats, workload_stats_type, emitted_type_names);
+		}
+		writer.end_array();
+
+		writer.key("engine_session_id");
+		writer.string(session_id_override ? session_id_override : "");
+
+		writer.key("writable_inputs");
+		writer.start_array();
+		for (size_t i = 0; i < writable_input_fields.size(); ++i)
+		{
+			const auto& writable = writable_input_fields[i];
+			writer.start_object();
+			writer.key("field_handle");
+			writer.uint64(static_cast<uint64_t>(writable.handle));
+			writer.key("field_path");
+			writer.string(writable.path.c_str());
+			writer.key("type");
+			writer.string(writable.type_desc ? writable.type_desc->name.c_str() : "unknown");
+			writer.key("size");
+			writer.uint64(static_cast<uint64_t>(writable.value_size));
+			writer.end_object();
+		}
+		writer.end_array();
+		writer.end_object();
 	}
 
 	static size_t get_process_memory_used()
@@ -1231,96 +1481,27 @@ namespace robotick
 		return 0;
 	}
 
-	static nlohmann::ordered_json build_layout_json(const Engine& engine)
-	{
-		WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
-		const auto& instances = engine.get_all_instance_info();
-
-		nlohmann::ordered_json layout_json;
-		layout_json["workloads_buffer_size_used"] = workloads_buffer.get_size_used();
-		layout_json["process_memory_used"] = get_process_memory_used();
-		layout_json["workloads"] = nlohmann::ordered_json::array();
-		layout_json["types"] = nlohmann::ordered_json::array();
-
-		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
-		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
-
-		for (const WorkloadInstanceInfo& workload_instance_info : instances)
-		{
-			if (workload_instance_info.seed == nullptr || workload_instance_info.type == nullptr)
-			{
-				ROBOTICK_WARNING("TelemetryServer: Null workload seed or type, skipping...");
-				continue;
-			}
-
-			const WorkloadDescriptor* desc = workload_instance_info.type->get_workload_desc();
-			if (desc == nullptr)
-			{
-				ROBOTICK_WARNING(
-					"TelemetryServer: WorkloadDescriptor is null for '%s', skipping...", workload_instance_info.seed->unique_name.c_str());
-				continue;
-			}
-
-			nlohmann::ordered_json workload_json;
-			workload_json["name"] = workload_instance_info.seed->unique_name;
-			workload_json["type"] = workload_instance_info.type->name.c_str();
-			workload_json["offset_within_container"] = static_cast<int>(workload_instance_info.offset_in_workloads_buffer);
-
-			void* workload_ptr = (void*)workload_instance_info.get_ptr(workloads_buffer);
-
-			emit_struct_info(layout_json, workload_json, workloads_buffer, workload_ptr, "config", desc->config_desc, desc->config_offset);
-			emit_struct_info(layout_json, workload_json, workloads_buffer, workload_ptr, "inputs", desc->inputs_desc, desc->inputs_offset);
-			emit_struct_info(layout_json, workload_json, workloads_buffer, workload_ptr, "outputs", desc->outputs_desc, desc->outputs_offset);
-
-			workload_json["stats_offset_within_container"] =
-				static_cast<int>((uint8_t*)workload_instance_info.workload_stats - workloads_buffer.raw_ptr());
-
-			emit_type_info(layout_json, workloads_buffer, workload_instance_info.workload_stats, workload_stats_type);
-
-			layout_json["workloads"].push_back(workload_json);
-		}
-
-		robotick::sort(layout_json["workloads"].begin(),
-			layout_json["workloads"].end(),
-			[](const nlohmann::ordered_json& a, const nlohmann::ordered_json& b)
-			{
-				return a["offset_within_container"].get<int>() < b["offset_within_container"].get<int>();
-			});
-
-		robotick::sort(layout_json["types"].begin(),
-			layout_json["types"].end(),
-			[](const nlohmann::ordered_json& a, const nlohmann::ordered_json& b)
-			{
-				const auto& a_name = a["name"].get_ref<const nlohmann::ordered_json::string_t&>();
-				const auto& b_name = b["name"].get_ref<const nlohmann::ordered_json::string_t&>();
-				return StringView(a_name.c_str()) < StringView(b_name.c_str());
-			});
-
-		return layout_json;
-	}
-
 	void TelemetryServer::Impl::handle_get_workloads_buffer_layout(const WebRequest& /*req*/, WebResponse& res)
 	{
-		nlohmann::ordered_json layout_json = build_workloads_buffer_layout_json(*engine, session_id.c_str());
-		layout_json["writable_inputs"] = nlohmann::ordered_json::array();
-
-		const size_t writable_count = writable_input_fields.size();
-		for (size_t i = 0; i < writable_count; ++i)
-		{
-			const WritableInputField& writable = writable_input_fields[i];
-			nlohmann::ordered_json writable_json;
-			writable_json["field_handle"] = writable.handle;
-			writable_json["field_path"] = writable.path.c_str();
-			writable_json["type"] = writable.type_desc ? writable.type_desc->name.c_str() : "unknown";
-			writable_json["size"] = writable.value_size;
-			layout_json["writable_inputs"].push_back(writable_json);
-		}
-
 		res.set_status_code(WebResponseCode::OK);
 		res.set_content_type("application/json");
 
-		auto out_str = layout_json.dump();
-		res.set_body_string(out_str.c_str());
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
+		const auto flush_chunk = [&](const char* data, const size_t size)
+		{
+			res.set_body(data, size);
+		};
+		json::ChunkedSink<decltype(flush_chunk)> sink(flush_chunk);
+		json::Writer<json::ChunkedSink<decltype(flush_chunk)>> writer(sink);
+		write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
+		writer.flush();
+#else
+		json::StringSink sink;
+		json::Writer<json::StringSink> writer(sink);
+		write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
+		writer.flush();
+		res.set_body(sink.c_str(), sink.size());
+#endif
 	}
 
 	void TelemetryServer::Impl::handle_get_workloads_buffer_raw(const WebRequest& /*req*/, WebResponse& res)
@@ -1340,13 +1521,6 @@ namespace robotick
 		res.add_header(frame_seq_header.c_str());
 
 		res.set_body(workloads_buffer.raw_ptr(), workloads_buffer.get_size_used());
-	}
-
-	nlohmann::ordered_json build_workloads_buffer_layout_json(const Engine& engine, const char* session_id_override)
-	{
-		nlohmann::ordered_json layout_json = build_layout_json(engine);
-		layout_json["engine_session_id"] = session_id_override ? session_id_override : "";
-		return layout_json;
 	}
 
 } // namespace robotick

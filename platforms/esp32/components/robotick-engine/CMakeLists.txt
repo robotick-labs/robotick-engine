@@ -55,6 +55,7 @@ set(srcs ${CORE_SOURCES})
 set(include_dirs
     ${CMAKE_CURRENT_LIST_DIR}/include
     ${CMAKE_CURRENT_LIST_DIR}/lib/json/single_include
+    ${CMAKE_CURRENT_LIST_DIR}/lib/rapidjson/include
 )
 
 message(STATUS "🧐 Included sources:")

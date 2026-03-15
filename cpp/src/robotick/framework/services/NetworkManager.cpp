@@ -6,11 +6,11 @@
 
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
 
-#include <lwip/ip4_addr.h>
 #include <esp_event.h>
 #include <esp_log.h>
 #include <esp_netif.h>
 #include <esp_wifi.h>
+#include <lwip/ip4_addr.h>
 #include <nvs_flash.h>
 
 namespace robotick
@@ -33,6 +33,20 @@ namespace robotick
 			if (err == ESP_ERR_INVALID_STATE)
 			{
 				ESP_LOGI("NetworkClient", "%s already initialized; reusing existing state", what);
+				return;
+			}
+
+			ESP_ERROR_CHECK(err);
+		}
+
+		void esp32_check_ok_or_skip(const esp_err_t err, const esp_err_t allowed, const char* what)
+		{
+			if (err == ESP_OK || err == allowed)
+			{
+				if (err == allowed)
+				{
+					ESP_LOGI("NetworkClient", "%s already applied; reusing existing state", what);
+				}
 				return;
 			}
 
@@ -107,7 +121,7 @@ namespace robotick
 			ip_info.gw.addr = parsed_gw.addr;
 			ip_info.netmask.addr = parsed_netmask.addr;
 
-			ESP_ERROR_CHECK(esp_netif_dhcpc_stop(netif));
+			esp32_check_ok_or_skip(esp_netif_dhcpc_stop(netif), ESP_ERR_ESP_NETIF_DHCP_ALREADY_STOPPED, "esp_netif_dhcpc_stop");
 			ESP_ERROR_CHECK(esp_netif_set_ip_info(netif, &ip_info));
 		}
 
@@ -135,8 +149,7 @@ namespace robotick
 			if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
 			{
 				const auto* disconnect = static_cast<const wifi_event_sta_disconnected_t*>(event_data);
-				ESP_LOGW(
-					TAG,
+				ESP_LOGW(TAG,
 					"Disconnected from SSID '%s' (reason=%d)",
 					wait_context->ssid ? wait_context->ssid : "<unknown>",
 					disconnect ? static_cast<int>(disconnect->reason) : -1);
@@ -329,13 +342,12 @@ namespace robotick
 		const char* privilege_prefix = geteuid() == 0 ? "" : "sudo -n ";
 
 		FixedString512 cmd;
-		cmd.format(
-			"%snmcli connection delete '%s' >/dev/null 2>&1 || true; "
-			"%snmcli connection add type wifi ifname %s con-name '%s' autoconnect no ssid '%s' >/dev/null && "
-			"%snmcli connection modify '%s' 802-11-wireless.mode ap 802-11-wireless.band bg "
-			"ipv4.method shared ipv4.addresses '%s' ipv6.method disabled "
-			"wifi-sec.key-mgmt wpa-psk wifi-sec.proto rsn wifi-sec.psk '%s' && "
-			"%snmcli connection up '%s'",
+		cmd.format("%snmcli connection delete '%s' >/dev/null 2>&1 || true; "
+				   "%snmcli connection add type wifi ifname %s con-name '%s' autoconnect no ssid '%s' >/dev/null && "
+				   "%snmcli connection modify '%s' 802-11-wireless.mode ap 802-11-wireless.band bg "
+				   "ipv4.method shared ipv4.addresses '%s' ipv6.method disabled "
+				   "wifi-sec.key-mgmt wpa-psk wifi-sec.proto rsn wifi-sec.psk '%s' && "
+				   "%snmcli connection up '%s'",
 			privilege_prefix,
 			escaped_connection_name.c_str(),
 			privilege_prefix,
