@@ -712,29 +712,36 @@ namespace robotick::test
 
 			const auto& writable_inputs = layout_json["writable_inputs"];
 			REQUIRE(writable_inputs.is_array());
-			const nlohmann::json* target_writable = nullptr;
+			const nlohmann::json* target_float_writable = nullptr;
+			const nlohmann::json* target_string_writable = nullptr;
 			for (const auto& writable : writable_inputs)
 			{
 				if (writable.contains("field_path")
 					&& contains_text(writable["field_path"].get_ref<const nlohmann::json::string_t&>().c_str(), "input_float"))
 				{
-					target_writable = &writable;
-					break;
+					target_float_writable = &writable;
+				}
+				if (writable.contains("field_path")
+					&& contains_text(writable["field_path"].get_ref<const nlohmann::json::string_t&>().c_str(), "input_string_64"))
+				{
+					target_string_writable = &writable;
 				}
 			}
-			REQUIRE(target_writable != nullptr);
+			REQUIRE(target_float_writable != nullptr);
+			REQUIRE(target_string_writable != nullptr);
 
 			char body[512];
 			::snprintf(
 				body,
 				sizeof(body),
-				"{\"engine_session_id\":\"%s\",\"field_handle\":%u,\"value\":42.25}",
+				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":42.25},{\"field_handle\":%u,\"value\":\"updated via batch\"}]}",
 				layout_json["engine_session_id"].get_ref<const nlohmann::json::string_t&>().c_str(),
-				target_writable->value("field_handle", 0));
+				target_float_writable->value("field_handle", 0),
+				target_string_writable->value("field_handle", 0));
 			::snprintf(
 				url,
 				sizeof(url),
-				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/set_workload_input_field_data",
+				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/set_workload_input_fields_data",
 				static_cast<unsigned int>(gateway_port));
 			const HttpResponse write_response = http_request(url, "POST", body);
 			REQUIRE(write_response.status_code == 200);
@@ -743,22 +750,23 @@ namespace robotick::test
 			const DummyWorkload* peer_instance = peer_engine.find_instance<DummyWorkload>("peer_dummy");
 			REQUIRE(peer_instance != nullptr);
 			CHECK(peer_instance->inputs.input_float == Catch::Approx(42.25f));
+			CHECK(peer_instance->inputs.input_string_64 == "updated via batch");
 
 			::snprintf(
 				body,
 				sizeof(body),
-				"{\"engine_session_id\":\"%s\",\"field_handle\":%u,\"value\":11.0,\"seq\":100}",
+				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":11.0,\"seq\":100}]}",
 				layout_json["engine_session_id"].get_ref<const nlohmann::json::string_t&>().c_str(),
-				target_writable->value("field_handle", 0));
+				target_float_writable->value("field_handle", 0));
 			const HttpResponse latest_write_response = http_request(url, "POST", body);
 			REQUIRE(latest_write_response.status_code == 200);
 
 			::snprintf(
 				body,
 				sizeof(body),
-				"{\"engine_session_id\":\"%s\",\"field_handle\":%u,\"value\":-99.0,\"seq\":99}",
+				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":-99.0,\"seq\":99}]}",
 				layout_json["engine_session_id"].get_ref<const nlohmann::json::string_t&>().c_str(),
-				target_writable->value("field_handle", 0));
+				target_float_writable->value("field_handle", 0));
 			const HttpResponse stale_write_response = http_request(url, "POST", body);
 			REQUIRE(stale_write_response.status_code == 200);
 

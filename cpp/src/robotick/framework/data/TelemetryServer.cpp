@@ -357,7 +357,7 @@ namespace robotick
 		void handle_forwarded_telemetry_request(const WebRequest& req, WebResponse& res, const TelemetryPeerRoute& peer, const char* suffix_uri);
 		void handle_get_workloads_buffer_layout(const WebRequest& req, WebResponse& res);
 		void handle_get_workloads_buffer_raw(const WebRequest& req, WebResponse& res);
-		void handle_set_workload_input_field_data(const WebRequest& req, WebResponse& res);
+		void handle_set_workload_input_fields_data(const WebRequest& req, WebResponse& res);
 	};
 
 	TelemetryServer::TelemetryServer()
@@ -626,10 +626,10 @@ namespace robotick
 		}
 		else if (req.method.equals("POST"))
 		{
-			if (uri_equals(effective_uri, "/api/telemetry/set_workload_input_field_data") ||
-				uri_equals(effective_uri, "/set_workload_input_field_data"))
+			if (uri_equals(effective_uri, "/api/telemetry/set_workload_input_fields_data") ||
+				uri_equals(effective_uri, "/set_workload_input_fields_data"))
 			{
-				handle_set_workload_input_field_data(req, res);
+				handle_set_workload_input_fields_data(req, res);
 				return true;
 			}
 		}
@@ -858,8 +858,15 @@ namespace robotick
 			});
 	}
 
-	void TelemetryServer::Impl::handle_set_workload_input_field_data(const WebRequest& req, WebResponse& res)
+	void TelemetryServer::Impl::handle_set_workload_input_fields_data(const WebRequest& req, WebResponse& res)
 	{
+		struct ParsedWrite
+		{
+			size_t writable_index = 0;
+			uint16_t writable_handle = 0;
+			PendingInputWrite staged;
+		};
+
 		nlohmann::ordered_json response_json;
 		if (!engine)
 		{
@@ -895,115 +902,155 @@ namespace robotick
 			return;
 		}
 
-		int writable_index = -1;
-		uint16_t writable_handle = 0;
-		FixedString512 requested_path;
-
-		if (payload.contains("field_handle") && payload["field_handle"].is_number_integer())
+		const nlohmann::json writes_node = payload.contains("writes") ? payload["writes"] : nlohmann::json();
+		if (!writes_node.is_array() || writes_node.empty())
 		{
-			const long long handle_value = payload["field_handle"].get<long long>();
-			if (handle_value <= 0 || handle_value > 0xFFFF)
+			response_json["error"] = "missing_writes";
+			set_json_response(res, WebResponseCode::BadRequest, response_json);
+			return;
+		}
+
+		HeapVector<ParsedWrite> parsed_writes;
+		parsed_writes.initialize(writes_node.size());
+		size_t parsed_count = 0;
+
+		for (const nlohmann::json& write_payload : writes_node)
+		{
+			if (!write_payload.is_object())
 			{
-				response_json["error"] = "invalid_field_handle";
+				response_json["error"] = "invalid_write_entry";
 				set_json_response(res, WebResponseCode::BadRequest, response_json);
 				return;
 			}
-			writable_handle = static_cast<uint16_t>(handle_value);
-			writable_index = find_writable_input_index_by_handle(writable_handle);
-		}
 
-		if (payload.contains("field_path") && payload["field_path"].is_string())
-		{
-			requested_path = payload["field_path"].get_ref<const nlohmann::json::string_t&>().c_str();
+			int writable_index = -1;
+			uint16_t writable_handle = 0;
+			FixedString512 requested_path;
 
-			const int path_index = find_writable_input_index_by_path(requested_path.c_str());
-			if (path_index >= 0)
+			if (write_payload.contains("field_handle") && write_payload["field_handle"].is_number_integer())
 			{
-				if (writable_index >= 0 && static_cast<size_t>(writable_index) != static_cast<size_t>(path_index))
+				const long long handle_value = write_payload["field_handle"].get<long long>();
+				if (handle_value <= 0 || handle_value > 0xFFFF)
 				{
-					response_json["error"] = "field_handle_path_mismatch";
+					response_json["error"] = "invalid_field_handle";
 					set_json_response(res, WebResponseCode::BadRequest, response_json);
 					return;
 				}
-				writable_index = path_index;
-				writable_handle = writable_input_fields[static_cast<size_t>(writable_index)].handle;
-			}
-		}
-
-		if (writable_index < 0)
-		{
-			response_json["error"] = "writable_input_not_found";
-			set_json_response(res, WebResponseCode::NotFound, response_json);
-			return;
-		}
-
-		if (!payload.contains("value"))
-		{
-			response_json["error"] = "missing_value";
-			set_json_response(res, WebResponseCode::BadRequest, response_json);
-			return;
-		}
-
-		WritableInputField& writable = writable_input_fields[static_cast<size_t>(writable_index)];
-		if (!writable.type_desc || writable.value_size == 0 || writable.value_size > kMaxWritePayloadBytes)
-		{
-			response_json["error"] = "unsupported_target_field";
-			set_json_response(res, WebResponseCode::BadRequest, response_json);
-			return;
-		}
-
-		FixedString256 value_text;
-		if (!json_value_to_text(payload["value"], value_text))
-		{
-			response_json["error"] = "unsupported_value_type";
-			set_json_response(res, WebResponseCode::BadRequest, response_json);
-			return;
-		}
-
-		PendingInputWrite staged;
-		staged.pending = true;
-		staged.payload_size = writable.value_size;
-		::memset(staged.payload, 0, sizeof(staged.payload));
-		if (!writable.type_desc->from_string(value_text.c_str(), staged.payload))
-		{
-			response_json["error"] = "value_parse_failed";
-			set_json_response(res, WebResponseCode::BadRequest, response_json);
-			return;
-		}
-
-		if (payload.contains("seq") && payload["seq"].is_number_integer())
-		{
-			const long long seq_value = payload["seq"].get<long long>();
-			staged.seq = seq_value > 0 ? static_cast<uint64_t>(seq_value) : 0;
-		}
-
-		{
-			LockGuard lock(pending_input_writes_mutex);
-			if (staged.seq == 0)
-			{
-				write_seq_counter += 1;
-				staged.seq = write_seq_counter;
+				writable_handle = static_cast<uint16_t>(handle_value);
+				writable_index = find_writable_input_index_by_handle(writable_handle);
 			}
 
-			PendingInputWrite& pending = pending_input_writes[static_cast<size_t>(writable_index)];
-			if (pending.seq != 0 && staged.seq <= pending.seq)
+			if (write_payload.contains("field_path") && write_payload["field_path"].is_string())
 			{
-				response_json["status"] = "ignored_stale";
-				response_json["field_handle"] = writable_handle;
-				response_json["field_path"] = writable.path.c_str();
-				response_json["seq"] = staged.seq;
-				response_json["latest_seq"] = pending.seq;
-				set_json_response(res, WebResponseCode::OK, response_json);
+				requested_path = write_payload["field_path"].get_ref<const nlohmann::json::string_t&>().c_str();
+				const int path_index = find_writable_input_index_by_path(requested_path.c_str());
+				if (path_index >= 0)
+				{
+					if (writable_index >= 0 && static_cast<size_t>(writable_index) != static_cast<size_t>(path_index))
+					{
+						response_json["error"] = "field_handle_path_mismatch";
+						set_json_response(res, WebResponseCode::BadRequest, response_json);
+						return;
+					}
+					writable_index = path_index;
+					writable_handle = writable_input_fields[static_cast<size_t>(writable_index)].handle;
+				}
+			}
+
+			if (writable_index < 0)
+			{
+				response_json["error"] = "writable_input_not_found";
+				set_json_response(res, WebResponseCode::NotFound, response_json);
 				return;
 			}
 
-			pending = staged;
+			if (!write_payload.contains("value"))
+			{
+				response_json["error"] = "missing_value";
+				set_json_response(res, WebResponseCode::BadRequest, response_json);
+				return;
+			}
+
+			WritableInputField& writable = writable_input_fields[static_cast<size_t>(writable_index)];
+			if (!writable.type_desc || writable.value_size == 0 || writable.value_size > kMaxWritePayloadBytes)
+			{
+				response_json["error"] = "unsupported_target_field";
+				set_json_response(res, WebResponseCode::BadRequest, response_json);
+				return;
+			}
+
+			FixedString256 value_text;
+			if (!json_value_to_text(write_payload["value"], value_text))
+			{
+				response_json["error"] = "unsupported_value_type";
+				set_json_response(res, WebResponseCode::BadRequest, response_json);
+				return;
+			}
+
+			ParsedWrite& parsed = parsed_writes[parsed_count];
+			parsed.writable_index = static_cast<size_t>(writable_index);
+			parsed.writable_handle = writable_handle;
+			parsed.staged.pending = true;
+			parsed.staged.payload_size = writable.value_size;
+			::memset(parsed.staged.payload, 0, sizeof(parsed.staged.payload));
+			if (!writable.type_desc->from_string(value_text.c_str(), parsed.staged.payload))
+			{
+				response_json["error"] = "value_parse_failed";
+				set_json_response(res, WebResponseCode::BadRequest, response_json);
+				return;
+			}
+
+			if (write_payload.contains("seq") && write_payload["seq"].is_number_integer())
+			{
+				const long long seq_value = write_payload["seq"].get<long long>();
+				parsed.staged.seq = seq_value > 0 ? static_cast<uint64_t>(seq_value) : 0;
+			}
+
+			parsed_count += 1;
 		}
 
-		response_json["status"] = "accepted";
-		response_json["field_handle"] = writable_handle;
-		response_json["field_path"] = writable.path.c_str();
-		response_json["seq"] = staged.seq;
+		response_json["status"] = "processed";
+		response_json["writes"] = nlohmann::ordered_json::array();
+		size_t accepted_count = 0;
+		size_t ignored_stale_count = 0;
+
+		{
+			LockGuard lock(pending_input_writes_mutex);
+			for (size_t i = 0; i < parsed_count; ++i)
+			{
+				ParsedWrite& parsed = parsed_writes[i];
+				WritableInputField& writable = writable_input_fields[parsed.writable_index];
+				if (parsed.staged.seq == 0)
+				{
+					write_seq_counter += 1;
+					parsed.staged.seq = write_seq_counter;
+				}
+
+				PendingInputWrite& pending = pending_input_writes[parsed.writable_index];
+				nlohmann::ordered_json write_result;
+				write_result["field_handle"] = parsed.writable_handle;
+				write_result["field_path"] = writable.path.c_str();
+				write_result["seq"] = parsed.staged.seq;
+
+				if (pending.seq != 0 && parsed.staged.seq <= pending.seq)
+				{
+					write_result["status"] = "ignored_stale";
+					write_result["latest_seq"] = pending.seq;
+					ignored_stale_count += 1;
+				}
+				else
+				{
+					pending = parsed.staged;
+					write_result["status"] = "accepted";
+					accepted_count += 1;
+				}
+
+				response_json["writes"].push_back(write_result);
+			}
+		}
+
+		response_json["accepted_count"] = accepted_count;
+		response_json["ignored_stale_count"] = ignored_stale_count;
 		set_json_response(res, WebResponseCode::OK, response_json);
 	}
 
