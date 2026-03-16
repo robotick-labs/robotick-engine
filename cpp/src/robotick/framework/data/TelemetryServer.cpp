@@ -6,6 +6,7 @@
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/concurrency/Sync.h"
+#include "robotick/framework/concurrency/Thread.h"
 #include "robotick/framework/containers/FixedVector.h"
 #include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/data/DataConnection.h"
@@ -39,6 +40,23 @@ namespace robotick
 	{
 		template <typename BuildFn> static void set_json_response(WebResponse& res, const int status_code, BuildFn&& build_json)
 		{
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
+			char body[4096] = {};
+			json::FixedBufferSink sink(body, sizeof(body));
+			json::Writer<json::FixedBufferSink> writer(sink);
+			build_json(writer);
+			writer.flush();
+			if (!sink.is_ok())
+			{
+				res.set_status_code(WebResponseCode::InternalServerError);
+				res.set_content_type("application/json");
+				res.set_body("{\"error\":\"json_response_overflow\"}", sizeof("{\"error\":\"json_response_overflow\"}") - 1);
+				return;
+			}
+			res.set_status_code(status_code);
+			res.set_content_type("application/json");
+			res.set_body(sink.c_str(), sink.written_size());
+#else
 			json::StringSink sink;
 			json::Writer<json::StringSink> writer(sink);
 			build_json(writer);
@@ -46,6 +64,7 @@ namespace robotick
 			res.set_status_code(status_code);
 			res.set_content_type("application/json");
 			res.set_body(sink.c_str(), sink.size());
+#endif
 		}
 
 		static void set_error_response(WebResponse& res, const int status_code, const char* error_text)
@@ -156,9 +175,12 @@ namespace robotick
 
 		struct TelemetryWriteRequestPayload
 		{
+			TelemetryWriteRequestPayload() { writes.initialize(max_writes); }
+
 			bool has_engine_session_id = false;
 			FixedString64 engine_session_id;
 			bool has_writes = false;
+			static constexpr size_t max_writes = 32;
 			HeapVector<TelemetryWriteRequestEntry> writes;
 			size_t write_count = 0;
 		};
@@ -697,7 +719,8 @@ namespace robotick
 					{
 						return false;
 					}
-					out_writes[out_count++] = entry;
+					out_writes[out_count] = entry;
+					out_count += 1;
 
 					skip_ws();
 					if (consume(']'))
@@ -968,6 +991,15 @@ namespace robotick
 		FixedString64 session_id;
 		HeapVector<WritableInputField> writable_input_fields;
 		HeapVector<PendingInputWrite> pending_input_writes;
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
+		Mutex layout_cache_mutex;
+		static constexpr size_t layout_cache_capacity = 16384;
+		char cached_layout_body[layout_cache_capacity] = {};
+		size_t cached_layout_body_size = 0;
+		bool has_cached_layout_body = false;
+		bool layout_cache_build_failed = false;
+		FixedString64 layout_cache_failure_reason = "not_built";
+#endif
 		Mutex pending_input_writes_mutex;
 		uint64_t write_seq_counter = 0;
 		bool is_setup = false;
@@ -979,6 +1011,9 @@ namespace robotick
 		int find_writable_input_index_by_path(const char* path) const;
 		int find_telemetry_peer_index_by_model_id(const char* model_id) const;
 		void rebuild_telemetry_peer_registry();
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
+		void rebuild_layout_cache();
+#endif
 		bool handle_local_telemetry_request(const WebRequest& req, WebResponse& res, const char* effective_uri);
 		void handle_get_gateway_models(WebResponse& res);
 		void handle_forwarded_telemetry_request(const WebRequest& req, WebResponse& res, const TelemetryPeerRoute& peer, const char* suffix_uri);
@@ -1041,6 +1076,10 @@ namespace robotick
 			setup(engine_in);
 		}
 		impl->engine = &engine_in;
+
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
+		impl->rebuild_layout_cache();
+#endif
 
 		// WebServer owns the socket lifetime; the handler lambda only decides whether a request belongs to the telemetry API.
 		impl->web_server.start("Telemetry",
@@ -1652,7 +1691,6 @@ namespace robotick
 		}
 
 		TelemetryWriteRequestPayload payload;
-		payload.writes.initialize(writable_input_fields.size() > 0 ? writable_input_fields.size() : 1);
 
 		JsonCursor cursor(reinterpret_cast<const char*>(req.body.data()), req.body.size());
 		if (!cursor.parse_write_request(payload))
@@ -1661,8 +1699,7 @@ namespace robotick
 			return;
 		}
 
-		const bool session_matches =
-			!payload.has_engine_session_id || StringView(session_id.c_str()).equals(payload.engine_session_id.c_str());
+		const bool session_matches = !payload.has_engine_session_id || StringView(session_id.c_str()).equals(payload.engine_session_id.c_str());
 
 		if (!payload.has_writes || payload.write_count == 0)
 		{
@@ -1745,6 +1782,7 @@ namespace robotick
 			}
 
 			ParsedWrite& parsed = parsed_writes[parsed_count];
+			parsed = ParsedWrite{};
 			parsed.writable_index = static_cast<size_t>(writable_index);
 			parsed.writable_handle = writable_handle;
 			parsed.staged.pending = true;
@@ -1792,13 +1830,18 @@ namespace robotick
 			{
 				ParsedWrite& parsed = parsed_writes[i];
 				WritableInputField& writable = writable_input_fields[parsed.writable_index];
+				PendingInputWrite& pending = pending_input_writes[parsed.writable_index];
 				if (parsed.staged.seq == 0)
 				{
-					write_seq_counter += 1;
-					parsed.staged.seq = write_seq_counter;
+					const uint64_t next_seq = max(write_seq_counter, pending.seq) + 1;
+					write_seq_counter = next_seq;
+					parsed.staged.seq = next_seq;
+				}
+				else if (parsed.staged.seq > write_seq_counter)
+				{
+					write_seq_counter = parsed.staged.seq;
 				}
 
-				PendingInputWrite& pending = pending_input_writes[parsed.writable_index];
 				WriteResult& write_result = write_results[i];
 				write_result.field_handle = parsed.writable_handle;
 				write_result.field_path = writable.path.c_str();
@@ -2198,20 +2241,71 @@ namespace robotick
 		return 0;
 	}
 
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
+	void TelemetryServer::Impl::rebuild_layout_cache()
+	{
+		if (!engine)
+		{
+			LockGuard lock(layout_cache_mutex);
+			has_cached_layout_body = false;
+			cached_layout_body_size = 0;
+			cached_layout_body[0] = '\0';
+			layout_cache_build_failed = true;
+			layout_cache_failure_reason = "no_engine";
+			return;
+		}
+
+		char new_cached_layout_body[layout_cache_capacity] = {};
+		json::FixedBufferSink sink(new_cached_layout_body, layout_cache_capacity);
+		json::Writer<json::FixedBufferSink> writer(sink);
+		write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
+		writer.flush();
+
+		if (!sink.is_ok())
+		{
+			LockGuard lock(layout_cache_mutex);
+			has_cached_layout_body = false;
+			cached_layout_body_size = 0;
+			cached_layout_body[0] = '\0';
+			layout_cache_build_failed = true;
+			layout_cache_failure_reason = "buffer_overflow";
+			return;
+		}
+
+		new_cached_layout_body[sink.written_size()] = '\0';
+
+		LockGuard lock(layout_cache_mutex);
+		::memcpy(cached_layout_body, new_cached_layout_body, sink.written_size() + 1);
+		cached_layout_body_size = sink.written_size();
+		has_cached_layout_body = true;
+		layout_cache_build_failed = false;
+		layout_cache_failure_reason = "";
+	}
+#endif
+
 	void TelemetryServer::Impl::handle_get_workloads_buffer_layout(const WebRequest& /*req*/, WebResponse& res)
 	{
 		res.set_status_code(WebResponseCode::OK);
 		res.set_content_type("application/json");
 
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
-		const auto flush_chunk = [&](const char* data, const size_t size)
+		LockGuard lock(layout_cache_mutex);
+		if (!has_cached_layout_body)
 		{
-			res.set_body(data, size);
-		};
-		json::ChunkedSink<decltype(flush_chunk)> sink(flush_chunk);
-		json::Writer<json::ChunkedSink<decltype(flush_chunk)>> writer(sink);
-		write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
-		writer.flush();
+			set_json_response(res,
+				WebResponseCode::ServiceUnavailable,
+				[&](auto& writer)
+				{
+					writer.start_object();
+					writer.key("error");
+					writer.string("telemetry_layout_generation_failed");
+					writer.key("reason");
+					writer.string(layout_cache_failure_reason.empty() ? "not_built" : layout_cache_failure_reason.c_str());
+					writer.end_object();
+				});
+			return;
+		}
+		res.set_body(cached_layout_body, cached_layout_body_size);
 #else
 		json::StringSink sink;
 		json::Writer<json::StringSink> writer(sink);

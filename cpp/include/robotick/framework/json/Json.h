@@ -6,6 +6,7 @@
 #include "robotick/framework/strings/FixedString.h"
 #include "robotick/framework/strings/StringView.h"
 
+#include <rapidjson/allocators.h>
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -36,6 +37,45 @@ namespace robotick::json
 
 	  private:
 		rapidjson::StringBuffer buffer;
+	};
+
+	class FixedBufferSink
+	{
+	  public:
+		using Ch = char;
+
+		FixedBufferSink(char* buffer_in, size_t capacity_in)
+			: buffer(buffer_in)
+			, capacity(capacity_in)
+		{
+		}
+
+		void Put(char c)
+		{
+			if (size + 1 >= capacity)
+			{
+				ok = false;
+				return;
+			}
+			buffer[size++] = c;
+		}
+
+		void Flush() {}
+		char Peek() const { return '\0'; }
+		char Take() { return '\0'; }
+		size_t Tell() const { return size; }
+		char* PutBegin() { return nullptr; }
+		size_t PutEnd(char*) { return 0; }
+
+		const char* c_str() const { return buffer; }
+		size_t written_size() const { return size; }
+		bool is_ok() const { return ok; }
+
+	  private:
+		char* buffer = nullptr;
+		size_t capacity = 0;
+		size_t size = 0;
+		bool ok = true;
 	};
 
 	template <typename FlushFn, size_t BufferSize = 512> class ChunkedSink
@@ -88,7 +128,8 @@ namespace robotick::json
 	  public:
 		explicit Writer(Sink& sink_in)
 			: sink(sink_in)
-			, writer(sink_in)
+			, stack_allocator(writer_stack_storage, sizeof(writer_stack_storage))
+			, writer(sink_in, &stack_allocator, writer_stack_levels)
 		{
 		}
 
@@ -112,8 +153,14 @@ namespace robotick::json
 		template <size_t N> friend bool compact_to_fixed_string(const Value& value, FixedString<N>& out);
 		friend class Value;
 
+		using StackAllocator = rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator>;
+		static constexpr size_t writer_stack_storage_bytes = 512;
+		static constexpr size_t writer_stack_levels = 16;
+
 		Sink& sink;
-		rapidjson::Writer<Sink> writer;
+		char writer_stack_storage[writer_stack_storage_bytes] = {};
+		StackAllocator stack_allocator;
+		rapidjson::Writer<Sink, rapidjson::UTF8<>, rapidjson::UTF8<>, StackAllocator> writer;
 	};
 
 	class Value
