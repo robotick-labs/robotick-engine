@@ -104,7 +104,7 @@ namespace robotick
 		int status_code = WebResponseCode::OK;
 		FixedString64 status_line = "200 OK";
 		const char* content_type = "text/plain";
-		bool write_failed = false;
+		[[maybe_unused]] bool write_failed = false;
 	};
 
 	using WebRequestHandler = Function<bool(const WebRequest&, WebResponse&)>;
