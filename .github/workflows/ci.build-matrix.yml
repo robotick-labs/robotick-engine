@@ -27,12 +27,36 @@ jobs:
           - platform: linux
             preset: robotick-engine-tests-linux-debug
             docker_image: mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04
+            docker_source: pull
+            run_linux_setup: true
+            run_tests: true
           - platform: linux
             preset: robotick-engine-tests-linux-release
             docker_image: mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04
+            docker_source: pull
+            run_linux_setup: true
+            run_tests: false
+          - platform: linux-arm64
+            preset: robotick-engine-linux-arm64
+            docker_image: robotick-engine-ci-linux-arm64
+            docker_source: build
+            dockerfile: tools/docker/linux-arm64.Dockerfile
+            run_linux_setup: false
+            run_tests: false
+          - platform: linux-arm32
+            preset: robotick-engine-linux-arm32
+            docker_image: robotick-engine-ci-linux-arm32
+            docker_source: build
+            dockerfile: tools/docker/linux-arm32.Dockerfile
+            run_linux_setup: false
+            run_tests: false
           - platform: esp32s3
             preset: esp32s3
             docker_image: robotick-engine-ci-esp32s3
+            docker_source: build
+            dockerfile: tools/docker/esp32s3.Dockerfile
+            run_linux_setup: false
+            run_tests: false
 
     steps:
       - name: Checkout repository
@@ -42,11 +66,11 @@ jobs:
 
       - name: Prepare Docker image
         run: |
-          if [ '${{ matrix.platform }}' = 'esp32s3' ]; then
+          if [ '${{ matrix.docker_source }}' = 'build' ]; then
             docker build \
               -t ${{ matrix.docker_image }} \
-              -f tools/docker/esp32s3.Dockerfile \
-              .
+              -f ${{ matrix.dockerfile }} \
+              tools/docker
           else
             docker pull ${{ matrix.docker_image }}
           fi
@@ -80,11 +104,14 @@ jobs:
 
               else
                 echo '🚧 Linux Setup'
-                bash tools/setup_my_env_as_root.linux.sh
+                if [ '${{ matrix.run_linux_setup }}' = 'true' ]; then
+                  bash tools/setup_my_env_as_root.linux.sh
+                fi
+                mkdir -p .cmake
                 cmake --preset ${{ matrix.preset }}
                 cmake --build --preset ${{ matrix.preset }} -j$(nproc)
 
-                if [ '${{ matrix.preset }}' == 'robotick-engine-tests-linux-debug' ]; then
+                if [ '${{ matrix.run_tests }}' = 'true' ]; then
                   ctest --test-dir build/${{ matrix.preset }}/cpp/tests --output-on-failure --timeout 120 --fail-if-no-tests -j$(nproc)
                 fi
               fi

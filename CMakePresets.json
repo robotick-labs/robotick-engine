@@ -20,6 +20,32 @@
       }
     },
     {
+      "name": "linux-arm64-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "description": "Base preset for Linux ARM64 cross-builds",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "ROBOTICK_PLATFORM_LINUX": "ON",
+        "ROBOTICK_PLATFORM_DESKTOP": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-linux-arm64.cmake",
+        "ROBOTICK_BUILD_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "linux-arm32-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "description": "Base preset for Linux ARM32 cross-builds",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "ROBOTICK_PLATFORM_LINUX": "ON",
+        "ROBOTICK_PLATFORM_DESKTOP": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-linux-arm32.cmake",
+        "ROBOTICK_BUILD_TESTS": "OFF"
+      }
+    },
+    {
       "name": "robotick-engine-tests-linux-debug",
       "inherits": "linux-base",
       "description": "Linux Debug build (no optimizations, full asserts)",
@@ -40,6 +66,28 @@
         "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
         "ROBOTICK_STRIP_PROBES": "ON"
       }
+    },
+    {
+      "name": "robotick-engine-linux-arm64",
+      "inherits": "linux-arm64-base",
+      "description": "Linux ARM64 cross-build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG -DROBOTICK_RELEASE",
+        "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
+        "ROBOTICK_STRIP_PROBES": "ON"
+      }
+    },
+    {
+      "name": "robotick-engine-linux-arm32",
+      "inherits": "linux-arm32-base",
+      "description": "Linux ARM32 cross-build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG -DROBOTICK_RELEASE",
+        "ROBOTICK_BUILD_CONFIG_RELEASE": "ON",
+        "ROBOTICK_STRIP_PROBES": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -50,6 +98,14 @@
     {
       "name": "robotick-engine-tests-linux-release",
       "configurePreset": "robotick-engine-tests-linux-release"
+    },
+    {
+      "name": "robotick-engine-linux-arm64",
+      "configurePreset": "robotick-engine-linux-arm64"
+    },
+    {
+      "name": "robotick-engine-linux-arm32",
+      "configurePreset": "robotick-engine-linux-arm32"
     }
   ]
 }
