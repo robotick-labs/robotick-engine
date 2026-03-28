@@ -4,6 +4,9 @@
 [submodule "cpp/lib/civetweb"]
 	path = cpp/lib/civetweb
 	url = https://github.com/civetweb/civetweb.git
+[submodule "cpp/lib/rapidjson"]
+	path = cpp/lib/rapidjson
+	url = https://github.com/Tencent/rapidjson.git
 [submodule "platforms/esp32/components/cjson"]
 	path = platforms/esp32/components/cjson
 	url = https://github.com/DaveGamble/cJSON.git
