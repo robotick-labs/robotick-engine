@@ -261,6 +261,82 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		}
 	}
 
+	SECTION("Handshake grows receiver field storage beyond initial reserve", "[RemoteEngineConnection]")
+	{
+		static constexpr int kFieldCount = 20;
+		int recv_values[kFieldCount] = {};
+		int send_values[kFieldCount] = {};
+		for (int i = 0; i < kFieldCount; ++i)
+		{
+			send_values[i] = i + 100;
+		}
+
+		FixedVector<FixedString64, kFieldCount> paths;
+		for (int i = 0; i < kFieldCount; ++i)
+		{
+			FixedString64 name;
+			name.format("grow_field_%d", i);
+			paths.add(name);
+		}
+
+		int bound_count = 0;
+
+		RemoteEngineConnection receiver;
+		RemoteEngineConnection sender;
+
+		receiver.configure_receiver("rx");
+		receiver.set_field_binder(
+			[&](const char* path, RemoteEngineConnection::Field& out)
+			{
+				for (int i = 0; i < kFieldCount; ++i)
+				{
+					if (string_equals(paths[i].c_str(), path))
+					{
+						out.path = path;
+						out.recv_ptr = &recv_values[i];
+						out.size = sizeof(int);
+						out.type_desc = TypeRegistry::get().find_by_name("int");
+						++bound_count;
+						return true;
+					}
+				}
+				return false;
+			});
+
+		const int receiver_listen_port = wait_for_listen_port(receiver);
+		REQUIRE(receiver_listen_port > 0);
+
+		sender.configure_sender("tx", "rx", "127.0.0.1", receiver_listen_port);
+		for (int i = 0; i < kFieldCount; ++i)
+		{
+			sender.register_field({paths[i].c_str(), &send_values[i], nullptr, sizeof(int), 0});
+		}
+
+		for (int i = 0; i < 150; ++i)
+		{
+			sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			Thread::sleep_ms(5);
+
+			bool all_match = true;
+			for (int j = 0; j < kFieldCount; ++j)
+			{
+				if (recv_values[j] != send_values[j])
+				{
+					all_match = false;
+				}
+			}
+			if (all_match)
+				break;
+		}
+
+		REQUIRE(bound_count == kFieldCount);
+		for (int i = 0; i < kFieldCount; ++i)
+		{
+			REQUIRE(recv_values[i] == send_values[i]);
+		}
+	}
+
 	SECTION("Handles large payload", "[RemoteEngineConnection]")
 	{
 		constexpr uint8_t target_value = 0xAB;

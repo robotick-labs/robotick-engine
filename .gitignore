@@ -3,6 +3,7 @@
 *.pyc
 **/__pycache__/*
 **/build/*
+**/build-*/
 /scratch/
 robotick.egg-info
 tools/esp32-compile-check/platforms/

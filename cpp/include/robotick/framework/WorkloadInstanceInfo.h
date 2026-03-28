@@ -15,7 +15,7 @@ namespace robotick
 	class Engine;
 	struct TypeDescriptor;
 	struct WorkloadSeed;
-	struct WorkloadsBuffer;
+	class WorkloadsBuffer;
 	struct WorkloadDescriptor;
 
 	using TickDurationWindow = FixedVector<uint32_t, 64>;

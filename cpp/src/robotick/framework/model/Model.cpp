@@ -6,6 +6,7 @@
 #include "robotick/api_base.h"
 #include "robotick/framework/model/DataConnectionSeed.h"
 #include "robotick/framework/model/RemoteModelSeed.h"
+#include "robotick/framework/model/TelemetryPeerSeed.h"
 #include "robotick/framework/model/WorkloadSeed.h"
 #include "robotick/framework/strings/StringUtils.h"
 
@@ -51,6 +52,12 @@ namespace robotick
 	{
 		const RemoteModelSeed** mutable_ptr = const_cast<const RemoteModelSeed**>(in_remote_model_seeds);
 		remote_models = ArrayView<const RemoteModelSeed*>(mutable_ptr, num_remote_model_seeds);
+	}
+
+	void Model::use_telemetry_peer_seeds(const TelemetryPeerSeed* const* in_telemetry_peers, size_t num_telemetry_peers)
+	{
+		const TelemetryPeerSeed** mutable_ptr = const_cast<const TelemetryPeerSeed**>(in_telemetry_peers);
+		telemetry_peers = ArrayView<const TelemetryPeerSeed*>(mutable_ptr, num_telemetry_peers);
 	}
 
 	void Model::set_root_workload(const WorkloadSeed& root, bool auto_finalize)

@@ -44,6 +44,37 @@ namespace robotick
 		mg_write(static_cast<mg_connection*>(conn), data, size);
 	}
 
+	static const char* reason_phrase_for_status(const int status_code)
+	{
+		switch (status_code)
+		{
+		case 200:
+			return "OK";
+		case 201:
+			return "Created";
+		case 204:
+			return "No Content";
+		case 400:
+			return "Bad Request";
+		case 404:
+			return "Not Found";
+		case 405:
+			return "Method Not Allowed";
+		case 409:
+			return "Conflict";
+		case 500:
+			return "Internal Server Error";
+		case 502:
+			return "Bad Gateway";
+		case 503:
+			return "Service Unavailable";
+		case 504:
+			return "Gateway Timeout";
+		default:
+			return "OK";
+		}
+	}
+
 	// -------------------------------
 	// WebResponse streaming operations
 	// -------------------------------
@@ -51,12 +82,13 @@ namespace robotick
 	static inline void write_status_and_cors(void* conn, int status_code)
 	{
 		write_line(conn,
-			"HTTP/1.1 %d OK\r\n"
+			"HTTP/1.1 %d %s\r\n"
 			"Access-Control-Allow-Origin: *\r\n"
 			"Access-Control-Allow-Headers: Content-Type\r\n"
 			"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
 			"Access-Control-Expose-Headers: X-Robotick-Session-Id\r\n",
-			status_code);
+			status_code,
+			reason_phrase_for_status(status_code));
 	}
 
 	void WebResponse::set_status_code(int code)

@@ -516,6 +516,13 @@ namespace robotick
 		return state->root_instance;
 	}
 
+	const Model& Engine::get_model() const
+	{
+		ROBOTICK_ASSERT(state != nullptr);
+		ROBOTICK_ASSERT(state->model != nullptr);
+		return *state->model;
+	}
+
 	const WorkloadInstanceInfo* Engine::find_instance_info(const char* unique_name) const
 	{
 		WorkloadInstanceInfo** found_instance_info = state->instances_by_unique_name.find(unique_name);
@@ -551,6 +558,11 @@ namespace robotick
 	WorkloadsBuffer& Engine::get_workloads_buffer() const
 	{
 		return state->workloads_buffer;
+	}
+
+	TelemetryServer& Engine::get_telemetry_server() const
+	{
+		return state->telemetry_server;
 	}
 
 	size_t Engine::compute_blackboard_memory_requirements(const HeapVector<WorkloadInstanceInfo>& instances)

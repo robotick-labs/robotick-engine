@@ -59,11 +59,12 @@ namespace robotick
 		listen_port = 0;
 	}
 
-	void RemoteEngineDiscoverer::initialize_sender(const char* my_model_name, const char* target_model_name)
+	void RemoteEngineDiscoverer::initialize_sender(const char* my_model_name, const char* target_model_name, const char* target_address_in)
 	{
 		mode = DiscoveryMode::Sender;
 		my_model_id = my_model_name;
 		target_model_id = target_model_name;
+		target_address = target_address_in ? target_address_in : "";
 		status = DiscoveryStatus::ReadyToBroadcast;
 		time_sec_to_broadcast = 0.0f;
 		init_send_socket();
@@ -73,10 +74,12 @@ namespace robotick
 			ROBOTICK_REMOTE_ENGINE_DISCOVERER_VERBOSE, "[%s] Sender initialized (looking for: %s)", my_model_id.c_str(), target_model_id.c_str());
 	}
 
-	void RemoteEngineDiscoverer::initialize_receiver(const char* my_model_name)
+	void RemoteEngineDiscoverer::initialize_receiver(const char* my_model_name, const uint16_t telemetry_port_in, const bool is_gateway_in)
 	{
 		mode = DiscoveryMode::Receiver;
 		my_model_id = my_model_name;
+		telemetry_port = telemetry_port_in;
+		is_gateway = is_gateway_in;
 		init_recv_socket();
 		init_send_socket();
 
@@ -180,7 +183,15 @@ namespace robotick
 		sockaddr_in target{};
 		target.sin_family = AF_INET;
 		target.sin_port = htons(DISCOVERY_PORT);
-		target.sin_addr.s_addr = inet_addr(MULTICAST_GROUP);
+		if (target_address.empty())
+		{
+			target.sin_addr.s_addr = inet_addr(MULTICAST_GROUP);
+		}
+		else if (inet_pton(AF_INET, target_address.c_str(), &target.sin_addr) != 1)
+		{
+			ROBOTICK_WARNING("[%s] Invalid target discovery address '%s'", my_model_id.c_str(), target_address.c_str());
+			return;
+		}
 
 		ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_DISCOVERER_VERBOSE, "[%s] Broadcasting discovery: '%s'", my_model_id.c_str(), buffer);
 		sendto(send_fd, buffer, len, 0, (sockaddr*)&target, sizeof(target));
@@ -252,7 +263,14 @@ namespace robotick
 			}
 
 			char reply[256];
-			int reply_len = snprintf(reply, sizeof(reply), "%s %s %d", PEER_REPLY_MSG, my_model_id.c_str(), dynamic_rec_port);
+			int reply_len = snprintf(reply,
+				sizeof(reply),
+				"%s %s %d %d %d",
+				PEER_REPLY_MSG,
+				my_model_id.c_str(),
+				dynamic_rec_port,
+				static_cast<int>(telemetry_port),
+				is_gateway ? 1 : 0);
 
 			sockaddr_in dest{};
 			dest.sin_family = AF_INET;
@@ -267,7 +285,10 @@ namespace robotick
 		{
 			char model_id[64] = {};
 			int port = -1;
-			if (sscanf(data, "%*s %63s %d", model_id, &port) != 2)
+			int discovered_telemetry_port = 0;
+			int discovered_gateway_flag = 0;
+			const int parsed = sscanf(data, "%*s %63s %d %d %d", model_id, &port, &discovered_telemetry_port, &discovered_gateway_flag);
+			if (parsed < 2)
 			{
 				ROBOTICK_WARNING("[%s] Malformed PEER_HERE: '%s'", my_model_id.c_str(), data);
 				return;
@@ -277,6 +298,8 @@ namespace robotick
 			info.model_id = model_id;
 			info.ip = inet_ntoa(sender.sin_addr);
 			info.port = port;
+			info.telemetry_port = parsed >= 3 ? static_cast<uint16_t>(discovered_telemetry_port) : 0;
+			info.is_gateway = parsed >= 4 ? (discovered_gateway_flag != 0) : false;
 
 			ROBOTICK_INFO_IF(ROBOTICK_REMOTE_ENGINE_DISCOVERER_VERBOSE,
 				"[%s] Received peer reply from '%s' (%s:%d)",

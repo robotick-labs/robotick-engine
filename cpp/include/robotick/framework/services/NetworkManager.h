@@ -18,8 +18,10 @@ namespace robotick
 	{
 		NetworkType type = NetworkType::Wifi;
 		FixedString32 iface = "wlan0";
+		FixedString64 connection_name = "robotick-hotspot";
 		FixedString32 ssid = "robotick-demo";
 		FixedString32 password = "letmein123";
+		FixedString32 ipv4_address_cidr = "10.42.0.1/24";
 	};
 
 	struct NetworkClientConfig
@@ -28,6 +30,9 @@ namespace robotick
 		FixedString32 iface = "wlan0";
 		FixedString32 ssid = "robotick-demo";
 		FixedString32 password = "letmein123";
+		FixedString32 static_ipv4 = "";
+		FixedString32 gateway_ipv4 = "";
+		FixedString32 netmask_ipv4 = "";
 	};
 
 	class NetworkHotspot

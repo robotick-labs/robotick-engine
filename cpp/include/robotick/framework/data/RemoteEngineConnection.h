@@ -4,6 +4,7 @@
 #pragma once
 
 #include "robotick/framework/containers/HeapVector.h"
+#include "robotick/framework/containers/List.h"
 #include "robotick/framework/data/InProgressMessage.h"
 #include "robotick/framework/strings/FixedString.h"
 #include "robotick/framework/utility/Function.h"
@@ -124,8 +125,11 @@ namespace robotick
 
 		BinderCallback binder;
 
-		// set on startup (register_field()) on Sender; on tick_receiver_receive_handshake_and_bind() on Receiver:
+		// Sender fields stay in a contiguous heap block for fast payload writes.
+		// Receiver fields are accumulated incrementally during handshake, then copied
+		// into this exact-sized buffer once binding is complete.
 		HeapVector<Field> fields;
+		List<Field> pending_receiver_fields;
 		size_t field_count = 0;
 		size_t handshake_path_total_length = 0;
 		size_t handshake_payload_capacity = sizeof(uint32_t);

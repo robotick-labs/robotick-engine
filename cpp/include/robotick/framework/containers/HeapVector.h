@@ -52,25 +52,11 @@ namespace robotick
 			if (other.size_ == 0)
 				return;
 			data_ = static_cast<T*>(operator new[](other.size_ * sizeof(T)));
-			size_t constructed = 0;
-			try
+			for (size_t constructed = 0; constructed < other.size_; ++constructed)
 			{
-				for (; constructed < other.size_; ++constructed)
-				{
-					new (&data_[constructed]) T(other.data_[constructed]);
-				}
-				size_ = other.size_;
+				new (&data_[constructed]) T(other.data_[constructed]);
 			}
-			catch (...)
-			{
-				for (size_t i = 0; i < constructed; ++i)
-				{
-					data_[i].~T();
-				}
-				operator delete[](data_);
-				data_ = nullptr;
-				throw;
-			}
+			size_ = other.size_;
 		}
 
 		// Copy assignment
@@ -83,25 +69,11 @@ namespace robotick
 			if (other.size_ == 0)
 				return *this;
 			data_ = static_cast<T*>(operator new[](other.size_ * sizeof(T)));
-			size_t constructed = 0;
-			try
+			for (size_t constructed = 0; constructed < other.size_; ++constructed)
 			{
-				for (; constructed < other.size_; ++constructed)
-				{
-					new (&data_[constructed]) T(other.data_[constructed]);
-				}
-				size_ = other.size_;
+				new (&data_[constructed]) T(other.data_[constructed]);
 			}
-			catch (...)
-			{
-				for (size_t i = 0; i < constructed; ++i)
-				{
-					data_[i].~T();
-				}
-				operator delete[](data_);
-				data_ = nullptr;
-				throw;
-			}
+			size_ = other.size_;
 			return *this;
 		}
 
@@ -164,6 +136,8 @@ namespace robotick
 		T* end() { return data_ + size_; }
 		const T* begin() const { return data_; }
 		const T* end() const { return data_ + size_; }
+
+		void reset() { destroy(); }
 
 	  private:
 		void destroy()

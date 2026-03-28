@@ -4,12 +4,33 @@
 #include "robotick/framework/data/RemoteEngineConnections.h"
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
+#include "robotick/framework/data/TelemetryServer.h"
 #include "robotick/framework/model/Model.h"
+
+#include <cstring>
 
 #define ROBOTICK_REMOTE_ENGINE_CONNECTIONS_VERBOSE 0
 
 namespace robotick
 {
+	namespace
+	{
+		const char* resolve_discovery_target_address(const RemoteModelSeed& remote_model)
+		{
+			if (remote_model.comms_mode == RemoteModelSeed::Mode::Local)
+			{
+				return "127.0.0.1";
+			}
+
+			if (remote_model.comms_mode != RemoteModelSeed::Mode::IP || remote_model.comms_channel.empty())
+			{
+				return nullptr;
+			}
+
+			const char* channel = remote_model.comms_channel.c_str();
+			return strncmp(channel, "ip:", 3) == 0 ? channel + 3 : channel;
+		}
+	} // namespace
 
 	RemoteEngineConnections::~RemoteEngineConnections()
 	{
@@ -26,7 +47,7 @@ namespace robotick
 
 		ROBOTICK_INFO_IF(log_verbose, "[REC::setup] Setting up RemoteEngineConnections for model '%s'", my_model_name);
 
-		discoverer_receiver.initialize_receiver(my_model_name);
+		discoverer_receiver.initialize_receiver(my_model_name, model.get_telemetry_port(), model.get_telemetry_is_gateway());
 		discoverer_receiver.set_on_incoming_connection_requested(
 			[this, &model](const char* source_model_id, uint16_t& rec_port_out)
 			{
@@ -91,11 +112,16 @@ namespace robotick
 			RemoteEngineDiscoverer& discoverer_sender = discoverer_senders[index];
 			index++;
 
-			discoverer_sender.initialize_sender(my_model_name, remote_model->model_name.c_str());
+			discoverer_sender.initialize_sender(my_model_name, remote_model->model_name.c_str(), resolve_discovery_target_address(*remote_model));
 			discoverer_sender.set_on_remote_model_discovered(
 				[&](const RemoteEngineDiscoverer::PeerInfo& peer)
 				{
 					ROBOTICK_INFO("[REC::sender] Discovered remote model '%s' at %s:%d", peer.model_id.c_str(), peer.ip.c_str(), peer.port);
+					if (engine && peer.telemetry_port > 0)
+					{
+						engine->get_telemetry_server().update_peer_route(
+							peer.model_id.c_str(), peer.ip.c_str(), peer.telemetry_port, peer.is_gateway);
+					}
 					if (!remote_connection.has_basic_connection())
 					{
 						ROBOTICK_INFO_IF(log_verbose, "[REC::sender] Configuring sender to model '%s'", peer.model_id.c_str());

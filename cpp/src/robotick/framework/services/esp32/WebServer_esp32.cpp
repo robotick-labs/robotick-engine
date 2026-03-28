@@ -6,6 +6,7 @@
 #include "robotick/api.h"
 #include "robotick/framework/services/WebServer.h"
 
+#include <cstdio>
 #include <cstring>
 #include <esp_http_server.h>
 
@@ -16,30 +17,86 @@ namespace robotick
 		httpd_handle_t handle = nullptr;
 	};
 
+	namespace
+	{
+		const char* get_reason_phrase(const int status_code)
+		{
+			switch (status_code)
+			{
+			case 200:
+				return "OK";
+			case 201:
+				return "Created";
+			case 204:
+				return "No Content";
+			case 400:
+				return "Bad Request";
+			case 401:
+				return "Unauthorized";
+			case 403:
+				return "Forbidden";
+			case 404:
+				return "Not Found";
+			case 405:
+				return "Method Not Allowed";
+			case 409:
+				return "Conflict";
+			case 412:
+				return "Precondition Failed";
+			case 500:
+				return "Internal Server Error";
+			case 501:
+				return "Not Implemented";
+			case 503:
+				return "Service Unavailable";
+			default:
+				return "OK";
+			}
+		}
+	} // namespace
+
 	// ----------------------------------------
 	//  Write utilities
 	// ----------------------------------------
 
-	static inline void write_status_and_cors(httpd_req_t* req, int status_code)
+	static inline bool write_status_and_cors(httpd_req_t* req, const char* status_line)
 	{
-		char status_line[32];
-		snprintf(status_line, sizeof(status_line), "%d OK", status_code);
-		httpd_resp_set_status(req, status_line);
+		if (!req || !status_line)
+			return false;
 
-		httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-		httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
-		httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-		httpd_resp_set_hdr(req, "Access-Control-Expose-Headers", "X-Robotick-Session-Id");
+		if (httpd_resp_set_status(req, status_line) != ESP_OK)
+			return false;
+
+		if (httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*") != ESP_OK)
+			return false;
+		if (httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type") != ESP_OK)
+			return false;
+		if (httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS") != ESP_OK)
+			return false;
+		if (httpd_resp_set_hdr(req, "Access-Control-Expose-Headers", "X-Robotick-Session-Id") != ESP_OK)
+			return false;
+
+		return true;
 	}
 
-	static inline void write_chunk(httpd_req_t* req, const void* data, size_t size)
+	static inline bool write_content_type(httpd_req_t* req, const char* type)
 	{
-		httpd_resp_send_chunk(req, (const char*)data, size);
+		return req && httpd_resp_set_type(req, type ? type : "text/plain") == ESP_OK;
 	}
 
-	static inline void write_empty_terminator(httpd_req_t* req)
+	static inline bool write_header(httpd_req_t* req, const char* key, const char* value)
 	{
-		httpd_resp_send_chunk(req, nullptr, 0);
+		return req && httpd_resp_set_hdr(req, key, value) == ESP_OK;
+	}
+
+	static inline bool write_full_body(httpd_req_t* req, const void* data, size_t size)
+	{
+		if (!req)
+			return false;
+		const char* body = static_cast<const char*>(data);
+		if (!body)
+			body = "";
+		return httpd_resp_send(req, body, size) == ESP_OK;
 	}
 
 	// ----------------------------------------
@@ -48,23 +105,38 @@ namespace robotick
 
 	void WebResponse::set_status_code(int code)
 	{
+		if (write_failed)
+			return;
 		ensure_headers_open();
 		status_code = code;
+		char formatted_status_line[64] = {};
+		snprintf(formatted_status_line, sizeof(formatted_status_line), "%d %s", status_code, get_reason_phrase(status_code));
+		status_line = formatted_status_line;
 	}
 
 	void WebResponse::set_content_type(const char* type)
 	{
+		if (write_failed)
+			return;
 		ensure_headers_open();
 		content_type = type ? type : "text/plain";
 	}
 
 	void WebResponse::add_header(const char* header_line)
 	{
+		if (write_failed)
+			return;
+
 		httpd_req_t* req = static_cast<httpd_req_t*>(conn);
 
 		if (state == State::Start)
 		{
-			write_status_and_cors(req, status_code);
+			if (!write_status_and_cors(req, status_line.c_str()))
+			{
+				write_failed = true;
+				state = State::Done;
+				return;
+			}
 		}
 
 		ensure_headers_open();
@@ -83,35 +155,41 @@ namespace robotick
 			while (*val == ' ')
 				val++;
 
-			httpd_resp_set_hdr(req, key.c_str(), val);
+			if (!write_header(req, key.c_str(), val))
+			{
+				write_failed = true;
+				state = State::Done;
+			}
 		}
 	}
 
 	void WebResponse::set_body(const void* data, size_t size)
 	{
+		if (write_failed)
+			return;
+
 		ensure_body_allowed();
 		httpd_req_t* req = static_cast<httpd_req_t*>(conn);
 
-		// First time writing any data? Emit status + CORS + type
-		if (state == State::Start)
+		// Apply current status/headers before sending the one-shot body.
+		if (state == State::Start || state == State::HeadersOpen)
 		{
-			write_status_and_cors(req, status_code);
-			httpd_resp_set_type(req, content_type);
-			ensure_headers_open();
+			if (!write_status_and_cors(req, status_line.c_str()) || !write_content_type(req, content_type))
+			{
+				write_failed = true;
+				state = State::Done;
+				return;
+			}
 		}
 
-		// If headers are open and body is starting, close header block
-		if (state == State::HeadersOpen)
+		if (!write_full_body(req, data, size))
 		{
-			// Done setting headers. From now on, only chunked body.
-			state = State::BodyStreaming;
+			write_failed = true;
+			state = State::Done;
+			return;
 		}
 
-		// Body write
-		if (size > 0)
-		{
-			write_chunk(req, data, size);
-		}
+		state = State::Done;
 	}
 
 	void WebResponse::set_body_string(const char* text)
@@ -125,20 +203,28 @@ namespace robotick
 		if (state == State::Done)
 			return;
 
-		httpd_req_t* req = static_cast<httpd_req_t*>(conn);
-
-		// No body ever written → send an empty body with correct headers
-		if (state == State::Start || state == State::HeadersOpen)
+		if (write_failed)
 		{
-			write_status_and_cors(req, status_code);
-			httpd_resp_set_type(req, content_type);
-
-			// Empty chunk
-			write_chunk(req, "", 0);
+			state = State::Done;
+			return;
 		}
 
-		// Terminate chunked transfer
-		write_empty_terminator(req);
+		httpd_req_t* req = static_cast<httpd_req_t*>(conn);
+
+		// No body ever written → send an empty response with correct headers
+		if (state == State::Start || state == State::HeadersOpen)
+		{
+			if (!write_status_and_cors(req, status_line.c_str()) || !write_content_type(req, content_type))
+			{
+				write_failed = true;
+				state = State::Done;
+				return;
+			}
+			if (!write_full_body(req, "", 0))
+			{
+				write_failed = true;
+			}
+		}
 
 		state = State::Done;
 	}
@@ -209,13 +295,25 @@ namespace robotick
 		// Body read (ESP32 doesn't support chunked POST in this setup)
 		if (req->content_len > 0)
 		{
-			size_t to_read = req->content_len;
-			char buf[1024];
-			int rd = httpd_req_recv(req, buf, to_read);
-			if (rd > 0)
+			if (req->content_len > static_cast<int>(r.body.capacity()))
 			{
-				r.body.set_bytes(buf, rd);
+				httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Request body too large");
+				return ESP_OK;
 			}
+
+			size_t total_read = 0;
+			while (total_read < static_cast<size_t>(req->content_len))
+			{
+				const size_t remaining = static_cast<size_t>(req->content_len) - total_read;
+				const int rd = httpd_req_recv(req, reinterpret_cast<char*>(r.body.data()) + total_read, static_cast<int>(remaining));
+				if (rd <= 0)
+				{
+					httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to read request body");
+					return ESP_OK;
+				}
+				total_read += static_cast<size_t>(rd);
+			}
+			r.body.set_size(total_read);
 		}
 
 		// Dynamic handler, skip static file logic (ESP-side)
@@ -270,10 +368,15 @@ namespace robotick
 		httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 		config.server_port = port;
 		config.uri_match_fn = httpd_uri_match_wildcard;
+		config.max_open_sockets = 7;
+		config.lru_purge_enable = true;
+		config.task_caps = MALLOC_CAP_8BIT;
+		config.stack_size = 12288;
 
-		if (httpd_start(&s->handle, &config) != ESP_OK)
+		const esp_err_t start_err = httpd_start(&s->handle, &config);
+		if (start_err != ESP_OK)
 		{
-			ROBOTICK_FATAL_EXIT("Failed to start ESP32 WebServer");
+			ROBOTICK_FATAL_EXIT("Failed to start ESP32 WebServer: %s", esp_err_to_name(start_err));
 		}
 
 		httpd_uri_t get_uri = {.uri = "/*", .method = HTTP_GET, .handler = esp32_handler, .user_ctx = this};
