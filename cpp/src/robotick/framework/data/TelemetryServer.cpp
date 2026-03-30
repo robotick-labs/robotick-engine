@@ -1902,7 +1902,7 @@ namespace robotick
 			});
 	}
 
-	static FixedString64 make_blackboard_type_name(const DynamicStructDescriptor& desc, void* data_ptr)
+	static FixedString64 make_dynamic_struct_type_name(const TypeDescriptor& type_desc, const DynamicStructDescriptor& desc, void* data_ptr)
 	{
 		const StructDescriptor* struct_desc = desc.get_struct_descriptor(data_ptr);
 		robotick::Hash32 hash;
@@ -1919,7 +1919,8 @@ namespace robotick
 		}
 
 		FixedString64 type_name;
-		type_name.format("Blackboard_%08X", static_cast<unsigned int>(hash.final()));
+		const char* base_name = type_desc.name.empty() ? "DynamicStruct" : type_desc.name.c_str();
+		type_name.format("%s_%08X", base_name, static_cast<unsigned int>(hash.final()));
 		return type_name;
 	}
 
@@ -1928,7 +1929,7 @@ namespace robotick
 		const DynamicStructDescriptor* dynamic_struct_desc = type_desc.get_dynamic_struct_desc();
 		if (dynamic_struct_desc)
 		{
-			const FixedString64 blackboard_name = make_blackboard_type_name(*dynamic_struct_desc, data_ptr);
+			const FixedString64 blackboard_name = make_dynamic_struct_type_name(type_desc, *dynamic_struct_desc, data_ptr);
 			FixedString256 type_name;
 			type_name = blackboard_name.c_str();
 			return type_name;

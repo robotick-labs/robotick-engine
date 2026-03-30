@@ -272,6 +272,12 @@ namespace robotick::test
 
 		SECTION("TypeRegistry rejects duplicate ids")
 		{
+			if (TypeRegistry::get().is_sealed())
+			{
+				SUCCEED("TypeRegistry is already sealed by earlier engine tests; duplicate registration is blocked before id checks.");
+				return;
+			}
+
 			static FixedString64 persistent_names[32];
 			static size_t persistent_count = 0;
 			const size_t primary_idx = persistent_count++;

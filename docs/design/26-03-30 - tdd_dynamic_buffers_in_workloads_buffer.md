@@ -47,11 +47,10 @@ The existing `DynamicStructDescriptor` abstraction currently covers schema resol
 
 - Given an instance, return its `StructDescriptor`.
 
-To support startup-sized backing storage, extend it with one optional storage callback that can:
+To support startup-sized backing storage, extend it with an explicit planning/binding storage contract that can:
 
-- Dry-run sizing / alignment during startup.
-- Bind the instance to its storage during the real bind pass.
-- Advance a shared cursor within the `Dynamic Struct Storage Region`.
+- Describe storage size and alignment requirements during startup planning.
+- Bind the instance to its assigned storage during the real bind pass.
 
 This lets `Engine.cpp` stop special-casing `Blackboard` by name and instead operate on dynamic structs with storage requirements.
 
@@ -68,31 +67,51 @@ The abstraction should distinguish between:
 
 ## Minimal API Shape To Explore
 
-Keep `resolve_fn`, and add one optional storage callback to `DynamicStructDescriptor`.
+Keep `resolve_fn`, and add an optional two-phase storage contract to `DynamicStructDescriptor`.
 
 Potential shape:
 
 ```cpp
+struct DynamicStructStoragePlan
+{
+	size_t size_bytes = 0;
+	size_t alignment = 1;
+};
+
 struct DynamicStructDescriptor
 {
 	const StructDescriptor* (*resolve_fn)(const void* instance);
 
-	bool (*storage_fn)(
+	bool (*plan_storage_fn)(
+		const void* instance,
+		DynamicStructStoragePlan& out_plan);
+
+	bool (*bind_storage_fn)(
 		void* instance,
 		const WorkloadsBuffer& workloads_buffer,
-		size_t& cursor_in_workloads_buffer,
-		bool bind_offsets);
+		size_t storage_offset_in_workloads_buffer,
+		size_t storage_size_bytes);
 };
 ```
 
 Intended semantics:
 
-- `bind_offsets == false`
-  Dry sizing pass only. Advance the `Dynamic Struct Storage Region` cursor, do not write offsets.
-- `bind_offsets == true`
-  Real bind pass. Advance the `Dynamic Struct Storage Region` cursor and write offsets / internal state.
+- `plan_storage_fn`
+  Describes the dynamic struct's required storage region, without writing any bound offsets or state into the instance.
+- `bind_storage_fn`
+  Receives the region assigned by the engine and writes the instance's bound offsets / internal state.
 
-The key point is to unify sizing and binding in one callback so the logic cannot drift.
+This keeps sizing and binding conceptually separate while still allowing each dynamic struct implementation to share internal layout helpers.
+
+### Impact on `Blackboard`
+
+`Blackboard` should be migrated onto this contract immediately.
+
+That means:
+
+- `Blackboard::compute_total_datablock_size()` / related layout planning logic becomes the basis of `plan_storage_fn`.
+- `Blackboard::bind(...)` becomes the basis of `bind_storage_fn`.
+- Any duplicated cursor/layout math inside `Blackboard` should be refactored behind a shared helper so the planning and binding paths remain consistent without being conflated at the descriptor API level.
 
 ---
 
@@ -125,6 +144,7 @@ Notes:
 - `count` is the active element count.
 - `capacity` is the startup-bound maximum size for this instance.
 - Internal addressing should be offset-based relative to the container header or owning buffer region within `WorkloadsBuffer`.
+- Like Blackboard-backed dynamic fields, telemetry/tooling should be able to follow the reflected `data_buffer` offset to its bound target region and treat that target buffer as readily as if it were inline, provided it lies within used `WorkloadsBuffer`.
 
 Avoid raw pointers in the reflected or persisted state.
 
@@ -134,14 +154,15 @@ Avoid raw pointers in the reflected or persisted state.
 
 Refactor `Engine.cpp` so that the current Blackboard path becomes a generic dynamic-struct storage pass:
 
-1. Construct workloads as today.
-2. Apply initial config as today.
-3. Run preload as today.
+1. Compute the exact inline workload + stats footprint.
+2. Allocate a scratch `WorkloadsBuffer` for just that inline region.
+3. Construct workloads, apply initial config, and run `pre_load()` in that scratch buffer.
 4. Scan workload config / inputs / outputs for dynamic structs with storage callbacks.
-5. Run a dry sizing pass to total required `Dynamic Struct Storage Region` usage.
-6. Validate against reserved capacity.
-7. Run a bind pass to assign offsets / storage.
-8. Continue with the post-bind config pass and normal startup flow.
+5. Run a planning pass to collect storage size / alignment requirements for each dynamic struct that needs storage.
+6. Destroy the scratch workload instances.
+7. Allocate the final `WorkloadsBuffer` to the exact inline-workloads + `Dynamic Struct Storage Region` size required.
+8. Reconstruct workloads, re-run initial config + `pre_load()`, validate the plan is unchanged, then bind dynamic-struct storage.
+9. Continue with the post-bind config pass and normal startup flow.
 
 This should replace Blackboard-specific naming and logic with dynamic-struct storage terminology where appropriate.
 
@@ -210,6 +231,19 @@ This gives image handling three related but distinct modes:
 
 The image use-case should likely be the first implementation target, even though the underlying abstraction is generic.
 
+As part of that first image-focused pass, the existing fixed image aliases should be renamed to make their inline storage mode explicit.
+
+Preferred names:
+
+- `ImageJpegInline128k`
+- `ImageJpegInline256k`
+- `ImagePngInline16k`
+- `ImagePngInline64k`
+- `ImagePngInline128k`
+- `ImagePngInline256k`
+- `ImageJpegDynamic`
+- `ImagePngDynamic`
+
 ---
 
 ## Telemetry / Studio Considerations
@@ -236,13 +270,18 @@ Use `Dynamic Struct Storage Region` as the formal term for the post-instance are
 
 Likely code / API names:
 
-- `DEFAULT_MAX_DYNAMIC_STRUCT_STORAGE_BYTES`
 - `dynamic_struct_storage_start_offset`
 - `dynamic_struct_storage_cursor`
 - `compute_dynamic_struct_storage_requirements()`
 - `bind_dynamic_struct_storage_for_instances()`
 
 Low-level comments can still describe it as the tail region of `WorkloadsBuffer`, but the formal engine concept should be `Dynamic Struct Storage Region`.
+
+For dynamic-struct storage callbacks, storage support should be treated as an all-or-nothing contract:
+
+- both callbacks present => storage-backed dynamic struct
+- both callbacks absent => reflection-only dynamic struct
+- any mixed case => descriptor validation failure
 
 ---
 
@@ -254,3 +293,5 @@ After implementation starts, these docs should be updated to reflect the new abs
 - `docs/ownership.md`
 - `docs/design/25-11-28 - tdd_reflective_telemetry.md`
 - core-workloads docs covering image buffer types and any workload I/O that moves from fixed-capacity inline buffers to startup-sized dynamic buffers
+
+---

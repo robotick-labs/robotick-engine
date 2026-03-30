@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/config/AssertUtils.h"
-#include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/containers/HeapVector.h"
+#include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/registry/TypeMacros.h"
 #include "robotick/framework/strings/StringView.h"
@@ -21,6 +21,16 @@ namespace robotick::test
 		const TypeDescriptor s_zero_size_desc{
 			StringView("ZeroSizeDescriptor"), TypeId("ZeroSizeDescriptor"), 0, alignof(int), TypeCategory::Primitive, {}, nullptr};
 		const AutoRegisterType s_zero_size_reg(s_zero_size_desc);
+
+		const StructDescriptor* fake_dynamic_struct_resolve(const void*)
+		{
+			return nullptr;
+		}
+
+		bool fake_dynamic_struct_plan(const void*, DynamicStructStoragePlan&)
+		{
+			return true;
+		}
 	} // namespace
 
 	TEST_CASE("Unit/Framework/Registry/DescriptorValidation")
@@ -45,6 +55,12 @@ namespace robotick::test
 
 			Blackboard blackboard;
 			ROBOTICK_REQUIRE_ERROR_MSG(blackboard.initialize_fields(fields), "zero-sized type");
+		}
+
+		SECTION("Dynamic struct storage callbacks must be both present or both absent")
+		{
+			DynamicStructDescriptor invalid_desc{fake_dynamic_struct_resolve, fake_dynamic_struct_plan, nullptr};
+			ROBOTICK_REQUIRE_ERROR_MSG(invalid_desc.has_storage_callbacks(), "both present or both absent");
 		}
 	}
 } // namespace robotick::test

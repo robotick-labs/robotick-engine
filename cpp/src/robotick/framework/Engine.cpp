@@ -84,12 +84,8 @@ namespace robotick
 		return (alignment > alignof(max_align_t)) ? alignment : alignof(max_align_t);
 	}
 
-	// Ensure the cursor respects the max alignment of the upcoming type so every allocation remains well-aligned.
-	static bool align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	static bool align_workloads_cursor_with_alignment(size_t alignment, size_t& workloads_cursor)
 	{
-		const size_t alignment = max_align_for_type(type.alignment);
-		// This should never fail, since max_align_for_type clamps to at least alignof(max_align_t),
-		// but we keep the division defensive to protect the cursor from bad alignments.
 		if (alignment == 0)
 			return false;
 		size_t remainder = workloads_cursor % alignment;
@@ -99,10 +95,17 @@ namespace robotick
 			size_t aligned_cursor = 0;
 			if (!safe_add_size(workloads_cursor, delta, aligned_cursor))
 				return false;
-			// Move the cursor forward so that the next placement-new starts at an address compatible with the target type.
 			workloads_cursor = aligned_cursor;
 		}
 		return true;
+	}
+
+	// Ensure the cursor respects the max alignment of the upcoming type so every allocation remains well-aligned.
+	static bool align_workloads_cursor_for_type(const TypeDescriptor& type, size_t& workloads_cursor)
+	{
+		const size_t alignment = max_align_for_type(type.alignment);
+		// Move the cursor forward so that the next placement-new starts at an address compatible with the target type.
+		return align_workloads_cursor_with_alignment(alignment, workloads_cursor);
 	}
 
 	// Reserve space for the named type and record the advanced cursor so the next workload starts immediately after it.
@@ -116,6 +119,28 @@ namespace robotick
 		// Advance past the object we just allocated so the following type begins immediately afterwards.
 		workloads_cursor = next_cursor;
 		return true;
+	}
+
+	static size_t compute_dynamic_struct_storage_region_end(
+		size_t workloads_cursor, size_t dynamic_struct_storage_start_alignment, size_t dynamic_struct_storage_size, size_t& out_start_offset)
+	{
+		size_t dynamic_struct_storage_start = workloads_cursor;
+		if (dynamic_struct_storage_size > 0 &&
+			!align_workloads_cursor_with_alignment(dynamic_struct_storage_start_alignment, dynamic_struct_storage_start))
+		{
+			ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while reserving dynamic struct storage");
+		}
+
+		size_t dynamic_struct_storage_end = dynamic_struct_storage_start;
+		if (dynamic_struct_storage_size > 0 && !safe_add_size(dynamic_struct_storage_start, dynamic_struct_storage_size, dynamic_struct_storage_end))
+		{
+			ROBOTICK_FATAL_EXIT("Workloads buffer overflow while reserving dynamic struct storage (%zu + %zu)",
+				dynamic_struct_storage_start,
+				dynamic_struct_storage_size);
+		}
+
+		out_start_offset = dynamic_struct_storage_start;
+		return dynamic_struct_storage_end;
 	}
 
 	void Engine::load(const Model& model)
@@ -140,129 +165,59 @@ namespace robotick
 
 		state->model = &model;
 
-		// compute how big we need our workloads-buffer to be:
-		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
-		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
+		const size_t inline_workloads_size = compute_inline_workloads_buffer_size();
 
-		const auto& seeds = model.get_workload_seeds();
-		size_t total_size = 0;
-		for (const WorkloadSeed* seed : seeds)
+		// Preflight the workload graph once to discover exact dynamic-struct storage requirements.
+		state->workloads_buffer = WorkloadsBuffer(inline_workloads_size);
+		construct_workload_instances();
+		run_workload_pre_load_pass();
+
+		size_t planned_dynamic_struct_storage_start_alignment = 1;
+		const size_t planned_dynamic_struct_storage_size =
+			compute_dynamic_struct_storage_requirements(state->instances, planned_dynamic_struct_storage_start_alignment);
+
+		destroy_constructed_workload_instances();
+		reset_loaded_workload_state();
+
+		size_t planned_dynamic_struct_storage_start = inline_workloads_size;
+		const size_t final_workloads_buffer_size = compute_dynamic_struct_storage_region_end(inline_workloads_size,
+			planned_dynamic_struct_storage_start_alignment,
+			planned_dynamic_struct_storage_size,
+			planned_dynamic_struct_storage_start);
+
+		// Rebuild for real into the final exact-sized WorkloadsBuffer, then validate the plan before binding.
+		state->workloads_buffer = WorkloadsBuffer(final_workloads_buffer_size);
+		construct_workload_instances();
+		run_workload_pre_load_pass();
+
+		size_t final_dynamic_struct_storage_start_alignment = 1;
+		const size_t final_dynamic_struct_storage_size =
+			compute_dynamic_struct_storage_requirements(state->instances, final_dynamic_struct_storage_start_alignment);
+		if (final_dynamic_struct_storage_start_alignment != planned_dynamic_struct_storage_start_alignment ||
+			final_dynamic_struct_storage_size != planned_dynamic_struct_storage_size)
 		{
-			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
-			ROBOTICK_ASSERT_MSG(workload_type, "Unknown workload type: %s", seed->type_id.get_debug_name());
-
-			if (!align_workloads_cursor_for_type(*workload_stats_type, total_size))
-				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while sizing stats type '%s'", workload_stats_type->name.c_str());
-			if (!increment_workloads_cursor_for_type(*workload_stats_type, total_size))
-				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while sizing stats type '%s'", workload_stats_type->name.c_str());
-
-			if (!align_workloads_cursor_for_type(*workload_type, total_size))
-				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow for workload type '%s'", workload_type->name.c_str());
-			if (!increment_workloads_cursor_for_type(*workload_type, total_size))
-				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while sizing workload type '%s'", workload_type->name.c_str());
-		}
-
-		// create our workloads-buffer, workload-instances info, and construct each workload:
-		size_t buffer_capacity = 0;
-
-		// Blackboard storage sits immediately after workload instances; reserve it now so the contiguous block never relocates.
-		if (!safe_add_size(total_size, DEFAULT_MAX_BLACKBOARDS_BYTES, buffer_capacity))
 			ROBOTICK_FATAL_EXIT(
-				"Workloads buffer size overflow when reserving blackboard space (%zu + %zu)", total_size, (size_t)DEFAULT_MAX_BLACKBOARDS_BYTES);
-		state->workloads_buffer = WorkloadsBuffer(buffer_capacity);
-
-		size_t workloads_cursor = 0;
-		uint8_t* buffer_ptr = state->workloads_buffer.raw_ptr();
-		state->instances.initialize(seeds.size());
-
-		for (size_t i = 0; i < seeds.size(); ++i)
-		{
-			const auto* seed = seeds[i];
-
-			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
-			ROBOTICK_ASSERT_MSG(workload_type, "Unknown workload type: %s", seed->type_id.get_debug_name());
-
-			const auto* workload_desc = workload_type->get_workload_desc();
-			ROBOTICK_ASSERT(workload_desc != nullptr);
-
-			// Stats/instance structs are colocated in the same buffer; align both as if they were independently allocated.
-			if (!align_workloads_cursor_for_type(*workload_stats_type, workloads_cursor))
-				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while laying-out stats for workload type '%s'", workload_type->name.c_str());
-			const size_t stats_offset = workloads_cursor;
-			if (!increment_workloads_cursor_for_type(*workload_stats_type, workloads_cursor))
-				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while laying-out stats for workload type '%s'", workload_type->name.c_str());
-
-			if (!align_workloads_cursor_for_type(*workload_type, workloads_cursor))
-				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while laying-out workload type '%s'", workload_type->name.c_str());
-			const size_t instance_offset = workloads_cursor;
-			if (!increment_workloads_cursor_for_type(*workload_type, workloads_cursor))
-				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while laying-out workload type '%s'", workload_type->name.c_str());
-
-			uint8_t* workload_stats_ptr = buffer_ptr + stats_offset;
-			uint8_t* workload_ptr = buffer_ptr + instance_offset;
-
-			WorkloadInstanceInfo& workload_instance_info = state->instances[i];
-			workload_instance_info.offset_in_workloads_buffer = instance_offset;
-			workload_instance_info.type = workload_type;
-			workload_instance_info.workload_descriptor = workload_desc;
-			workload_instance_info.seed = seed;
-
-			// Stats are lifetime-bound to the buffer; placement-new keeps RAII intact without separate allocations.
-			workload_instance_info.workload_stats = new (static_cast<void*>(workload_stats_ptr)) WorkloadInstanceStats{};
-			workload_instance_info.workload_stats->tick_rate_hz = seed->tick_rate_hz;
-
-			// add it to our map for quick lookup by name
-			state->instances_by_unique_name.insert(seed->unique_name.c_str(), &workload_instance_info);
-
-			if (workload_desc->construct_fn)
-			{
-				workload_desc->construct_fn(workload_ptr);
-			}
+				"Dynamic struct storage plan changed between preflight and final load (planned align=%zu size=%zu, final align=%zu size=%zu)",
+				planned_dynamic_struct_storage_start_alignment,
+				planned_dynamic_struct_storage_size,
+				final_dynamic_struct_storage_start_alignment,
+				final_dynamic_struct_storage_size);
 		}
 
-		// handle pre-load for each workload (we can multithread this in future, where platforms allow)
-		for (size_t i = 0; i < seeds.size(); ++i)
+		size_t dynamic_struct_storage_start = inline_workloads_size;
+		size_t workloads_cursor = compute_dynamic_struct_storage_region_end(
+			inline_workloads_size, final_dynamic_struct_storage_start_alignment, final_dynamic_struct_storage_size, dynamic_struct_storage_start);
+
+		if (final_dynamic_struct_storage_size > 0)
 		{
-			const auto& seed = seeds[i];
-			const auto* workload_desc = state->instances[i].workload_descriptor;
-			uint8_t* ptr = buffer_ptr + state->instances[i].offset_in_workloads_buffer;
-
-			if (workload_desc->set_engine_fn)
-				workload_desc->set_engine_fn(ptr, *this);
-
-			if (seed->config.size() > 0 && workload_desc->config_desc)
-			{
-				ROBOTICK_ASSERT(workload_desc->config_offset != OFFSET_UNBOUND);
-
-				// don't error on first pass - we may need to set some, preload a script to create blackboard, and then have final pass
-				const bool fatalExitIfNotFound = false;
-				DataConnectionUtils::apply_struct_field_values(
-					ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config, fatalExitIfNotFound);
-			}
-
-			if (workload_desc->pre_load_fn)
-				workload_desc->pre_load_fn(ptr);
-		}
-
-		// compute our blackboard memory requirements, and bind our blackboards to that memory (they will store buffer-offsets relative to each
-		// Blackboard header):
-		size_t blackboard_size = compute_blackboard_memory_requirements(state->instances);
-		if (blackboard_size > DEFAULT_MAX_BLACKBOARDS_BYTES)
-			ROBOTICK_FATAL_EXIT("Blackboard memory (%zu) exceeds max allowed (%zu)", blackboard_size, DEFAULT_MAX_BLACKBOARDS_BYTES);
-
-		if (blackboard_size > 0)
-		{
-			size_t start = workloads_cursor;
-			size_t next_cursor = 0;
-			if (!safe_add_size(workloads_cursor, blackboard_size, next_cursor))
-				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while reserving blackboards (%zu + %zu)", start, blackboard_size);
-			workloads_cursor = next_cursor;
-			bind_blackboards_for_instances(state->instances, start);
+			bind_dynamic_struct_storage_for_instances(state->instances, dynamic_struct_storage_start);
 		}
 
 		state->workloads_buffer.set_size_used(workloads_cursor);
 
-		// post-blackboard-setup config pass:
+		// post-dynamic-struct-storage config pass:
+		const auto& seeds = model.get_workload_seeds();
+		uint8_t* buffer_ptr = state->workloads_buffer.raw_ptr();
 		for (size_t i = 0; i < seeds.size(); ++i)
 		{
 			const auto& seed = seeds[i];
@@ -565,9 +520,153 @@ namespace robotick
 		return state->telemetry_server;
 	}
 
-	size_t Engine::compute_blackboard_memory_requirements(const HeapVector<WorkloadInstanceInfo>& instances)
+	size_t Engine::compute_inline_workloads_buffer_size() const
+	{
+		ROBOTICK_ASSERT(state != nullptr);
+		ROBOTICK_ASSERT(state->model != nullptr);
+
+		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
+		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
+
+		const auto& seeds = state->model->get_workload_seeds();
+		size_t total_size = 0;
+		for (const WorkloadSeed* seed : seeds)
+		{
+			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
+			ROBOTICK_ASSERT_MSG(workload_type, "Unknown workload type: %s", seed->type_id.get_debug_name());
+
+			if (!align_workloads_cursor_for_type(*workload_stats_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while sizing stats type '%s'", workload_stats_type->name.c_str());
+			if (!increment_workloads_cursor_for_type(*workload_stats_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while sizing stats type '%s'", workload_stats_type->name.c_str());
+
+			if (!align_workloads_cursor_for_type(*workload_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow for workload type '%s'", workload_type->name.c_str());
+			if (!increment_workloads_cursor_for_type(*workload_type, total_size))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while sizing workload type '%s'", workload_type->name.c_str());
+		}
+
+		return total_size;
+	}
+
+	void Engine::construct_workload_instances()
+	{
+		ROBOTICK_ASSERT(state != nullptr);
+		ROBOTICK_ASSERT(state->model != nullptr);
+
+		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
+		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
+
+		const auto& seeds = state->model->get_workload_seeds();
+		size_t workloads_cursor = 0;
+		uint8_t* buffer_ptr = state->workloads_buffer.raw_ptr();
+		state->instances.initialize(seeds.size());
+
+		for (size_t i = 0; i < seeds.size(); ++i)
+		{
+			const auto* seed = seeds[i];
+
+			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
+			ROBOTICK_ASSERT_MSG(workload_type, "Unknown workload type: %s", seed->type_id.get_debug_name());
+
+			const auto* workload_desc = workload_type->get_workload_desc();
+			ROBOTICK_ASSERT(workload_desc != nullptr);
+
+			if (!align_workloads_cursor_for_type(*workload_stats_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while laying-out stats for workload type '%s'", workload_type->name.c_str());
+			const size_t stats_offset = workloads_cursor;
+			if (!increment_workloads_cursor_for_type(*workload_stats_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while laying-out stats for workload type '%s'", workload_type->name.c_str());
+
+			if (!align_workloads_cursor_for_type(*workload_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while laying-out workload type '%s'", workload_type->name.c_str());
+			const size_t instance_offset = workloads_cursor;
+			if (!increment_workloads_cursor_for_type(*workload_type, workloads_cursor))
+				ROBOTICK_FATAL_EXIT("Workloads buffer overflow while laying-out workload type '%s'", workload_type->name.c_str());
+
+			uint8_t* workload_stats_ptr = buffer_ptr + stats_offset;
+			uint8_t* workload_ptr = buffer_ptr + instance_offset;
+
+			WorkloadInstanceInfo& workload_instance_info = state->instances[i];
+			workload_instance_info.offset_in_workloads_buffer = instance_offset;
+			workload_instance_info.type = workload_type;
+			workload_instance_info.workload_descriptor = workload_desc;
+			workload_instance_info.seed = seed;
+
+			workload_instance_info.workload_stats = new (static_cast<void*>(workload_stats_ptr)) WorkloadInstanceStats{};
+			workload_instance_info.workload_stats->tick_rate_hz = seed->tick_rate_hz;
+
+			state->instances_by_unique_name.insert(seed->unique_name.c_str(), &workload_instance_info);
+
+			if (workload_desc->construct_fn)
+			{
+				workload_desc->construct_fn(workload_ptr);
+			}
+		}
+	}
+
+	void Engine::run_workload_pre_load_pass()
+	{
+		ROBOTICK_ASSERT(state != nullptr);
+		ROBOTICK_ASSERT(state->model != nullptr);
+
+		const auto& seeds = state->model->get_workload_seeds();
+		uint8_t* buffer_ptr = state->workloads_buffer.raw_ptr();
+		for (size_t i = 0; i < seeds.size(); ++i)
+		{
+			const auto& seed = seeds[i];
+			const auto* workload_desc = state->instances[i].workload_descriptor;
+			uint8_t* ptr = buffer_ptr + state->instances[i].offset_in_workloads_buffer;
+
+			if (workload_desc->set_engine_fn)
+				workload_desc->set_engine_fn(ptr, *this);
+
+			if (seed->config.size() > 0 && workload_desc->config_desc)
+			{
+				ROBOTICK_ASSERT(workload_desc->config_offset != OFFSET_UNBOUND);
+
+				const bool fatalExitIfNotFound = false;
+				DataConnectionUtils::apply_struct_field_values(
+					ptr + workload_desc->config_offset, *workload_desc->config_desc, seed->config, fatalExitIfNotFound);
+			}
+
+			if (workload_desc->pre_load_fn)
+				workload_desc->pre_load_fn(ptr);
+		}
+	}
+
+	void Engine::destroy_constructed_workload_instances()
+	{
+		ROBOTICK_ASSERT(state != nullptr);
+
+		for (auto& instance : state->instances)
+		{
+			if (!instance.workload_descriptor || !instance.workload_descriptor->destruct_fn)
+				continue;
+
+			void* instance_ptr = instance.get_ptr(*this);
+			ROBOTICK_ASSERT(instance_ptr != nullptr);
+			instance.workload_descriptor->destruct_fn(instance_ptr);
+		}
+	}
+
+	void Engine::reset_loaded_workload_state()
+	{
+		ROBOTICK_ASSERT(state != nullptr);
+
+		state->root_instance = nullptr;
+		state->instances_by_unique_name.clear();
+		state->data_connections_all.reset();
+		state->data_connections_acquired.reset();
+		state->instances.reset();
+		state->workloads_buffer = WorkloadsBuffer();
+	}
+
+	size_t Engine::compute_dynamic_struct_storage_requirements(
+		const HeapVector<WorkloadInstanceInfo>& instances, size_t& out_dynamic_struct_storage_start_alignment)
 	{
 		size_t total = 0;
+		out_dynamic_struct_storage_start_alignment = 1;
 		for (const auto& instance : instances)
 		{
 			const WorkloadDescriptor* workload_descriptor = instance.workload_descriptor;
@@ -592,22 +691,44 @@ namespace robotick
 
 				for (const FieldDescriptor& field : struct_desc->fields)
 				{
-					if (field.type_id == GET_TYPE_ID(Blackboard))
+					const TypeDescriptor* field_type_desc = field.find_type_descriptor();
+					const DynamicStructDescriptor* dynamic_struct_desc = field_type_desc ? field_type_desc->get_dynamic_struct_desc() : nullptr;
+					if (!dynamic_struct_desc || !dynamic_struct_desc->has_storage_callbacks())
 					{
-						ROBOTICK_ASSERT(field.offset_within_container != OFFSET_UNBOUND);
-
-						const Blackboard& blackboard =
-							field.get_data<Blackboard>(state->workloads_buffer, instance, *struct_type_desc, struct_offset);
-						size_t next_total = 0;
-						size_t block_size = blackboard.get_info().total_datablock_size;
-						if (!safe_add_size(total, block_size, next_total))
-						{
-							const char* instance_name =
-								(instance.seed && instance.seed->unique_name.c_str()) ? instance.seed->unique_name.c_str() : "unknown";
-							ROBOTICK_FATAL_EXIT("Blackboard memory overflow while sizing workload '%s'", instance_name);
-						}
-						total = next_total;
+						continue;
 					}
+
+					void* dynamic_struct_ptr = field.get_data_ptr(state->workloads_buffer, instance, *struct_type_desc, struct_offset);
+					DynamicStructStoragePlan storage_plan;
+					if (!dynamic_struct_desc->plan_storage(dynamic_struct_ptr, storage_plan))
+					{
+						const char* instance_name =
+							(instance.seed && instance.seed->unique_name.c_str()) ? instance.seed->unique_name.c_str() : "unknown";
+						ROBOTICK_FATAL_EXIT("Dynamic struct storage planning failed for workload '%s' field '%s'", instance_name, field.name.c_str());
+					}
+
+					if (storage_plan.alignment > out_dynamic_struct_storage_start_alignment)
+					{
+						out_dynamic_struct_storage_start_alignment = storage_plan.alignment;
+					}
+
+					if (!align_workloads_cursor_with_alignment(storage_plan.alignment, total))
+					{
+						const char* instance_name =
+							(instance.seed && instance.seed->unique_name.c_str()) ? instance.seed->unique_name.c_str() : "unknown";
+						ROBOTICK_FATAL_EXIT(
+							"Dynamic struct storage alignment overflow while sizing workload '%s' field '%s'", instance_name, field.name.c_str());
+					}
+
+					size_t next_total = 0;
+					if (!safe_add_size(total, storage_plan.size_bytes, next_total))
+					{
+						const char* instance_name =
+							(instance.seed && instance.seed->unique_name.c_str()) ? instance.seed->unique_name.c_str() : "unknown";
+						ROBOTICK_FATAL_EXIT(
+							"Dynamic struct storage overflow while sizing workload '%s' field '%s'", instance_name, field.name.c_str());
+					}
+					total = next_total;
 				}
 			};
 
@@ -618,23 +739,56 @@ namespace robotick
 		return total;
 	}
 
-	void Engine::bind_blackboards_in_struct(
-		WorkloadInstanceInfo& instance, const TypeDescriptor& struct_type_desc, const size_t struct_offset, size_t& blackboard_storage_offset)
+	void Engine::bind_dynamic_struct_storage_in_struct(
+		WorkloadInstanceInfo& instance, const TypeDescriptor& struct_type_desc, const size_t struct_offset, size_t& dynamic_struct_storage_cursor)
 	{
 		const StructDescriptor* struct_desc = struct_type_desc.get_struct_desc();
 		ROBOTICK_ASSERT(struct_desc != nullptr);
 
 		for (const FieldDescriptor& field : struct_desc->fields)
 		{
-			if (field.type_id == GET_TYPE_ID(Blackboard))
+			const TypeDescriptor* field_type_desc = field.find_type_descriptor();
+			const DynamicStructDescriptor* dynamic_struct_desc = field_type_desc ? field_type_desc->get_dynamic_struct_desc() : nullptr;
+			if (!dynamic_struct_desc || !dynamic_struct_desc->has_storage_callbacks())
 			{
-				Blackboard& blackboard = field.get_data<Blackboard>(state->workloads_buffer, instance, struct_type_desc, struct_offset);
-				blackboard.bind(state->workloads_buffer, blackboard_storage_offset);
+				continue;
 			}
+
+			void* dynamic_struct_ptr = field.get_data_ptr(state->workloads_buffer, instance, struct_type_desc, struct_offset);
+			DynamicStructStoragePlan storage_plan;
+			if (!dynamic_struct_desc->plan_storage(dynamic_struct_ptr, storage_plan))
+			{
+				const char* instance_name = (instance.seed && instance.seed->unique_name.c_str()) ? instance.seed->unique_name.c_str() : "unknown";
+				ROBOTICK_FATAL_EXIT(
+					"Dynamic struct storage planning failed during bind for workload '%s' field '%s'", instance_name, field.name.c_str());
+			}
+
+			if (!align_workloads_cursor_with_alignment(storage_plan.alignment, dynamic_struct_storage_cursor))
+			{
+				const char* instance_name = (instance.seed && instance.seed->unique_name.c_str()) ? instance.seed->unique_name.c_str() : "unknown";
+				ROBOTICK_FATAL_EXIT(
+					"Dynamic struct storage alignment overflow during bind for workload '%s' field '%s'", instance_name, field.name.c_str());
+			}
+
+			const size_t storage_offset = dynamic_struct_storage_cursor;
+			size_t next_cursor = 0;
+			if (!safe_add_size(dynamic_struct_storage_cursor, storage_plan.size_bytes, next_cursor))
+			{
+				const char* instance_name = (instance.seed && instance.seed->unique_name.c_str()) ? instance.seed->unique_name.c_str() : "unknown";
+				ROBOTICK_FATAL_EXIT("Dynamic struct storage overflow during bind for workload '%s' field '%s'", instance_name, field.name.c_str());
+			}
+
+			if (!dynamic_struct_desc->bind_storage(dynamic_struct_ptr, state->workloads_buffer, storage_offset, storage_plan.size_bytes))
+			{
+				const char* instance_name = (instance.seed && instance.seed->unique_name.c_str()) ? instance.seed->unique_name.c_str() : "unknown";
+				ROBOTICK_FATAL_EXIT("Dynamic struct storage binding failed for workload '%s' field '%s'", instance_name, field.name.c_str());
+			}
+
+			dynamic_struct_storage_cursor = next_cursor;
 		}
 	}
 
-	void Engine::bind_blackboards_for_instances(HeapVector<WorkloadInstanceInfo>& instances, size_t start_offset)
+	void Engine::bind_dynamic_struct_storage_for_instances(HeapVector<WorkloadInstanceInfo>& instances, size_t start_offset)
 	{
 		for (auto& instance : instances)
 		{
@@ -643,11 +797,11 @@ namespace robotick
 				continue;
 
 			if (workload_desc->config_desc)
-				bind_blackboards_in_struct(instance, *workload_desc->config_desc, workload_desc->config_offset, start_offset);
+				bind_dynamic_struct_storage_in_struct(instance, *workload_desc->config_desc, workload_desc->config_offset, start_offset);
 			if (workload_desc->inputs_desc)
-				bind_blackboards_in_struct(instance, *workload_desc->inputs_desc, workload_desc->inputs_offset, start_offset);
+				bind_dynamic_struct_storage_in_struct(instance, *workload_desc->inputs_desc, workload_desc->inputs_offset, start_offset);
 			if (workload_desc->outputs_desc)
-				bind_blackboards_in_struct(instance, *workload_desc->outputs_desc, workload_desc->outputs_offset, start_offset);
+				bind_dynamic_struct_storage_in_struct(instance, *workload_desc->outputs_desc, workload_desc->outputs_offset, start_offset);
 		}
 	}
 

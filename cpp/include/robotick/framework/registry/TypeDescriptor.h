@@ -89,12 +89,49 @@ namespace robotick
 		const FieldDescriptor* find_field(const char* field_name) const;
 	};
 
+	struct DynamicStructStoragePlan
+	{
+		size_t size_bytes = 0;
+		size_t alignment = 1;
+	};
+
 	struct DynamicStructDescriptor
 	{
 		/// @brief Takes a void* to an instance (e.g. a blackboard), returns a StructDescriptor view of available fields
 		const StructDescriptor* (*resolve_fn)(const void* instance);
+		bool (*plan_storage_fn)(const void* instance, DynamicStructStoragePlan& out_plan);
+		bool (*bind_storage_fn)(
+			void* instance, const WorkloadsBuffer& workloads_buffer, size_t storage_offset_in_workloads_buffer, size_t storage_size_bytes);
 
-		const StructDescriptor* get_struct_descriptor(const void* instance) const { return resolve_fn(instance); }
+		const StructDescriptor* get_struct_descriptor(const void* instance) const
+		{
+			ROBOTICK_ASSERT_MSG(resolve_fn != nullptr, "DynamicStructDescriptor::get_struct_descriptor() requires resolve_fn");
+			return resolve_fn(instance);
+		}
+
+		bool has_storage_callbacks() const
+		{
+			const bool has_plan = (plan_storage_fn != nullptr);
+			const bool has_bind = (bind_storage_fn != nullptr);
+			ROBOTICK_ASSERT_MSG(has_plan == has_bind,
+				"Dynamic struct storage callbacks must be both present or both absent (plan=%d bind=%d)",
+				static_cast<int>(has_plan),
+				static_cast<int>(has_bind));
+			return has_plan;
+		}
+
+		bool plan_storage(const void* instance, DynamicStructStoragePlan& out_plan) const
+		{
+			ROBOTICK_ASSERT_MSG(plan_storage_fn != nullptr, "DynamicStructDescriptor::plan_storage() requires plan_storage_fn");
+			return plan_storage_fn(instance, out_plan);
+		}
+
+		bool bind_storage(
+			void* instance, const WorkloadsBuffer& workloads_buffer, size_t storage_offset_in_workloads_buffer, size_t storage_size_bytes) const
+		{
+			ROBOTICK_ASSERT_MSG(bind_storage_fn != nullptr, "DynamicStructDescriptor::bind_storage() requires bind_storage_fn");
+			return bind_storage_fn(instance, workloads_buffer, storage_offset_in_workloads_buffer, storage_size_bytes);
+		}
 	};
 
 	struct WorkloadDescriptor

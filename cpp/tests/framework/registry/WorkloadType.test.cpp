@@ -3,9 +3,9 @@
 
 #include "robotick/api.h"
 
+#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/math/Vec3.h"
-#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/registry/TypeMacros.h"
 #include "robotick/framework/utils/TypeId.h"
 
@@ -155,8 +155,14 @@ namespace robotick::test
 			// Get the dynamic resolver and call it with our Blackboard
 			const DynamicStructDescriptor* dyn_desc = blackboard_type->type_category_desc.dynamic_struct_desc;
 			REQUIRE(dyn_desc != nullptr);
+			REQUIRE(dyn_desc->has_storage_callbacks());
 
-			const StructDescriptor* resolved_struct = dyn_desc->resolve_fn(&blackboard);
+			DynamicStructStoragePlan storage_plan;
+			REQUIRE(dyn_desc->plan_storage(&blackboard, storage_plan));
+			CHECK(storage_plan.size_bytes == blackboard.get_info().total_datablock_size);
+			CHECK(storage_plan.alignment >= alignof(int));
+
+			const StructDescriptor* resolved_struct = dyn_desc->get_struct_descriptor(&blackboard);
 			REQUIRE(resolved_struct != nullptr);
 
 			CHECK(resolved_struct->fields.size() == 2);

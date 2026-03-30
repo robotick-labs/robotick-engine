@@ -18,7 +18,40 @@ namespace robotick
 		return blackboard ? &(blackboard->get_struct_descriptor()) : nullptr;
 	}
 
-	ROBOTICK_REGISTER_DYNAMIC_STRUCT(Blackboard, Blackboard::resolve_descriptor)
+	bool Blackboard::plan_storage(const void* instance, DynamicStructStoragePlan& out_plan)
+	{
+		const Blackboard* blackboard = static_cast<const Blackboard*>(instance);
+		if (!blackboard)
+		{
+			return false;
+		}
+
+		out_plan.size_bytes = blackboard->get_info().total_datablock_size;
+		out_plan.alignment = blackboard->compute_storage_alignment();
+		return true;
+	}
+
+	bool Blackboard::bind_storage(
+		void* instance, const WorkloadsBuffer& workloads_buffer, size_t storage_offset_in_workloads_buffer, size_t storage_size_bytes)
+	{
+		Blackboard* blackboard = static_cast<Blackboard*>(instance);
+		if (!blackboard)
+		{
+			return false;
+		}
+
+		size_t storage_cursor = storage_offset_in_workloads_buffer;
+		blackboard->bind(workloads_buffer, storage_cursor);
+
+		const size_t expected_end = storage_offset_in_workloads_buffer + storage_size_bytes;
+		ROBOTICK_ASSERT_MSG(storage_cursor == expected_end,
+			"Blackboard::bind_storage() consumed %zu bytes, expected %zu bytes",
+			storage_cursor - storage_offset_in_workloads_buffer,
+			storage_size_bytes);
+		return true;
+	}
+
+	ROBOTICK_REGISTER_DYNAMIC_STRUCT(Blackboard, Blackboard::resolve_descriptor, Blackboard::plan_storage, Blackboard::bind_storage)
 
 	void Blackboard::initialize_fields(const HeapVector<FieldDescriptor>& fields)
 	{
@@ -107,6 +140,22 @@ namespace robotick
 
 		info.total_datablock_size =
 			compute_and_apply_layout(0, info.struct_descriptor.fields.data_ptr(), info.struct_descriptor.fields.size(), start_offset, write_offsets);
+	}
+
+	size_t Blackboard::compute_storage_alignment() const
+	{
+		size_t max_alignment = 1;
+		for (const FieldDescriptor& field : info.struct_descriptor.fields)
+		{
+			const TypeDescriptor* type = field.find_type_descriptor();
+			ROBOTICK_ASSERT_MSG(type != nullptr, "Blackboard field '%s' has no type descriptor", field.name.c_str());
+			ROBOTICK_ASSERT_MSG(type->alignment != 0, "Blackboard field '%s' uses invalid alignment (0)", field.name.c_str());
+			if (type->alignment > max_alignment)
+			{
+				max_alignment = type->alignment;
+			}
+		}
+		return max_alignment;
 	}
 
 	void Blackboard::bind(const WorkloadsBuffer& workloads_buffer, size_t& datablock_offset_in_workloads_buffer)

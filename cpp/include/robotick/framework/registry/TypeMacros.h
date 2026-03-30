@@ -73,13 +73,13 @@ namespace robotick
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##StructType(s_type_desc_##StructType);
 
-/// @brief Macro to register Dynamic Structs :
-#define ROBOTICK_REGISTER_DYNAMIC_STRUCT(TypeName, ResolveFn)                                                                                        \
+/// @brief Macros to register Dynamic Structs :
+#define ROBOTICK_REGISTER_DYNAMIC_STRUCT_2(TypeName, ResolveFn)                                                                                      \
 	static_assert(robotick::is_standard_layout_v<TypeName>,                                                                                          \
 		#TypeName " is not standard layout. Only standard layout types can be registered as dynamic structs.");                                      \
 	static_assert(robotick::is_trivially_copyable_v<TypeName>,                                                                                       \
 		#TypeName " is not trivially copyable. Only trivially copyable types can be registered as dynamic structs.");                                \
-	static const ::robotick::DynamicStructDescriptor s_dynamic_struct_desc_##TypeName = {ResolveFn};                                                 \
+	static const ::robotick::DynamicStructDescriptor s_dynamic_struct_desc_##TypeName = {ResolveFn, nullptr, nullptr};                               \
 	static const ::robotick::TypeDescriptor s_type_desc_##TypeName = {#TypeName,                                                                     \
 		GET_TYPE_ID(TypeName),                                                                                                                       \
 		sizeof(TypeName),                                                                                                                            \
@@ -88,6 +88,27 @@ namespace robotick
 		{&s_dynamic_struct_desc_##TypeName},                                                                                                         \
 		nullptr};                                                                                                                                    \
 	static const ::robotick::AutoRegisterType s_register_##TypeName(s_type_desc_##TypeName);
+
+#define ROBOTICK_REGISTER_DYNAMIC_STRUCT_4(TypeName, ResolveFn, PlanStorageFn, BindStorageFn)                                                        \
+	static_assert(robotick::is_standard_layout_v<TypeName>,                                                                                          \
+		#TypeName " is not standard layout. Only standard layout types can be registered as dynamic structs.");                                      \
+	static_assert(robotick::is_trivially_copyable_v<TypeName>,                                                                                       \
+		#TypeName " is not trivially copyable. Only trivially copyable types can be registered as dynamic structs.");                                \
+	static const ::robotick::DynamicStructDescriptor s_dynamic_struct_desc_##TypeName = {ResolveFn, PlanStorageFn, BindStorageFn};                   \
+	static const ::robotick::TypeDescriptor s_type_desc_##TypeName = {#TypeName,                                                                     \
+		GET_TYPE_ID(TypeName),                                                                                                                       \
+		sizeof(TypeName),                                                                                                                            \
+		alignof(TypeName),                                                                                                                           \
+		::robotick::TypeCategory::DynamicStruct,                                                                                                     \
+		{&s_dynamic_struct_desc_##TypeName},                                                                                                         \
+		nullptr};                                                                                                                                    \
+	static const ::robotick::AutoRegisterType s_register_##TypeName(s_type_desc_##TypeName);
+
+#define GET_ROBOTICK_REGISTER_DYNAMIC_STRUCT_MACRO(_1, _2, _3, _4, NAME, ...) NAME
+
+#define ROBOTICK_REGISTER_DYNAMIC_STRUCT(...)                                                                                                        \
+	GET_ROBOTICK_REGISTER_DYNAMIC_STRUCT_MACRO(__VA_ARGS__, ROBOTICK_REGISTER_DYNAMIC_STRUCT_4, _, ROBOTICK_REGISTER_DYNAMIC_STRUCT_2)               \
+	(__VA_ARGS__)
 
 #define ROBOTICK_SUPPRESS_UNUSED_WARNING_START                                                                                                       \
 	_Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wunused-variable\"") _Pragma("GCC diagnostic ignored \"-Wattributes\"")
