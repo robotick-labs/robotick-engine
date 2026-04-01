@@ -108,13 +108,13 @@ namespace robotick
 				continue;
 			}
 
-			RemoteEngineConnection& remote_connection = senders[index];
+			RemoteEngineConnection* remote_connection = &senders[index];
 			RemoteEngineDiscoverer& discoverer_sender = discoverer_senders[index];
 			index++;
 
 			discoverer_sender.initialize_sender(my_model_name, remote_model->model_name.c_str(), resolve_discovery_target_address(*remote_model));
 			discoverer_sender.set_on_remote_model_discovered(
-				[&](const RemoteEngineDiscoverer::PeerInfo& peer)
+				[this, &model, remote_connection, log_verbose](const RemoteEngineDiscoverer::PeerInfo& peer)
 				{
 					ROBOTICK_INFO("[REC::sender] Discovered remote model '%s' at %s:%d", peer.model_id.c_str(), peer.ip.c_str(), peer.port);
 					if (engine && peer.telemetry_port > 0)
@@ -122,10 +122,10 @@ namespace robotick
 						engine->get_telemetry_server().update_peer_route(
 							peer.model_id.c_str(), peer.ip.c_str(), peer.telemetry_port, peer.is_gateway);
 					}
-					if (!remote_connection.has_basic_connection())
+					if (remote_connection && !remote_connection->has_basic_connection())
 					{
 						ROBOTICK_INFO_IF(log_verbose, "[REC::sender] Configuring sender to model '%s'", peer.model_id.c_str());
-						remote_connection.configure_sender(model.get_model_name(), peer.model_id.c_str(), peer.ip.c_str(), peer.port);
+						remote_connection->configure_sender(model.get_model_name(), peer.model_id.c_str(), peer.ip.c_str(), peer.port);
 					}
 				});
 
@@ -150,7 +150,7 @@ namespace robotick
 				f.type_desc = field_info.descriptor->find_type_descriptor();
 				ROBOTICK_ASSERT(f.type_desc);
 
-				remote_connection.register_field(f);
+				remote_connection->register_field(f);
 			}
 		}
 
