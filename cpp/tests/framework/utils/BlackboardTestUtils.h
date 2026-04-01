@@ -24,13 +24,24 @@ namespace robotick
 
 	struct BlackboardTestUtils
 	{
+		static size_t align_offset(size_t offset, size_t alignment)
+		{
+			ROBOTICK_ASSERT_MSG(alignment > 0, "BlackboardTestUtils::align_offset() requires alignment > 0");
+			const size_t remainder = offset % alignment;
+			return (remainder == 0) ? offset : (offset + (alignment - remainder));
+		}
+
 		static BlackboardBuffer make_buffer_and_embedded_blackboard(const HeapVector<FieldDescriptor>& fields)
 		{
 			// create a temp-blackboard on the stack to find out how much data-block space the scheme needs
 			Blackboard temp_blackboard;
 			temp_blackboard.initialize_fields(fields);
 
-			const size_t total_size = sizeof(Blackboard) + temp_blackboard.get_info().total_datablock_size;
+			DynamicStructStoragePlan storage_plan;
+			ROBOTICK_ASSERT(Blackboard::plan_storage(&temp_blackboard, storage_plan));
+
+			const size_t datablock_offset = align_offset(sizeof(Blackboard), storage_plan.alignment);
+			const size_t total_size = datablock_offset + storage_plan.size_bytes;
 
 			BlackboardBuffer result{WorkloadsBuffer(total_size), nullptr};
 
@@ -39,10 +50,10 @@ namespace robotick
 			new (blackboard_ptr) Blackboard();
 			blackboard_ptr->initialize_fields(fields);
 
-			size_t datablock_offset = sizeof(Blackboard);
-			blackboard_ptr->bind(result.buffer, datablock_offset);
+			ROBOTICK_ASSERT(Blackboard::bind_storage(blackboard_ptr, result.buffer, datablock_offset, storage_plan.size_bytes));
 
-			ROBOTICK_ASSERT_MSG(datablock_offset == total_size, "Datablock-offset pointer should have been incremented ready for next blackboard");
+			size_t expected_end = datablock_offset + storage_plan.size_bytes;
+			ROBOTICK_ASSERT_MSG(expected_end == total_size, "Datablock-offset pointer should have been incremented ready for next blackboard");
 
 			result.blackboard = blackboard_ptr;
 			return result;

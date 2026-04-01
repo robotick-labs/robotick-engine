@@ -6,8 +6,10 @@
 #include "robotick/framework/WorkloadInstanceInfo.h"
 #include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Thread.h"
+#include "robotick/framework/containers/DynamicStructStorageVector.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/data/TelemetryServer.h"
+#include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/json/Json.h"
 
 #include <algorithm>
@@ -257,6 +259,37 @@ namespace robotick::test
 			LayoutEnumConfig config;
 		};
 		ROBOTICK_REGISTER_WORKLOAD(LayoutEnumWorkload, LayoutEnumConfig)
+
+		using TestDynamicByteBuffer = DynamicStructStorageVector<uint8_t, GET_TYPE_ID(uint8_t).value>;
+		ROBOTICK_REGISTER_DYNAMIC_STRUCT(TestDynamicByteBuffer,
+			TestDynamicByteBuffer::resolve_descriptor,
+			TestDynamicByteBuffer::plan_storage,
+			TestDynamicByteBuffer::bind_storage)
+
+		struct LargeDynamicConfig
+		{
+			uint32_t max_output_bytes = 0;
+		};
+		ROBOTICK_REGISTER_STRUCT_BEGIN(LargeDynamicConfig)
+		ROBOTICK_STRUCT_FIELD(LargeDynamicConfig, uint32_t, max_output_bytes)
+		ROBOTICK_REGISTER_STRUCT_END(LargeDynamicConfig)
+
+		struct LargeDynamicOutputs
+		{
+			TestDynamicByteBuffer bytes;
+		};
+		ROBOTICK_REGISTER_STRUCT_BEGIN(LargeDynamicOutputs)
+		ROBOTICK_STRUCT_FIELD(LargeDynamicOutputs, TestDynamicByteBuffer, bytes)
+		ROBOTICK_REGISTER_STRUCT_END(LargeDynamicOutputs)
+
+		struct LargeDynamicWorkload
+		{
+			LargeDynamicConfig config;
+			LargeDynamicOutputs outputs;
+
+			void pre_load() { outputs.bytes.initialize_capacity(config.max_output_bytes); }
+		};
+		ROBOTICK_REGISTER_WORKLOAD(LargeDynamicWorkload, LargeDynamicConfig, void, LargeDynamicOutputs)
 
 	} // namespace
 
@@ -592,6 +625,28 @@ namespace robotick::test
 			CHECK(enum_it["enum_is_flags"].get_bool() == false);
 
 			stop_flag.set();
+		}
+
+		SECTION("WorkloadsBuffer is exact-sized after dynamic-struct preflight")
+		{
+			Model model;
+			model.set_telemetry_port(choose_telemetry_port());
+			static const FieldConfigEntry config[] = {{"max_output_bytes", "5242880"}};
+			static const WorkloadSeed workload_seed{TypeId("LargeDynamicWorkload"), StringView("large_dynamic"), 30.0f, {}, config, {}};
+			static const WorkloadSeed* const workloads[] = {&workload_seed};
+			model.use_workload_seeds(workloads);
+			model.set_root_workload(workload_seed);
+
+			Engine engine;
+			engine.load(model);
+
+			const WorkloadsBuffer& workloads_buffer = engine.get_workloads_buffer();
+			REQUIRE(workloads_buffer.get_size() == workloads_buffer.get_size_used());
+			REQUIRE(workloads_buffer.get_size_used() > (size_t)(4 * 1024 * 1024));
+
+			const auto* instance = engine.find_instance<LargeDynamicWorkload>(workload_seed.unique_name);
+			REQUIRE(instance != nullptr);
+			REQUIRE(instance->outputs.bytes.capacity() == 5 * 1024 * 1024);
 		}
 
 		SECTION("start_fn executes on same thread as tick_fn")

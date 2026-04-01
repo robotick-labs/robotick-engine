@@ -37,6 +37,9 @@ namespace robotick
 		void initialize_fields(const ArrayView<FieldDescriptor>& fields);
 
 		static const StructDescriptor* resolve_descriptor(const void* instance);
+		static bool plan_storage(const void* instance, DynamicStructStoragePlan& out_plan);
+		static bool bind_storage(
+			void* instance, const WorkloadsBuffer& workloads_buffer, size_t storage_offset_in_workloads_buffer, size_t storage_size_bytes);
 
 	  public: // field-query methods (by name - slower as requires string-based lookup)
 		const FieldDescriptor* find_field(const char* field_name) const;
@@ -94,6 +97,7 @@ namespace robotick
 
 	  protected:
 		void compute_total_datablock_size();
+		size_t compute_storage_alignment() const;
 
 	  private:
 		BlackboardInfo info;

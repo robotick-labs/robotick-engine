@@ -22,6 +22,8 @@ Robotick deliberately keeps global state to an absolute minimum so embedded targ
 ## Data connections, workloads, and buffers
 
 - No global singletons. `WorkloadsBuffer`, `DataConnectionInfo`, and workload instances are all owned by `Engine::State`.
+- `Engine::load()` now uses a two-pass startup model for `WorkloadsBuffer`: a transient scratch inline-only buffer is created for preflight construction / `pre_load()` sizing, then destroyed before the final exact-sized buffer is allocated.
+- The final `WorkloadsBuffer` consists of the inline workload / stats region plus the `Dynamic Struct Storage Region`, which is also owned by `Engine::State` and bound during final load.
 - `RemoteEngineConnection` objects are created on demand (e.g., by workloads or higher-level orchestrators) and follow the same RAII pattern: configure, start, stop/destroy.
 
 ## Contributor guidelines

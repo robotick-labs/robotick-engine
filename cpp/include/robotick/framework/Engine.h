@@ -58,13 +58,20 @@ namespace robotick
 		TelemetryServer& get_telemetry_server() const;
 
 	  private:
-		void bind_blackboards_in_struct(WorkloadInstanceInfo& workload_instance_info,
+		size_t compute_inline_workloads_buffer_size() const;
+		void construct_workload_instances();
+		void run_workload_pre_load_pass();
+		void destroy_constructed_workload_instances();
+		void reset_loaded_workload_state();
+
+		void bind_dynamic_struct_storage_in_struct(WorkloadInstanceInfo& workload_instance_info,
 			const TypeDescriptor& struct_type_desc,
 			const size_t struct_offset,
-			size_t& blackboard_storage_offset);
-		void bind_blackboards_for_instances(HeapVector<WorkloadInstanceInfo>& instances, const size_t blackboards_data_start_offset);
+			size_t& dynamic_struct_storage_cursor);
+		void bind_dynamic_struct_storage_for_instances(HeapVector<WorkloadInstanceInfo>& instances, const size_t dynamic_struct_storage_start_offset);
 
-		size_t compute_blackboard_memory_requirements(const HeapVector<WorkloadInstanceInfo>& instances);
+		size_t compute_dynamic_struct_storage_requirements(
+			const HeapVector<WorkloadInstanceInfo>& instances, size_t& out_dynamic_struct_storage_start_alignment);
 
 	  private:
 		struct State;

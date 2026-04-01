@@ -27,6 +27,8 @@
 
 - Already core part of the Robotick Engine - this is a flat binary buffer containing all workload `config`, `inputs`, and `outputs`.
 - Fixed offsets per field, no runtime packing — layout is statically known per-session.
+- The buffer may also contain a `Dynamic Struct Storage Region` used for startup-sized dynamic structs such as `Blackboard` payloads or bounded compressed image buffers.
+- Dynamic structs still report field offsets relative to their parent struct; `data_buffer` and similar reflected binary fields may therefore reference out-of-line storage in the same `WorkloadsBuffer` instance that owns the parent struct.
 
 ### 2. **Layout Registry**
 
@@ -146,11 +148,11 @@
 
 ## Design Note: Large or Dynamic Data
 
-Reflective Telemetry is intentionally designed for structured, typed, per-tick data — typically config, inputs, and outputs of real-time workloads. It is **not** intended for large-scale or dynamic memory content such as:
+Reflective Telemetry is intentionally designed for structured, typed, per-tick data — typically config, inputs, and outputs of real-time workloads. It is still a poor fit for very large or weakly bounded payloads such as:
 
 - SLAM maps or occupancy grids
 - Long-lived knowledge graphs or datasets
-- High-resolution camera frames
+- Raw high-resolution camera frames
 - Arbitrary dynamically allocated state
 
 These types of data are not well-suited to the fixed-layout, per-tick semantics of the Workloads Buffer or the dataflow model of the Robotick Engine. Instead:
@@ -158,5 +160,13 @@ These types of data are not well-suited to the fixed-layout, per-tick semantics 
 - Use **buffer/resource IDs** in Reflective Telemetry to refer to large assets.
 - Exchange those IDs in fields (e.g. `slam_map_id: uint32`), and expose the actual data via a separate `/resource/` API.
 - This enables **zero-copy**, **lazy access**, and maintains the strict deterministic performance guarantees of the engine.
+
+Bounded compressed image payloads are now a valid exception to that general rule. Startup-sized dynamic structs can expose JPEG / PNG outputs directly in `WorkloadsBuffer` when:
+
+- the payload is genuinely useful as a per-tick reflective output
+- the maximum size is configured and bound at startup
+- the cost is acceptable for the target platform and model
+
+Even then, `ImageRef`-style indirection or a separate resource API remains the better fit for very large, shared, archival, or infrequently inspected image data.
 
 This approach keeps Reflective Telemetry compact, reliable, and introspectable — while enabling extensibility to support complex or heavy data elsewhere.
