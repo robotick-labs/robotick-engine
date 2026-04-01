@@ -126,8 +126,8 @@ namespace robotick
 				self->capacity_value > 0, "DynamicStructStorageVector::plan_storage() requires initialize_capacity() before engine binding");
 			ROBOTICK_ASSERT_MSG(sizeof(T) > 0, "DynamicStructStorageVector::plan_storage() does not support zero-sized element types");
 			ROBOTICK_ASSERT_MSG(self->capacity_value <= (SIZE_MAX / sizeof(T)),
-				"DynamicStructStorageVector::plan_storage() size overflow for capacity %u and element size %zu",
-				self->capacity_value,
+				"DynamicStructStorageVector::plan_storage() size overflow for capacity %zu and element size %zu",
+				static_cast<size_t>(self->capacity_value),
 				sizeof(T));
 
 			out_plan.size_bytes = static_cast<size_t>(self->capacity_value) * sizeof(T);
