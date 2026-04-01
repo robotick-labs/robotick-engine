@@ -68,14 +68,12 @@ namespace robotick
 
 		T& operator[](size_t index)
 		{
-			ROBOTICK_ASSERT_MSG(index < capacity(), "DynamicStructStorageVector::operator[] index beyond capacity [%zu/%zu]", index, capacity());
 			ROBOTICK_ASSERT_MSG(index < size(), "DynamicStructStorageVector::operator[] index beyond size [%zu/%zu]", index, size());
 			return data()[index];
 		}
 
 		const T& operator[](size_t index) const
 		{
-			ROBOTICK_ASSERT_MSG(index < capacity(), "DynamicStructStorageVector::operator[] index beyond capacity [%zu/%zu]", index, capacity());
 			ROBOTICK_ASSERT_MSG(index < size(), "DynamicStructStorageVector::operator[] index beyond size [%zu/%zu]", index, size());
 			return data()[index];
 		}

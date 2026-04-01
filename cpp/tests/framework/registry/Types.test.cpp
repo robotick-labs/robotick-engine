@@ -274,8 +274,7 @@ namespace robotick::test
 		{
 			if (TypeRegistry::get().is_sealed())
 			{
-				SUCCEED("TypeRegistry is already sealed by earlier engine tests; duplicate registration is blocked before id checks.");
-				return;
+				SKIP("TypeRegistry already sealed by earlier tests; run this section in an unsealed test context.");
 			}
 
 			static FixedString64 persistent_names[32];

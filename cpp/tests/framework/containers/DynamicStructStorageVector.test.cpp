@@ -17,6 +17,7 @@ namespace robotick::test
 
 		static size_t align_offset(size_t offset, size_t alignment)
 		{
+			ROBOTICK_ASSERT_MSG(alignment > 0, "align_offset() requires alignment > 0");
 			const size_t remainder = offset % alignment;
 			return (remainder == 0) ? offset : (offset + (alignment - remainder));
 		}

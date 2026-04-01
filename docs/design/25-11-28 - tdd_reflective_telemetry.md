@@ -28,7 +28,7 @@
 - Already core part of the Robotick Engine - this is a flat binary buffer containing all workload `config`, `inputs`, and `outputs`.
 - Fixed offsets per field, no runtime packing — layout is statically known per-session.
 - The buffer may also contain a `Dynamic Struct Storage Region` used for startup-sized dynamic structs such as `Blackboard` payloads or bounded compressed image buffers.
-- Dynamic structs still report field offsets relative to their parent struct; reflected binary fields such as `data_buffer` may therefore point to out-of-line storage within the same used `WorkloadsBuffer`.
+- Dynamic structs still report field offsets relative to their parent struct; `data_buffer` and similar reflected binary fields may therefore reference out-of-line storage in the same `WorkloadsBuffer` instance that owns the parent struct.
 
 ### 2. **Layout Registry**
 

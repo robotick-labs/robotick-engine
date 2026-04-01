@@ -160,10 +160,20 @@ namespace robotick::test
 			DynamicStructStoragePlan storage_plan;
 			REQUIRE(dyn_desc->plan_storage(&blackboard, storage_plan));
 			CHECK(storage_plan.size_bytes == blackboard.get_info().total_datablock_size);
-			CHECK(storage_plan.alignment >= alignof(int));
 
 			const StructDescriptor* resolved_struct = dyn_desc->get_struct_descriptor(&blackboard);
 			REQUIRE(resolved_struct != nullptr);
+			size_t expected_alignment = 1;
+			for (const FieldDescriptor& field : resolved_struct->fields)
+			{
+				const TypeDescriptor* field_type = field.find_type_descriptor();
+				REQUIRE(field_type != nullptr);
+				if (field_type->alignment > expected_alignment)
+				{
+					expected_alignment = field_type->alignment;
+				}
+			}
+			CHECK(storage_plan.alignment >= expected_alignment);
 
 			CHECK(resolved_struct->fields.size() == 2);
 
