@@ -371,11 +371,117 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
 			sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
 			Thread::sleep_ms(2);
-			if (receive_buffer[100] == target_value)
+			bool matches = true;
+			for (size_t j = 0; j < receive_buffer.size(); ++j)
+			{
+				if (receive_buffer[j] != send_buffer[j])
+				{
+					matches = false;
+					break;
+				}
+			}
+			if (matches)
 				break;
 		}
 
-		REQUIRE(receive_buffer[100] == target_value);
+		for (size_t i = 0; i < receive_buffer.size(); ++i)
+		{
+			REQUIRE(receive_buffer[i] == target_value);
+		}
+	}
+
+	SECTION("Stress large count and blob updates", "[RemoteEngineConnection]")
+	{
+		static constexpr size_t kBlobCapacity = 8192;
+		static constexpr uint32_t kBaseCount = 6400;
+		static constexpr uint32_t kFrameCount = 48;
+
+		uint32_t recv_count = 0;
+		uint32_t send_count = 0;
+		HeapVector<uint8_t> send_buffer;
+		send_buffer.initialize(kBlobCapacity);
+		HeapVector<uint8_t> receive_buffer;
+		receive_buffer.initialize(kBlobCapacity);
+
+		RemoteEngineConnection receiver;
+		RemoteEngineConnection sender;
+
+		receiver.configure_receiver("test-receiver");
+		receiver.set_field_binder(
+			[&](const char* path, RemoteEngineConnection::Field& out)
+			{
+				if (string_equals(path, "blob.count"))
+				{
+					out.recv_ptr = &recv_count;
+					out.size = sizeof(recv_count);
+					out.path = path;
+					out.type_desc = TypeRegistry::get().find_by_name("uint32_t");
+					return true;
+				}
+
+				if (string_equals(path, "blob.data"))
+				{
+					out.recv_ptr = receive_buffer.data();
+					out.size = receive_buffer.size();
+					out.path = path;
+					return true;
+				}
+
+				return false;
+			});
+
+		const int receiver_listen_port = wait_for_listen_port(receiver);
+		REQUIRE(receiver_listen_port > 0);
+
+		sender.configure_sender("test-sender", "test-receiver", "127.0.0.1", receiver_listen_port);
+		sender.register_field({"blob.count", &send_count, nullptr, sizeof(send_count), 0});
+		sender.register_field({"blob.data", send_buffer.data(), nullptr, send_buffer.size(), 0});
+
+		auto buffers_match = [&]() -> bool
+		{
+			for (size_t i = 0; i < send_buffer.size(); ++i)
+			{
+				if (receive_buffer[i] != send_buffer[i])
+				{
+					return false;
+				}
+			}
+			return true;
+		};
+
+		for (uint32_t frame = 0; frame < kFrameCount; ++frame)
+		{
+			send_count = kBaseCount + (frame % 97);
+			const uint8_t frame_seed = static_cast<uint8_t>((frame * 37U) & 0xFFU);
+			for (size_t i = 0; i < send_buffer.size(); ++i)
+			{
+				send_buffer[i] = (i < send_count) ? static_cast<uint8_t>(frame_seed + (i % 17U)) : static_cast<uint8_t>(0xE0U + frame);
+			}
+
+			bool delivered = false;
+			for (int step = 0; step < 100; ++step)
+			{
+				receiver.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
+				sender.tick(robotick::TICK_INFO_FIRST_1MS_1KHZ);
+
+				if (recv_count == send_count)
+				{
+					REQUIRE(buffers_match());
+				}
+
+				if (recv_count == send_count && buffers_match())
+				{
+					delivered = true;
+					break;
+				}
+
+				Thread::sleep_ms(1);
+			}
+
+			REQUIRE(delivered);
+			REQUIRE(recv_count == send_count);
+			REQUIRE(buffers_match());
+		}
 	}
 
 	SECTION("Reconnect after sender drop", "[RemoteEngineConnection]")

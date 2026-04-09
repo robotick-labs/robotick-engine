@@ -474,6 +474,7 @@ namespace robotick
 			const size_t separator_count = (field_count > 0) ? (field_count - 1) : 0;
 			handshake_payload_capacity = sizeof(uint32_t) + handshake_path_total_length + separator_count;
 		}
+
 	}
 
 	size_t RemoteEngineConnection::write_handshake_payload(uint32_t tick_rate_net, size_t offset, uint8_t* dst, size_t max_len) const
@@ -588,6 +589,8 @@ namespace robotick
 
 		if (in_progress_message_out.is_vacant())
 		{
+			in_progress_message_out.reserve_payload_capacity(rtk_max(handshake_payload_capacity, field_payload_capacity));
+
 			// The sender announces its local tick-rate (Hz) in the Subscribe message.
 			// The receiver will min() this with its own rate and echo the result
 			// in the first FieldsRequest — establishing a mutual tick-rate.
@@ -729,7 +732,7 @@ namespace robotick
 				// Trailing path flushed after full payload.
 			};
 
-			in_progress_message_in.begin_receive(reader);
+			in_progress_message_in.begin_receive(reader, InProgressMessage::ReceiveMode::StreamPayload);
 		}
 
 		// pump non-blocking
@@ -817,6 +820,7 @@ namespace robotick
 			}
 			pending_receiver_fields.clear();
 			field_count = fields.size();
+			in_progress_message_in.reserve_payload_capacity(field_payload_capacity);
 
 			in_progress_message_in.vacate(); // ready for next message
 
@@ -922,7 +926,7 @@ namespace robotick
 				}
 			};
 
-			in_progress_message_in.begin_receive(reader);
+			in_progress_message_in.begin_receive(reader, InProgressMessage::ReceiveMode::StreamPayload);
 		}
 
 		while (in_progress_message_in.is_occupied() && !in_progress_message_in.is_completed())
@@ -982,12 +986,19 @@ namespace robotick
 			in_progress_message_out.begin_send((uint8_t)MessageType::Fields, field_payload_capacity, writer);
 		}
 
-		const InProgressMessage::Result tick_result = in_progress_message_out.tick(socket_fd);
-		if (tick_result == InProgressMessage::Result::ConnectionLost)
+		while (in_progress_message_out.is_occupied() && !in_progress_message_out.is_completed())
 		{
-			ROBOTICK_WARNING("Connection lost sending field-data from Sender");
-			disconnect();
-			return;
+			const InProgressMessage::Result tick_result = in_progress_message_out.tick(socket_fd);
+			if (tick_result == InProgressMessage::Result::ConnectionLost)
+			{
+				ROBOTICK_WARNING("Connection lost sending field-data from Sender");
+				disconnect();
+				return;
+			}
+			if (tick_result == InProgressMessage::Result::InProgress)
+			{
+				break;
+			}
 		}
 
 		if (in_progress_message_out.is_completed())
@@ -1042,12 +1053,19 @@ namespace robotick
 			in_progress_message_in.begin_receive(reader);
 		}
 
-		const InProgressMessage::Result tick_result = in_progress_message_in.tick(socket_fd);
-		if (tick_result == InProgressMessage::Result::ConnectionLost)
+		while (in_progress_message_in.is_occupied() && !in_progress_message_in.is_completed())
 		{
-			ROBOTICK_WARNING("Connection lost receiving field-data from Sender");
-			disconnect();
-			return false;
+			const InProgressMessage::Result tick_result = in_progress_message_in.tick(socket_fd);
+			if (tick_result == InProgressMessage::Result::ConnectionLost)
+			{
+				ROBOTICK_WARNING("Connection lost receiving field-data from Sender");
+				disconnect();
+				return false;
+			}
+			if (tick_result == InProgressMessage::Result::InProgress)
+			{
+				break;
+			}
 		}
 
 		if (!in_progress_message_in.is_completed())
