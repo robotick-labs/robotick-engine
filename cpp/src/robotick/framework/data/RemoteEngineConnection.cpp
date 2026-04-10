@@ -8,6 +8,7 @@
 
 #include <arpa/inet.h>
 #include <csignal> // For signal(), SIGPIPE, SIG_IGN
+#include <cstdio>
 #include <cstring>
 #include <errno.h>
 #include <fcntl.h>
@@ -82,6 +83,55 @@ namespace robotick
 		constexpr float RECONNECT_BACKOFF_MAX_SEC = 2.00f;
 		constexpr float RECONNECT_BACKOFF_MULTIPLIER = 2.00f;
 		constexpr size_t MAX_REMOTE_FIELDS = 128;
+		constexpr size_t MAX_SHARED_HEALTH_LOG_STATES = 64;
+		constexpr size_t MAX_SHARED_HEALTH_IDENTITY_LEN = 192;
+
+		struct SharedHealthLogState
+		{
+			bool used = false;
+			bool healthy = false;
+			bool attempt_logged_since_unhealthy = false;
+			char identity[MAX_SHARED_HEALTH_IDENTITY_LEN]{};
+		} g_shared_health_log_states[MAX_SHARED_HEALTH_LOG_STATES];
+
+		SharedHealthLogState& find_or_create_shared_health_log_state(const char* identity)
+		{
+			SharedHealthLogState* first_free = nullptr;
+			for (size_t i = 0; i < MAX_SHARED_HEALTH_LOG_STATES; ++i)
+			{
+				SharedHealthLogState& state = g_shared_health_log_states[i];
+				if (state.used)
+				{
+					if (strcmp(state.identity, identity) == 0)
+					{
+						return state;
+					}
+					continue;
+				}
+
+				if (first_free == nullptr)
+				{
+					first_free = &state;
+				}
+			}
+
+			if (first_free)
+			{
+				first_free->used = true;
+				first_free->healthy = false;
+				first_free->attempt_logged_since_unhealthy = false;
+				snprintf(first_free->identity, MAX_SHARED_HEALTH_IDENTITY_LEN, "%s", identity);
+				return *first_free;
+			}
+
+			// If full, reuse slot 0 as a bounded fallback.
+			SharedHealthLogState& fallback = g_shared_health_log_states[0];
+			fallback.used = true;
+			fallback.healthy = false;
+			fallback.attempt_logged_since_unhealthy = false;
+			snprintf(fallback.identity, MAX_SHARED_HEALTH_IDENTITY_LEN, "%s", identity);
+			return fallback;
+		}
 
 		template <typename T> inline T rtk_min(const T a, const T b)
 		{
@@ -186,15 +236,46 @@ namespace robotick
 		}
 
 		connection_attempt_logged_for_current_outage = true;
+		bool should_log = true;
+		{
+			char identity[MAX_SHARED_HEALTH_IDENTITY_LEN];
+			if (mode == Mode::Sender)
+			{
+				snprintf(identity, MAX_SHARED_HEALTH_IDENTITY_LEN, "%s|%s->%s", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+			}
+			else
+			{
+				snprintf(identity, MAX_SHARED_HEALTH_IDENTITY_LEN, "%s|%s", get_mode_label(), my_model_name.c_str());
+			}
 
-		if (mode == Mode::Sender)
-		{
-			ROBOTICK_INFO(
-				"[REC::health] [%s %s -> %s] connection attempt started", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+			SharedHealthLogState& shared_state = find_or_create_shared_health_log_state(identity);
+			if (shared_state.healthy)
+			{
+				shared_state.healthy = false;
+				shared_state.attempt_logged_since_unhealthy = false;
+			}
+
+			if (shared_state.attempt_logged_since_unhealthy)
+			{
+				should_log = false;
+			}
+			else
+			{
+				shared_state.attempt_logged_since_unhealthy = true;
+			}
 		}
-		else
+
+		if (should_log)
 		{
-			ROBOTICK_INFO("[REC::health] [%s %s] connection attempt started", get_mode_label(), my_model_name.c_str());
+			if (mode == Mode::Sender)
+			{
+				ROBOTICK_INFO(
+					"[REC::health] [%s %s -> %s] connection attempt started", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+			}
+			else
+			{
+				ROBOTICK_INFO("[REC::health] [%s %s] connection attempt started", get_mode_label(), my_model_name.c_str());
+			}
 		}
 
 		test_health_lifecycle_stats_.attempt_begin_count += 1;
@@ -204,14 +285,36 @@ namespace robotick
 	{
 		connection_attempt_logged_for_current_outage = false;
 		reset_reconnect_backoff();
+		bool should_log = true;
+		{
+			char identity[MAX_SHARED_HEALTH_IDENTITY_LEN];
+			if (mode == Mode::Sender)
+			{
+				snprintf(identity, MAX_SHARED_HEALTH_IDENTITY_LEN, "%s|%s->%s", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+			}
+			else
+			{
+				snprintf(identity, MAX_SHARED_HEALTH_IDENTITY_LEN, "%s|%s", get_mode_label(), my_model_name.c_str());
+			}
 
-		if (mode == Mode::Sender)
-		{
-			ROBOTICK_INFO("[REC::health] [%s %s -> %s] connection healthy", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+			SharedHealthLogState& shared_state = find_or_create_shared_health_log_state(identity);
+			if (shared_state.healthy)
+				should_log = false;
+
+			shared_state.healthy = true;
+			shared_state.attempt_logged_since_unhealthy = false;
 		}
-		else
+
+		if (should_log)
 		{
-			ROBOTICK_INFO("[REC::health] [%s %s] connection healthy", get_mode_label(), my_model_name.c_str());
+			if (mode == Mode::Sender)
+			{
+				ROBOTICK_INFO("[REC::health] [%s %s -> %s] connection healthy", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+			}
+			else
+			{
+				ROBOTICK_INFO("[REC::health] [%s %s] connection healthy", get_mode_label(), my_model_name.c_str());
+			}
 		}
 
 		test_health_lifecycle_stats_.healthy_transition_count += 1;
@@ -221,15 +324,37 @@ namespace robotick
 	{
 		// Re-arm one-shot "attempt started" reporting for this new unhealthy period.
 		connection_attempt_logged_for_current_outage = false;
+		bool should_log = true;
+		{
+			char identity[MAX_SHARED_HEALTH_IDENTITY_LEN];
+			if (mode == Mode::Sender)
+			{
+				snprintf(identity, MAX_SHARED_HEALTH_IDENTITY_LEN, "%s|%s->%s", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+			}
+			else
+			{
+				snprintf(identity, MAX_SHARED_HEALTH_IDENTITY_LEN, "%s|%s", get_mode_label(), my_model_name.c_str());
+			}
 
-		if (mode == Mode::Sender)
-		{
-			ROBOTICK_INFO(
-				"[REC::health] [%s %s -> %s] connection unhealthy (will retry)", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+			SharedHealthLogState& shared_state = find_or_create_shared_health_log_state(identity);
+			if (!shared_state.healthy)
+				should_log = false;
+
+			shared_state.healthy = false;
+			shared_state.attempt_logged_since_unhealthy = false;
 		}
-		else
+
+		if (should_log)
 		{
-			ROBOTICK_INFO("[REC::health] [%s %s] connection unhealthy (will retry)", get_mode_label(), my_model_name.c_str());
+			if (mode == Mode::Sender)
+			{
+				ROBOTICK_INFO(
+					"[REC::health] [%s %s -> %s] connection unhealthy (will retry)", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+			}
+			else
+			{
+				ROBOTICK_INFO("[REC::health] [%s %s] connection unhealthy (will retry)", get_mode_label(), my_model_name.c_str());
+			}
 		}
 
 		test_health_lifecycle_stats_.unhealthy_transition_count += 1;
