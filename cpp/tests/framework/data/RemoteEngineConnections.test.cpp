@@ -9,7 +9,11 @@
 #include "robotick/framework/model/RemoteModelSeed.h"
 #include "robotick/framework/time/Clock.h"
 
+#include <arpa/inet.h>
 #include <catch2/catch_all.hpp>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 namespace robotick::test
 {
@@ -22,6 +26,63 @@ namespace robotick::test
 		};
 
 		constexpr long long kRemoteEngineConnectionTimeoutNs = 3'000'000'000LL;
+
+		uint16_t find_free_port_for_test()
+		{
+			int sock = ::socket(AF_INET, SOCK_STREAM, 0);
+			if (sock < 0)
+				return 0;
+
+			sockaddr_in addr{};
+			addr.sin_family = AF_INET;
+			addr.sin_addr.s_addr = htonl(INADDR_ANY);
+			addr.sin_port = 0;
+
+			if (::bind(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
+			{
+				::close(sock);
+				return 0;
+			}
+
+			socklen_t addr_len = sizeof(addr);
+			if (::getsockname(sock, reinterpret_cast<sockaddr*>(&addr), &addr_len) != 0)
+			{
+				::close(sock);
+				return 0;
+			}
+
+			const uint16_t port = ntohs(addr.sin_port);
+			::close(sock);
+			return port;
+		}
+
+		uint16_t choose_telemetry_port()
+		{
+			for (int attempt = 0; attempt < 3; ++attempt)
+			{
+				const uint16_t port = find_free_port_for_test();
+				if (port != 0)
+					return port;
+			}
+			ROBOTICK_FATAL_EXIT("RemoteEngineConnections test: no free telemetry port found after 3 attempts");
+			return 0;
+		}
+
+		uint16_t choose_telemetry_port_distinct_from(uint16_t existing_port)
+		{
+			for (int attempt = 0; attempt < 8; ++attempt)
+			{
+				const uint16_t candidate = choose_telemetry_port();
+				if (candidate != 0 && candidate != existing_port)
+				{
+					return candidate;
+				}
+			}
+			ROBOTICK_FATAL_EXIT(
+				"RemoteEngineConnections test: failed to choose distinct telemetry port from %u",
+				static_cast<unsigned>(existing_port));
+			return 0;
+		}
 
 		void engine_run_entry(void* arg)
 		{
@@ -90,9 +151,12 @@ namespace robotick::test
 		}();
 		static const RemoteModelSeed* const remote_models[] = {&remote_receiver};
 
+		const uint16_t sender_telemetry_port = choose_telemetry_port();
+		const uint16_t receiver_telemetry_port = choose_telemetry_port_distinct_from(sender_telemetry_port);
 		sender_model.use_workload_seeds(sender_workloads);
 		sender_model.use_remote_models(remote_models);
 		sender_model.set_root_workload(sender_seed);
+		sender_model.set_telemetry_port(sender_telemetry_port);
 
 		// --- Setup receiver
 		Model receiver_model;
@@ -106,7 +170,7 @@ namespace robotick::test
 			{}	// inputs
 		};
 		static const WorkloadSeed* const receiver_workloads[] = {&receiver_seed};
-		receiver_model.set_telemetry_port(7091); // so as to not conflict with the above
+		receiver_model.set_telemetry_port(receiver_telemetry_port);
 		receiver_model.use_workload_seeds(receiver_workloads);
 		receiver_model.set_root_workload(receiver_seed);
 

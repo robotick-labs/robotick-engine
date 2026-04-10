@@ -5,6 +5,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
+#include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Sync.h"
 #include "robotick/framework/concurrency/Thread.h"
 #include "robotick/framework/containers/FixedVector.h"
@@ -28,6 +29,13 @@
 
 #if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
 #include <curl/curl.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/time.h>
 #endif
 
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
@@ -159,6 +167,17 @@ namespace robotick
 		static const char* skip_prefix(const char* text, const char* prefix)
 		{
 			return starts_with(text, prefix) ? text + ::strlen(prefix) : nullptr;
+		}
+
+		static bool ends_with(const char* text, const char* suffix)
+		{
+			if (!text || !suffix)
+			{
+				return false;
+			}
+			const size_t text_len = ::strlen(text);
+			const size_t suffix_len = ::strlen(suffix);
+			return text_len >= suffix_len && ::strncmp(text + (text_len - suffix_len), suffix, suffix_len) == 0;
 		}
 
 		struct TelemetryWriteRequestEntry
@@ -941,8 +960,348 @@ namespace robotick
 			::fclose(tmp);
 			return true;
 		}
+
+		static void close_socket_fd(int& fd)
+		{
+			if (fd >= 0)
+			{
+				::close(fd);
+				fd = -1;
+			}
+		}
+
+		static bool socket_wait_readable(const int fd, const int timeout_ms)
+		{
+			if (fd < 0)
+			{
+				return false;
+			}
+			fd_set read_set;
+			FD_ZERO(&read_set);
+			FD_SET(fd, &read_set);
+
+			timeval timeout{};
+			timeout.tv_sec = timeout_ms > 0 ? timeout_ms / 1000 : 0;
+			timeout.tv_usec = timeout_ms > 0 ? (timeout_ms % 1000) * 1000 : 0;
+
+			const int rc = ::select(fd + 1, &read_set, nullptr, nullptr, &timeout);
+			return rc > 0 && FD_ISSET(fd, &read_set);
+		}
+
+		static bool socket_send_all(const int fd, const uint8_t* data, const size_t size)
+		{
+			size_t sent = 0;
+			while (sent < size)
+			{
+				const ssize_t written = ::send(fd, data + sent, size - sent, 0);
+				if (written <= 0)
+				{
+					return false;
+				}
+				sent += static_cast<size_t>(written);
+			}
+			return true;
+		}
+
+		static bool socket_recv_exact_with_timeout(const int fd, uint8_t* out, const size_t size, const int timeout_ms)
+		{
+			size_t read = 0;
+			while (read < size)
+			{
+				if (!socket_wait_readable(fd, timeout_ms))
+				{
+					return false;
+				}
+				const ssize_t n = ::recv(fd, out + read, size - read, 0);
+				if (n <= 0)
+				{
+					return false;
+				}
+				read += static_cast<size_t>(n);
+			}
+			return true;
+		}
+
+		static bool ws_send_masked_frame(const int fd, const int opcode, const void* data, const size_t size)
+		{
+			if (fd < 0)
+			{
+				return false;
+			}
+			if (size > 0xFFFF)
+			{
+				return false;
+			}
+
+			uint8_t header[14] = {};
+			size_t header_size = 0;
+			header[header_size++] = static_cast<uint8_t>(0x80 | (opcode & 0x0F));
+			if (size <= 125)
+			{
+				header[header_size++] = static_cast<uint8_t>(0x80 | size);
+			}
+			else
+			{
+				header[header_size++] = static_cast<uint8_t>(0x80 | 126);
+				header[header_size++] = static_cast<uint8_t>((size >> 8) & 0xFF);
+				header[header_size++] = static_cast<uint8_t>(size & 0xFF);
+			}
+
+			const uint8_t mask[4] = {0x13, 0x57, 0x9B, 0xDF};
+			header[header_size++] = mask[0];
+			header[header_size++] = mask[1];
+			header[header_size++] = mask[2];
+			header[header_size++] = mask[3];
+
+			if (!socket_send_all(fd, header, header_size))
+			{
+				return false;
+			}
+
+			if (size == 0)
+			{
+				return true;
+			}
+
+			HeapVector<uint8_t> masked_payload;
+			masked_payload.initialize(size);
+			const uint8_t* payload = static_cast<const uint8_t*>(data);
+			for (size_t i = 0; i < size; ++i)
+			{
+				const uint8_t src = payload ? payload[i] : 0;
+				masked_payload[i] = src ^ mask[i % 4];
+			}
+
+			return socket_send_all(fd, masked_payload.data(), size);
+		}
+
+		static bool ws_send_masked_text(const int fd, const char* text, const size_t size)
+		{
+			return ws_send_masked_frame(fd, 0x1, text, size);
+		}
+
+		static bool ws_send_masked_pong(const int fd, const uint8_t* payload, const size_t size)
+		{
+			return ws_send_masked_frame(fd, 0xA, payload, size);
+		}
+
+		static bool ws_try_read_frame(const int fd, int& out_opcode, HeapVector<uint8_t>& out_payload, size_t& out_payload_size, const int timeout_ms)
+		{
+			out_opcode = 0;
+			out_payload_size = 0;
+			out_payload.reset();
+
+			if (!socket_wait_readable(fd, timeout_ms))
+			{
+				return false;
+			}
+
+			uint8_t header[2] = {};
+			if (!socket_recv_exact_with_timeout(fd, header, sizeof(header), timeout_ms))
+			{
+				return false;
+			}
+
+			out_opcode = header[0] & 0x0F;
+			const bool masked = (header[1] & 0x80) != 0;
+			uint64_t payload_size = static_cast<uint64_t>(header[1] & 0x7F);
+			if (payload_size == 126)
+			{
+				uint8_t ext[2] = {};
+				if (!socket_recv_exact_with_timeout(fd, ext, sizeof(ext), timeout_ms))
+				{
+					return false;
+				}
+				payload_size = (static_cast<uint64_t>(ext[0]) << 8) | static_cast<uint64_t>(ext[1]);
+			}
+			else if (payload_size == 127)
+			{
+				uint8_t ext[8] = {};
+				if (!socket_recv_exact_with_timeout(fd, ext, sizeof(ext), timeout_ms))
+				{
+					return false;
+				}
+				payload_size = 0;
+				for (size_t i = 0; i < sizeof(ext); ++i)
+				{
+					payload_size = (payload_size << 8) | static_cast<uint64_t>(ext[i]);
+				}
+			}
+
+			if (payload_size > (8U * 1024U * 1024U))
+			{
+				return false;
+			}
+
+			uint8_t mask[4] = {};
+			if (masked)
+			{
+				if (!socket_recv_exact_with_timeout(fd, mask, sizeof(mask), timeout_ms))
+				{
+					return false;
+				}
+			}
+
+			if (payload_size > 0)
+			{
+				out_payload.initialize(static_cast<size_t>(payload_size));
+				if (!socket_recv_exact_with_timeout(fd, out_payload.data(), static_cast<size_t>(payload_size), timeout_ms))
+				{
+					return false;
+				}
+				if (masked)
+				{
+					for (size_t i = 0; i < static_cast<size_t>(payload_size); ++i)
+					{
+						out_payload[i] ^= mask[i % 4];
+					}
+				}
+			}
+
+			out_payload_size = static_cast<size_t>(payload_size);
+			return true;
+		}
+
+		static bool connect_websocket_client_socket(const char* host, const uint16_t port, const char* path, int& out_fd)
+		{
+			out_fd = -1;
+			if (!host || host[0] == '\0' || !path || path[0] != '/')
+			{
+				return false;
+			}
+
+			char port_text[16];
+			::snprintf(port_text, sizeof(port_text), "%u", static_cast<unsigned>(port));
+
+			addrinfo hints{};
+			hints.ai_family = AF_UNSPEC;
+			hints.ai_socktype = SOCK_STREAM;
+			addrinfo* results = nullptr;
+			if (::getaddrinfo(host, port_text, &hints, &results) != 0)
+			{
+				return false;
+			}
+
+			int fd = -1;
+			for (addrinfo* it = results; it != nullptr; it = it->ai_next)
+			{
+				fd = ::socket(it->ai_family, it->ai_socktype, it->ai_protocol);
+				if (fd < 0)
+				{
+					continue;
+				}
+				if (::connect(fd, it->ai_addr, static_cast<socklen_t>(it->ai_addrlen)) == 0)
+				{
+					break;
+				}
+				close_socket_fd(fd);
+			}
+			::freeaddrinfo(results);
+			if (fd < 0)
+			{
+				return false;
+			}
+
+			const char* handshake =
+				"GET %s HTTP/1.1\r\n"
+				"Host: %s:%u\r\n"
+				"Upgrade: websocket\r\n"
+				"Connection: Upgrade\r\n"
+				"Sec-WebSocket-Version: 13\r\n"
+				"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+				"\r\n";
+
+			char request[1024];
+			::snprintf(request, sizeof(request), handshake, path, host, static_cast<unsigned>(port));
+			if (!socket_send_all(fd, reinterpret_cast<const uint8_t*>(request), ::strlen(request)))
+			{
+				close_socket_fd(fd);
+				return false;
+			}
+
+			char response[4096] = {};
+			size_t response_len = 0;
+			while (response_len + 1 < sizeof(response))
+			{
+				uint8_t ch = 0;
+				if (!socket_recv_exact_with_timeout(fd, &ch, 1, 200))
+				{
+					close_socket_fd(fd);
+					return false;
+				}
+				response[response_len++] = static_cast<char>(ch);
+				response[response_len] = '\0';
+				if (::strstr(response, "\r\n\r\n") != nullptr)
+				{
+					break;
+				}
+			}
+
+			if (::strstr(response, " 101 ") == nullptr || ::strstr(response, "Sec-WebSocket-Accept:") == nullptr)
+			{
+				close_socket_fd(fd);
+				return false;
+			}
+
+			out_fd = fd;
+			return true;
+		}
+
+		static bool json_extract_uint32(const char* json, const char* key, uint32_t& out_value)
+		{
+			if (!json || !key)
+			{
+				return false;
+			}
+			FixedString64 pattern;
+			pattern.format("\"%s\":", key);
+			const char* p = ::strstr(json, pattern.c_str());
+			if (!p)
+			{
+				return false;
+			}
+			p += ::strlen(pattern.c_str());
+			while (*p == ' ' || *p == '\t')
+			{
+				++p;
+			}
+			unsigned parsed = 0;
+			if (::sscanf(p, "%u", &parsed) != 1)
+			{
+				return false;
+			}
+			out_value = static_cast<uint32_t>(parsed);
+			return true;
+		}
+
+		static bool json_extract_string(const char* json, const char* key, FixedString64& out_value)
+		{
+			if (!json || !key)
+			{
+				return false;
+			}
+			FixedString64 pattern;
+			pattern.format("\"%s\":\"", key);
+			const char* p = ::strstr(json, pattern.c_str());
+			if (!p)
+			{
+				return false;
+			}
+			p += ::strlen(pattern.c_str());
+			const char* end = ::strchr(p, '"');
+			if (!end || end <= p)
+			{
+				return false;
+			}
+			out_value.assign(p, static_cast<size_t>(end - p));
+			return true;
+		}
 #endif
 	} // namespace
+
+	template <typename Writer, typename WritableInputFields>
+	static void write_layout_json_stream(
+		Writer& writer, const Engine& engine, const char* session_id_override, const WritableInputFields& writable_input_fields);
 
 	struct TelemetryServer::Impl
 	{
@@ -983,7 +1342,39 @@ namespace robotick
 			bool has_cached_layout = false;
 			FixedString64 last_seen_session_id;
 			FixedString64 cached_layout_session_id;
+			int peer_ws_fd = -1;
+			Clock::time_point peer_ws_last_connect_attempt{};
+			bool peer_ws_has_pending_frame_meta = false;
+			uint32_t peer_ws_pending_frame_seq = 0;
+			uint32_t peer_ws_pending_payload_size = 0;
+			FixedString64 peer_ws_pending_session_id;
+			HeapVector<uint8_t> peer_ws_latest_raw;
+			uint32_t peer_ws_latest_frame_seq = 0;
+			FixedString64 peer_ws_latest_session_id;
+			bool peer_ws_has_latest_raw = false;
+			HeapVector<char> peer_ws_latest_layout;
+			size_t peer_ws_latest_layout_size = 0;
+			bool peer_ws_has_latest_layout = false;
+			HeapVector<char> peer_ws_write_response;
+			size_t peer_ws_write_response_size = 0;
+			bool peer_ws_has_write_response = false;
 #endif
+		};
+
+		struct WsRoute
+		{
+			bool valid = false;
+			bool is_local = true;
+			int peer_index = -1;
+			FixedString64 model_id;
+		};
+
+		struct WsClient
+		{
+			bool active = false;
+			WebSocketConnection connection;
+			WsRoute route;
+			Clock::time_point last_heartbeat_at{};
 		};
 
 		WebServer web_server;
@@ -1005,12 +1396,53 @@ namespace robotick
 		bool is_setup = false;
 		bool is_gateway = false;
 		HeapVector<TelemetryPeerRoute> telemetry_peers;
+		Mutex ws_clients_mutex;
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
+		static constexpr size_t ws_max_clients = 1;
+#else
+		static constexpr size_t ws_max_clients = 8;
+#endif
+		HeapVector<WsClient> ws_clients;
+		AtomicFlag ws_broadcast_stop{false};
+		Thread ws_broadcast_thread;
+		uint32_t ws_last_local_frame_seq = 0;
+		HeapVector<uint32_t> ws_last_peer_frame_seq;
+		static constexpr uint32_t ws_heartbeat_interval_ms = 1000;
+		static constexpr uint32_t ws_broadcast_tick_ms = 10;
 
 		void rebuild_writable_input_registry();
 		int find_writable_input_index_by_handle(uint16_t handle) const;
 		int find_writable_input_index_by_path(const char* path) const;
 		int find_telemetry_peer_index_by_model_id(const char* model_id) const;
 		void rebuild_telemetry_peer_registry();
+		void initialize_ws_state();
+		void clear_ws_clients();
+		void configure_websocket_endpoints();
+		bool resolve_ws_route(const char* uri, WsRoute& out_route) const;
+		bool ws_connections_equal(const WebSocketConnection& lhs, const WebSocketConnection& rhs) const;
+		int find_ws_client_index_unlocked(const WebSocketConnection& connection) const;
+		bool register_ws_client(const WsRoute& route, const WebSocketConnection& incoming, int& out_index);
+		void unregister_ws_client(const WebSocketConnection& connection);
+		void send_ws_hello(const WsClient& client);
+		void send_ws_layout(const WsClient& client);
+		void send_ws_error(const WebSocketConnection& connection, const char* error_text);
+		bool handle_ws_message(const WsRoute& route, const WebSocketConnection& connection, const WebSocketMessage& message);
+		void build_write_response_json(const char* request_body, size_t request_size, int& out_status_code, json::StringSink& out_json);
+		void maybe_broadcast_local_frame(const Clock::time_point now);
+		void maybe_broadcast_peer_frames(const Clock::time_point now);
+		void maybe_send_heartbeats(const Clock::time_point now);
+		void start_ws_broadcast_loop();
+		void stop_ws_broadcast_loop();
+		static void ws_broadcast_entry(void* user_data);
+		void ws_broadcast_loop();
+#if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+		void reset_peer_ws_state(TelemetryPeerRoute& peer);
+		void close_peer_ws_connection(TelemetryPeerRoute& peer);
+		bool ensure_peer_ws_connection(TelemetryPeerRoute& peer, int timeout_ms);
+		bool pump_peer_ws_messages(TelemetryPeerRoute& peer, int max_frames, int timeout_ms);
+		bool wait_for_peer_layout(TelemetryPeerRoute& peer, int timeout_ms);
+		bool wait_for_peer_write_response(TelemetryPeerRoute& peer, int timeout_ms);
+#endif
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
 		void rebuild_layout_cache();
 #endif
@@ -1056,6 +1488,7 @@ namespace robotick
 	{
 		if (impl)
 		{
+			impl->stop_ws_broadcast_loop();
 			impl->web_server.stop();
 			delete impl;
 			impl = nullptr;
@@ -1066,6 +1499,7 @@ namespace robotick
 		build_session_id(engine_in.get_model_name(), impl->session_id);
 		impl->rebuild_writable_input_registry();
 		impl->rebuild_telemetry_peer_registry();
+		impl->initialize_ws_state();
 		impl->is_setup = true;
 	}
 
@@ -1076,6 +1510,7 @@ namespace robotick
 			setup(engine_in);
 		}
 		impl->engine = &engine_in;
+		impl->configure_websocket_endpoints();
 
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
 		impl->rebuild_layout_cache();
@@ -1105,28 +1540,17 @@ namespace robotick
 					FixedString128 routed_suffix_uri;
 					if (try_parse_model_routed_uri(req.uri.c_str(), routed_model_id, routed_suffix_uri))
 					{
-						if (routed_model_id == impl->engine->get_model_name())
-						{
-							return impl->handle_local_telemetry_request(req, res, routed_suffix_uri.c_str());
-						}
-
-						const int peer_index = impl->find_telemetry_peer_index_by_model_id(routed_model_id.c_str());
-						if (peer_index >= 0)
-						{
-							impl->handle_forwarded_telemetry_request(
-								req, res, impl->telemetry_peers[static_cast<size_t>(peer_index)], routed_suffix_uri.c_str());
-							return true;
-						}
-
 						set_json_response(res,
 							WebResponseCode::NotFound,
 							[&](auto& writer)
 							{
 								writer.start_object();
 								writer.key("error");
-								writer.string("telemetry_peer_not_found");
+								writer.string("telemetry_rest_data_plane_removed");
 								writer.key("model_id");
 								writer.string(routed_model_id.c_str());
+								writer.key("path");
+								writer.string(routed_suffix_uri.c_str());
 								writer.end_object();
 							});
 						return true;
@@ -1135,6 +1559,7 @@ namespace robotick
 
 				return impl->handle_local_telemetry_request(req, res, req.uri.c_str());
 			});
+		impl->start_ws_broadcast_loop();
 	}
 
 	void TelemetryServer::stop()
@@ -1143,8 +1568,17 @@ namespace robotick
 		{
 			return;
 		}
+		impl->stop_ws_broadcast_loop();
+#if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+		for (size_t i = 0; i < impl->telemetry_peers.size(); ++i)
+		{
+			LockGuard lock(impl->telemetry_peers[i].forwarded_request_mutex);
+			impl->close_peer_ws_connection(impl->telemetry_peers[i]);
+		}
+#endif
 		impl->web_server.stop();
 		impl->engine = nullptr;
+		impl->clear_ws_clients();
 	}
 
 	void TelemetryServer::apply_pending_input_writes()
@@ -1192,6 +1626,12 @@ namespace robotick
 		}
 
 		Impl::TelemetryPeerRoute& peer = impl->telemetry_peers[static_cast<size_t>(peer_index)];
+#if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+		{
+			LockGuard lock(peer.forwarded_request_mutex);
+			impl->close_peer_ws_connection(peer);
+		}
+#endif
 		peer.host = host;
 		peer.telemetry_port = telemetry_port;
 		peer.is_gateway = is_gateway;
@@ -1274,6 +1714,870 @@ namespace robotick
 		}
 	}
 
+	void TelemetryServer::Impl::initialize_ws_state()
+	{
+		if (ws_clients.empty())
+		{
+			ws_clients.initialize(ws_max_clients);
+		}
+		for (size_t i = 0; i < ws_clients.size(); ++i)
+		{
+			ws_clients[i] = WsClient{};
+		}
+
+		if (!telemetry_peers.empty() && ws_last_peer_frame_seq.empty())
+		{
+			ws_last_peer_frame_seq.initialize(telemetry_peers.size());
+		}
+		for (size_t i = 0; i < ws_last_peer_frame_seq.size(); ++i)
+		{
+			ws_last_peer_frame_seq[i] = 0;
+		}
+
+		ws_last_local_frame_seq = 0;
+		ws_broadcast_stop.clear();
+	}
+
+	void TelemetryServer::Impl::clear_ws_clients()
+	{
+		LockGuard lock(ws_clients_mutex);
+		for (size_t i = 0; i < ws_clients.size(); ++i)
+		{
+			ws_clients[i] = WsClient{};
+		}
+	}
+
+#if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+	void TelemetryServer::Impl::reset_peer_ws_state(TelemetryPeerRoute& peer)
+	{
+		peer.peer_ws_has_pending_frame_meta = false;
+		peer.peer_ws_pending_frame_seq = 0;
+		peer.peer_ws_pending_payload_size = 0;
+		peer.peer_ws_pending_session_id.clear();
+		peer.peer_ws_latest_raw.reset();
+		peer.peer_ws_latest_frame_seq = 0;
+		peer.peer_ws_latest_session_id.clear();
+		peer.peer_ws_has_latest_raw = false;
+		peer.peer_ws_latest_layout.reset();
+		peer.peer_ws_latest_layout_size = 0;
+		peer.peer_ws_has_latest_layout = false;
+		peer.peer_ws_write_response.reset();
+		peer.peer_ws_write_response_size = 0;
+		peer.peer_ws_has_write_response = false;
+	}
+
+	void TelemetryServer::Impl::close_peer_ws_connection(TelemetryPeerRoute& peer)
+	{
+		close_socket_fd(peer.peer_ws_fd);
+		reset_peer_ws_state(peer);
+	}
+
+	bool TelemetryServer::Impl::ensure_peer_ws_connection(TelemetryPeerRoute& peer, const int timeout_ms)
+	{
+		if (peer.peer_ws_fd >= 0)
+		{
+			return true;
+		}
+
+		const Clock::time_point now = Clock::now();
+		if (peer.peer_ws_last_connect_attempt.time_since_epoch().count() != 0)
+		{
+			const uint64_t elapsed_ms = static_cast<uint64_t>(Clock::to_nanoseconds(now - peer.peer_ws_last_connect_attempt).count() / 1000000ULL);
+			if (elapsed_ms < 200)
+			{
+				return false;
+			}
+		}
+		peer.peer_ws_last_connect_attempt = now;
+
+		int fd = -1;
+		if (!connect_websocket_client_socket(peer.host.c_str(), peer.telemetry_port, "/api/telemetry/ws", fd))
+		{
+			close_socket_fd(fd);
+			return false;
+		}
+		peer.peer_ws_fd = fd;
+		reset_peer_ws_state(peer);
+		return pump_peer_ws_messages(peer, 8, timeout_ms);
+	}
+
+	bool TelemetryServer::Impl::pump_peer_ws_messages(TelemetryPeerRoute& peer, const int max_frames, const int timeout_ms)
+	{
+		if (peer.peer_ws_fd < 0)
+		{
+			return false;
+		}
+
+		for (int i = 0; i < max_frames; ++i)
+		{
+			int opcode = 0;
+			HeapVector<uint8_t> payload;
+			size_t payload_size = 0;
+			if (!ws_try_read_frame(peer.peer_ws_fd, opcode, payload, payload_size, i == 0 ? timeout_ms : 0))
+			{
+				return true;
+			}
+
+			if (opcode == 0x9)
+			{
+				if (!ws_send_masked_pong(peer.peer_ws_fd, payload_size > 0 ? payload.data() : nullptr, payload_size))
+				{
+					close_peer_ws_connection(peer);
+					return false;
+				}
+				continue;
+			}
+			if (opcode == 0xA)
+			{
+				continue;
+			}
+			if (opcode == 0x8)
+			{
+				close_peer_ws_connection(peer);
+				return false;
+			}
+
+			if (opcode == 0x1)
+			{
+				HeapVector<char> text;
+				text.initialize(payload_size + 1);
+				if (payload_size > 0)
+				{
+					::memcpy(text.data(), payload.data(), payload_size);
+				}
+				text[payload_size] = '\0';
+
+				const char* body = text.data();
+				if (::strstr(body, "\"type\":\"heartbeat\""))
+				{
+					continue;
+				}
+				if (::strstr(body, "\"type\":\"frame\""))
+				{
+					uint32_t frame_seq = 0;
+					uint32_t payload_len = 0;
+					FixedString64 sid;
+					if (json_extract_uint32(body, "frame_seq", frame_seq))
+					{
+						peer.peer_ws_has_pending_frame_meta = true;
+						peer.peer_ws_pending_frame_seq = frame_seq;
+						peer.peer_ws_pending_payload_size = json_extract_uint32(body, "payload_size", payload_len) ? payload_len : 0;
+						if (json_extract_string(body, "engine_session_id", sid))
+						{
+							peer.peer_ws_pending_session_id = sid.c_str();
+						}
+						else
+						{
+							peer.peer_ws_pending_session_id.clear();
+						}
+					}
+					continue;
+				}
+				if (::strstr(body, "\"type\":\"hello\""))
+				{
+					continue;
+				}
+				if (::strstr(body, "\"workloads\"") && ::strstr(body, "\"types\""))
+				{
+					peer.peer_ws_latest_layout.reset();
+					peer.peer_ws_latest_layout.initialize(payload_size + 1);
+					if (payload_size > 0)
+					{
+						::memcpy(peer.peer_ws_latest_layout.data(), body, payload_size);
+					}
+					peer.peer_ws_latest_layout[payload_size] = '\0';
+					peer.peer_ws_latest_layout_size = payload_size;
+					peer.peer_ws_has_latest_layout = true;
+					continue;
+				}
+				if (::strstr(body, "\"accepted_count\"") || ::strstr(body, "\"ignored_stale_count\"") || ::strstr(body, "\"error\""))
+				{
+					peer.peer_ws_write_response.reset();
+					peer.peer_ws_write_response.initialize(payload_size + 1);
+					if (payload_size > 0)
+					{
+						::memcpy(peer.peer_ws_write_response.data(), body, payload_size);
+					}
+					peer.peer_ws_write_response[payload_size] = '\0';
+					peer.peer_ws_write_response_size = payload_size;
+					peer.peer_ws_has_write_response = true;
+				}
+				continue;
+			}
+
+			if (opcode == 0x2 && peer.peer_ws_has_pending_frame_meta)
+			{
+				peer.peer_ws_latest_raw.reset();
+				peer.peer_ws_latest_raw.initialize(payload_size);
+				if (payload_size > 0)
+				{
+					::memcpy(peer.peer_ws_latest_raw.data(), payload.data(), payload_size);
+				}
+				peer.peer_ws_latest_frame_seq = peer.peer_ws_pending_frame_seq;
+				peer.peer_ws_latest_session_id = peer.peer_ws_pending_session_id.c_str();
+				peer.peer_ws_has_latest_raw = true;
+				peer.peer_ws_has_pending_frame_meta = false;
+				peer.peer_ws_pending_frame_seq = 0;
+				peer.peer_ws_pending_payload_size = 0;
+				peer.peer_ws_pending_session_id.clear();
+			}
+		}
+
+		return true;
+	}
+
+	bool TelemetryServer::Impl::wait_for_peer_layout(TelemetryPeerRoute& peer, const int timeout_ms)
+	{
+		const Clock::time_point start = Clock::now();
+		while (true)
+		{
+			if (peer.peer_ws_has_latest_layout)
+			{
+				return true;
+			}
+			if (!pump_peer_ws_messages(peer, 8, 50))
+			{
+				return false;
+			}
+			const int elapsed_ms = static_cast<int>(Clock::to_nanoseconds(Clock::now() - start).count() / 1000000LL);
+			if (elapsed_ms >= timeout_ms)
+			{
+				return false;
+			}
+		}
+	}
+
+	bool TelemetryServer::Impl::wait_for_peer_write_response(TelemetryPeerRoute& peer, const int timeout_ms)
+	{
+		const Clock::time_point start = Clock::now();
+		while (true)
+		{
+			if (peer.peer_ws_has_write_response)
+			{
+				return true;
+			}
+			if (!pump_peer_ws_messages(peer, 8, 50))
+			{
+				return false;
+			}
+			const int elapsed_ms = static_cast<int>(Clock::to_nanoseconds(Clock::now() - start).count() / 1000000LL);
+			if (elapsed_ms >= timeout_ms)
+			{
+				return false;
+			}
+		}
+	}
+#endif
+
+	bool TelemetryServer::Impl::resolve_ws_route(const char* uri, WsRoute& out_route) const
+	{
+		out_route = WsRoute{};
+		if (!uri || !engine)
+		{
+			return false;
+		}
+
+		if (uri_equals(uri, "/api/telemetry/ws"))
+		{
+			out_route.valid = true;
+			out_route.is_local = true;
+			out_route.model_id = engine->get_model_name();
+			return true;
+		}
+
+		if (!is_gateway)
+		{
+			return false;
+		}
+
+		constexpr const char* gateway_prefix = "/api/telemetry-gateway/";
+		const char* rest = skip_prefix(uri, gateway_prefix);
+		if (!rest || rest[0] == '\0' || !ends_with(uri, "/ws"))
+		{
+			return false;
+		}
+
+		const char* ws_suffix = ::strstr(rest, "/ws");
+		if (!ws_suffix || ws_suffix == rest || ws_suffix[3] != '\0')
+		{
+			return false;
+		}
+
+		out_route.model_id.assign(rest, static_cast<size_t>(ws_suffix - rest));
+		if (out_route.model_id.empty())
+		{
+			return false;
+		}
+
+		if (out_route.model_id == engine->get_model_name())
+		{
+			out_route.valid = true;
+			out_route.is_local = true;
+			return true;
+		}
+
+		const int peer_index = find_telemetry_peer_index_by_model_id(out_route.model_id.c_str());
+		if (peer_index < 0)
+		{
+			return false;
+		}
+
+		out_route.valid = true;
+		out_route.is_local = false;
+		out_route.peer_index = peer_index;
+		return true;
+	}
+
+	bool TelemetryServer::Impl::ws_connections_equal(const WebSocketConnection& lhs, const WebSocketConnection& rhs) const
+	{
+		if (lhs.conn && rhs.conn && lhs.conn == rhs.conn)
+		{
+			return true;
+		}
+		if (lhs.socket_fd >= 0 && rhs.socket_fd >= 0 && lhs.socket_fd == rhs.socket_fd)
+		{
+			if (!lhs.server || !rhs.server || lhs.server == rhs.server)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	int TelemetryServer::Impl::find_ws_client_index_unlocked(const WebSocketConnection& connection) const
+	{
+		for (size_t i = 0; i < ws_clients.size(); ++i)
+		{
+			const WsClient& client = ws_clients[i];
+			if (!client.active)
+			{
+				continue;
+			}
+			if (ws_connections_equal(client.connection, connection))
+			{
+				return static_cast<int>(i);
+			}
+		}
+		return -1;
+	}
+
+	bool TelemetryServer::Impl::register_ws_client(const WsRoute& route, const WebSocketConnection& incoming, int& out_index)
+	{
+		out_index = -1;
+		if (!route.valid)
+		{
+			return false;
+		}
+
+		WebSocketConnection stored_connection = incoming;
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
+		if (stored_connection.server && stored_connection.socket_fd >= 0)
+		{
+			stored_connection.conn = nullptr;
+		}
+#endif
+
+		LockGuard lock(ws_clients_mutex);
+		const int existing_index = find_ws_client_index_unlocked(stored_connection);
+		if (existing_index >= 0)
+		{
+			WsClient& existing = ws_clients[static_cast<size_t>(existing_index)];
+			existing.active = true;
+			existing.connection = stored_connection;
+			existing.route = route;
+			existing.last_heartbeat_at = Clock::now();
+			out_index = existing_index;
+			return true;
+		}
+
+		for (size_t i = 0; i < ws_clients.size(); ++i)
+		{
+			WsClient& slot = ws_clients[i];
+			if (slot.active)
+			{
+				continue;
+			}
+			slot.active = true;
+			slot.connection = stored_connection;
+			slot.route = route;
+			slot.last_heartbeat_at = Clock::now();
+			out_index = static_cast<int>(i);
+			return true;
+		}
+
+		return false;
+	}
+
+	void TelemetryServer::Impl::unregister_ws_client(const WebSocketConnection& connection)
+	{
+		LockGuard lock(ws_clients_mutex);
+		const int index = find_ws_client_index_unlocked(connection);
+		if (index < 0)
+		{
+			return;
+		}
+		ws_clients[static_cast<size_t>(index)] = WsClient{};
+	}
+
+	void TelemetryServer::Impl::send_ws_hello(const WsClient& client)
+	{
+		if (!client.active)
+		{
+			return;
+		}
+
+		FixedString1024 hello;
+		hello.format("{\"type\":\"hello\",\"protocol_version\":1,\"model_id\":\"%s\",\"engine_session_id\":\"%s\",\"capabilities\":{"
+					 "\"layout_text\":true,\"binary_frames\":true,\"write_ack\":true}}",
+			client.route.model_id.c_str(),
+			client.route.is_local ? session_id.c_str() : "");
+		if (!client.connection.send_text(hello.c_str()))
+		{
+			unregister_ws_client(client.connection);
+		}
+	}
+
+	void TelemetryServer::Impl::send_ws_error(const WebSocketConnection& connection, const char* error_text)
+	{
+		FixedString512 body;
+		body.format("{\"type\":\"error\",\"error\":\"%s\"}", error_text ? error_text : "unknown");
+		if (!connection.send_text(body.c_str()))
+		{
+			unregister_ws_client(connection);
+		}
+	}
+
+	void TelemetryServer::Impl::send_ws_layout(const WsClient& client)
+	{
+		if (!client.active)
+		{
+			return;
+		}
+
+		if (client.route.is_local)
+		{
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
+			LockGuard lock(layout_cache_mutex);
+			if (!has_cached_layout_body)
+			{
+				send_ws_error(client.connection, "telemetry_layout_generation_failed");
+				return;
+			}
+			if (!client.connection.send_frame(0x1, cached_layout_body, cached_layout_body_size))
+			{
+				unregister_ws_client(client.connection);
+			}
+#else
+			json::StringSink layout_sink;
+			json::Writer<json::StringSink> writer(layout_sink);
+			write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
+			writer.flush();
+			if (!client.connection.send_frame(0x1, layout_sink.c_str(), layout_sink.size()))
+			{
+				unregister_ws_client(client.connection);
+			}
+#endif
+			return;
+		}
+
+#if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+		if (client.route.peer_index < 0 || static_cast<size_t>(client.route.peer_index) >= telemetry_peers.size())
+		{
+			send_ws_error(client.connection, "telemetry_peer_not_found");
+			return;
+		}
+		TelemetryPeerRoute& peer = telemetry_peers[static_cast<size_t>(client.route.peer_index)];
+		LockGuard lock(peer.forwarded_request_mutex);
+		if (!ensure_peer_ws_connection(peer, 100) || !wait_for_peer_layout(peer, 1000))
+		{
+			send_ws_error(client.connection, "telemetry_forward_failed");
+			return;
+		}
+		if (!client.connection.send_frame(
+				0x1,
+				peer.peer_ws_latest_layout_size > 0 ? reinterpret_cast<const void*>(peer.peer_ws_latest_layout.data()) : "{}",
+				peer.peer_ws_latest_layout_size))
+		{
+			unregister_ws_client(client.connection);
+		}
+#else
+		send_ws_error(client.connection, "telemetry_forwarding_not_supported_on_this_platform");
+#endif
+	}
+
+	void TelemetryServer::Impl::configure_websocket_endpoints()
+	{
+		web_server.clear_websocket_endpoints();
+
+		WebSocketHandler handler;
+		handler.on_connect = [this](const WebRequest& req, WebSocketConnection& connection)
+		{
+			WsRoute route;
+			if (!resolve_ws_route(req.uri.c_str(), route))
+			{
+				return false;
+			}
+			int index = -1;
+			if (!register_ws_client(route, connection, index))
+			{
+				return false;
+			}
+			(void)index;
+			return true;
+		};
+		handler.on_ready = [this](WebSocketConnection& connection)
+		{
+			WsClient client;
+			{
+				LockGuard lock(ws_clients_mutex);
+				const int index = find_ws_client_index_unlocked(connection);
+				if (index < 0)
+				{
+					return;
+				}
+				client = ws_clients[static_cast<size_t>(index)];
+			}
+			send_ws_hello(client);
+			send_ws_layout(client);
+		};
+		handler.on_message = [this](WebSocketConnection& connection, const WebSocketMessage& message)
+		{
+			WsRoute route;
+			{
+				LockGuard lock(ws_clients_mutex);
+				const int index = find_ws_client_index_unlocked(connection);
+				if (index < 0)
+				{
+					return false;
+				}
+				route = ws_clients[static_cast<size_t>(index)].route;
+			}
+			return handle_ws_message(route, connection, message);
+		};
+		handler.on_close = [this](const WebSocketConnection& connection)
+		{
+			unregister_ws_client(connection);
+		};
+
+		web_server.add_websocket_endpoint("/api/telemetry/ws", handler);
+		if (!is_gateway || !engine)
+		{
+			return;
+		}
+
+		FixedString128 local_gateway_ws_uri;
+		local_gateway_ws_uri.format("/api/telemetry-gateway/%s/ws", engine->get_model_name());
+		web_server.add_websocket_endpoint(local_gateway_ws_uri.c_str(), handler);
+
+		for (const TelemetryPeerRoute& peer : telemetry_peers)
+		{
+			FixedString128 peer_gateway_ws_uri;
+			peer_gateway_ws_uri.format("/api/telemetry-gateway/%s/ws", peer.model_id.c_str());
+			web_server.add_websocket_endpoint(peer_gateway_ws_uri.c_str(), handler);
+		}
+	}
+
+	void TelemetryServer::Impl::start_ws_broadcast_loop()
+	{
+		ws_broadcast_stop.clear();
+		if (ws_broadcast_thread.is_joining_supported() && ws_broadcast_thread.is_joinable())
+		{
+			ws_broadcast_thread.join();
+		}
+		ws_broadcast_thread = Thread(&TelemetryServer::Impl::ws_broadcast_entry, this, "TelemetryWsBroadcast");
+	}
+
+	void TelemetryServer::Impl::stop_ws_broadcast_loop()
+	{
+		ws_broadcast_stop.set();
+		if (ws_broadcast_thread.is_joining_supported() && ws_broadcast_thread.is_joinable())
+		{
+			ws_broadcast_thread.join();
+		}
+	}
+
+	void TelemetryServer::Impl::ws_broadcast_entry(void* user_data)
+	{
+		auto* self = static_cast<TelemetryServer::Impl*>(user_data);
+		if (self)
+		{
+			self->ws_broadcast_loop();
+		}
+	}
+
+	void TelemetryServer::Impl::ws_broadcast_loop()
+	{
+		while (!ws_broadcast_stop.is_set())
+		{
+			const Clock::time_point now = Clock::now();
+			maybe_broadcast_local_frame(now);
+			maybe_broadcast_peer_frames(now);
+			maybe_send_heartbeats(now);
+			Thread::sleep_ms(ws_broadcast_tick_ms);
+		}
+	}
+
+	void TelemetryServer::Impl::maybe_broadcast_local_frame(const Clock::time_point now)
+	{
+		(void)now;
+		if (!engine)
+		{
+			return;
+		}
+
+		const WorkloadsBuffer& workloads_buffer = engine->get_workloads_buffer();
+		const uint32_t frame_seq = workloads_buffer.get_telemetry_frame_seq();
+		if ((frame_seq & 1u) != 0u || frame_seq == ws_last_local_frame_seq)
+		{
+			return;
+		}
+
+		FixedVector<WsClient, ws_max_clients> clients;
+		{
+			LockGuard lock(ws_clients_mutex);
+			for (size_t i = 0; i < ws_clients.size(); ++i)
+			{
+				const WsClient& client = ws_clients[i];
+				if (!client.active || !client.route.is_local)
+				{
+					continue;
+				}
+				clients.add(client);
+			}
+		}
+
+		if (clients.empty())
+		{
+			ws_last_local_frame_seq = frame_seq;
+			return;
+		}
+
+		const uint64_t timestamp_ns = static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count());
+		FixedString512 metadata;
+		metadata.format("{\"type\":\"frame\",\"engine_session_id\":\"%s\",\"frame_seq\":%u,\"timestamp_ns\":%llu,\"payload_size\":%u}",
+			session_id.c_str(),
+			static_cast<unsigned>(frame_seq),
+			static_cast<unsigned long long>(timestamp_ns),
+			static_cast<unsigned>(workloads_buffer.get_size_used()));
+
+		for (size_t i = 0; i < clients.size(); ++i)
+		{
+			const WsClient& client = clients[i];
+			const bool metadata_ok = client.connection.send_text(metadata.c_str());
+			const bool frame_ok = metadata_ok && client.connection.send_binary(workloads_buffer.raw_ptr(), workloads_buffer.get_size_used());
+			if (!frame_ok)
+			{
+				unregister_ws_client(client.connection);
+			}
+		}
+
+		ws_last_local_frame_seq = frame_seq;
+	}
+
+	void TelemetryServer::Impl::maybe_broadcast_peer_frames(const Clock::time_point now)
+	{
+		(void)now;
+#if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+		if (telemetry_peers.empty())
+		{
+			return;
+		}
+
+		for (size_t peer_index = 0; peer_index < telemetry_peers.size(); ++peer_index)
+		{
+			TelemetryPeerRoute& peer = telemetry_peers[peer_index];
+			bool has_subscribers = false;
+			FixedVector<WsClient, ws_max_clients> clients;
+			{
+				LockGuard lock(ws_clients_mutex);
+				for (size_t i = 0; i < ws_clients.size(); ++i)
+				{
+					const WsClient& client = ws_clients[i];
+					if (!client.active || client.route.is_local || client.route.peer_index != static_cast<int>(peer_index))
+					{
+						continue;
+					}
+					has_subscribers = true;
+					clients.add(client);
+				}
+			}
+			if (!has_subscribers)
+			{
+				continue;
+			}
+
+			{
+				LockGuard lock(peer.forwarded_request_mutex);
+				if (!ensure_peer_ws_connection(peer, 25))
+				{
+					continue;
+				}
+				if (!pump_peer_ws_messages(peer, 8, 0))
+				{
+					continue;
+				}
+				if (!peer.peer_ws_has_latest_raw)
+				{
+					continue;
+				}
+			}
+
+			const uint32_t frame_seq = peer.peer_ws_latest_frame_seq;
+			if ((frame_seq & 1u) != 0u)
+			{
+				continue;
+			}
+			if (!ws_last_peer_frame_seq.empty() && peer_index < ws_last_peer_frame_seq.size() && ws_last_peer_frame_seq[peer_index] == frame_seq)
+			{
+				continue;
+			}
+
+			const uint64_t timestamp_ns = static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count());
+			FixedString512 metadata;
+			metadata.format("{\"type\":\"frame\",\"engine_session_id\":\"%s\",\"frame_seq\":%u,\"timestamp_ns\":%llu,\"payload_size\":%u}",
+				peer.peer_ws_latest_session_id.c_str(),
+				static_cast<unsigned>(frame_seq),
+				static_cast<unsigned long long>(timestamp_ns),
+				static_cast<unsigned>(peer.peer_ws_latest_raw.size()));
+
+			for (size_t i = 0; i < clients.size(); ++i)
+			{
+				const WsClient& client = clients[i];
+				const bool metadata_ok = client.connection.send_text(metadata.c_str());
+				const bool frame_ok = metadata_ok &&
+					client.connection.send_binary(
+						peer.peer_ws_latest_raw.size() > 0 ? reinterpret_cast<const void*>(peer.peer_ws_latest_raw.data()) : nullptr,
+						peer.peer_ws_latest_raw.size());
+				if (!frame_ok)
+				{
+					unregister_ws_client(client.connection);
+				}
+			}
+
+			if (!ws_last_peer_frame_seq.empty() && peer_index < ws_last_peer_frame_seq.size())
+			{
+				ws_last_peer_frame_seq[peer_index] = frame_seq;
+			}
+		}
+#else
+		(void)now;
+#endif
+	}
+
+	void TelemetryServer::Impl::maybe_send_heartbeats(const Clock::time_point now)
+	{
+		FixedVector<WsClient, ws_max_clients> due_clients;
+		{
+			LockGuard lock(ws_clients_mutex);
+			for (size_t i = 0; i < ws_clients.size(); ++i)
+			{
+				WsClient& client = ws_clients[i];
+				if (!client.active)
+				{
+					continue;
+				}
+				const uint64_t elapsed_ns = static_cast<uint64_t>(Clock::to_nanoseconds(now - client.last_heartbeat_at).count());
+				if (elapsed_ns < static_cast<uint64_t>(ws_heartbeat_interval_ms) * 1000000ULL)
+				{
+					continue;
+				}
+				client.last_heartbeat_at = now;
+				due_clients.add(client);
+			}
+		}
+
+		for (size_t i = 0; i < due_clients.size(); ++i)
+		{
+			const WsClient& client = due_clients[i];
+			if (!client.connection.send_text("{\"type\":\"heartbeat\"}"))
+			{
+				unregister_ws_client(client.connection);
+			}
+		}
+	}
+
+	bool TelemetryServer::Impl::handle_ws_message(const WsRoute& route, const WebSocketConnection& connection, const WebSocketMessage& message)
+	{
+		if (message.opcode == 0x8)
+		{
+			return false;
+		}
+		if (message.opcode == 0x9)
+		{
+			connection.send_frame(0xA, message.data, message.size);
+			return true;
+		}
+		if (message.opcode != 0x1 || !message.data || message.size == 0)
+		{
+			return true;
+		}
+
+		HeapVector<char> text;
+		text.initialize(message.size + 1);
+		::memcpy(text.data(), message.data, message.size);
+		text[message.size] = '\0';
+
+		if (!::strstr(text.data(), "\"writes\""))
+		{
+			return true;
+		}
+
+		if (route.is_local)
+		{
+			int status_code = WebResponseCode::InternalServerError;
+			json::StringSink sink;
+			build_write_response_json(text.data(), message.size, status_code, sink);
+			if (!connection.send_text(sink.c_str()))
+			{
+				return false;
+			}
+			return true;
+		}
+
+#if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
+		if (route.peer_index < 0 || static_cast<size_t>(route.peer_index) >= telemetry_peers.size())
+		{
+			send_ws_error(connection, "telemetry_peer_not_found");
+			return true;
+		}
+		TelemetryPeerRoute& peer = telemetry_peers[static_cast<size_t>(route.peer_index)];
+		LockGuard lock(peer.forwarded_request_mutex);
+		if (!ensure_peer_ws_connection(peer, 100))
+		{
+			send_ws_error(connection, "telemetry_forward_failed");
+			return true;
+		}
+
+		peer.peer_ws_has_write_response = false;
+		if (!ws_send_masked_text(peer.peer_ws_fd, reinterpret_cast<const char*>(message.data), message.size))
+		{
+			close_peer_ws_connection(peer);
+			send_ws_error(connection, "telemetry_forward_failed");
+			return true;
+		}
+
+		if (!wait_for_peer_write_response(peer, 1200))
+		{
+			send_ws_error(connection, "telemetry_forward_failed");
+			return true;
+		}
+
+		const bool sent = connection.send_frame(
+			0x1,
+			peer.peer_ws_write_response_size > 0 ? reinterpret_cast<const void*>(peer.peer_ws_write_response.data()) : "",
+			peer.peer_ws_write_response_size);
+		if (!sent)
+		{
+			return false;
+		}
+		return true;
+#else
+		(void)route;
+		send_ws_error(connection, "telemetry_forwarding_not_supported_on_this_platform");
+		return true;
+#endif
+	}
+
 	bool TelemetryServer::Impl::handle_local_telemetry_request(const WebRequest& req, WebResponse& res, const char* effective_uri)
 	{
 		if (req.method.equals("GET"))
@@ -1282,25 +2586,6 @@ namespace robotick
 			{
 				res.set_status_code(WebResponseCode::OK);
 				res.set_body(nullptr, 0);
-				return true;
-			}
-			if (uri_equals(effective_uri, "/api/telemetry/workloads_buffer/layout") || uri_equals(effective_uri, "/workloads_buffer/layout"))
-			{
-				handle_get_workloads_buffer_layout(req, res);
-				return true;
-			}
-			if (uri_equals(effective_uri, "/api/telemetry/workloads_buffer/raw") || uri_equals(effective_uri, "/workloads_buffer/raw"))
-			{
-				handle_get_workloads_buffer_raw(req, res);
-				return true;
-			}
-		}
-		else if (req.method.equals("POST"))
-		{
-			if (uri_equals(effective_uri, "/api/telemetry/set_workload_input_fields_data") ||
-				uri_equals(effective_uri, "/set_workload_input_fields_data"))
-			{
-				handle_set_workload_input_fields_data(req, res);
 				return true;
 			}
 		}
@@ -1675,7 +2960,8 @@ namespace robotick
 			});
 	}
 
-	void TelemetryServer::Impl::handle_set_workload_input_fields_data(const WebRequest& req, WebResponse& res)
+	void TelemetryServer::Impl::build_write_response_json(
+		const char* request_body, const size_t request_size, int& out_status_code, json::StringSink& out_json)
 	{
 		struct ParsedWrite
 		{
@@ -1684,26 +2970,35 @@ namespace robotick
 			PendingInputWrite staged;
 		};
 
+		auto write_error = [&](const int status, const char* error_text)
+		{
+			out_status_code = status;
+			json::Writer<json::StringSink> writer(out_json);
+			writer.start_object();
+			writer.key("error");
+			writer.string(error_text ? error_text : "unknown_error");
+			writer.end_object();
+			writer.flush();
+		};
+
 		if (!engine)
 		{
-			set_error_response(res, WebResponseCode::ServiceUnavailable, "engine_not_available");
+			write_error(WebResponseCode::ServiceUnavailable, "engine_not_available");
 			return;
 		}
 
 		TelemetryWriteRequestPayload payload;
-
-		JsonCursor cursor(reinterpret_cast<const char*>(req.body.data()), req.body.size());
+		JsonCursor cursor(request_body, request_size);
 		if (!cursor.parse_write_request(payload))
 		{
-			set_error_response(res, WebResponseCode::BadRequest, "invalid_json");
+			write_error(WebResponseCode::BadRequest, "invalid_json");
 			return;
 		}
 
 		const bool session_matches = !payload.has_engine_session_id || StringView(session_id.c_str()).equals(payload.engine_session_id.c_str());
-
 		if (!payload.has_writes || payload.write_count == 0)
 		{
-			set_error_response(res, WebResponseCode::BadRequest, "missing_writes");
+			write_error(WebResponseCode::BadRequest, "missing_writes");
 			return;
 		}
 
@@ -1805,7 +3100,7 @@ namespace robotick
 
 		if (parse_failed)
 		{
-			set_error_response(res, parse_failed_status, parse_failed_error);
+			write_error(parse_failed_status, parse_failed_error);
 			return;
 		}
 
@@ -1831,6 +3126,7 @@ namespace robotick
 				ParsedWrite& parsed = parsed_writes[i];
 				WritableInputField& writable = writable_input_fields[parsed.writable_index];
 				PendingInputWrite& pending = pending_input_writes[parsed.writable_index];
+
 				if (parsed.staged.seq == 0)
 				{
 					const uint64_t next_seq = max(write_seq_counter, pending.seq) + 1;
@@ -1863,43 +3159,52 @@ namespace robotick
 			}
 		}
 
-		set_json_response(res,
-			WebResponseCode::OK,
-			[&](auto& writer)
+		out_status_code = WebResponseCode::OK;
+		json::Writer<json::StringSink> writer(out_json);
+		writer.start_object();
+		writer.key("status");
+		writer.string("processed");
+		writer.key("engine_session_id");
+		writer.string(session_id.c_str());
+		writer.key("writes");
+		writer.start_array();
+		for (size_t i = 0; i < parsed_count; ++i)
+		{
+			const WriteResult& write_result = write_results[i];
+			writer.start_object();
+			writer.key("field_handle");
+			writer.uint64(write_result.field_handle);
+			writer.key("field_path");
+			writer.string(write_result.field_path);
+			writer.key("seq");
+			writer.uint64(write_result.seq);
+			writer.key("status");
+			writer.string(write_result.status);
+			if (write_result.has_latest_seq)
 			{
-				writer.start_object();
-				writer.key("status");
-				writer.string("processed");
-				writer.key("engine_session_id");
-				writer.string(session_id.c_str());
-				writer.key("writes");
-				writer.start_array();
-				for (size_t i = 0; i < parsed_count; ++i)
-				{
-					const WriteResult& write_result = write_results[i];
-					writer.start_object();
-					writer.key("field_handle");
-					writer.uint64(write_result.field_handle);
-					writer.key("field_path");
-					writer.string(write_result.field_path);
-					writer.key("seq");
-					writer.uint64(write_result.seq);
-					writer.key("status");
-					writer.string(write_result.status);
-					if (write_result.has_latest_seq)
-					{
-						writer.key("latest_seq");
-						writer.uint64(write_result.latest_seq);
-					}
-					writer.end_object();
-				}
-				writer.end_array();
-				writer.key("accepted_count");
-				writer.uint64(accepted_count);
-				writer.key("ignored_stale_count");
-				writer.uint64(ignored_stale_count);
-				writer.end_object();
-			});
+				writer.key("latest_seq");
+				writer.uint64(write_result.latest_seq);
+			}
+			writer.end_object();
+		}
+		writer.end_array();
+		writer.key("accepted_count");
+		writer.uint64(accepted_count);
+		writer.key("ignored_stale_count");
+		writer.uint64(ignored_stale_count);
+		writer.end_object();
+		writer.flush();
+	}
+
+	void TelemetryServer::Impl::handle_set_workload_input_fields_data(const WebRequest& req, WebResponse& res)
+	{
+		json::StringSink response_body;
+		int status_code = WebResponseCode::InternalServerError;
+		build_write_response_json(reinterpret_cast<const char*>(req.body.data()), req.body.size(), status_code, response_body);
+
+		res.set_status_code(status_code);
+		res.set_content_type("application/json");
+		res.set_body(response_body.c_str(), response_body.size());
 	}
 
 	static FixedString64 make_dynamic_struct_type_name(const TypeDescriptor& type_desc, const DynamicStructDescriptor& desc, void* data_ptr)

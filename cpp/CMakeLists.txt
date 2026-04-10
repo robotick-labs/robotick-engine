@@ -63,7 +63,7 @@ message(STATUS "ALL_CPP_SOURCES: ${ALL_CPP_SOURCES_COUNT}")
 # Minimal civetweb (added before linking)
 add_library(civetweb STATIC lib/civetweb/src/civetweb.c)
 target_include_directories(civetweb PUBLIC lib/civetweb/include)
-target_compile_definitions(civetweb PRIVATE NO_SSL)
+target_compile_definitions(civetweb PRIVATE NO_SSL USE_WEBSOCKET)
 
 # ============================
 # Shared Library: robotick-engine

@@ -12,9 +12,100 @@
 
 namespace robotick
 {
+	namespace
+	{
+#if defined(CONFIG_HTTPD_WS_SUPPORT)
+		static httpd_ws_type_t map_ws_opcode_to_esp(const int opcode)
+		{
+			switch (opcode)
+			{
+			case 0x1:
+				return HTTPD_WS_TYPE_TEXT;
+			case 0x2:
+				return HTTPD_WS_TYPE_BINARY;
+			case 0x8:
+				return HTTPD_WS_TYPE_CLOSE;
+			case 0x9:
+				return HTTPD_WS_TYPE_PING;
+			case 0xA:
+				return HTTPD_WS_TYPE_PONG;
+			default:
+				return HTTPD_WS_TYPE_BINARY;
+			}
+		}
+
+		static int map_esp_opcode_to_ws(const httpd_ws_type_t type)
+		{
+			switch (type)
+			{
+			case HTTPD_WS_TYPE_TEXT:
+				return 0x1;
+			case HTTPD_WS_TYPE_BINARY:
+				return 0x2;
+			case HTTPD_WS_TYPE_CLOSE:
+				return 0x8;
+			case HTTPD_WS_TYPE_PING:
+				return 0x9;
+			case HTTPD_WS_TYPE_PONG:
+				return 0xA;
+			default:
+				return 0x2;
+			}
+		}
+#endif
+	} // namespace
+
+	bool WebSocketConnection::send_frame(const int opcode, const void* data, const size_t size) const
+	{
+#if defined(CONFIG_HTTPD_WS_SUPPORT)
+		httpd_ws_frame_t frame = {};
+		frame.type = map_ws_opcode_to_esp(opcode);
+		frame.payload = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(data));
+		frame.len = size;
+
+		if (conn)
+		{
+			return httpd_ws_send_frame(static_cast<httpd_req_t*>(conn), &frame) == ESP_OK;
+		}
+		if (server && socket_fd >= 0)
+		{
+			return httpd_ws_send_frame_async(static_cast<httpd_handle_t>(server), socket_fd, &frame) == ESP_OK;
+		}
+#else
+		(void)opcode;
+		(void)data;
+		(void)size;
+#endif
+		return false;
+	}
+
+	bool WebSocketConnection::send_text(const char* text) const
+	{
+		if (!text)
+		{
+			return send_frame(0x1, "", 0);
+		}
+		return send_frame(0x1, text, ::strlen(text));
+	}
+
+	bool WebSocketConnection::send_binary(const void* data, const size_t size) const
+	{
+		return send_frame(0x2, data, size);
+	}
+
 	struct WebServerImpl
 	{
 		httpd_handle_t handle = nullptr;
+#if defined(CONFIG_HTTPD_WS_SUPPORT)
+		struct WsEndpointContext
+		{
+			WebServer* server = nullptr;
+			size_t endpoint_index = 0;
+		};
+		WsEndpointContext ws_contexts[8] = {};
+		httpd_uri_t ws_handlers[8] = {};
+		size_t ws_handler_count = 0;
+#endif
 	};
 
 	namespace
@@ -334,6 +425,91 @@ namespace robotick
 		return ESP_OK;
 	}
 
+#if defined(CONFIG_HTTPD_WS_SUPPORT)
+	static esp_err_t esp32_ws_handler(httpd_req_t* req)
+	{
+		WebServerImpl::WsEndpointContext* context =
+			static_cast<WebServerImpl::WsEndpointContext*>(req->user_ctx);
+		if (!context || !context->server)
+		{
+			return ESP_FAIL;
+		}
+		const auto& endpoints = context->server->get_websocket_endpoints();
+		if (context->endpoint_index >= endpoints.size())
+		{
+			return ESP_FAIL;
+		}
+		const WebSocketEndpoint& endpoint = endpoints[context->endpoint_index];
+
+		WebSocketConnection ws_conn;
+		ws_conn.conn = req;
+		ws_conn.server = req->handle;
+		ws_conn.socket_fd = httpd_req_to_sockfd(req);
+
+		if (req->method == HTTP_GET)
+		{
+			WebRequest ws_req;
+			ws_req.method = "GET";
+			ws_req.uri = req->uri ? req->uri : "";
+
+			if (endpoint.handler.on_connect)
+			{
+				if (!endpoint.handler.on_connect(ws_req, ws_conn))
+				{
+					return ESP_FAIL;
+				}
+			}
+			if (endpoint.handler.on_ready)
+			{
+				endpoint.handler.on_ready(ws_conn);
+			}
+			return ESP_OK;
+		}
+
+		httpd_ws_frame_t frame = {};
+		frame.type = HTTPD_WS_TYPE_TEXT;
+		esp_err_t err = httpd_ws_recv_frame(req, &frame, 0);
+		if (err != ESP_OK)
+		{
+			return err;
+		}
+
+		FixedVector8k payload_buffer;
+		if (frame.len > payload_buffer.capacity())
+		{
+			return ESP_FAIL;
+		}
+		if (frame.len > 0)
+		{
+			payload_buffer.set_size(frame.len);
+			frame.payload = payload_buffer.begin();
+			err = httpd_ws_recv_frame(req, &frame, frame.len);
+			if (err != ESP_OK)
+			{
+				return err;
+			}
+		}
+
+		if (endpoint.handler.on_message)
+		{
+			WebSocketMessage ws_message;
+			ws_message.opcode = map_esp_opcode_to_ws(frame.type);
+			ws_message.data = frame.len > 0 ? payload_buffer.begin() : nullptr;
+			ws_message.size = frame.len;
+			const bool keep_open = endpoint.handler.on_message(ws_conn, ws_message);
+			if (!keep_open)
+			{
+				if (endpoint.handler.on_close)
+				{
+					endpoint.handler.on_close(ws_conn);
+				}
+				return ESP_FAIL;
+			}
+		}
+		return ESP_OK;
+	}
+#endif
+
 	// ----------------------------------------
 	//  WebServer lifecycle
 	// ----------------------------------------
@@ -387,6 +563,40 @@ namespace robotick
 		httpd_register_uri_handler(s->handle, &post_uri);
 		httpd_register_uri_handler(s->handle, &options_uri);
 
+#if defined(CONFIG_HTTPD_WS_SUPPORT)
+		s->ws_handler_count = 0;
+		for (size_t i = 0; i < websocket_endpoints.size(); ++i)
+		{
+			if (s->ws_handler_count >= 8)
+			{
+				ROBOTICK_WARNING("WebServer websocket endpoint capacity exceeded on ESP32; skipping endpoint %zu", i);
+				break;
+			}
+			WebServerImpl::WsEndpointContext& context = s->ws_contexts[s->ws_handler_count];
+			context.server = this;
+			context.endpoint_index = i;
+
+			httpd_uri_t& ws_uri = s->ws_handlers[s->ws_handler_count];
+			ws_uri = {};
+			ws_uri.uri = websocket_endpoints[i].uri.c_str();
+			ws_uri.method = HTTP_GET;
+			ws_uri.handler = esp32_ws_handler;
+			ws_uri.user_ctx = &context;
+			ws_uri.is_websocket = true;
+			ws_uri.handle_ws_control_frames = true;
+
+			const esp_err_t register_err = httpd_register_uri_handler(s->handle, &ws_uri);
+			if (register_err != ESP_OK)
+			{
+				ROBOTICK_WARNING("Failed to register websocket endpoint '%s' (err=%s)",
+					websocket_endpoints[i].uri.c_str(),
+					esp_err_to_name(register_err));
+				continue;
+			}
+			s->ws_handler_count += 1;
+		}
+#endif
+
 		running = true;
 	}
 
@@ -403,6 +613,23 @@ namespace robotick
 		}
 
 		running = false;
+	}
+
+	void WebServer::add_websocket_endpoint(const char* uri, WebSocketHandler ws_handler)
+	{
+		ROBOTICK_ASSERT_MSG(!running, "WebServer websocket endpoints must be added before start()");
+		ROBOTICK_ASSERT_MSG(uri && uri[0] != '\0', "WebServer websocket endpoint uri must not be empty");
+		ROBOTICK_ASSERT_MSG(!websocket_endpoints.full(), "WebServer websocket endpoint capacity exceeded");
+		WebSocketEndpoint endpoint;
+		endpoint.uri = uri;
+		endpoint.handler = ws_handler;
+		websocket_endpoints.add(endpoint);
+	}
+
+	void WebServer::clear_websocket_endpoints()
+	{
+		ROBOTICK_ASSERT_MSG(!running, "WebServer websocket endpoints cannot be cleared while running");
+		websocket_endpoints.clear();
 	}
 
 } // namespace robotick
