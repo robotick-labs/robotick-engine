@@ -59,11 +59,28 @@
 
 #define ROBOTICK_REMOTE_ENGINE_CONNECTION_VERBOSE 0
 
+#ifndef ROBOTICK_REC_DEV_DIAGNOSTICS
+#define ROBOTICK_REC_DEV_DIAGNOSTICS 0
+#endif
+
+#if ROBOTICK_REC_DEV_DIAGNOSTICS
+#define ROBOTICK_REC_DEV_INFO(...) ROBOTICK_INFO(__VA_ARGS__)
+#define ROBOTICK_REC_DEV_WARNING(...) ROBOTICK_WARNING(__VA_ARGS__)
+#define ROBOTICK_REC_DEV_WARNING_ONCE(...) ROBOTICK_WARNING_ONCE(__VA_ARGS__)
+#else
+#define ROBOTICK_REC_DEV_INFO(...) ((void)0)
+#define ROBOTICK_REC_DEV_WARNING(...) ((void)0)
+#define ROBOTICK_REC_DEV_WARNING_ONCE(...) ((void)0)
+#endif
+
 namespace robotick
 {
 	namespace
 	{
-		constexpr float RECONNECT_ATTEMPT_INTERVAL_SEC = 0.01f;
+		constexpr float RECONNECT_ATTEMPT_INTERVAL_SEC = 0.05f;
+		constexpr float RECONNECT_BACKOFF_MIN_SEC = 0.10f;
+		constexpr float RECONNECT_BACKOFF_MAX_SEC = 2.00f;
+		constexpr float RECONNECT_BACKOFF_MULTIPLIER = 2.00f;
 		constexpr size_t MAX_REMOTE_FIELDS = 128;
 
 		template <typename T> inline T rtk_min(const T a, const T b)
@@ -91,14 +108,14 @@ namespace robotick
 		{
 			if (!is_network_stack_ready())
 			{
-				ROBOTICK_WARNING_ONCE("Network stack not ready — skipping socket creation");
+				ROBOTICK_REC_DEV_WARNING_ONCE("Network stack not ready — skipping socket creation");
 				return -1;
 			}
 
 			int fd = socket(AF_INET, SOCK_STREAM, 0);
 			if (fd < 0)
 			{
-				ROBOTICK_WARNING("Failed to create socket: errno=%d (%s)", errno, strerror(errno));
+				ROBOTICK_REC_DEV_WARNING("Failed to create socket: errno=%d (%s)", errno, strerror(errno));
 				return -1;
 			}
 
@@ -107,18 +124,26 @@ namespace robotick
 			// Allow address reuse
 			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
 			{
-				const int err = errno;
+				const int set_opt_error = errno;
 				close(fd);
-				ROBOTICK_WARNING("Failed to set SO_REUSEADDR on socket: errno=%d (%s)", err, strerror(err));
+#if ROBOTICK_REC_DEV_DIAGNOSTICS
+				ROBOTICK_REC_DEV_WARNING("Failed to set SO_REUSEADDR on socket: errno=%d (%s)", set_opt_error, strerror(set_opt_error));
+#else
+				(void)set_opt_error;
+#endif
 				return -1;
 			}
 
 			// Disable Nagle's algorithm (batches up messages) — send every message immediately (essential for real-time control)
 			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0)
 			{
-				const int err = errno;
+				const int set_opt_error = errno;
 				close(fd);
-				ROBOTICK_WARNING("Failed to set TCP_NODELAY on socket: errno=%d (%s)", err, strerror(err));
+#if ROBOTICK_REC_DEV_DIAGNOSTICS
+				ROBOTICK_REC_DEV_WARNING("Failed to set TCP_NODELAY on socket: errno=%d (%s)", set_opt_error, strerror(set_opt_error));
+#else
+				(void)set_opt_error;
+#endif
 				return -1;
 			}
 
@@ -131,6 +156,85 @@ namespace robotick
 
 	} // namespace
 
+	const char* RemoteEngineConnection::get_mode_label() const
+	{
+		return (mode == Mode::Receiver) ? "receiver" : "sender";
+	}
+
+	void RemoteEngineConnection::reset_reconnect_backoff()
+	{
+		reconnect_backoff_sec = RECONNECT_BACKOFF_MIN_SEC;
+		time_sec_to_reconnect = 0.0f;
+	}
+
+	void RemoteEngineConnection::schedule_reconnect_backoff()
+	{
+		if (reconnect_backoff_sec <= 0.0f)
+		{
+			reconnect_backoff_sec = RECONNECT_BACKOFF_MIN_SEC;
+		}
+
+		time_sec_to_reconnect = reconnect_backoff_sec;
+		reconnect_backoff_sec = rtk_min(RECONNECT_BACKOFF_MAX_SEC, reconnect_backoff_sec * RECONNECT_BACKOFF_MULTIPLIER);
+	}
+
+	void RemoteEngineConnection::log_connection_attempt_begin_once()
+	{
+		if (connection_attempt_logged_for_current_outage)
+		{
+			return;
+		}
+
+		connection_attempt_logged_for_current_outage = true;
+
+		if (mode == Mode::Sender)
+		{
+			ROBOTICK_INFO(
+				"[REC::health] [%s %s -> %s] connection attempt started", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+		}
+		else
+		{
+			ROBOTICK_INFO("[REC::health] [%s %s] connection attempt started", get_mode_label(), my_model_name.c_str());
+		}
+
+		test_health_lifecycle_stats_.attempt_begin_count += 1;
+	}
+
+	void RemoteEngineConnection::log_connection_became_healthy()
+	{
+		connection_attempt_logged_for_current_outage = false;
+		reset_reconnect_backoff();
+
+		if (mode == Mode::Sender)
+		{
+			ROBOTICK_INFO("[REC::health] [%s %s -> %s] connection healthy", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+		}
+		else
+		{
+			ROBOTICK_INFO("[REC::health] [%s %s] connection healthy", get_mode_label(), my_model_name.c_str());
+		}
+
+		test_health_lifecycle_stats_.healthy_transition_count += 1;
+	}
+
+	void RemoteEngineConnection::log_connection_became_unhealthy()
+	{
+		// Re-arm one-shot "attempt started" reporting for this new unhealthy period.
+		connection_attempt_logged_for_current_outage = false;
+
+		if (mode == Mode::Sender)
+		{
+			ROBOTICK_INFO(
+				"[REC::health] [%s %s -> %s] connection unhealthy (will retry)", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+		}
+		else
+		{
+			ROBOTICK_INFO("[REC::health] [%s %s] connection unhealthy (will retry)", get_mode_label(), my_model_name.c_str());
+		}
+
+		test_health_lifecycle_stats_.unhealthy_transition_count += 1;
+	}
+
 	void RemoteEngineConnection::set_state(const State target_state)
 	{
 		if (state == target_state)
@@ -138,34 +242,46 @@ namespace robotick
 			return; // already in desired state
 		}
 
+		const State previous_state = state;
 		state = target_state;
 
+		const bool transitioned_to_healthy = (previous_state != State::ReadyForFields) && (state == State::ReadyForFields);
+		const bool transitioned_to_unhealthy = (previous_state == State::ReadyForFields) && (state != State::ReadyForFields);
+
+		if (transitioned_to_healthy)
+		{
+			log_connection_became_healthy();
+		}
+		else if (transitioned_to_unhealthy)
+		{
+			log_connection_became_unhealthy();
+		}
+
+#if ROBOTICK_REC_DEV_DIAGNOSTICS
 		const bool is_receiver = (mode == Mode::Receiver);
 		const char* mode_str = is_receiver ? "Receiver" : "Sender";
 		const char* color_start = is_receiver ? "\033[33m" : "\033[32m"; // yellow : green
 		const char* color_end = "\033[0m";
 
-		// Pushing all log output + colorization through this gate keeps every transition auditable; callers simply request
-		// the new state and let the centralized logger/TCP cleanup run.  That in turn makes RAII cleanup (close sockets on stop)
-		// far easier to reason about.
 		if (state == State::Disconnected)
 		{
-			ROBOTICK_INFO("%s[%s] [-> State::Disconnected] - disconnected%s", color_start, mode_str, color_end);
+			ROBOTICK_REC_DEV_INFO("%s[%s] [-> State::Disconnected] - disconnected%s", color_start, mode_str, color_end);
 		}
 		else if (state == State::ReadyForHandshake)
 		{
-			ROBOTICK_INFO(
+			ROBOTICK_REC_DEV_INFO(
 				"%s[%s] [-> State::ReadyForHandshake] - socket-connection established, ready for handshake%s", color_start, mode_str, color_end);
 		}
 		else if (state == State::ReadyForFields)
 		{
 			const char* field_data_str = is_receiver ? "receive" : "send";
-			ROBOTICK_INFO("%s[%s] [-> State::ReadyForFields] - ready to %s fields-data!%s", color_start, mode_str, field_data_str, color_end);
+			ROBOTICK_REC_DEV_INFO("%s[%s] [-> State::ReadyForFields] - ready to %s fields-data!%s", color_start, mode_str, field_data_str, color_end);
 		}
 		else
 		{
 			ROBOTICK_FATAL_EXIT("[%s] - unknown state %i", mode_str, static_cast<int>(state));
 		}
+#endif
 	}
 
 	void RemoteEngineConnection::configure_sender(
@@ -176,6 +292,8 @@ namespace robotick
 		target_model_name = in_target_model_name;
 		remote_ip = in_remote_ip;
 		remote_port = in_remote_port;
+		reset_reconnect_backoff();
+		connection_attempt_logged_for_current_outage = false;
 
 		set_state(State::Disconnected);
 	}
@@ -192,6 +310,8 @@ namespace robotick
 		my_model_name = in_my_model_name;
 		target_model_name = ""; // receivers don't target
 		listen_port = 0;		// we'll bind(0) and discover the port
+		reset_reconnect_backoff();
+		connection_attempt_logged_for_current_outage = false;
 
 		set_state(State::Disconnected);
 	}
@@ -225,6 +345,8 @@ namespace robotick
 				return;
 			}
 
+			log_connection_attempt_begin_once();
+
 			// Connection state machine deliberately tears down and recreates sockets per transition.  Rebinding avoids
 			// reusing half-closed FDs and guarantees both sender/receiver restart cleanly after network failures.
 			if (mode == Mode::Sender)
@@ -238,8 +360,11 @@ namespace robotick
 
 			if (state == State::Disconnected)
 			{
-				// still disconnected - try again in a bit
-				time_sec_to_reconnect = RECONNECT_ATTEMPT_INTERVAL_SEC;
+				// still disconnected - if no failure path scheduled a backoff, use the short default poll cadence.
+				if (time_sec_to_reconnect <= 0.0f)
+				{
+					time_sec_to_reconnect = RECONNECT_ATTEMPT_INTERVAL_SEC;
+				}
 				return;
 			}
 			// else have an initial go at the below (fall-through)
@@ -326,9 +451,10 @@ namespace robotick
 
 		if (inet_pton(AF_INET, remote_ip.c_str(), &addr.sin_addr) != 1)
 		{
-			ROBOTICK_WARNING_ONCE("Invalid IP address: %s", remote_ip.c_str());
+			ROBOTICK_REC_DEV_WARNING_ONCE("Invalid IP address: %s", remote_ip.c_str());
 			close(socket_fd);
 			socket_fd = -1;
+			schedule_reconnect_backoff();
 			return;
 		}
 
@@ -336,9 +462,10 @@ namespace robotick
 		{
 			if (errno != EINPROGRESS)
 			{
-				ROBOTICK_WARNING("Failed to connect to %s:%d", remote_ip.c_str(), remote_port);
+				ROBOTICK_REC_DEV_WARNING("Failed to connect to %s:%d", remote_ip.c_str(), remote_port);
 				close(socket_fd);
 				socket_fd = -1;
+				schedule_reconnect_backoff();
 				return;
 			}
 		}
@@ -372,9 +499,10 @@ namespace robotick
 
 			if (bind(socket_fd, (sockaddr*)&addr, sizeof(addr)) < 0)
 			{
-				ROBOTICK_WARNING("Failed to bind socket");
+				ROBOTICK_REC_DEV_WARNING("Failed to bind socket");
 				close(socket_fd);
 				socket_fd = -1;
+				schedule_reconnect_backoff();
 				return;
 			}
 
@@ -384,18 +512,19 @@ namespace robotick
 			if (getsockname(socket_fd, (sockaddr*)&bound_addr, &addr_len) == 0)
 			{
 				listen_port = ntohs(bound_addr.sin_port);
-				ROBOTICK_INFO("Receiver [%s] listening on port %d", my_model_name.c_str(), listen_port);
+				ROBOTICK_REC_DEV_INFO("Receiver [%s] listening on port %d", my_model_name.c_str(), listen_port);
 			}
 			else
 			{
-				ROBOTICK_WARNING("Failed to get bound port");
+				ROBOTICK_REC_DEV_WARNING("Failed to get bound port");
 			}
 
 			if (listen(socket_fd, 1) < 0)
 			{
-				ROBOTICK_WARNING("Failed to listen on socket");
+				ROBOTICK_REC_DEV_WARNING("Failed to listen on socket");
 				close(socket_fd);
 				socket_fd = -1;
+				schedule_reconnect_backoff();
 				return;
 			}
 
@@ -409,7 +538,7 @@ namespace robotick
 		if (client_fd < 0)
 		{
 			if (errno != EAGAIN && errno != EWOULDBLOCK)
-				ROBOTICK_WARNING("Accept failed: errno=%d", errno);
+				ROBOTICK_REC_DEV_WARNING("Accept failed: errno=%d", errno);
 			return;
 		}
 
@@ -419,7 +548,7 @@ namespace robotick
 		close(socket_fd);
 		socket_fd = client_fd;
 
-		ROBOTICK_INFO("Receiver [%s] accepted connection on port %d", my_model_name.c_str(), listen_port);
+		ROBOTICK_REC_DEV_INFO("Receiver [%s] accepted connection on port %d", my_model_name.c_str(), listen_port);
 
 		set_state(State::ReadyForHandshake);
 	}
@@ -474,7 +603,6 @@ namespace robotick
 			const size_t separator_count = (field_count > 0) ? (field_count - 1) : 0;
 			handshake_payload_capacity = sizeof(uint32_t) + handshake_path_total_length + separator_count;
 		}
-
 	}
 
 	size_t RemoteEngineConnection::write_handshake_payload(uint32_t tick_rate_net, size_t offset, uint8_t* dst, size_t max_len) const
@@ -623,7 +751,7 @@ namespace robotick
 			const InProgressMessage::Result r = in_progress_message_out.tick(socket_fd);
 			if (r == InProgressMessage::Result::ConnectionLost)
 			{
-				ROBOTICK_WARNING("Connection lost sending handshake from Sender");
+				ROBOTICK_REC_DEV_WARNING("Connection lost sending handshake from Sender");
 				disconnect();
 				return;
 			}
@@ -684,7 +812,7 @@ namespace robotick
 					Field field;
 					if (!binder(handshake_receive_state.current_path.c_str(), field))
 					{
-						ROBOTICK_WARNING("Failed to bind field: %s", handshake_receive_state.current_path.c_str());
+						ROBOTICK_REC_DEV_WARNING("Failed to bind field: %s", handshake_receive_state.current_path.c_str());
 						handshake_receive_state.failed_count++;
 					}
 					else
@@ -771,7 +899,7 @@ namespace robotick
 				Field field;
 				if (!binder(handshake_receive_state.current_path.c_str(), field))
 				{
-					ROBOTICK_WARNING("Failed to bind field: %s", handshake_receive_state.current_path.c_str());
+					ROBOTICK_REC_DEV_WARNING("Failed to bind field: %s", handshake_receive_state.current_path.c_str());
 					handshake_receive_state.failed_count++;
 				}
 				else
@@ -885,7 +1013,7 @@ namespace robotick
 			const InProgressMessage::Result tick_result = in_progress_message_out.tick(socket_fd);
 			if (tick_result == InProgressMessage::Result::ConnectionLost)
 			{
-				ROBOTICK_WARNING("Connection lost sending field-request from Receiver");
+				ROBOTICK_REC_DEV_WARNING("Connection lost sending field-request from Receiver");
 				disconnect();
 				return;
 			}
@@ -934,7 +1062,7 @@ namespace robotick
 			const InProgressMessage::Result tick_result = in_progress_message_in.tick(socket_fd);
 			if (tick_result == InProgressMessage::Result::ConnectionLost)
 			{
-				ROBOTICK_WARNING("Connection lost receiving field-request from Receiver");
+				ROBOTICK_REC_DEV_WARNING("Connection lost receiving field-request from Receiver");
 				disconnect();
 				return false;
 			}
@@ -950,7 +1078,7 @@ namespace robotick
 
 			if (fields_request_receive_state.tick_rate_bytes_received < sizeof(uint32_t))
 			{
-				ROBOTICK_WARNING("FieldsRequest missing mutual tick rate payload");
+				ROBOTICK_REC_DEV_WARNING("FieldsRequest missing mutual tick rate payload");
 				received_mutual_tick_rate_hz = 0.0f;
 			}
 
@@ -962,7 +1090,7 @@ namespace robotick
 			}
 			else
 			{
-				ROBOTICK_WARNING("Invalid mutual tick rate received");
+				ROBOTICK_REC_DEV_WARNING("Invalid mutual tick rate received");
 			}
 
 			in_progress_message_in.vacate(); // vacate ready for next user
@@ -991,7 +1119,7 @@ namespace robotick
 			const InProgressMessage::Result tick_result = in_progress_message_out.tick(socket_fd);
 			if (tick_result == InProgressMessage::Result::ConnectionLost)
 			{
-				ROBOTICK_WARNING("Connection lost sending field-data from Sender");
+				ROBOTICK_REC_DEV_WARNING("Connection lost sending field-data from Sender");
 				disconnect();
 				return;
 			}
@@ -1058,7 +1186,7 @@ namespace robotick
 			const InProgressMessage::Result tick_result = in_progress_message_in.tick(socket_fd);
 			if (tick_result == InProgressMessage::Result::ConnectionLost)
 			{
-				ROBOTICK_WARNING("Connection lost receiving field-data from Sender");
+				ROBOTICK_REC_DEV_WARNING("Connection lost receiving field-data from Sender");
 				disconnect();
 				return false;
 			}
@@ -1130,7 +1258,14 @@ namespace robotick
 			close(socket_fd);
 		socket_fd = -1;
 
-		time_sec_to_reconnect = RECONNECT_ATTEMPT_INTERVAL_SEC;
+		if (state != State::Disconnected)
+		{
+			schedule_reconnect_backoff();
+		}
+		else if (time_sec_to_reconnect <= 0.0f)
+		{
+			time_sec_to_reconnect = RECONNECT_ATTEMPT_INTERVAL_SEC;
+		}
 
 		if (mode == Mode::Receiver)
 		{

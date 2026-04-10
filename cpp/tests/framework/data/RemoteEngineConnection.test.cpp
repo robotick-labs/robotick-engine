@@ -526,14 +526,38 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 
 		REQUIRE(recv_value == target_value);
 
+#if defined(ROBOTICK_TEST_MODE)
+		const auto stats_before_drop = sender.test_health_lifecycle_stats();
+#endif
+
 		ROBOTICK_INFO("Disconnecting...");
 
 		sender.disconnect();
 		Thread::sleep_ms(50);
 
+#if defined(ROBOTICK_TEST_MODE)
+		{
+			const auto stats_after_disconnect = sender.test_health_lifecycle_stats();
+			REQUIRE(stats_after_disconnect.unhealthy_transition_count == stats_before_drop.unhealthy_transition_count + 1);
+		}
+#endif
+
+		// Keep receiver idle briefly so sender remains unhealthy and retries;
+		// verify lifecycle attempt logging stays edge-triggered (no per-tick growth).
+		for (int i = 0; i < 20; ++i)
+		{
+			sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			Thread::sleep_ms(10);
+		}
+
+#if defined(ROBOTICK_TEST_MODE)
+		const auto stats_after_unhealthy_window = sender.test_health_lifecycle_stats();
+		REQUIRE(stats_after_unhealthy_window.attempt_begin_count == stats_before_drop.attempt_begin_count + 1);
+		REQUIRE(stats_after_unhealthy_window.unhealthy_transition_count == stats_before_drop.unhealthy_transition_count + 1);
+#endif
+
 		// Reconnect
 		send_value = target_value_later;
-		sender.tick(robotick::TICK_INFO_FIRST_100MS_10HZ); // allow reconnect
 
 		for (int i = 0; i < 50; ++i)
 		{
@@ -545,6 +569,12 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		}
 
 		REQUIRE(recv_value == target_value_later);
+
+#if defined(ROBOTICK_TEST_MODE)
+		const auto stats_after_recovery = sender.test_health_lifecycle_stats();
+		REQUIRE(stats_after_recovery.healthy_transition_count >= stats_before_drop.healthy_transition_count + 1);
+		REQUIRE(stats_after_recovery.attempt_begin_count == stats_after_unhealthy_window.attempt_begin_count);
+#endif
 	}
 
 	SECTION("Field updates on same connection", "[RemoteEngineConnection]")
