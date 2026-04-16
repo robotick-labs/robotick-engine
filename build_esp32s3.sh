@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE="${ESP32_IDF_IMAGE:-espressif/idf:release-v5.4}"
+IMAGE="${ESP32_IDF_IMAGE:-ghcr.io/robotick-labs/robotick-idf5.4-esp32:latest}"
 DOCKER_RUN_OPTS=(--rm --user root -v "${ROOT_DIR}:/workspace" -w /workspace)
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -21,12 +21,6 @@ set -Eeuo pipefail
 export TERM=xterm-256color
 set -x
 cd tools/esp32-compile-check
-if ! command -v ninja >/dev/null 2>&1; then
-  DEBIAN_FRONTEND=noninteractive apt-get update -yq
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ninja-build ccache
-  apt-get clean
-  rm -rf /var/lib/apt/lists/*
-fi
 bash /workspace/tools/make_esp32_symlinks.sh
 ./1_idf_clean.sh
 ./2_idf_build.sh

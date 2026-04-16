@@ -9,8 +9,8 @@ if [[ -z "$REPO_ROOT" ]]; then
     exit 1
 fi
 
-IMAGE_NAME="robotick-engine-esp32s3"
-DOCKERFILE="$SCRIPT_DIR/docker/esp32s3.Dockerfile"
+IMAGE_NAME="robotick-idf5.4-esp32:local"
+DOCKERFILE="$SCRIPT_DIR/docker/robotick-idf5.4-esp32.Dockerfile"
 CONTAINER_NAME="robotick-engine-dev-esp32s3"
 
 echo "🐳 Building image: $IMAGE_NAME"

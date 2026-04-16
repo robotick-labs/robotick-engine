@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE="robotick-engine-ci-linux-arm64"
-DOCKERFILE="${ROOT_DIR}/tools/docker/linux-arm64.Dockerfile"
+IMAGE="robotick-debian12-cross-linux-arm64:local"
+DOCKERFILE="${ROOT_DIR}/tools/docker/robotick-debian12-cross-linux-arm64.Dockerfile"
 CONFIG_PRESET="robotick-engine-linux-arm64"
 
 if ! command -v docker >/dev/null 2>&1; then
