@@ -2,23 +2,23 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE="${ROBOTICK_LINUX_ARM32_IMAGE:-ghcr.io/robotick-labs/robotick-debian12-cross-linux-arm32:latest}"
-CONFIG_PRESET="robotick-engine-linux-arm32"
+IMAGE="${ROBOTICK_NATIVE_LINUX_IMAGE:-ghcr.io/robotick-labs/robotick-ubuntu24.04-native-linux:latest}"
+CONFIG_PRESET="robotick-engine-tests-linux-release"
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "[build_linux_arm32] docker command not found." >&2
+  echo "[build_linux_release] docker command not found." >&2
   exit 1
 fi
 
 if [[ "${IMAGE}" == *":latest" ]]; then
-  echo "[build_linux_arm32] Refreshing Docker image ${IMAGE}..."
+  echo "[build_linux_release] Refreshing Docker image ${IMAGE}..."
   docker pull "${IMAGE}"
 elif ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
-  echo "[build_linux_arm32] Pulling Docker image ${IMAGE}..."
+  echo "[build_linux_release] Pulling Docker image ${IMAGE}..."
   docker pull "${IMAGE}"
 fi
 
-echo "[build_linux_arm32] Configuring and building preset '${CONFIG_PRESET}'..."
+echo "[build_linux_release] Configuring and building preset '${CONFIG_PRESET}' inside ${IMAGE}..."
 docker run --rm --init \
   --user "$(id -u):$(id -g)" \
   -e HOME=/tmp \
@@ -33,4 +33,4 @@ docker run --rm --init \
     cmake --build --preset ${CONFIG_PRESET} -j\$(nproc)
   "
 
-echo "[build_linux_arm32] ✅ Linux ARM32 cross-build complete."
+echo "[build_linux_release] ✅ Linux release build complete."

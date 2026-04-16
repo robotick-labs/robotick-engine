@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+IMAGE_NAME="robotick-idf5.4-esp32"
+LOCAL_TAG="${IMAGE_NAME}:local"
+DOCKERFILE="${SCRIPT_DIR}/robotick-idf5.4-esp32.Dockerfile"
+
+echo "Building ${LOCAL_TAG} from ${DOCKERFILE}"
+docker build \
+  -t "${LOCAL_TAG}" \
+  -f "${DOCKERFILE}" \
+  "${SCRIPT_DIR}"
+
+echo "Built ${LOCAL_TAG}"

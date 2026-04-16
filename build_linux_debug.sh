@@ -2,21 +2,36 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$ROOT_DIR"
-
+IMAGE="${ROBOTICK_NATIVE_LINUX_IMAGE:-ghcr.io/robotick-labs/robotick-ubuntu24.04-native-linux:latest}"
 CONFIG_PRESET="robotick-engine-tests-linux-debug"
 
-if [ ! -d ".cmake" ]; then
-  mkdir -p .cmake >/dev/null 2>&1 || true
+if ! command -v docker >/dev/null 2>&1; then
+  echo "[build_linux_debug] docker command not found." >&2
+  exit 1
 fi
 
-echo "[build_linux_debug] Configuring CMake preset '${CONFIG_PRESET}'..."
-cmake --preset "${CONFIG_PRESET}"
+if [[ "${IMAGE}" == *":latest" ]]; then
+  echo "[build_linux_debug] Refreshing Docker image ${IMAGE}..."
+  docker pull "${IMAGE}"
+elif ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
+  echo "[build_linux_debug] Pulling Docker image ${IMAGE}..."
+  docker pull "${IMAGE}"
+fi
 
-echo "[build_linux_debug] Building preset '${CONFIG_PRESET}'..."
-cmake --build --preset "${CONFIG_PRESET}" -j"$(nproc)"
-
-echo "[build_linux_debug] Running unit tests (5s timeout)..."
-ctest --test-dir "build/${CONFIG_PRESET}/cpp/tests" --output-on-failure --timeout 5 --fail-if-no-tests -j"$(nproc)"
+echo "[build_linux_debug] Configuring, building, and testing preset '${CONFIG_PRESET}' inside ${IMAGE}..."
+docker run --rm --init \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp \
+  -v "${ROOT_DIR}:/workspace" \
+  -w /workspace \
+  "${IMAGE}" \
+  bash -lc "
+    set -Eeuo pipefail
+    mkdir -p .cmake
+    rm -rf build/${CONFIG_PRESET}
+    cmake --preset ${CONFIG_PRESET}
+    cmake --build --preset ${CONFIG_PRESET} -j\$(nproc)
+    ctest --test-dir build/${CONFIG_PRESET}/cpp/tests --output-on-failure --timeout 5 --fail-if-no-tests -j\$(nproc)
+  "
 
 echo "[build_linux_debug] ✅ Linux debug build + tests complete."
