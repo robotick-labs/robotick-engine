@@ -88,6 +88,17 @@ namespace robotick
 		[[nodiscard]] bool is_ready() const; // we have finished our handshake and ready for field-data exchange through out tick() method
 		[[nodiscard]] uint16_t get_listen_port() const { return listen_port; }
 
+#if defined(ROBOTICK_TEST_MODE)
+		struct TestHealthLifecycleStats
+		{
+			uint32_t attempt_begin_count = 0;
+			uint32_t healthy_transition_count = 0;
+			uint32_t unhealthy_transition_count = 0;
+		};
+
+		[[nodiscard]] const TestHealthLifecycleStats& test_health_lifecycle_stats() const { return test_health_lifecycle_stats_; }
+#endif
+
 	  private:
 		[[nodiscard]] State get_state() const { return state; };
 		void set_state(const State state);
@@ -108,6 +119,12 @@ namespace robotick
 		void tick_send_fields_as_message(const bool allow_start_new);
 		bool tick_receive_fields_as_message();
 		void add_field(const Field& field, bool update_handshake_stats);
+		void log_connection_attempt_begin_once();
+		void log_connection_became_healthy();
+		void log_connection_became_unhealthy();
+		void schedule_reconnect_backoff();
+		void reset_reconnect_backoff();
+		[[nodiscard]] const char* get_mode_label() const;
 
 	  private:
 		// things we set up once on startup:
@@ -139,6 +156,8 @@ namespace robotick
 		State state = State::Disconnected;
 		int socket_fd = -1;
 		float time_sec_to_reconnect = 0.0f;
+		float reconnect_backoff_sec = 0.0f;
+		bool connection_attempt_logged_for_current_outage = false;
 
 		float mutual_tick_rate_hz = 0.0f; // gets set to minimum of receiver and sender engine's root tick-rate, on handshake
 		uint64_t ticks_until_next_send = 1;
@@ -176,6 +195,10 @@ namespace robotick
 			size_t tick_rate_bytes_received = 0;
 			float tick_rate_hz = 0.0f;
 		} fields_request_receive_state;
+
+#if defined(ROBOTICK_TEST_MODE)
+		TestHealthLifecycleStats test_health_lifecycle_stats_;
+#endif
 	};
 
 } // namespace robotick

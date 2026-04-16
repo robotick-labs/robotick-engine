@@ -63,7 +63,7 @@ message(STATUS "ALL_CPP_SOURCES: ${ALL_CPP_SOURCES_COUNT}")
 # Minimal civetweb (added before linking)
 add_library(civetweb STATIC lib/civetweb/src/civetweb.c)
 target_include_directories(civetweb PUBLIC lib/civetweb/include)
-target_compile_definitions(civetweb PRIVATE NO_SSL)
+target_compile_definitions(civetweb PRIVATE NO_SSL USE_WEBSOCKET)
 
 # ============================
 # Shared Library: robotick-engine
@@ -132,6 +132,13 @@ add_dependencies(robotick-engine-static code_policy_check)
 
 if (ROBOTICK_BUILD_TESTS)
     message(STATUS "ROBOTICK_BUILD_TESTS - ON")
+
+    # Keep library and test translation units on the same ABI when test-only
+    # members are compiled into public headers.
+    target_compile_definitions(robotick-engine PRIVATE ROBOTICK_TEST_MODE=1)
+    target_compile_definitions(robotick-engine-static PRIVATE ROBOTICK_TEST_MODE=1)
+    target_compile_options(robotick-engine PRIVATE -fexceptions)
+    target_compile_options(robotick-engine-static PRIVATE -fexceptions)
 
     enable_testing()
     add_subdirectory(tests)

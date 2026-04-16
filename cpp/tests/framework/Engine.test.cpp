@@ -7,6 +7,7 @@
 #include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Thread.h"
 #include "robotick/framework/containers/DynamicStructStorageVector.h"
+#include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/data/TelemetryServer.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
@@ -20,6 +21,8 @@
 #include <curl/curl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 namespace robotick::test
 {
@@ -159,6 +162,394 @@ namespace robotick::test
 			EngineRunContext context{};
 			Thread thread;
 		};
+
+		struct WsFrame
+		{
+			uint8_t opcode = 0;
+			HeapVector<uint8_t> payload;
+			size_t payload_size = 0;
+
+			void clear()
+			{
+				opcode = 0;
+				payload.reset();
+				payload_size = 0;
+			}
+		};
+
+		class WsTestClient
+		{
+		  public:
+			~WsTestClient() { disconnect(); }
+
+			bool connect(const char* host, uint16_t port, const char* path)
+			{
+				if (!host || !path)
+				{
+					return false;
+				}
+
+				sock = ::socket(AF_INET, SOCK_STREAM, 0);
+				if (sock < 0)
+				{
+					return false;
+				}
+
+				timeval timeout{};
+				timeout.tv_sec = 0;
+				timeout.tv_usec = 200000;
+				::setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+				::setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+
+				sockaddr_in addr{};
+				addr.sin_family = AF_INET;
+				addr.sin_port = htons(port);
+				if (::inet_pton(AF_INET, host, &addr.sin_addr) != 1)
+				{
+					disconnect();
+					return false;
+				}
+				if (::connect(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
+				{
+					disconnect();
+					return false;
+				}
+
+				char request[1024];
+				::snprintf(request,
+					sizeof(request),
+					"GET %s HTTP/1.1\r\n"
+					"Host: %s:%u\r\n"
+					"Upgrade: websocket\r\n"
+					"Connection: Upgrade\r\n"
+					"Sec-WebSocket-Version: 13\r\n"
+					"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+					"\r\n",
+					path,
+					host,
+					static_cast<unsigned>(port));
+				if (!send_all(reinterpret_cast<const uint8_t*>(request), ::strlen(request)))
+				{
+					disconnect();
+					return false;
+				}
+
+				char response[2048] = {};
+				size_t response_len = 0;
+				while (response_len + 1 < sizeof(response))
+				{
+					char ch = '\0';
+					const ssize_t n = ::recv(sock, &ch, 1, 0);
+					if (n <= 0)
+					{
+						disconnect();
+						return false;
+					}
+					response[response_len++] = ch;
+					response[response_len] = '\0';
+					if (::strstr(response, "\r\n\r\n") != nullptr)
+					{
+						break;
+					}
+				}
+
+				if (::strstr(response, " 101 ") == nullptr || ::strstr(response, "Sec-WebSocket-Accept:") == nullptr)
+				{
+					disconnect();
+					return false;
+				}
+				return true;
+			}
+
+			void disconnect()
+			{
+				if (sock >= 0)
+				{
+					::close(sock);
+					sock = -1;
+				}
+			}
+
+			bool send_text(const char* text)
+			{
+				const char* payload_text = text ? text : "";
+				const size_t payload_len = ::strlen(payload_text);
+				if (payload_len > 0xFFFF)
+					return false;
+				const size_t extended_len_bytes = payload_len <= 125 ? 0 : 2;
+				const size_t frame_size = 2 + extended_len_bytes + 4 + payload_len;
+
+				HeapVector<uint8_t> frame;
+				frame.initialize(frame_size);
+				size_t at = 0;
+				frame[at++] = static_cast<uint8_t>(0x80 | 0x1);
+				if (payload_len <= 125)
+				{
+					frame[at++] = static_cast<uint8_t>(0x80 | payload_len);
+				}
+				else
+				{
+					frame[at++] = static_cast<uint8_t>(0x80 | 126);
+					frame[at++] = static_cast<uint8_t>((payload_len >> 8) & 0xFF);
+					frame[at++] = static_cast<uint8_t>(payload_len & 0xFF);
+				}
+
+				const uint8_t mask[4] = {0x12, 0x34, 0x56, 0x78};
+				frame[at++] = mask[0];
+				frame[at++] = mask[1];
+				frame[at++] = mask[2];
+				frame[at++] = mask[3];
+				for (size_t i = 0; i < payload_len; ++i)
+				{
+					frame[at++] = static_cast<uint8_t>(payload_text[i]) ^ mask[i % 4];
+				}
+				return send_all(frame.data(), at);
+			}
+
+			bool send_pong(const uint8_t* payload, size_t payload_len)
+			{
+				if (payload_len > 125)
+				{
+					return false;
+				}
+
+				HeapVector<uint8_t> frame;
+				frame.initialize(payload_len + 6);
+				size_t at = 0;
+				frame[at++] = static_cast<uint8_t>(0x80 | 0xA);
+				frame[at++] = static_cast<uint8_t>(0x80 | payload_len);
+				const uint8_t mask[4] = {0x21, 0x43, 0x65, 0x87};
+				frame[at++] = mask[0];
+				frame[at++] = mask[1];
+				frame[at++] = mask[2];
+				frame[at++] = mask[3];
+				for (size_t i = 0; i < payload_len; ++i)
+				{
+					const uint8_t value = payload ? payload[i] : 0;
+					frame[at++] = value ^ mask[i % 4];
+				}
+				return send_all(frame.data(), at);
+			}
+
+			bool receive_frame(WsFrame& out_frame)
+			{
+				out_frame.clear();
+				uint8_t header[2] = {};
+				if (!recv_exact(header, sizeof(header)))
+				{
+					return false;
+				}
+
+				out_frame.opcode = static_cast<uint8_t>(header[0] & 0x0F);
+				const bool masked = (header[1] & 0x80) != 0;
+				uint64_t payload_len = static_cast<uint64_t>(header[1] & 0x7F);
+
+				if (payload_len == 126)
+				{
+					uint8_t ext[2] = {};
+					if (!recv_exact(ext, sizeof(ext)))
+					{
+						return false;
+					}
+					payload_len = (static_cast<uint64_t>(ext[0]) << 8) | static_cast<uint64_t>(ext[1]);
+				}
+				else if (payload_len == 127)
+				{
+					uint8_t ext[8] = {};
+					if (!recv_exact(ext, sizeof(ext)))
+					{
+						return false;
+					}
+					payload_len = 0;
+					for (size_t i = 0; i < sizeof(ext); ++i)
+					{
+						payload_len = (payload_len << 8) | static_cast<uint64_t>(ext[i]);
+					}
+				}
+
+				if (payload_len > (8U * 1024U * 1024U))
+				{
+					return false;
+				}
+
+				uint8_t mask[4] = {};
+				if (masked)
+				{
+					if (!recv_exact(mask, sizeof(mask)))
+					{
+						return false;
+					}
+				}
+
+				out_frame.payload_size = static_cast<size_t>(payload_len);
+				if (out_frame.payload_size > 0)
+				{
+					out_frame.payload.initialize(out_frame.payload_size);
+					if (!recv_exact(out_frame.payload.data(), out_frame.payload_size))
+					{
+						return false;
+					}
+				}
+
+				if (masked)
+				{
+					for (size_t i = 0; i < out_frame.payload_size; ++i)
+					{
+						out_frame.payload[i] ^= mask[i % 4];
+					}
+				}
+				return true;
+			}
+
+		  private:
+			bool send_all(const uint8_t* data, size_t size)
+			{
+				size_t sent = 0;
+				while (sent < size)
+				{
+					const ssize_t n = ::send(sock, data + sent, size - sent, 0);
+					if (n <= 0)
+					{
+						return false;
+					}
+					sent += static_cast<size_t>(n);
+				}
+				return true;
+			}
+
+			bool recv_exact(void* data, size_t size)
+			{
+				uint8_t* out = static_cast<uint8_t*>(data);
+				size_t received = 0;
+				while (received < size)
+				{
+					const ssize_t n = ::recv(sock, out + received, size - received, 0);
+					if (n <= 0)
+					{
+						return false;
+					}
+					received += static_cast<size_t>(n);
+				}
+				return true;
+			}
+
+			int sock = -1;
+		};
+
+		bool read_ws_application_frame(WsTestClient& client, WsFrame& out_frame, int max_attempts = 16)
+		{
+			for (int attempt = 0; attempt < max_attempts; ++attempt)
+			{
+				if (!client.receive_frame(out_frame))
+				{
+					return false;
+				}
+				if (out_frame.opcode == 0x9)
+				{
+					if (!client.send_pong(out_frame.payload_size > 0 ? out_frame.payload.data() : nullptr, out_frame.payload_size))
+					{
+						return false;
+					}
+					continue;
+				}
+				if (out_frame.opcode == 0xA)
+				{
+					continue;
+				}
+				if (out_frame.opcode == 0x8)
+				{
+					return false;
+				}
+				return true;
+			}
+			return false;
+		}
+
+		bool frame_to_text(const WsFrame& frame, HeapVector<char>& out_text)
+		{
+			if (frame.opcode != 0x1)
+			{
+				return false;
+			}
+			out_text.reset();
+			out_text.initialize(frame.payload_size + 1);
+			if (frame.payload_size > 0)
+			{
+				::memcpy(out_text.data(), frame.payload.data(), frame.payload_size);
+			}
+			out_text[frame.payload_size] = '\0';
+			return true;
+		}
+
+		bool wait_for_ws_text_message(WsTestClient& client, HeapVector<char>& out_text, int max_frames = 32)
+		{
+			WsFrame frame;
+			for (int i = 0; i < max_frames; ++i)
+			{
+				if (!read_ws_application_frame(client, frame))
+				{
+					return false;
+				}
+				if (frame_to_text(frame, out_text))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		bool wait_for_ws_frame_metadata_and_payload(
+			WsTestClient& client,
+			json::Document& metadata_doc,
+			size_t& payload_size,
+			int max_frames = 48)
+		{
+			WsFrame frame;
+			HeapVector<char> text;
+			bool saw_metadata = false;
+			size_t expected_payload_size = 0;
+			payload_size = 0;
+
+			for (int i = 0; i < max_frames; ++i)
+			{
+				if (!read_ws_application_frame(client, frame))
+				{
+					return false;
+				}
+
+				if (!saw_metadata)
+				{
+					if (frame.opcode != 0x1)
+					{
+						continue;
+					}
+					if (!frame_to_text(frame, text))
+					{
+						continue;
+					}
+					if (!metadata_doc.parse(text.data()))
+					{
+						continue;
+					}
+					const json::Value root = metadata_doc.root();
+					if (!root.is_object() || !root.contains("type") || !root["type"].equals("frame"))
+					{
+						continue;
+					}
+					expected_payload_size = static_cast<size_t>(root["payload_size"].get_uint64());
+					saw_metadata = true;
+					continue;
+				}
+
+				if (frame.opcode == 0x2)
+				{
+					payload_size = frame.payload_size;
+					return payload_size == expected_payload_size;
+				}
+			}
+
+			return false;
+		}
 	} // namespace
 	struct TestSequencedGroupWorkload
 	{
@@ -571,7 +962,7 @@ namespace robotick::test
 			run_engine_once(telemetry_port);
 		}
 
-		SECTION("Telemetry layout emits enum metadata")
+		SECTION("Telemetry websocket layout emits enum metadata")
 		{
 			Model model;
 			const uint16_t telemetry_port = choose_telemetry_port();
@@ -586,15 +977,16 @@ namespace robotick::test
 			engine.load(model);
 			AtomicFlag stop_flag{false};
 			EngineRunThread runner(engine, stop_flag);
+			Thread::sleep_ms(100);
 
-			char url[256];
-			::snprintf(url, sizeof(url), "http://127.0.0.1:%u/api/telemetry/workloads_buffer/layout", static_cast<unsigned int>(telemetry_port));
-			Thread::sleep_ms(50);
-			const HttpResponse layout_response = http_request(url);
-			REQUIRE(layout_response.status_code == 200);
-
+			WsTestClient ws_client;
+			REQUIRE(ws_client.connect("127.0.0.1", telemetry_port, "/api/telemetry/ws"));
+			HeapVector<char> hello_text;
+			REQUIRE(wait_for_ws_text_message(ws_client, hello_text));
+			HeapVector<char> layout_text;
+			REQUIRE(wait_for_ws_text_message(ws_client, layout_text));
 			json::Document layout_document;
-			REQUIRE(layout_document.parse(layout_response.body.data));
+			REQUIRE(layout_document.parse(layout_text.data()));
 			const json::Value layout = layout_document.root();
 			REQUIRE(layout.contains("types"));
 			const json::Value types = layout["types"];
@@ -681,7 +1073,129 @@ namespace robotick::test
 			CHECK(info->start_thread != Thread::ThreadId{});
 		}
 
-		SECTION("Telemetry gateway routes local and peer telemetry")
+		SECTION("Telemetry websocket sends hello, layout, frame, and write response")
+		{
+			const uint16_t telemetry_port = choose_telemetry_port();
+			REQUIRE(telemetry_port != 0);
+
+			Model model;
+			model.set_model_name("ws-local-model");
+			model.set_telemetry_port(telemetry_port);
+			static const FieldConfigEntry local_inputs[] = {{"input_float", "1.5"}, {"input_string_64", "seed"}};
+			static const WorkloadSeed local_root{TypeId("TickCounterWorkload"), StringView("ws_local_root"), 60.0f, {}, {}, {}};
+			static const WorkloadSeed local_dummy{TypeId("DummyWorkload"), StringView("ws_dummy"), 30.0f, {}, {}, local_inputs};
+			static const WorkloadSeed* const local_workloads[] = {&local_dummy, &local_root};
+			model.use_workload_seeds(local_workloads);
+			model.set_root_workload(local_root);
+
+			Engine engine;
+			engine.load(model);
+			const DummyWorkload* dummy_instance = engine.find_instance<DummyWorkload>("ws_dummy");
+			REQUIRE(dummy_instance != nullptr);
+
+			AtomicFlag stop_flag{false};
+			EngineRunThread runner(engine, stop_flag);
+			Thread::sleep_ms(100);
+
+			WsTestClient ws_client;
+			REQUIRE(ws_client.connect("127.0.0.1", telemetry_port, "/api/telemetry/ws"));
+
+			HeapVector<char> hello_text;
+			REQUIRE(wait_for_ws_text_message(ws_client, hello_text));
+			json::Document hello_document;
+			REQUIRE(hello_document.parse(hello_text.data()));
+			const json::Value hello = hello_document.root();
+			REQUIRE(hello.is_object());
+			REQUIRE(hello.contains("type"));
+			REQUIRE(hello["type"].equals("hello"));
+			REQUIRE(hello.contains("model_id"));
+			REQUIRE(hello["model_id"].equals("ws-local-model"));
+			REQUIRE(hello.contains("engine_session_id"));
+			const char* hello_session_id = hello["engine_session_id"].get_c_string();
+			REQUIRE(hello_session_id != nullptr);
+			REQUIRE(hello_session_id[0] != '\0');
+
+			HeapVector<char> layout_text;
+			REQUIRE(wait_for_ws_text_message(ws_client, layout_text));
+			json::Document layout_document;
+			REQUIRE(layout_document.parse(layout_text.data()));
+			const json::Value layout = layout_document.root();
+			REQUIRE(layout.is_object());
+			REQUIRE(layout.contains("writable_inputs"));
+			REQUIRE(layout.contains("engine_session_id"));
+			const char* layout_session_id = layout["engine_session_id"].get_c_string();
+			REQUIRE(layout_session_id != nullptr);
+			REQUIRE(layout_session_id[0] != '\0');
+			CHECK(StringView(layout_session_id).equals(hello_session_id));
+
+			const json::Value writable_inputs = layout["writable_inputs"];
+			REQUIRE(writable_inputs.is_array());
+			json::Value float_writable;
+			writable_inputs.for_each_array(
+				[&](const json::Value writable)
+				{
+					if (!float_writable.is_valid() && writable.contains("field_path") &&
+						contains_text(writable["field_path"].get_c_string(), "input_float"))
+					{
+						float_writable = writable;
+					}
+				});
+			REQUIRE(float_writable.is_valid());
+			const uint32_t float_handle = static_cast<uint32_t>(float_writable["field_handle"].get_uint64());
+
+			json::Document frame_metadata_document;
+			size_t frame_payload_size = 0;
+			REQUIRE(wait_for_ws_frame_metadata_and_payload(ws_client, frame_metadata_document, frame_payload_size));
+			const json::Value frame_metadata = frame_metadata_document.root();
+			REQUIRE(frame_metadata.is_object());
+			REQUIRE(frame_metadata.contains("type"));
+			REQUIRE(frame_metadata["type"].equals("frame"));
+			REQUIRE(frame_metadata.contains("frame_seq"));
+			CHECK((frame_metadata["frame_seq"].get_uint64() % 2) == 0);
+			REQUIRE(frame_metadata.contains("engine_session_id"));
+			CHECK(StringView(frame_metadata["engine_session_id"].get_c_string()).equals(layout_session_id));
+			REQUIRE(frame_payload_size > 0);
+
+			char write_body[512];
+			::snprintf(write_body,
+				sizeof(write_body),
+				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":6.5}]}",
+				layout_session_id,
+				static_cast<unsigned>(float_handle));
+			REQUIRE(ws_client.send_text(write_body));
+
+			bool saw_write_response = false;
+			WsFrame ws_frame;
+			for (int i = 0; i < 24; ++i)
+			{
+				if (!read_ws_application_frame(ws_client, ws_frame))
+				{
+					break;
+				}
+				if (ws_frame.opcode != 0x1)
+				{
+					continue;
+				}
+				HeapVector<char> text;
+				if (!frame_to_text(ws_frame, text))
+				{
+					continue;
+				}
+				if (contains_text(text.data(), "\"accepted_count\""))
+				{
+					saw_write_response = true;
+					break;
+				}
+			}
+			REQUIRE(saw_write_response);
+
+			Thread::sleep_ms(80);
+			CHECK(dummy_instance->inputs.input_float == Catch::Approx(6.5f));
+
+			stop_flag.set();
+		}
+
+		SECTION("Telemetry gateway websocket forwards peer layout, frame, and writes")
 		{
 			const uint16_t peer_port = choose_telemetry_port();
 			const uint16_t gateway_port = choose_telemetry_port();
@@ -703,9 +1217,144 @@ namespace robotick::test
 			gateway_model.set_model_name("gateway-model");
 			gateway_model.set_telemetry_port(gateway_port);
 			gateway_model.set_telemetry_is_gateway(true);
-			static const WorkloadSeed gateway_workload{TypeId("TickCounterWorkload"), StringView("gateway_counter"), 30.0f, {}, {}, {}};
 			static const WorkloadSeed gateway_root{TypeId("TickCounterWorkload"), StringView("gateway_root"), 30.0f, {}, {}, {}};
-			static const WorkloadSeed* const gateway_workloads[] = {&gateway_workload, &gateway_root};
+			static const WorkloadSeed* const gateway_workloads[] = {&gateway_root};
+			static const TelemetryPeerSeed telemetry_peer{StringView("peer-model"), StringView("127.0.0.1"), peer_port, false};
+			static const TelemetryPeerSeed* const gateway_peers[] = {&telemetry_peer};
+			gateway_model.use_workload_seeds(gateway_workloads);
+			gateway_model.use_telemetry_peer_seeds(gateway_peers);
+			gateway_model.set_root_workload(gateway_root);
+
+			Engine peer_engine;
+			peer_engine.load(peer_model);
+			const DummyWorkload* peer_instance = peer_engine.find_instance<DummyWorkload>("peer_dummy");
+			REQUIRE(peer_instance != nullptr);
+			AtomicFlag peer_stop{false};
+			EngineRunThread peer_runner(peer_engine, peer_stop);
+
+			Engine gateway_engine;
+			gateway_engine.load(gateway_model);
+			AtomicFlag gateway_stop{false};
+			EngineRunThread gateway_runner(gateway_engine, gateway_stop);
+
+			Thread::sleep_ms(100);
+
+			WsTestClient ws_client;
+			REQUIRE(ws_client.connect("127.0.0.1", gateway_port, "/api/telemetry-gateway/peer-model/ws"));
+
+			HeapVector<char> hello_text;
+			REQUIRE(wait_for_ws_text_message(ws_client, hello_text));
+			json::Document hello_document;
+			REQUIRE(hello_document.parse(hello_text.data()));
+			const json::Value hello = hello_document.root();
+			REQUIRE(hello.is_object());
+			REQUIRE(hello.contains("type"));
+			REQUIRE(hello["type"].equals("hello"));
+			REQUIRE(hello.contains("model_id"));
+			REQUIRE(hello["model_id"].equals("peer-model"));
+
+			HeapVector<char> layout_text;
+			REQUIRE(wait_for_ws_text_message(ws_client, layout_text));
+			json::Document layout_document;
+			REQUIRE(layout_document.parse(layout_text.data()));
+			const json::Value layout = layout_document.root();
+			REQUIRE(layout.is_object());
+			REQUIRE(layout.contains("engine_session_id"));
+			REQUIRE(layout.contains("writable_inputs"));
+			const char* layout_session_id = layout["engine_session_id"].get_c_string();
+			REQUIRE(layout_session_id != nullptr);
+			REQUIRE(layout_session_id[0] != '\0');
+
+			const json::Value writable_inputs = layout["writable_inputs"];
+			REQUIRE(writable_inputs.is_array());
+			json::Value float_writable;
+			writable_inputs.for_each_array(
+				[&](const json::Value writable)
+				{
+					if (!float_writable.is_valid() && writable.contains("field_path") &&
+						contains_text(writable["field_path"].get_c_string(), "input_float"))
+					{
+						float_writable = writable;
+					}
+				});
+			REQUIRE(float_writable.is_valid());
+			const uint32_t float_handle = static_cast<uint32_t>(float_writable["field_handle"].get_uint64());
+
+			json::Document frame_metadata_document;
+			size_t frame_payload_size = 0;
+			REQUIRE(wait_for_ws_frame_metadata_and_payload(ws_client, frame_metadata_document, frame_payload_size));
+			const json::Value frame_metadata = frame_metadata_document.root();
+			REQUIRE(frame_metadata.is_object());
+			REQUIRE(frame_metadata.contains("type"));
+			REQUIRE(frame_metadata["type"].equals("frame"));
+			REQUIRE(frame_metadata.contains("frame_seq"));
+			CHECK((frame_metadata["frame_seq"].get_uint64() % 2) == 0);
+			REQUIRE(frame_metadata.contains("engine_session_id"));
+			CHECK(StringView(frame_metadata["engine_session_id"].get_c_string()).equals(layout_session_id));
+			REQUIRE(frame_payload_size > 0);
+
+			char write_body[512];
+			::snprintf(write_body,
+				sizeof(write_body),
+				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":19.75}]}",
+				layout_session_id,
+				static_cast<unsigned>(float_handle));
+			REQUIRE(ws_client.send_text(write_body));
+
+			bool saw_write_response = false;
+			WsFrame ws_frame;
+			for (int i = 0; i < 24; ++i)
+			{
+				if (!read_ws_application_frame(ws_client, ws_frame))
+				{
+					break;
+				}
+				if (ws_frame.opcode != 0x1)
+				{
+					continue;
+				}
+				HeapVector<char> text;
+				if (!frame_to_text(ws_frame, text))
+				{
+					continue;
+				}
+				if (contains_text(text.data(), "\"accepted_count\""))
+				{
+					saw_write_response = true;
+					break;
+				}
+			}
+			REQUIRE(saw_write_response);
+
+			Thread::sleep_ms(80);
+			CHECK(peer_instance->inputs.input_float == Catch::Approx(19.75f));
+
+			gateway_stop.set();
+			peer_stop.set();
+		}
+
+		SECTION("Telemetry gateway models endpoint remains available")
+		{
+			const uint16_t peer_port = choose_telemetry_port();
+			const uint16_t gateway_port = choose_telemetry_port();
+			REQUIRE(peer_port != 0);
+			REQUIRE(gateway_port != 0);
+			REQUIRE(peer_port != gateway_port);
+
+			Model peer_model;
+			peer_model.set_model_name("peer-model");
+			peer_model.set_telemetry_port(peer_port);
+			static const WorkloadSeed peer_root{TypeId("TickCounterWorkload"), StringView("peer_root"), 30.0f, {}, {}, {}};
+			static const WorkloadSeed* const peer_workloads[] = {&peer_root};
+			peer_model.use_workload_seeds(peer_workloads);
+			peer_model.set_root_workload(peer_root);
+
+			Model gateway_model;
+			gateway_model.set_model_name("gateway-model");
+			gateway_model.set_telemetry_port(gateway_port);
+			gateway_model.set_telemetry_is_gateway(true);
+			static const WorkloadSeed gateway_root{TypeId("TickCounterWorkload"), StringView("gateway_root"), 30.0f, {}, {}, {}};
+			static const WorkloadSeed* const gateway_workloads[] = {&gateway_root};
 			static const TelemetryPeerSeed telemetry_peer{StringView("peer-model"), StringView("127.0.0.1"), peer_port, false};
 			static const TelemetryPeerSeed* const gateway_peers[] = {&telemetry_peer};
 			gateway_model.use_workload_seeds(gateway_workloads);
@@ -731,7 +1380,6 @@ namespace robotick::test
 			json::Document models_document;
 			REQUIRE(models_document.parse(models_response.body.data));
 			const json::Value models_json = models_document.root();
-			REQUIRE(models_json.is_object());
 			REQUIRE(models_json.contains("models"));
 			const json::Value models = models_json["models"];
 			bool saw_gateway_model = false;
@@ -751,164 +1399,11 @@ namespace robotick::test
 			REQUIRE(saw_gateway_model);
 			REQUIRE(saw_peer_model);
 
-			::snprintf(url,
-				sizeof(url),
-				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/workloads_buffer/layout",
-				static_cast<unsigned int>(gateway_port));
-			const HttpResponse layout_response = http_request(url);
-			REQUIRE(layout_response.status_code == 200);
-			json::Document layout_document;
-			REQUIRE(layout_document.parse(layout_response.body.data));
-			const json::Value layout_json = layout_document.root();
-			REQUIRE(layout_json.is_object());
-			REQUIRE(layout_json.contains("engine_session_id"));
-			REQUIRE(layout_json.contains("writable_inputs"));
-
-			const json::Value writable_inputs = layout_json["writable_inputs"];
-			REQUIRE(writable_inputs.is_array());
-			json::Value target_float_writable;
-			json::Value target_string_writable;
-			writable_inputs.for_each_array(
-				[&](const json::Value writable)
-				{
-					if (!target_float_writable.is_valid() && writable.contains("field_path") &&
-						contains_text(writable["field_path"].get_c_string(), "input_float"))
-					{
-						target_float_writable = writable;
-					}
-					if (!target_string_writable.is_valid() && writable.contains("field_path") &&
-						contains_text(writable["field_path"].get_c_string(), "input_string_64"))
-					{
-						target_string_writable = writable;
-					}
-				});
-			REQUIRE(target_float_writable.is_valid());
-			REQUIRE(target_string_writable.is_valid());
-
-			char body[512];
-			::snprintf(body,
-				sizeof(body),
-				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":42.25},{\"field_handle\":%u,\"value\":\"updated via "
-				"batch\"}]}",
-				layout_json["engine_session_id"].get_c_string(),
-				static_cast<unsigned>(target_float_writable["field_handle"].get_uint64()),
-				static_cast<unsigned>(target_string_writable["field_handle"].get_uint64()));
-			::snprintf(url,
-				sizeof(url),
-				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/set_workload_input_fields_data",
-				static_cast<unsigned int>(gateway_port));
-			const HttpResponse write_response = http_request(url, "POST", body);
-			REQUIRE(write_response.status_code == 200);
-
-			Thread::sleep_ms(50);
-			const DummyWorkload* peer_instance = peer_engine.find_instance<DummyWorkload>("peer_dummy");
-			REQUIRE(peer_instance != nullptr);
-			CHECK(peer_instance->inputs.input_float == Catch::Approx(42.25f));
-			CHECK(peer_instance->inputs.input_string_64 == "updated via batch");
-
-			::snprintf(body,
-				sizeof(body),
-				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":11.0,\"seq\":100}]}",
-				layout_json["engine_session_id"].get_c_string(),
-				static_cast<unsigned>(target_float_writable["field_handle"].get_uint64()));
-			const HttpResponse latest_write_response = http_request(url, "POST", body);
-			REQUIRE(latest_write_response.status_code == 200);
-
-			::snprintf(body,
-				sizeof(body),
-				"{\"engine_session_id\":\"%s\",\"writes\":[{\"field_handle\":%u,\"value\":-99.0,\"seq\":99}]}",
-				layout_json["engine_session_id"].get_c_string(),
-				static_cast<unsigned>(target_float_writable["field_handle"].get_uint64()));
-			const HttpResponse stale_write_response = http_request(url, "POST", body);
-			REQUIRE(stale_write_response.status_code == 200);
-
-			Thread::sleep_ms(50);
-			CHECK(peer_instance->inputs.input_float == Catch::Approx(11.0f));
-
-			::snprintf(body,
-				sizeof(body),
-				"{\"engine_session_id\":\"stale-session\",\"writes\":[{\"field_handle\":%u,\"field_path\":\"%s\",\"value\":21.5}]}",
-				static_cast<unsigned>(target_float_writable["field_handle"].get_uint64()),
-				target_float_writable["field_path"].get_c_string());
-			const HttpResponse stale_session_with_path_response = http_request(url, "POST", body);
-			REQUIRE(stale_session_with_path_response.status_code == 200);
-
-			Thread::sleep_ms(50);
-			CHECK(peer_instance->inputs.input_float == Catch::Approx(21.5f));
-
-			::snprintf(body,
-				sizeof(body),
-				"{\"engine_session_id\":\"stale-session\",\"writes\":[{\"field_handle\":%u,\"value\":33.0}]}",
-				static_cast<unsigned>(target_float_writable["field_handle"].get_uint64()));
-			const HttpResponse stale_session_handle_only_response = http_request(url, "POST", body);
-			REQUIRE(stale_session_handle_only_response.status_code == 412);
-
 			gateway_stop.set();
 			peer_stop.set();
 		}
 
-		SECTION("Telemetry gateway peer route can be refreshed at runtime")
-		{
-			const uint16_t peer_port = choose_telemetry_port();
-			const uint16_t gateway_port = choose_telemetry_port();
-			const uint16_t stale_peer_port = choose_telemetry_port();
-			REQUIRE(peer_port != 0);
-			REQUIRE(gateway_port != 0);
-			REQUIRE(stale_peer_port != 0);
-			REQUIRE(peer_port != gateway_port);
-			REQUIRE(peer_port != stale_peer_port);
-			REQUIRE(gateway_port != stale_peer_port);
-
-			Model peer_model;
-			peer_model.set_model_name("peer-model");
-			peer_model.set_telemetry_port(peer_port);
-			static const WorkloadSeed peer_root{TypeId("TickCounterWorkload"), StringView("peer_root"), 30.0f, {}, {}, {}};
-			static const WorkloadSeed* const peer_workloads[] = {&peer_root};
-			peer_model.use_workload_seeds(peer_workloads);
-			peer_model.set_root_workload(peer_root);
-
-			Model gateway_model;
-			gateway_model.set_model_name("gateway-model");
-			gateway_model.set_telemetry_port(gateway_port);
-			gateway_model.set_telemetry_is_gateway(true);
-			static const WorkloadSeed gateway_root{TypeId("TickCounterWorkload"), StringView("gateway_root"), 30.0f, {}, {}, {}};
-			static const WorkloadSeed* const gateway_workloads[] = {&gateway_root};
-			static const TelemetryPeerSeed stale_peer{StringView("peer-model"), StringView("127.0.0.1"), stale_peer_port, false};
-			static const TelemetryPeerSeed* const gateway_peers[] = {&stale_peer};
-			gateway_model.use_workload_seeds(gateway_workloads);
-			gateway_model.use_telemetry_peer_seeds(gateway_peers);
-			gateway_model.set_root_workload(gateway_root);
-
-			Engine peer_engine;
-			peer_engine.load(peer_model);
-			AtomicFlag peer_stop{false};
-			EngineRunThread peer_runner(peer_engine, peer_stop);
-
-			Engine gateway_engine;
-			gateway_engine.load(gateway_model);
-			AtomicFlag gateway_stop{false};
-			EngineRunThread gateway_runner(gateway_engine, gateway_stop);
-
-			Thread::sleep_ms(100);
-
-			char url[256];
-			::snprintf(url,
-				sizeof(url),
-				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/workloads_buffer/layout",
-				static_cast<unsigned int>(gateway_port));
-			const HttpResponse stale_response = http_request(url);
-			REQUIRE(stale_response.status_code == 503);
-
-			gateway_engine.get_telemetry_server().update_peer_route("peer-model", "127.0.0.1", peer_port, false);
-
-			const HttpResponse refreshed_response = http_request(url);
-			REQUIRE(refreshed_response.status_code == 200);
-
-			gateway_stop.set();
-			peer_stop.set();
-		}
-
-		SECTION("Telemetry gateway caches peer layout by session")
+		SECTION("Telemetry REST data-plane endpoints are removed")
 		{
 			const uint16_t peer_port = choose_telemetry_port();
 			const uint16_t gateway_port = choose_telemetry_port();
@@ -949,22 +1444,27 @@ namespace robotick::test
 			Thread::sleep_ms(100);
 
 			char url[256];
+			::snprintf(url, sizeof(url), "http://127.0.0.1:%u/api/telemetry/workloads_buffer/layout", static_cast<unsigned int>(gateway_port));
+			const HttpResponse local_layout = http_request(url);
+			REQUIRE(local_layout.status_code == 404);
+
 			::snprintf(url,
 				sizeof(url),
 				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/workloads_buffer/layout",
 				static_cast<unsigned int>(gateway_port));
+			const HttpResponse peer_layout = http_request(url);
+			REQUIRE(peer_layout.status_code == 404);
 
-			const HttpResponse initial_layout = http_request(url);
-			REQUIRE(initial_layout.status_code == 200);
-
-			peer_stop.set();
-			Thread::sleep_ms(100);
-
-			const HttpResponse cached_layout = http_request(url);
-			REQUIRE(cached_layout.status_code == 200);
-			CHECK(StringView(cached_layout.body.data).equals(initial_layout.body.data));
+			::snprintf(url,
+				sizeof(url),
+				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/set_workload_input_fields_data",
+				static_cast<unsigned int>(gateway_port));
+			const HttpResponse peer_write = http_request(
+				url, "POST", "{\"engine_session_id\":\"x\",\"writes\":[{\"field_handle\":1,\"value\":1.0}]}");
+			REQUIRE(peer_write.status_code == 404);
 
 			gateway_stop.set();
+			peer_stop.set();
 		}
 	}
 

@@ -51,9 +51,37 @@ namespace robotick
 	}
 #endif
 
+	void InProgressMessage::reserve_payload_capacity(size_t payload_capacity)
+	{
+		ROBOTICK_ASSERT_MSG(!(stage == Stage::Sending && payload_bytes_sent > 0),
+			"reserve_payload_capacity() must not grow the send buffer after payload transmission has started");
+		ROBOTICK_ASSERT_MSG(!(stage == Stage::Receiving && payload_bytes_received > 0),
+			"reserve_payload_capacity() must not grow the receive buffer after payload reception has started");
+
+		if (payload_capacity <= payload_buffer_capacity)
+		{
+			return;
+		}
+
+		uint8_t* new_payload_buffer = new uint8_t[payload_capacity];
+		const size_t bytes_to_preserve = (stage == Stage::Sending) ? payload_size : 0;
+		if (payload_buffer != nullptr && bytes_to_preserve > 0)
+		{
+			::memcpy(new_payload_buffer, payload_buffer, bytes_to_preserve);
+		}
+		delete[] payload_buffer;
+		payload_buffer = new_payload_buffer;
+		payload_buffer_capacity = payload_capacity;
+	}
+
 	void InProgressMessage::begin_send(uint8_t message_type, size_t payload_size_in, const PayloadWriter& writer)
 	{
 		ROBOTICK_ASSERT(is_vacant() && "InProgressMessage::begin_send() should only ever be called when vacant");
+		ROBOTICK_ASSERT_MSG(payload_size_in <= kMaxPayloadBytes, "Message payload too large (%zu bytes)", payload_size_in);
+		if (payload_size_in > 0)
+		{
+			reserve_payload_capacity(payload_size_in);
+		}
 
 		stage = Stage::Sending;
 		header = {};
@@ -68,12 +96,23 @@ namespace robotick
 		header_bytes_sent = 0;
 		payload_size = payload_size_in;
 		payload_bytes_sent = 0;
-		chunk_bytes_sent = 0;
-		chunk_bytes_total = 0;
-		payload_writer = writer;
+
+		if (payload_size_in > 0)
+		{
+			size_t payload_offset = 0;
+			while (payload_offset < payload_size_in)
+			{
+				const size_t bytes_written = writer ? writer(payload_offset, payload_buffer + payload_offset, payload_size_in - payload_offset) : 0;
+				if (bytes_written == 0)
+				{
+					ROBOTICK_FATAL_EXIT("Payload writer returned zero bytes while %zu bytes remain", payload_size_in - payload_offset);
+				}
+				payload_offset += bytes_written;
+			}
+		}
 	}
 
-	void InProgressMessage::begin_receive(const PayloadReader& reader)
+	void InProgressMessage::begin_receive(const PayloadReader& reader, ReceiveMode mode)
 	{
 		ROBOTICK_ASSERT(is_vacant() && "InProgressMessage::begin_receive() should only ever be called when vacant");
 
@@ -82,6 +121,7 @@ namespace robotick
 		header_bytes_received = 0;
 		payload_bytes_received = 0;
 		payload_reader = reader;
+		receive_mode = mode;
 	}
 
 	void InProgressMessage::vacate()
@@ -91,12 +131,10 @@ namespace robotick
 		header_bytes_sent = 0;
 		payload_size = 0;
 		payload_bytes_sent = 0;
-		chunk_bytes_sent = 0;
-		chunk_bytes_total = 0;
 		header_bytes_received = 0;
 		payload_bytes_received = 0;
-		payload_writer = nullptr;
 		payload_reader = nullptr;
+		receive_mode = ReceiveMode::StagePayload;
 	}
 
 	// Called repeatedly from RemoteEngineConnection::tick() so sockets can make forward progress without blocking.
@@ -111,8 +149,7 @@ namespace robotick
 		// ---------------------------
 		if (stage == Stage::Sending)
 		{
-			// 1) send header bytes first
-			if (header_bytes_sent < sizeof(MessageHeader))
+			while (header_bytes_sent < sizeof(MessageHeader))
 			{
 				uint8_t header_bytes[sizeof(MessageHeader)];
 				header.serialize(header_bytes);
@@ -131,29 +168,12 @@ namespace robotick
 					return Result::InProgress;
 
 				header_bytes_sent += static_cast<size_t>(bytes);
-				if (header_bytes_sent < sizeof(MessageHeader))
-					return Result::InProgress;
 			}
 
-			// 2) then stream payload
-			if (payload_bytes_sent < payload_size)
+			while (payload_bytes_sent < payload_size)
 			{
-				if (chunk_bytes_sent == chunk_bytes_total)
-				{
-					size_t remaining = payload_size - payload_bytes_sent;
-					const size_t max_to_write = min_size(sizeof(chunk_buffer), remaining);
-					chunk_bytes_total = payload_writer ? payload_writer(payload_bytes_sent, chunk_buffer, max_to_write) : 0;
-					chunk_bytes_sent = 0;
-
-					if (chunk_bytes_total == 0)
-					{
-						ROBOTICK_WARNING("Payload writer returned zero bytes while data remains");
-						return Result::ConnectionLost;
-					}
-				}
-
-				const size_t remaining_chunk = chunk_bytes_total - chunk_bytes_sent;
-				ssize_t bytes = send(socket_fd, chunk_buffer + chunk_bytes_sent, remaining_chunk, MSG_NOSIGNAL);
+				const size_t remaining = payload_size - payload_bytes_sent;
+				ssize_t bytes = send(socket_fd, payload_buffer + payload_bytes_sent, remaining, MSG_NOSIGNAL);
 
 				if (bytes < 0)
 				{
@@ -165,15 +185,8 @@ namespace robotick
 				if (bytes == 0)
 					return Result::InProgress;
 
-				chunk_bytes_sent += static_cast<size_t>(bytes);
 				payload_bytes_sent += static_cast<size_t>(bytes);
-
-				if (chunk_bytes_sent < chunk_bytes_total)
-					return Result::InProgress;
 			}
-
-			if (payload_bytes_sent < payload_size)
-				return Result::InProgress;
 
 			log_preview("Sent full message", header, nullptr, payload_size);
 			stage = Stage::Completed;
@@ -185,8 +198,7 @@ namespace robotick
 		// ---------------------------
 		if (stage == Stage::Receiving)
 		{
-			// 1) receive header
-			if (header_bytes_received < sizeof(MessageHeader))
+			while (header_bytes_received < sizeof(MessageHeader))
 			{
 				const size_t remaining = sizeof(MessageHeader) - header_bytes_received;
 				uint8_t* header_bytes = reinterpret_cast<uint8_t*>(&header);
@@ -204,7 +216,9 @@ namespace robotick
 
 				header_bytes_received += static_cast<size_t>(bytes);
 				if (header_bytes_received < sizeof(MessageHeader))
-					return Result::InProgress;
+				{
+					continue;
+				}
 
 				header.deserialize(header_bytes);
 
@@ -217,20 +231,36 @@ namespace robotick
 					return Result::ConnectionLost;
 				}
 
-				if (header.payload_len > 1024 * 1024)
+				if (header.payload_len > kMaxPayloadBytes)
 				{
 					ROBOTICK_WARNING("InProgressMessage::tick(): Payload too large (%u bytes)", (unsigned int)header.payload_len);
 					return Result::ConnectionLost;
 				}
+
+				if (receive_mode == ReceiveMode::StagePayload && header.payload_len > 0)
+				{
+					reserve_payload_capacity(header.payload_len);
+				}
 			}
 
-			// 2) receive payload
-			if (payload_bytes_received < header.payload_len)
+			while (payload_bytes_received < header.payload_len)
 			{
 				const size_t remaining = header.payload_len - payload_bytes_received;
-				const size_t to_read = min_size(sizeof(chunk_buffer), remaining);
+				uint8_t streamed_payload[1024];
+				uint8_t* recv_dst = nullptr;
+				size_t recv_len = 0;
+				if (receive_mode == ReceiveMode::StreamPayload)
+				{
+					recv_dst = streamed_payload;
+					recv_len = min_size(remaining, sizeof(streamed_payload));
+				}
+				else
+				{
+					recv_dst = payload_buffer + payload_bytes_received;
+					recv_len = remaining;
+				}
 
-				ssize_t bytes = recv(socket_fd, chunk_buffer, to_read, 0);
+				ssize_t bytes = recv(socket_fd, recv_dst, recv_len, 0);
 
 				if (bytes < 0)
 				{
@@ -243,13 +273,16 @@ namespace robotick
 					return Result::ConnectionLost;
 
 				payload_bytes_received += static_cast<size_t>(bytes);
-				if (payload_reader && bytes > 0)
-				{
-					payload_reader(chunk_buffer, static_cast<size_t>(bytes));
-				}
 
-				if (payload_bytes_received < header.payload_len)
-					return Result::InProgress;
+				if (receive_mode == ReceiveMode::StreamPayload && payload_reader && bytes > 0)
+				{
+					payload_reader(streamed_payload, static_cast<size_t>(bytes));
+				}
+			}
+
+			if (receive_mode == ReceiveMode::StagePayload && payload_reader && header.payload_len > 0)
+			{
+				payload_reader(payload_buffer, header.payload_len);
 			}
 
 			log_preview("Received full message", header, nullptr, header.payload_len);

@@ -189,6 +189,10 @@ namespace robotick
 	};
 
 	// --- Final types (can be forward-declared) ---
+	//
+	// The engine now prefers explicit scalar width in public math types.
+	// Callers should choose `Quatf` or `Quatd` deliberately rather than relying
+	// on a build-time "default real" alias that can silently change API meaning.
 
 	struct Quatf : public QuatBase<Quatf, float>
 	{
@@ -199,17 +203,5 @@ namespace robotick
 	{
 		using QuatBase::QuatBase;
 	};
-
-#if defined(ROBOTICK_DEFAULT_REAL_IS_DOUBLE)
-	struct Quat : public QuatBase<Quat, double>
-	{
-		using QuatBase::QuatBase;
-	};
-#else
-	struct Quat : public QuatBase<Quat, float>
-	{
-		using QuatBase::QuatBase;
-	};
-#endif
 
 } // namespace robotick

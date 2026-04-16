@@ -101,6 +101,17 @@ namespace robotick
 			return true;
 		}
 
+		static size_t get_marshaled_field_size(const FieldDescriptor* field, const TypeDescriptor* field_type_desc)
+		{
+			ROBOTICK_ASSERT(field != nullptr);
+			ROBOTICK_ASSERT(field_type_desc != nullptr);
+			const size_t element_count = (field->element_count > 0) ? static_cast<size_t>(field->element_count) : 1u;
+			const size_t max_marshaled_size = static_cast<size_t>(-1);
+			ROBOTICK_ASSERT_MSG(
+				field_type_desc->size == 0 || element_count <= max_marshaled_size / field_type_desc->size, "Marshaled field size overflow");
+			return field_type_desc->size * element_count;
+		}
+
 		// Walks a dotted member path inside an already-addressable container (supports static or dynamic structs).
 		// Example: container_ptr=ptr_to_vec2, container_type=Vec2f, dotted="x" or "position.x"
 		static bool resolve_nested_member(void* container_ptr,
@@ -215,7 +226,7 @@ namespace robotick
 			if (!field_type_desc)
 				ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has unknown type '%s'", field_token.c_str(), path, field->type_id.get_debug_name());
 			TypeId type = field->type_id;
-			size_t size = field_type_desc->size;
+			size_t size = get_marshaled_field_size(field, field_type_desc);
 
 			// Step 4: optional subfield chain
 			if (*path_cursor != '\0')
@@ -231,7 +242,7 @@ namespace robotick
 
 				ptr = static_cast<const uint8_t*>(sub_ptr);
 				type = sub_type->id;
-				size = sub_type->size;
+				size = get_marshaled_field_size(sub_desc, sub_type);
 
 				// consume any remaining chars (resolve_nested_member advanced the cursor via extract_next_token)
 				while (*path_cursor)
@@ -391,7 +402,7 @@ namespace robotick
 			ROBOTICK_FATAL_EXIT("Field '%s' in path '%s' has unknown type", field_token.c_str(), path);
 
 		void* base_ptr = field->get_data_ptr(const_cast<WorkloadsBuffer&>(workloads_buffer), *workload_info, *struct_type, struct_offset);
-		size_t size = field_type_desc->size;
+		size_t size = get_marshaled_field_size(field, field_type_desc);
 
 		// optional subfield chain
 		if (*path_cursor != '\0')
@@ -407,7 +418,7 @@ namespace robotick
 			}
 
 			base_ptr = sub_ptr;
-			size = sub_type->size;
+			size = get_marshaled_field_size(sub_desc, sub_type);
 			field = sub_desc;
 
 			// consume any remaining chars

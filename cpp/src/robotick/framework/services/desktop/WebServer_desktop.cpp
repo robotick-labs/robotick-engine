@@ -5,6 +5,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/services/WebServer.h"
+#include "robotick/framework/strings/StringView.h"
 
 #include <arpa/inet.h>
 #include <civetweb.h>
@@ -16,6 +17,34 @@
 
 namespace robotick
 {
+	bool WebSocketConnection::send_frame(const int opcode, const void* data, const size_t size) const
+	{
+		if (!conn)
+		{
+			return false;
+		}
+		struct mg_connection* ws_conn = static_cast<struct mg_connection*>(conn);
+		mg_lock_connection(ws_conn);
+		const int written = mg_websocket_write(
+			ws_conn, opcode, static_cast<const char*>(data), size);
+		mg_unlock_connection(ws_conn);
+		return written >= 0;
+	}
+
+	bool WebSocketConnection::send_text(const char* text) const
+	{
+		if (!text)
+		{
+			return send_frame(MG_WEBSOCKET_OPCODE_TEXT, "", 0);
+		}
+		return send_frame(MG_WEBSOCKET_OPCODE_TEXT, text, ::strlen(text));
+	}
+
+	bool WebSocketConnection::send_binary(const void* data, const size_t size) const
+	{
+		return send_frame(MG_WEBSOCKET_OPCODE_BINARY, data, size);
+	}
+
 	struct WebServerImpl
 	{
 		mg_context* ctx = nullptr;
@@ -300,6 +329,127 @@ namespace robotick
 		return 0;
 	}
 
+	static const WebSocketEndpoint* find_websocket_endpoint(
+		const WebServer* server, const char* uri)
+	{
+		if (!server || !uri)
+		{
+			return nullptr;
+		}
+		for (const auto& endpoint : server->get_websocket_endpoints())
+		{
+			if (StringView(uri).equals(endpoint.uri.c_str()))
+			{
+				return &endpoint;
+			}
+		}
+		return nullptr;
+	}
+
+	static int websocket_connect_callback(const struct mg_connection* c, void* userdata)
+	{
+		WebServer* self = static_cast<WebServer*>(userdata);
+		if (!self)
+		{
+			return 1;
+		}
+		const mg_request_info* info = mg_get_request_info(c);
+		const char* local_uri = info ? info->local_uri : nullptr;
+		const WebSocketEndpoint* endpoint = find_websocket_endpoint(self, local_uri);
+		if (!endpoint)
+		{
+			return 1;
+		}
+		if (!endpoint->handler.on_connect)
+		{
+			return 0;
+		}
+
+		WebRequest req;
+		req.method = "GET";
+		if (local_uri)
+		{
+			req.uri = local_uri;
+		}
+		if (info && info->query_string)
+		{
+			parse_query_string(info->query_string, req);
+		}
+
+		WebSocketConnection ws_conn;
+		ws_conn.conn = const_cast<mg_connection*>(c);
+		const bool accepted = endpoint->handler.on_connect(req, ws_conn);
+		return accepted ? 0 : 1;
+	}
+
+	static void websocket_ready_callback(struct mg_connection* c, void* userdata)
+	{
+		WebServer* self = static_cast<WebServer*>(userdata);
+		if (!self)
+		{
+			return;
+		}
+		const mg_request_info* info = mg_get_request_info(c);
+		const WebSocketEndpoint* endpoint = find_websocket_endpoint(
+			self, info ? info->local_uri : nullptr);
+		if (!endpoint || !endpoint->handler.on_ready)
+		{
+			return;
+		}
+		WebSocketConnection ws_conn;
+		ws_conn.conn = c;
+		endpoint->handler.on_ready(ws_conn);
+	}
+
+	static int websocket_data_callback(
+		struct mg_connection* c,
+		int bits,
+		char* data,
+		size_t data_len,
+		void* userdata)
+	{
+		WebServer* self = static_cast<WebServer*>(userdata);
+		if (!self)
+		{
+			return 0;
+		}
+		const mg_request_info* info = mg_get_request_info(c);
+		const WebSocketEndpoint* endpoint = find_websocket_endpoint(
+			self, info ? info->local_uri : nullptr);
+		if (!endpoint || !endpoint->handler.on_message)
+		{
+			return 1;
+		}
+		WebSocketConnection ws_conn;
+		ws_conn.conn = c;
+		WebSocketMessage message;
+		message.opcode = (bits & 0x0F);
+		message.data = reinterpret_cast<const uint8_t*>(data);
+		message.size = data_len;
+		const bool keep_open = endpoint->handler.on_message(ws_conn, message);
+		return keep_open ? 1 : 0;
+	}
+
+	static void websocket_close_callback(
+		const struct mg_connection* c, void* userdata)
+	{
+		WebServer* self = static_cast<WebServer*>(userdata);
+		if (!self)
+		{
+			return;
+		}
+		const mg_request_info* info = mg_get_request_info(c);
+		const WebSocketEndpoint* endpoint = find_websocket_endpoint(
+			self, info ? info->local_uri : nullptr);
+		if (!endpoint || !endpoint->handler.on_close)
+		{
+			return;
+		}
+		WebSocketConnection ws_conn;
+		ws_conn.conn = const_cast<mg_connection*>(c);
+		endpoint->handler.on_close(ws_conn);
+	}
+
 	// ------------------------------
 
 	void WebServer::start(const char* name, uint16_t port, const char* webroot, WebRequestHandler handler_in)
@@ -349,6 +499,17 @@ namespace robotick
 		bound_port = static_cast<uint16_t>(ports[0].port);
 
 		mg_set_request_handler(s->ctx, "/", callback, this);
+		for (const auto& endpoint : websocket_endpoints)
+		{
+			mg_set_websocket_handler(
+				s->ctx,
+				endpoint.uri.c_str(),
+				websocket_connect_callback,
+				websocket_ready_callback,
+				websocket_data_callback,
+				websocket_close_callback,
+				this);
+		}
 		handler = handler_in;
 		server_name = name;
 		document_root = doc_root_candidate.c_str();
@@ -369,6 +530,23 @@ namespace robotick
 		handler = nullptr;
 		server_name.clear();
 		document_root.clear();
+	}
+
+	void WebServer::add_websocket_endpoint(const char* uri, WebSocketHandler ws_handler)
+	{
+		ROBOTICK_ASSERT_MSG(!running, "WebServer websocket endpoints must be added before start()");
+		ROBOTICK_ASSERT_MSG(uri && uri[0] != '\0', "WebServer websocket endpoint uri must not be empty");
+		ROBOTICK_ASSERT_MSG(!websocket_endpoints.full(), "WebServer websocket endpoint capacity exceeded");
+		WebSocketEndpoint endpoint;
+		endpoint.uri = uri;
+		endpoint.handler = ws_handler;
+		websocket_endpoints.add(endpoint);
+	}
+
+	void WebServer::clear_websocket_endpoints()
+	{
+		ROBOTICK_ASSERT_MSG(!running, "WebServer websocket endpoints cannot be cleared while running");
+		websocket_endpoints.clear();
 	}
 
 } // namespace robotick
