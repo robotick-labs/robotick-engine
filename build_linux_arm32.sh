@@ -10,14 +10,18 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
+if [[ "${IMAGE}" == *":latest" ]]; then
+  echo "[build_linux_arm32] Refreshing Docker image ${IMAGE}..."
+  docker pull "${IMAGE}"
+elif ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
   echo "[build_linux_arm32] Pulling Docker image ${IMAGE}..."
   docker pull "${IMAGE}"
 fi
 
 echo "[build_linux_arm32] Configuring and building preset '${CONFIG_PRESET}'..."
 docker run --rm --init \
-  --user root \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp \
   -v "${ROOT_DIR}:/workspace" \
   -w /workspace \
   "${IMAGE}" \

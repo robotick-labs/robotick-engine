@@ -10,7 +10,10 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
+if [[ "${IMAGE}" == *":latest" ]]; then
+  echo "[build_esp32s3] Refreshing Docker image ${IMAGE}..."
+  docker pull "${IMAGE}"
+elif ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
   echo "[build_esp32s3] Pulling Docker image ${IMAGE}..."
   docker pull "${IMAGE}"
 fi

@@ -15,9 +15,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel)"
 
 BRANCH_NAME="$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD)"
-BRANCH_SLUG="$(printf '%s' "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[/_]#-#g')"
 COMMIT_SHA="$(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
-PUSH_TAG="${1:-${BRANCH_SLUG}-${COMMIT_SHA}}"
+DEFAULT_TAG_BASE="$(
+    printf '%s' "${BRANCH_NAME}" \
+        | tr '[:upper:]' '[:lower:]' \
+        | sed -E 's#[^a-z0-9_.-]+#-#g; s#^[^a-z0-9_]+##; s#-+#-#g; s#-+$##'
+)"
+DEFAULT_TAG_BASE="${DEFAULT_TAG_BASE:-branch}"
+MAX_BASE_LEN=$((128 - 1 - ${#COMMIT_SHA}))
+DEFAULT_TAG_BASE="${DEFAULT_TAG_BASE:0:${MAX_BASE_LEN}}"
+PUSH_TAG="${1:-${DEFAULT_TAG_BASE}-${COMMIT_SHA}}"
+if ! [[ "${PUSH_TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+    echo "Invalid push tag: ${PUSH_TAG}" >&2
+    exit 1
+fi
 REMOTE_TAG="${REMOTE_NAME}:${PUSH_TAG}"
 
 if ! docker image inspect "${LOCAL_TAG}" >/dev/null 2>&1; then
