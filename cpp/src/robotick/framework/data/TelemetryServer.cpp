@@ -1372,6 +1372,7 @@ namespace robotick
 		struct WsClient
 		{
 			bool active = false;
+			bool ready = false;
 			WebSocketConnection connection;
 			WsRoute route;
 			Clock::time_point last_heartbeat_at{};
@@ -2083,6 +2084,7 @@ namespace robotick
 		{
 			WsClient& existing = ws_clients[static_cast<size_t>(existing_index)];
 			existing.active = true;
+			existing.ready = false;
 			existing.connection = stored_connection;
 			existing.route = route;
 			existing.last_heartbeat_at = Clock::now();
@@ -2098,6 +2100,7 @@ namespace robotick
 				continue;
 			}
 			slot.active = true;
+			slot.ready = false;
 			slot.connection = stored_connection;
 			slot.route = route;
 			slot.last_heartbeat_at = Clock::now();
@@ -2228,17 +2231,31 @@ namespace robotick
 		handler.on_ready = [this](WebSocketConnection& connection)
 		{
 			WsClient client;
+			int client_index = -1;
 			{
 				LockGuard lock(ws_clients_mutex);
-				const int index = find_ws_client_index_unlocked(connection);
-				if (index < 0)
+				client_index = find_ws_client_index_unlocked(connection);
+				if (client_index < 0)
 				{
 					return;
 				}
-				client = ws_clients[static_cast<size_t>(index)];
+				client = ws_clients[static_cast<size_t>(client_index)];
 			}
 			send_ws_hello(client);
 			send_ws_layout(client);
+			{
+				LockGuard lock(ws_clients_mutex);
+				if (client_index < 0 || static_cast<size_t>(client_index) >= ws_clients.size())
+				{
+					return;
+				}
+				WsClient& live_client = ws_clients[static_cast<size_t>(client_index)];
+				if (!live_client.active || !ws_connections_equal(live_client.connection, connection))
+				{
+					return;
+				}
+				live_client.ready = true;
+			}
 		};
 		handler.on_message = [this](WebSocketConnection& connection, const WebSocketMessage& message)
 		{
@@ -2338,7 +2355,7 @@ namespace robotick
 			for (size_t i = 0; i < ws_clients.size(); ++i)
 			{
 				const WsClient& client = ws_clients[i];
-				if (!client.active || !client.route.is_local)
+				if (!client.active || !client.ready || !client.route.is_local)
 				{
 					continue;
 				}
@@ -2393,7 +2410,7 @@ namespace robotick
 				for (size_t i = 0; i < ws_clients.size(); ++i)
 				{
 					const WsClient& client = ws_clients[i];
-					if (!client.active || client.route.is_local || client.route.peer_index != static_cast<int>(peer_index))
+					if (!client.active || !client.ready || client.route.is_local || client.route.peer_index != static_cast<int>(peer_index))
 					{
 						continue;
 					}
@@ -2472,7 +2489,7 @@ namespace robotick
 			for (size_t i = 0; i < ws_clients.size(); ++i)
 			{
 				WsClient& client = ws_clients[i];
-				if (!client.active)
+				if (!client.active || !client.ready)
 				{
 					continue;
 				}
