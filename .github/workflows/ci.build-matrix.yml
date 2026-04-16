@@ -1,4 +1,4 @@
-name: CI - Build Matrix (Linux + ESP32-S3)
+name: Build Targets
 
 on:
   push:
@@ -18,29 +18,34 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    name: Build & Test (${{ matrix.platform }} - ${{ matrix.preset }})
+    name: ${{ matrix.label }}
 
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: linux
+            label: Linux Debug
             preset: robotick-engine-tests-linux-debug
             docker_image: ghcr.io/robotick-labs/robotick-ubuntu24.04-native-linux:latest
             run_tests: true
           - platform: linux
+            label: Linux Release
             preset: robotick-engine-tests-linux-release
             docker_image: ghcr.io/robotick-labs/robotick-ubuntu24.04-native-linux:latest
             run_tests: false
           - platform: linux-arm64
+            label: Linux ARM64
             preset: robotick-engine-linux-arm64
             docker_image: ghcr.io/robotick-labs/robotick-debian12-cross-linux-arm64:latest
             run_tests: false
           - platform: linux-arm32
+            label: Linux ARM32
             preset: robotick-engine-linux-arm32
             docker_image: ghcr.io/robotick-labs/robotick-debian12-cross-linux-arm32:latest
             run_tests: false
           - platform: esp32s3
+            label: ESP32-S3
             preset: esp32s3
             docker_image: ghcr.io/robotick-labs/robotick-idf5.4-esp32:latest
             run_tests: false
