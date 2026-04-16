@@ -2,8 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE="robotick-debian12-cross-linux-arm32:local"
-DOCKERFILE="${ROOT_DIR}/tools/docker/robotick-debian12-cross-linux-arm32.Dockerfile"
+IMAGE="${ROBOTICK_LINUX_ARM32_IMAGE:-ghcr.io/robotick-labs/robotick-debian12-cross-linux-arm32:latest}"
 CONFIG_PRESET="robotick-engine-linux-arm32"
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -11,8 +10,10 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "[build_linux_arm32] Building Docker image ${IMAGE}..."
-docker build -t "${IMAGE}" -f "${DOCKERFILE}" "${ROOT_DIR}/tools/docker"
+if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
+  echo "[build_linux_arm32] Pulling Docker image ${IMAGE}..."
+  docker pull "${IMAGE}"
+fi
 
 echo "[build_linux_arm32] Configuring and building preset '${CONFIG_PRESET}'..."
 docker run --rm --init \
@@ -23,6 +24,7 @@ docker run --rm --init \
   bash -lc "
     set -Eeuo pipefail
     mkdir -p .cmake
+    rm -rf build/${CONFIG_PRESET}
     cmake --preset ${CONFIG_PRESET}
     cmake --build --preset ${CONFIG_PRESET} -j\$(nproc)
   "

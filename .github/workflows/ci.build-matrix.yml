@@ -26,33 +26,23 @@ jobs:
         include:
           - platform: linux
             preset: robotick-engine-tests-linux-debug
-            docker_image: mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04
-            docker_source: pull
-            run_linux_setup: true
+            docker_image: ghcr.io/robotick-labs/robotick-ubuntu24.04-native-linux:latest
             run_tests: true
           - platform: linux
             preset: robotick-engine-tests-linux-release
-            docker_image: mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04
-            docker_source: pull
-            run_linux_setup: true
+            docker_image: ghcr.io/robotick-labs/robotick-ubuntu24.04-native-linux:latest
             run_tests: false
           - platform: linux-arm64
             preset: robotick-engine-linux-arm64
             docker_image: ghcr.io/robotick-labs/robotick-debian12-cross-linux-arm64:latest
-            docker_source: pull
-            run_linux_setup: false
             run_tests: false
           - platform: linux-arm32
             preset: robotick-engine-linux-arm32
             docker_image: ghcr.io/robotick-labs/robotick-debian12-cross-linux-arm32:latest
-            docker_source: pull
-            run_linux_setup: false
             run_tests: false
           - platform: esp32s3
             preset: esp32s3
             docker_image: ghcr.io/robotick-labs/robotick-idf5.4-esp32:latest
-            docker_source: pull
-            run_linux_setup: false
             run_tests: false
 
     steps:
@@ -62,15 +52,7 @@ jobs:
           submodules: recursive
 
       - name: Prepare Docker image
-        run: |
-          if [ '${{ matrix.docker_source }}' = 'build' ]; then
-            docker build \
-              -t ${{ matrix.docker_image }} \
-              -f ${{ matrix.dockerfile }} \
-              tools/docker
-          else
-            docker pull ${{ matrix.docker_image }}
-          fi
+        run: docker pull ${{ matrix.docker_image }}
 
       - name: Run Build inside Docker
         run: |
@@ -88,22 +70,12 @@ jobs:
                 echo '🚧 ESP32-S3 Setup'
                 cd tools/esp32-compile-check
 
-                if ! command -v ninja >/dev/null 2>&1; then
-                  DEBIAN_FRONTEND=noninteractive apt-get update -yq
-                  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ninja-build ccache
-                  apt-get clean
-                  rm -rf /var/lib/apt/lists/*
-                fi
-
                 bash /workspace/tools/make_esp32_symlinks.sh
                 ./1_idf_clean.sh || (echo '❌ Idf Clean failed' && exit 1)
                 ./2_idf_build.sh || (echo '❌ Idf Build failed' && exit 1)
 
               else
                 echo '🚧 Linux Setup'
-                if [ '${{ matrix.run_linux_setup }}' = 'true' ]; then
-                  bash tools/setup_my_env_as_root.linux.sh
-                fi
                 mkdir -p .cmake
                 cmake --preset ${{ matrix.preset }}
                 cmake --build --preset ${{ matrix.preset }} -j$(nproc)
