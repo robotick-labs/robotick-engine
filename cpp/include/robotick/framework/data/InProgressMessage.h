@@ -19,6 +19,8 @@ namespace robotick
 	  public:
 		InProgressMessage() = default;
 		~InProgressMessage() { delete[] payload_buffer; }
+		InProgressMessage(const InProgressMessage&) = delete;
+		InProgressMessage& operator=(const InProgressMessage&) = delete;
 
 		enum class Stage
 		{

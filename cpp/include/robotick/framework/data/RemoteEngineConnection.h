@@ -63,13 +63,6 @@ namespace robotick
 			const TypeDescriptor* type_desc = nullptr;
 		};
 
-		struct TestHealthLifecycleStats
-		{
-			uint32_t attempt_begin_count = 0;
-			uint32_t healthy_transition_count = 0;
-			uint32_t unhealthy_transition_count = 0;
-		};
-
 		using BinderCallback = Function<bool(const char* path, Field& out_field)>;
 
 		RemoteEngineConnection() = default;
@@ -95,7 +88,16 @@ namespace robotick
 		[[nodiscard]] bool is_ready() const; // we have finished our handshake and ready for field-data exchange through out tick() method
 		[[nodiscard]] uint16_t get_listen_port() const { return listen_port; }
 
+#if defined(ROBOTICK_TEST_MODE)
+		struct TestHealthLifecycleStats
+		{
+			uint32_t attempt_begin_count = 0;
+			uint32_t healthy_transition_count = 0;
+			uint32_t unhealthy_transition_count = 0;
+		};
+
 		[[nodiscard]] const TestHealthLifecycleStats& test_health_lifecycle_stats() const { return test_health_lifecycle_stats_; }
+#endif
 
 	  private:
 		[[nodiscard]] State get_state() const { return state; };
@@ -194,7 +196,9 @@ namespace robotick
 			float tick_rate_hz = 0.0f;
 		} fields_request_receive_state;
 
+#if defined(ROBOTICK_TEST_MODE)
 		TestHealthLifecycleStats test_health_lifecycle_stats_;
+#endif
 	};
 
 } // namespace robotick

@@ -278,7 +278,9 @@ namespace robotick
 			}
 		}
 
+#if defined(ROBOTICK_TEST_MODE)
 		test_health_lifecycle_stats_.attempt_begin_count += 1;
+#endif
 	}
 
 	void RemoteEngineConnection::log_connection_became_healthy()
@@ -317,7 +319,9 @@ namespace robotick
 			}
 		}
 
+#if defined(ROBOTICK_TEST_MODE)
 		test_health_lifecycle_stats_.healthy_transition_count += 1;
+#endif
 	}
 
 	void RemoteEngineConnection::log_connection_became_unhealthy()
@@ -348,8 +352,10 @@ namespace robotick
 		{
 			if (mode == Mode::Sender)
 			{
-				ROBOTICK_INFO(
-					"[REC::health] [%s %s -> %s] connection unhealthy (will retry)", get_mode_label(), my_model_name.c_str(), target_model_name.c_str());
+				ROBOTICK_INFO("[REC::health] [%s %s -> %s] connection unhealthy (will retry)",
+					get_mode_label(),
+					my_model_name.c_str(),
+					target_model_name.c_str());
 			}
 			else
 			{
@@ -357,7 +363,9 @@ namespace robotick
 			}
 		}
 
+#if defined(ROBOTICK_TEST_MODE)
 		test_health_lifecycle_stats_.unhealthy_transition_count += 1;
+#endif
 	}
 
 	void RemoteEngineConnection::set_state(const State target_state)

@@ -64,6 +64,11 @@ namespace robotick
 		}
 
 		uint8_t* new_payload_buffer = new uint8_t[payload_capacity];
+		const size_t bytes_to_preserve = (stage == Stage::Sending) ? payload_size : 0;
+		if (payload_buffer != nullptr && bytes_to_preserve > 0)
+		{
+			::memcpy(new_payload_buffer, payload_buffer, bytes_to_preserve);
+		}
 		delete[] payload_buffer;
 		payload_buffer = new_payload_buffer;
 		payload_buffer_capacity = payload_capacity;
@@ -226,49 +231,54 @@ namespace robotick
 					return Result::ConnectionLost;
 				}
 
-					if (header.payload_len > kMaxPayloadBytes)
-					{
-						ROBOTICK_WARNING("InProgressMessage::tick(): Payload too large (%u bytes)", (unsigned int)header.payload_len);
-						return Result::ConnectionLost;
-					}
-
-					if (receive_mode == ReceiveMode::StagePayload && header.payload_len > 0)
-					{
-						reserve_payload_capacity(header.payload_len);
-					}
+				if (header.payload_len > kMaxPayloadBytes)
+				{
+					ROBOTICK_WARNING("InProgressMessage::tick(): Payload too large (%u bytes)", (unsigned int)header.payload_len);
+					return Result::ConnectionLost;
 				}
 
-				while (payload_bytes_received < header.payload_len)
+				if (receive_mode == ReceiveMode::StagePayload && header.payload_len > 0)
 				{
-					const size_t remaining = header.payload_len - payload_bytes_received;
-					uint8_t streamed_payload[1024];
-					uint8_t* recv_dst = payload_buffer + payload_bytes_received;
-					size_t recv_len = remaining;
-					if (receive_mode == ReceiveMode::StreamPayload)
-					{
-						recv_dst = streamed_payload;
-						recv_len = min_size(remaining, sizeof(streamed_payload));
-					}
+					reserve_payload_capacity(header.payload_len);
+				}
+			}
 
-					ssize_t bytes = recv(socket_fd, recv_dst, recv_len, 0);
+			while (payload_bytes_received < header.payload_len)
+			{
+				const size_t remaining = header.payload_len - payload_bytes_received;
+				uint8_t streamed_payload[1024];
+				uint8_t* recv_dst = nullptr;
+				size_t recv_len = 0;
+				if (receive_mode == ReceiveMode::StreamPayload)
+				{
+					recv_dst = streamed_payload;
+					recv_len = min_size(remaining, sizeof(streamed_payload));
+				}
+				else
+				{
+					recv_dst = payload_buffer + payload_bytes_received;
+					recv_len = remaining;
+				}
 
-					if (bytes < 0)
-					{
+				ssize_t bytes = recv(socket_fd, recv_dst, recv_len, 0);
+
+				if (bytes < 0)
+				{
 					if (errno == EAGAIN || errno == EWOULDBLOCK)
 						return Result::InProgress;
 					return Result::ConnectionLost;
 				}
 
-					if (bytes == 0)
-						return Result::ConnectionLost;
+				if (bytes == 0)
+					return Result::ConnectionLost;
 
-					payload_bytes_received += static_cast<size_t>(bytes);
+				payload_bytes_received += static_cast<size_t>(bytes);
 
-					if (receive_mode == ReceiveMode::StreamPayload && payload_reader && bytes > 0)
-					{
-						payload_reader(streamed_payload, static_cast<size_t>(bytes));
-					}
+				if (receive_mode == ReceiveMode::StreamPayload && payload_reader && bytes > 0)
+				{
+					payload_reader(streamed_payload, static_cast<size_t>(bytes));
 				}
+			}
 
 			if (receive_mode == ReceiveMode::StagePayload && payload_reader && header.payload_len > 0)
 			{

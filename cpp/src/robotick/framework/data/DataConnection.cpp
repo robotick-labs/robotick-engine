@@ -106,6 +106,9 @@ namespace robotick
 			ROBOTICK_ASSERT(field != nullptr);
 			ROBOTICK_ASSERT(field_type_desc != nullptr);
 			const size_t element_count = (field->element_count > 0) ? static_cast<size_t>(field->element_count) : 1u;
+			const size_t max_marshaled_size = static_cast<size_t>(-1);
+			ROBOTICK_ASSERT_MSG(
+				field_type_desc->size == 0 || element_count <= max_marshaled_size / field_type_desc->size, "Marshaled field size overflow");
 			return field_type_desc->size * element_count;
 		}
 

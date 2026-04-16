@@ -63,13 +63,13 @@ namespace robotick
 		frame.payload = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(data));
 		frame.len = size;
 
-		if (conn)
-		{
-			return httpd_ws_send_frame(static_cast<httpd_req_t*>(conn), &frame) == ESP_OK;
-		}
 		if (server && socket_fd >= 0)
 		{
 			return httpd_ws_send_frame_async(static_cast<httpd_handle_t>(server), socket_fd, &frame) == ESP_OK;
+		}
+		if (conn)
+		{
+			return httpd_ws_send_frame(static_cast<httpd_req_t*>(conn), &frame) == ESP_OK;
 		}
 #else
 		(void)opcode;
@@ -428,8 +428,7 @@ namespace robotick
 #if defined(CONFIG_HTTPD_WS_SUPPORT)
 	static esp_err_t esp32_ws_handler(httpd_req_t* req)
 	{
-		WebServerImpl::WsEndpointContext* context =
-			static_cast<WebServerImpl::WsEndpointContext*>(req->user_ctx);
+		WebServerImpl::WsEndpointContext* context = static_cast<WebServerImpl::WsEndpointContext*>(req->user_ctx);
 		if (!context || !context->server)
 		{
 			return ESP_FAIL;
@@ -588,9 +587,8 @@ namespace robotick
 			const esp_err_t register_err = httpd_register_uri_handler(s->handle, &ws_uri);
 			if (register_err != ESP_OK)
 			{
-				ROBOTICK_WARNING("Failed to register websocket endpoint '%s' (err=%s)",
-					websocket_endpoints[i].uri.c_str(),
-					esp_err_to_name(register_err));
+				ROBOTICK_WARNING(
+					"Failed to register websocket endpoint '%s' (err=%s)", websocket_endpoints[i].uri.c_str(), esp_err_to_name(register_err));
 				continue;
 			}
 			s->ws_handler_count += 1;
