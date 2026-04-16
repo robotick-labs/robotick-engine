@@ -137,6 +137,8 @@ if (ROBOTICK_BUILD_TESTS)
     # members are compiled into public headers.
     target_compile_definitions(robotick-engine PRIVATE ROBOTICK_TEST_MODE=1)
     target_compile_definitions(robotick-engine-static PRIVATE ROBOTICK_TEST_MODE=1)
+    target_compile_options(robotick-engine PRIVATE -fexceptions)
+    target_compile_options(robotick-engine-static PRIVATE -fexceptions)
 
     enable_testing()
     add_subdirectory(tests)
