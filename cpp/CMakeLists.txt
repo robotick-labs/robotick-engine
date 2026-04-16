@@ -133,6 +133,11 @@ add_dependencies(robotick-engine-static code_policy_check)
 if (ROBOTICK_BUILD_TESTS)
     message(STATUS "ROBOTICK_BUILD_TESTS - ON")
 
+    # Keep library and test translation units on the same ABI when test-only
+    # members are compiled into public headers.
+    target_compile_definitions(robotick-engine PRIVATE ROBOTICK_TEST_MODE=1)
+    target_compile_definitions(robotick-engine-static PRIVATE ROBOTICK_TEST_MODE=1)
+
     enable_testing()
     add_subdirectory(tests)
 
