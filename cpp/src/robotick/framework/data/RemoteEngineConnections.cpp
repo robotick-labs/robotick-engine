@@ -66,11 +66,17 @@ namespace robotick
 							ROBOTICK_FATAL_EXIT("[REC::receiver] Receiver failed to bind field: %s", path);
 						}
 						out.path = path;
-						out.recv_ptr = field_info.ptr;
+						out.input_handle = engine ? engine->find_or_create_data_connection_input_handle(
+														path, field_info.ptr, field_info.size, field_info.descriptor->type_id)
+												  : nullptr;
 						out.size = field_info.size;
 						ROBOTICK_ASSERT(field_info.descriptor != nullptr);
 						out.type_desc = field_info.descriptor->find_type_descriptor();
 						ROBOTICK_ASSERT(out.type_desc != nullptr);
+						ROBOTICK_ASSERT(out.input_handle != nullptr);
+						ROBOTICK_ASSERT(out.input_handle->dest_ptr == field_info.ptr);
+						ROBOTICK_ASSERT(out.input_handle->size == out.size);
+						ROBOTICK_ASSERT(out.input_handle->type == field_info.descriptor->type_id);
 						return true;
 					});
 

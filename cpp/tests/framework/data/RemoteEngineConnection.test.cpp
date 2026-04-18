@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "robotick/framework/data/RemoteEngineConnection.h"
+#include "robotick/framework/data/DataConnection.h"
 
 #include "robotick/api.h"
 #include "robotick/framework/concurrency/Thread.h"
@@ -13,6 +14,33 @@
 #include <catch2/catch_all.hpp>
 
 using namespace robotick;
+
+static void init_input_handle(DataConnectionInputHandle& handle, void* dest_ptr, size_t size, TypeId type)
+{
+	handle.dest_ptr = dest_ptr;
+	handle.size = size;
+	handle.type = type;
+	handle.set_enabled(true);
+}
+
+static void bind_receiver_field(
+	RemoteEngineConnection::Field& out, const char* path, DataConnectionInputHandle& input_handle, const TypeDescriptor* type_desc = nullptr)
+{
+	out.path = path;
+	out.size = input_handle.size;
+	out.type_desc = type_desc;
+	out.input_handle = &input_handle;
+}
+
+static RemoteEngineConnection::Field make_sender_field(const char* path, const void* send_ptr, size_t size, const TypeDescriptor* type_desc = nullptr)
+{
+	RemoteEngineConnection::Field field;
+	field.path = path;
+	field.send_ptr = send_ptr;
+	field.size = size;
+	field.type_desc = type_desc;
+	return field;
+}
 
 static int wait_for_listen_port(RemoteEngineConnection& receiver, int max_attempts = 50, int sleep_ms = 10)
 {
@@ -38,6 +66,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		static constexpr int target_value = 42;
 		int recv_value = 0;
 		int send_value = target_value;
+		DataConnectionInputHandle recv_handle;
+		init_input_handle(recv_handle, &recv_value, sizeof(recv_value), GET_TYPE_ID(int));
 
 		RemoteEngineConnection receiver;
 		RemoteEngineConnection sender;
@@ -48,10 +78,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			{
 				if (string_equals(path, "x"))
 				{
-					out.path = path;
-					out.recv_ptr = &recv_value;
-					out.size = sizeof(int);
-					out.type_desc = TypeRegistry::get().find_by_name("int");
+					bind_receiver_field(out, path, recv_handle, TypeRegistry::get().find_by_name("int"));
 					return true;
 				}
 				return false;
@@ -61,7 +88,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		REQUIRE(receiver_listen_port > 0);
 
 		sender.configure_sender("test-sender", "test-receiver", "127.0.0.1", receiver_listen_port);
-		sender.register_field({"x", &send_value, nullptr, sizeof(int), 0});
+		sender.register_field(make_sender_field("x", &send_value, sizeof(int)));
 
 		for (int i = 0; i < 50; ++i)
 		{
@@ -76,12 +103,70 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		REQUIRE(recv_value == target_value);
 	}
 
+	SECTION("Receiver input handle suppresses remote writes until re-enabled", "[RemoteEngineConnection]")
+	{
+		int recv_value = 5;
+		int send_value = 42;
+
+		DataConnectionInputHandle input_handle;
+		init_input_handle(input_handle, &recv_value, sizeof(recv_value), GET_TYPE_ID(int));
+		input_handle.set_enabled(false);
+
+		RemoteEngineConnection receiver;
+		RemoteEngineConnection sender;
+
+		receiver.configure_receiver("test-receiver");
+		receiver.set_field_binder(
+			[&](const char* path, RemoteEngineConnection::Field& out)
+			{
+				if (string_equals(path, "x"))
+				{
+					bind_receiver_field(out, path, input_handle, TypeRegistry::get().find_by_name("int"));
+					return true;
+				}
+				return false;
+			});
+
+		const int receiver_listen_port = wait_for_listen_port(receiver);
+		REQUIRE(receiver_listen_port > 0);
+
+		sender.configure_sender("test-sender", "test-receiver", "127.0.0.1", receiver_listen_port);
+		sender.register_field(make_sender_field("x", &send_value, sizeof(int)));
+
+		for (int i = 0; i < 30; ++i)
+		{
+			sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			Thread::sleep_ms(20);
+		}
+		REQUIRE(recv_value == 5);
+
+		input_handle.set_enabled(true);
+		for (int i = 0; i < 30; ++i)
+		{
+			sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			Thread::sleep_ms(20);
+
+			if (recv_value == send_value)
+			{
+				break;
+			}
+		}
+
+		REQUIRE(recv_value == send_value);
+	}
+
 	SECTION("Handshake binds last field without trailing newline", "[RemoteEngineConnection]")
 	{
 		int recv_a = 0;
 		int recv_b = 0;
 		int send_a = 7;
 		int send_b = 9;
+		DataConnectionInputHandle recv_handle_a;
+		DataConnectionInputHandle recv_handle_b;
+		init_input_handle(recv_handle_a, &recv_a, sizeof(recv_a), GET_TYPE_ID(int));
+		init_input_handle(recv_handle_b, &recv_b, sizeof(recv_b), GET_TYPE_ID(int));
 
 		RemoteEngineConnection receiver;
 		RemoteEngineConnection sender;
@@ -97,19 +182,13 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			{
 				if (string_equals(path, path_a))
 				{
-					out.path = path;
-					out.recv_ptr = &recv_a;
-					out.size = sizeof(int);
-					out.type_desc = TypeRegistry::get().find_by_name("int");
+					bind_receiver_field(out, path, recv_handle_a, TypeRegistry::get().find_by_name("int"));
 					++bind_count;
 					return true;
 				}
 				if (string_equals(path, path_b))
 				{
-					out.path = path;
-					out.recv_ptr = &recv_b;
-					out.size = sizeof(int);
-					out.type_desc = TypeRegistry::get().find_by_name("int");
+					bind_receiver_field(out, path, recv_handle_b, TypeRegistry::get().find_by_name("int"));
 					++bind_count;
 					return true;
 				}
@@ -120,8 +199,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		REQUIRE(receiver_listen_port > 0);
 
 		sender.configure_sender("test-sender", "test-receiver", "127.0.0.1", receiver_listen_port);
-		sender.register_field({path_a, &send_a, nullptr, sizeof(int), 0});
-		sender.register_field({path_b, &send_b, nullptr, sizeof(int), 0});
+		sender.register_field(make_sender_field(path_a, &send_a, sizeof(int)));
+		sender.register_field(make_sender_field(path_b, &send_b, sizeof(int)));
 
 		for (int i = 0; i < 50; ++i)
 		{
@@ -152,6 +231,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		int recv_val = 0;
 		int send_val = 123;
 		bool bound = false;
+		DataConnectionInputHandle recv_handle;
+		init_input_handle(recv_handle, &recv_val, sizeof(recv_val), GET_TYPE_ID(int));
 
 		RemoteEngineConnection receiver;
 		RemoteEngineConnection sender;
@@ -162,10 +243,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			{
 				if (string_equals(path, long_path.c_str()))
 				{
-					out.path = path;
-					out.recv_ptr = &recv_val;
-					out.size = sizeof(int);
-					out.type_desc = TypeRegistry::get().find_by_name("int");
+					bind_receiver_field(out, path, recv_handle, TypeRegistry::get().find_by_name("int"));
 					bound = true;
 					return true;
 				}
@@ -176,7 +254,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		REQUIRE(receiver_listen_port > 0);
 
 		sender.configure_sender("tx", "rx", "127.0.0.1", receiver_listen_port);
-		sender.register_field({long_path.c_str(), &send_val, nullptr, sizeof(int), 0});
+		sender.register_field(make_sender_field(long_path.c_str(), &send_val, sizeof(int)));
 
 		for (int i = 0; i < 50; ++i)
 		{
@@ -196,6 +274,9 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		static constexpr int kFieldCount = 6;
 		int recv_values[kFieldCount] = {};
 		int send_values[kFieldCount] = {1, 2, 3, 4, 5, 6};
+		DataConnectionInputHandle recv_handles[kFieldCount];
+		for (int i = 0; i < kFieldCount; ++i)
+			init_input_handle(recv_handles[i], &recv_values[i], sizeof(recv_values[i]), GET_TYPE_ID(int));
 
 		FixedVector<FixedString64, kFieldCount> paths;
 		for (int i = 0; i < kFieldCount; ++i)
@@ -218,10 +299,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 				{
 					if (string_equals(paths[i].c_str(), path))
 					{
-						out.path = path;
-						out.recv_ptr = &recv_values[i];
-						out.size = sizeof(int);
-						out.type_desc = TypeRegistry::get().find_by_name("int");
+						bind_receiver_field(out, path, recv_handles[i], TypeRegistry::get().find_by_name("int"));
 						++bound_count;
 						return true;
 					}
@@ -235,7 +313,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		sender.configure_sender("tx", "rx", "127.0.0.1", receiver_listen_port);
 		for (int i = 0; i < kFieldCount; ++i)
 		{
-			sender.register_field({paths[i].c_str(), &send_values[i], nullptr, sizeof(int), 0});
+			sender.register_field(make_sender_field(paths[i].c_str(), &send_values[i], sizeof(int)));
 		}
 
 		for (int i = 0; i < 100; ++i)
@@ -266,9 +344,11 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		static constexpr int kFieldCount = 20;
 		int recv_values[kFieldCount] = {};
 		int send_values[kFieldCount] = {};
+		DataConnectionInputHandle recv_handles[kFieldCount];
 		for (int i = 0; i < kFieldCount; ++i)
 		{
 			send_values[i] = i + 100;
+			init_input_handle(recv_handles[i], &recv_values[i], sizeof(recv_values[i]), GET_TYPE_ID(int));
 		}
 
 		FixedVector<FixedString64, kFieldCount> paths;
@@ -292,10 +372,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 				{
 					if (string_equals(paths[i].c_str(), path))
 					{
-						out.path = path;
-						out.recv_ptr = &recv_values[i];
-						out.size = sizeof(int);
-						out.type_desc = TypeRegistry::get().find_by_name("int");
+						bind_receiver_field(out, path, recv_handles[i], TypeRegistry::get().find_by_name("int"));
 						++bound_count;
 						return true;
 					}
@@ -309,7 +386,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		sender.configure_sender("tx", "rx", "127.0.0.1", receiver_listen_port);
 		for (int i = 0; i < kFieldCount; ++i)
 		{
-			sender.register_field({paths[i].c_str(), &send_values[i], nullptr, sizeof(int), 0});
+			sender.register_field(make_sender_field(paths[i].c_str(), &send_values[i], sizeof(int)));
 		}
 
 		for (int i = 0; i < 150; ++i)
@@ -346,6 +423,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			send_buffer[i] = target_value;
 		HeapVector<uint8_t> receive_buffer;
 		receive_buffer.initialize(32768);
+		DataConnectionInputHandle recv_handle;
+		init_input_handle(recv_handle, receive_buffer.data(), receive_buffer.size(), TypeId::invalid());
 
 		RemoteEngineConnection receiver;
 		RemoteEngineConnection sender;
@@ -354,9 +433,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		receiver.set_field_binder(
 			[&](const char*, RemoteEngineConnection::Field& out)
 			{
-				out.recv_ptr = receive_buffer.data();
-				out.size = receive_buffer.size();
-				out.path = "blob";
+				bind_receiver_field(out, "blob", recv_handle);
 				return true;
 			});
 
@@ -364,7 +441,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		REQUIRE(receiver_listen_port > 0);
 
 		sender.configure_sender("test-sender", "test-receiver", "127.0.0.1", receiver_listen_port);
-		sender.register_field({"blob", send_buffer.data(), nullptr, send_buffer.size(), 0});
+		sender.register_field(make_sender_field("blob", send_buffer.data(), send_buffer.size()));
 
 		for (int i = 0; i < 50; ++i)
 		{
@@ -402,6 +479,10 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		send_buffer.initialize(kBlobCapacity);
 		HeapVector<uint8_t> receive_buffer;
 		receive_buffer.initialize(kBlobCapacity);
+		DataConnectionInputHandle recv_count_handle;
+		DataConnectionInputHandle recv_blob_handle;
+		init_input_handle(recv_count_handle, &recv_count, sizeof(recv_count), GET_TYPE_ID(uint32_t));
+		init_input_handle(recv_blob_handle, receive_buffer.data(), receive_buffer.size(), TypeId::invalid());
 
 		RemoteEngineConnection receiver;
 		RemoteEngineConnection sender;
@@ -412,18 +493,13 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			{
 				if (string_equals(path, "blob.count"))
 				{
-					out.recv_ptr = &recv_count;
-					out.size = sizeof(recv_count);
-					out.path = path;
-					out.type_desc = TypeRegistry::get().find_by_name("uint32_t");
+					bind_receiver_field(out, path, recv_count_handle, TypeRegistry::get().find_by_name("uint32_t"));
 					return true;
 				}
 
 				if (string_equals(path, "blob.data"))
 				{
-					out.recv_ptr = receive_buffer.data();
-					out.size = receive_buffer.size();
-					out.path = path;
+					bind_receiver_field(out, path, recv_blob_handle);
 					return true;
 				}
 
@@ -434,8 +510,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		REQUIRE(receiver_listen_port > 0);
 
 		sender.configure_sender("test-sender", "test-receiver", "127.0.0.1", receiver_listen_port);
-		sender.register_field({"blob.count", &send_count, nullptr, sizeof(send_count), 0});
-		sender.register_field({"blob.data", send_buffer.data(), nullptr, send_buffer.size(), 0});
+		sender.register_field(make_sender_field("blob.count", &send_count, sizeof(send_count)));
+		sender.register_field(make_sender_field("blob.data", send_buffer.data(), send_buffer.size()));
 
 		auto buffers_match = [&]() -> bool
 		{
@@ -490,6 +566,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		static constexpr int target_value_later = 200;
 		int recv_value = 0;
 		int send_value = target_value;
+		DataConnectionInputHandle recv_handle;
+		init_input_handle(recv_handle, &recv_value, sizeof(recv_value), GET_TYPE_ID(int));
 
 		RemoteEngineConnection receiver;
 		RemoteEngineConnection sender;
@@ -500,10 +578,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			{
 				if (string_equals(path, "x"))
 				{
-					out.path = path;
-					out.recv_ptr = &recv_value;
-					out.size = sizeof(int);
-					out.type_desc = TypeRegistry::get().find_by_name("int");
+					bind_receiver_field(out, path, recv_handle, TypeRegistry::get().find_by_name("int"));
 					return true;
 				}
 				return false;
@@ -513,7 +588,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		REQUIRE(receiver_listen_port > 0);
 
 		sender.configure_sender("test-sender", "test-receiver", "127.0.0.1", receiver_listen_port);
-		sender.register_field({"x", &send_value, nullptr, sizeof(int), 0});
+		sender.register_field(make_sender_field("x", &send_value, sizeof(int)));
 
 		for (int i = 0; i < 50; ++i)
 		{
@@ -581,6 +656,8 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 	{
 		int recv_value = 0;
 		int send_value = 11;
+		DataConnectionInputHandle recv_handle;
+		init_input_handle(recv_handle, &recv_value, sizeof(recv_value), GET_TYPE_ID(int));
 
 		RemoteEngineConnection receiver;
 		RemoteEngineConnection sender;
@@ -589,10 +666,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		receiver.set_field_binder(
 			[&](const char*, RemoteEngineConnection::Field& f)
 			{
-				f.recv_ptr = &recv_value;
-				f.size = sizeof(int);
-				f.path = "x";
-				f.type_desc = TypeRegistry::get().find_by_name("int");
+				bind_receiver_field(f, "x", recv_handle, TypeRegistry::get().find_by_name("int"));
 				return true;
 			});
 
@@ -600,7 +674,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		REQUIRE(receiver_listen_port > 0);
 
 		sender.configure_sender("test-sender", "test-receiver", "127.0.0.1", receiver_listen_port);
-		sender.register_field({"x", &send_value, nullptr, sizeof(int), 0});
+		sender.register_field(make_sender_field("x", &send_value, sizeof(int)));
 
 		for (int i = 0; i < 200 && recv_value != 11; ++i)
 		{
@@ -628,6 +702,10 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 	{
 		int a_send = 101, a_recv = 0;
 		int b_send = 202, b_recv = 0;
+		DataConnectionInputHandle a_recv_handle;
+		DataConnectionInputHandle b_recv_handle;
+		init_input_handle(a_recv_handle, &a_recv, sizeof(a_recv), GET_TYPE_ID(int));
+		init_input_handle(b_recv_handle, &b_recv, sizeof(b_recv), GET_TYPE_ID(int));
 
 		RemoteEngineConnection a_rx, a_tx;
 		RemoteEngineConnection b_rx, b_tx;
@@ -639,10 +717,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			{
 				if (string_equals(path, "value"))
 				{
-					f.path = path;
-					f.recv_ptr = &a_recv;
-					f.size = sizeof(int);
-					f.type_desc = TypeRegistry::get().find_by_name("int");
+					bind_receiver_field(f, path, a_recv_handle, TypeRegistry::get().find_by_name("int"));
 					return true;
 				}
 				return false;
@@ -658,10 +733,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			{
 				if (string_equals(path, "value"))
 				{
-					f.path = path;
-					f.recv_ptr = &b_recv;
-					f.size = sizeof(int);
-					f.type_desc = TypeRegistry::get().find_by_name("int");
+					bind_receiver_field(f, path, b_recv_handle, TypeRegistry::get().find_by_name("int"));
 					return true;
 				}
 				return false;
@@ -671,10 +743,10 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		REQUIRE(b_rx_listen_port > 0);
 
 		a_tx.configure_sender("peer-a", "peer-b", "127.0.0.1", b_rx_listen_port);
-		a_tx.register_field({"value", &a_send, nullptr, sizeof(int), 0});
+		a_tx.register_field(make_sender_field("value", &a_send, sizeof(int)));
 
 		b_tx.configure_sender("peer-b", "peer-a", "127.0.0.1", a_rx_listen_port);
-		b_tx.register_field({"value", &b_send, nullptr, sizeof(int), 0});
+		b_tx.register_field(make_sender_field("value", &b_send, sizeof(int)));
 
 		for (int i = 0; i < 100; ++i)
 		{
@@ -698,6 +770,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			const char* id;
 			int send_value = 0;
 			int recv_value = 0;
+			DataConnectionInputHandle recv_handle;
 
 			RemoteEngineConnection receiver;
 			RemoteEngineConnection sender;
@@ -706,10 +779,13 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		Peer a, b, c;
 		a.id = "peer-a";
 		a.send_value = 111;
+		init_input_handle(a.recv_handle, &a.recv_value, sizeof(a.recv_value), GET_TYPE_ID(int));
 		b.id = "peer-b";
 		b.send_value = 222;
+		init_input_handle(b.recv_handle, &b.recv_value, sizeof(b.recv_value), GET_TYPE_ID(int));
 		c.id = "peer-c";
 		c.send_value = 333;
+		init_input_handle(c.recv_handle, &c.recv_value, sizeof(c.recv_value), GET_TYPE_ID(int));
 
 		auto setup_receiver = [](Peer& peer, const char* expected_sender_id)
 		{
@@ -719,10 +795,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 				{
 					if (string_equals(path, expected_sender_id))
 					{
-						f.path = path;
-						f.recv_ptr = &peer.recv_value;
-						f.size = sizeof(int);
-						f.type_desc = TypeRegistry::get().find_by_name("int");
+						bind_receiver_field(f, path, peer.recv_handle, TypeRegistry::get().find_by_name("int"));
 						return true;
 					}
 					return false;
@@ -741,13 +814,13 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		REQUIRE(port_c > 0);
 
 		a.sender.configure_sender("peer-a", "peer-b", "127.0.0.1", port_b);
-		a.sender.register_field({"peer-a", &a.send_value, nullptr, sizeof(int), 0});
+		a.sender.register_field(make_sender_field("peer-a", &a.send_value, sizeof(int)));
 
 		b.sender.configure_sender("peer-b", "peer-c", "127.0.0.1", port_c);
-		b.sender.register_field({"peer-b", &b.send_value, nullptr, sizeof(int), 0});
+		b.sender.register_field(make_sender_field("peer-b", &b.send_value, sizeof(int)));
 
 		c.sender.configure_sender("peer-c", "peer-a", "127.0.0.1", port_a);
-		c.sender.register_field({"peer-c", &c.send_value, nullptr, sizeof(int), 0});
+		c.sender.register_field(make_sender_field("peer-c", &c.send_value, sizeof(int)));
 
 		for (int i = 0; i < 100; ++i)
 		{
@@ -777,6 +850,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			const char* id;
 			int recv_value = 0;
 			int send_value = 0;
+			DataConnectionInputHandle recv_handle;
 			RemoteEngineConnection receiver;
 			RemoteEngineConnection sender;
 		};
@@ -784,9 +858,12 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		Peer a, b, c;
 		a.id = "peer-a";
 		a.send_value = 111;
+		init_input_handle(a.recv_handle, &a.recv_value, sizeof(a.recv_value), GET_TYPE_ID(int));
 		b.id = "peer-b";
+		init_input_handle(b.recv_handle, &b.recv_value, sizeof(b.recv_value), GET_TYPE_ID(int));
 		c.id = "peer-c";
 		c.send_value = 333;
+		init_input_handle(c.recv_handle, &c.recv_value, sizeof(c.recv_value), GET_TYPE_ID(int));
 
 		a.receiver.configure_receiver("peer-a");
 		a.receiver.set_field_binder(
@@ -794,10 +871,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			{
 				if (string_equals(path, "peer-c"))
 				{
-					f.path = path;
-					f.recv_ptr = &a.recv_value;
-					f.size = sizeof(int);
-					f.type_desc = TypeRegistry::get().find_by_name("int");
+					bind_receiver_field(f, path, a.recv_handle, TypeRegistry::get().find_by_name("int"));
 					return true;
 				}
 				return false;
@@ -809,10 +883,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			{
 				if (string_equals(path, "peer-a"))
 				{
-					f.path = path;
-					f.recv_ptr = &b.recv_value;
-					f.size = sizeof(int);
-					f.type_desc = TypeRegistry::get().find_by_name("int");
+					bind_receiver_field(f, path, b.recv_handle, TypeRegistry::get().find_by_name("int"));
 					return true;
 				}
 				return false;
@@ -824,10 +895,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			{
 				if (string_equals(path, "peer-a"))
 				{
-					f.path = path;
-					f.recv_ptr = &c.recv_value;
-					f.size = sizeof(int);
-					f.type_desc = TypeRegistry::get().find_by_name("int");
+					bind_receiver_field(f, path, c.recv_handle, TypeRegistry::get().find_by_name("int"));
 					return true;
 				}
 				return false;
@@ -841,14 +909,14 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		REQUIRE(port_c > 0);
 
 		a.sender.configure_sender("peer-a", "peer-b", "127.0.0.1", port_b);
-		a.sender.register_field({"peer-a", &a.send_value, nullptr, sizeof(int), 0});
+		a.sender.register_field(make_sender_field("peer-a", &a.send_value, sizeof(int)));
 
 		RemoteEngineConnection a_to_c;
 		a_to_c.configure_sender("peer-a", "peer-c", "127.0.0.1", port_c);
-		a_to_c.register_field({"peer-a", &a.send_value, nullptr, sizeof(int), 0});
+		a_to_c.register_field(make_sender_field("peer-a", &a.send_value, sizeof(int)));
 
 		c.sender.configure_sender("peer-c", "peer-a", "127.0.0.1", port_a);
-		c.sender.register_field({"peer-c", &c.send_value, nullptr, sizeof(int), 0});
+		c.sender.register_field(make_sender_field("peer-c", &c.send_value, sizeof(int)));
 
 		for (int i = 0; i < 200; ++i)
 		{
@@ -885,6 +953,9 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 			int recv_from_b = 0;
 			int recv_from_c = 0;
 			int recv_from_d = 0;
+			DataConnectionInputHandle recv_handle_b;
+			DataConnectionInputHandle recv_handle_c;
+			DataConnectionInputHandle recv_handle_d;
 
 			RemoteEngineConnection rx_b;
 			RemoteEngineConnection rx_c;
@@ -901,28 +972,28 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 
 		Receiver a;
 		a.id = "peer-a";
+		init_input_handle(a.recv_handle_b, &a.recv_from_b, sizeof(a.recv_from_b), GET_TYPE_ID(int));
+		init_input_handle(a.recv_handle_c, &a.recv_from_c, sizeof(a.recv_from_c), GET_TYPE_ID(int));
+		init_input_handle(a.recv_handle_d, &a.recv_from_d, sizeof(a.recv_from_d), GET_TYPE_ID(int));
 
-		auto setup_receiver = [](RemoteEngineConnection& rx, const char* self, const char* sender_id, int* out)
+		auto setup_receiver = [](RemoteEngineConnection& rx, const char* self, const char* sender_id, DataConnectionInputHandle& input_handle)
 		{
 			rx.configure_receiver(self);
 			rx.set_field_binder(
-				[=](const char* path, RemoteEngineConnection::Field& f)
+				[&input_handle, sender_id](const char* path, RemoteEngineConnection::Field& f)
 				{
 					if (string_equals(path, sender_id))
 					{
-						f.path = path;
-						f.recv_ptr = out;
-						f.size = sizeof(int);
-						f.type_desc = TypeRegistry::get().find_by_name("int");
+						bind_receiver_field(f, path, input_handle, TypeRegistry::get().find_by_name("int"));
 						return true;
 					}
 					return false;
 				});
 		};
 
-		setup_receiver(a.rx_b, "peer-a", "peer-b", &a.recv_from_b);
-		setup_receiver(a.rx_c, "peer-a", "peer-c", &a.recv_from_c);
-		setup_receiver(a.rx_d, "peer-a", "peer-d", &a.recv_from_d);
+		setup_receiver(a.rx_b, "peer-a", "peer-b", a.recv_handle_b);
+		setup_receiver(a.rx_c, "peer-a", "peer-c", a.recv_handle_c);
+		setup_receiver(a.rx_d, "peer-a", "peer-d", a.recv_handle_d);
 
 		const int port_a_b = wait_for_listen_port(a.rx_b);
 		const int port_a_c = wait_for_listen_port(a.rx_c);
@@ -934,7 +1005,7 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		auto setup_sender = [](RemoteEngineConnection& s, const char* from, const char* to, const char* path, int* value, int port)
 		{
 			s.configure_sender(from, to, "127.0.0.1", port);
-			s.register_field({path, value, nullptr, sizeof(int), 0});
+			s.register_field(make_sender_field(path, value, sizeof(int)));
 		};
 
 		setup_sender(b.sender, "peer-b", "peer-a", "peer-b", &b.value, port_a_b);

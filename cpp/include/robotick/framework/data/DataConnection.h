@@ -4,6 +4,7 @@
 #pragma once
 
 #include "robotick/api_base.h"
+#include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/containers/ArrayView.h"
 #include "robotick/framework/containers/HeapVector.h"
 #include "robotick/framework/containers/Map.h"
@@ -16,6 +17,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 
 namespace robotick
@@ -28,11 +30,53 @@ namespace robotick
 	struct TypeDescriptor;
 	class WorkloadsBuffer;
 
+	struct DataConnectionInputHandle
+	{
+		uint16_t handle_id = 0;
+		FixedString512 path;
+		void* dest_ptr = nullptr;
+		size_t size = 0;
+		TypeId type;
+		AtomicValue<uint8_t> enabled{1};
+
+		bool is_enabled() const noexcept { return enabled.load(std_approved::memory_order_acquire) != 0; }
+		void set_enabled(bool value) noexcept
+		{
+			enabled.store(value ? static_cast<uint8_t>(1) : static_cast<uint8_t>(0), std_approved::memory_order_release);
+		}
+
+		void do_copy_data(const void* src_ptr) const noexcept
+		{
+			ROBOTICK_ASSERT(src_ptr != nullptr && dest_ptr != nullptr && size > 0);
+			ROBOTICK_ASSERT(src_ptr != dest_ptr && "Source and destination pointers are the same - this should have been caught in fixup");
+			if (!is_enabled())
+			{
+				return;
+			}
+
+			::memcpy(dest_ptr, src_ptr, size);
+		}
+
+		void do_copy_data_partial(const void* src_ptr, size_t offset, size_t bytes) const noexcept
+		{
+			ROBOTICK_ASSERT(src_ptr != nullptr && dest_ptr != nullptr);
+			ROBOTICK_ASSERT(offset <= size);
+			ROBOTICK_ASSERT(bytes <= size - offset);
+			if (!is_enabled() || bytes == 0)
+			{
+				return;
+			}
+
+			::memcpy(static_cast<uint8_t*>(dest_ptr) + offset, src_ptr, bytes);
+		}
+	};
+
 	struct DataConnectionInfo
 	{
 		const DataConnectionSeed* seed = nullptr;
 		const void* source_ptr = nullptr;
 		void* dest_ptr = nullptr;
+		DataConnectionInputHandle* dest_handle = nullptr;
 		const WorkloadInstanceInfo* source_workload = nullptr;
 		const WorkloadInstanceInfo* dest_workload = nullptr;
 		size_t size = 0;
@@ -49,9 +93,14 @@ namespace robotick
 
 		void do_data_copy() const noexcept
 		{
+			if (dest_handle)
+			{
+				dest_handle->do_copy_data(source_ptr);
+				return;
+			}
+
 			ROBOTICK_ASSERT(source_ptr != nullptr && dest_ptr != nullptr && size > 0);
 			ROBOTICK_ASSERT(source_ptr != dest_ptr && "Source and destination pointers are the same - this should have been caught in fixup");
-
 			::memcpy(dest_ptr, source_ptr, size);
 		}
 	};

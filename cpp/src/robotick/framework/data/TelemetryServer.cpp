@@ -28,8 +28,8 @@
 #include <unistd.h>
 
 #if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
-#include <curl/curl.h>
 #include <arpa/inet.h>
+#include <curl/curl.h>
 #include <errno.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -126,34 +126,6 @@ namespace robotick
 			return nullptr;
 		}
 
-		static bool has_incoming_connection_overlap(
-			const HeapVector<DataConnectionInfo>& connections, const void* target_ptr, const size_t target_size)
-		{
-			if (!target_ptr || target_size == 0)
-			{
-				return false;
-			}
-
-			const uintptr_t target_begin = reinterpret_cast<uintptr_t>(target_ptr);
-			const uintptr_t target_end = target_begin + target_size;
-
-			for (const DataConnectionInfo& connection : connections)
-			{
-				if (!connection.dest_ptr || connection.size == 0)
-				{
-					continue;
-				}
-
-				const uintptr_t connection_begin = reinterpret_cast<uintptr_t>(connection.dest_ptr);
-				const uintptr_t connection_end = connection_begin + connection.size;
-				if (target_begin < connection_end && connection_begin < target_end)
-				{
-					return true;
-				}
-			}
-			return false;
-		}
-
 		static bool uri_equals(const char* lhs, const char* rhs)
 		{
 			return lhs && rhs && StringView(lhs).equals(rhs);
@@ -202,6 +174,28 @@ namespace robotick
 			static constexpr size_t max_writes = 32;
 			HeapVector<TelemetryWriteRequestEntry> writes;
 			size_t write_count = 0;
+		};
+
+		struct TelemetryConnectionStateRequestEntry
+		{
+			bool has_field_handle = false;
+			uint16_t field_handle = 0;
+			bool has_field_path = false;
+			FixedString512 field_path;
+			bool has_enabled = false;
+			bool enabled = true;
+		};
+
+		struct TelemetryConnectionStateRequestPayload
+		{
+			TelemetryConnectionStateRequestPayload() { updates.initialize(max_updates); }
+
+			bool has_engine_session_id = false;
+			FixedString64 engine_session_id;
+			bool has_updates = false;
+			static constexpr size_t max_updates = 32;
+			HeapVector<TelemetryConnectionStateRequestEntry> updates;
+			size_t update_count = 0;
 		};
 
 		class JsonCursor
@@ -253,6 +247,70 @@ namespace robotick
 					{
 						out_payload.has_writes = true;
 						if (!parse_writes_array(out_payload.writes, out_payload.write_count))
+						{
+							return false;
+						}
+					}
+					else if (!skip_value())
+					{
+						return false;
+					}
+
+					skip_ws();
+					if (consume('}'))
+					{
+						return true;
+					}
+					if (!consume(','))
+					{
+						return false;
+					}
+					skip_ws();
+				}
+
+				return false;
+			}
+
+			bool parse_connection_state_request(TelemetryConnectionStateRequestPayload& out_payload)
+			{
+				skip_ws();
+				if (!consume('{'))
+				{
+					return false;
+				}
+
+				skip_ws();
+				if (consume('}'))
+				{
+					return true;
+				}
+
+				while (!is_at_end())
+				{
+					FixedString64 key;
+					if (!parse_string(key))
+					{
+						return false;
+					}
+					skip_ws();
+					if (!consume(':'))
+					{
+						return false;
+					}
+					skip_ws();
+
+					if (key == "engine_session_id")
+					{
+						out_payload.has_engine_session_id = parse_string(out_payload.engine_session_id);
+						if (!out_payload.has_engine_session_id)
+						{
+							return false;
+						}
+					}
+					else if (key == "updates")
+					{
+						out_payload.has_updates = true;
+						if (!parse_connection_updates_array(out_payload.updates, out_payload.update_count))
 						{
 							return false;
 						}
@@ -478,6 +536,23 @@ namespace robotick
 
 				out.assign(start, static_cast<size_t>(cur - start));
 				return true;
+			}
+
+			bool parse_bool(bool& out)
+			{
+				if (matches_literal("true"))
+				{
+					out = true;
+					cur += 4;
+					return true;
+				}
+				if (matches_literal("false"))
+				{
+					out = false;
+					cur += 5;
+					return true;
+				}
+				return false;
 			}
 
 			bool skip_string()
@@ -739,6 +814,121 @@ namespace robotick
 						return false;
 					}
 					out_writes[out_count] = entry;
+					out_count += 1;
+
+					skip_ws();
+					if (consume(']'))
+					{
+						return true;
+					}
+					if (!consume(','))
+					{
+						return false;
+					}
+					skip_ws();
+				}
+
+				return false;
+			}
+
+			bool parse_single_connection_update(TelemetryConnectionStateRequestEntry& out_entry)
+			{
+				if (!consume('{'))
+				{
+					return false;
+				}
+				skip_ws();
+				if (consume('}'))
+				{
+					return true;
+				}
+
+				while (!is_at_end())
+				{
+					FixedString64 key;
+					if (!parse_string(key))
+					{
+						return false;
+					}
+					skip_ws();
+					if (!consume(':'))
+					{
+						return false;
+					}
+					skip_ws();
+
+					if (key == "field_handle")
+					{
+						int64_t parsed_handle = 0;
+						if (!parse_integer(parsed_handle) || parsed_handle <= 0 || parsed_handle > 0xFFFF)
+						{
+							return false;
+						}
+						out_entry.has_field_handle = true;
+						out_entry.field_handle = static_cast<uint16_t>(parsed_handle);
+					}
+					else if (key == "field_path")
+					{
+						out_entry.has_field_path = parse_string(out_entry.field_path);
+						if (!out_entry.has_field_path)
+						{
+							return false;
+						}
+					}
+					else if (key == "enabled")
+					{
+						out_entry.has_enabled = parse_bool(out_entry.enabled);
+						if (!out_entry.has_enabled)
+						{
+							return false;
+						}
+					}
+					else if (!skip_value())
+					{
+						return false;
+					}
+
+					skip_ws();
+					if (consume('}'))
+					{
+						return true;
+					}
+					if (!consume(','))
+					{
+						return false;
+					}
+					skip_ws();
+				}
+
+				return false;
+			}
+
+			bool parse_connection_updates_array(HeapVector<TelemetryConnectionStateRequestEntry>& out_updates, size_t& out_count)
+			{
+				if (!consume('['))
+				{
+					return false;
+				}
+
+				skip_ws();
+				if (consume(']'))
+				{
+					return true;
+				}
+
+				while (!is_at_end())
+				{
+					if (out_count >= out_updates.size())
+					{
+						return false;
+					}
+
+					TelemetryConnectionStateRequestEntry entry;
+					if (!parse_single_connection_update(entry))
+					{
+						return false;
+					}
+					out_updates[out_count] = entry;
 					out_count += 1;
 
 					skip_ws();
@@ -1202,14 +1392,13 @@ namespace robotick
 				return false;
 			}
 
-			const char* handshake =
-				"GET %s HTTP/1.1\r\n"
-				"Host: %s:%u\r\n"
-				"Upgrade: websocket\r\n"
-				"Connection: Upgrade\r\n"
-				"Sec-WebSocket-Version: 13\r\n"
-				"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
-				"\r\n";
+			const char* handshake = "GET %s HTTP/1.1\r\n"
+									"Host: %s:%u\r\n"
+									"Upgrade: websocket\r\n"
+									"Connection: Upgrade\r\n"
+									"Sec-WebSocket-Version: 13\r\n"
+									"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+									"\r\n";
 
 			char request[1024];
 			::snprintf(request, sizeof(request), handshake, path, host, static_cast<unsigned>(port));
@@ -1314,6 +1503,7 @@ namespace robotick
 			const TypeDescriptor* type_desc = nullptr;
 			void* target_ptr = nullptr;
 			uint16_t value_size = 0;
+			DataConnectionInputHandle* incoming_connection_handle = nullptr;
 		};
 
 		struct PendingInputWrite
@@ -1429,6 +1619,7 @@ namespace robotick
 		void send_ws_error(const WebSocketConnection& connection, const char* error_text);
 		bool handle_ws_message(const WsRoute& route, const WebSocketConnection& connection, const WebSocketMessage& message);
 		void build_write_response_json(const char* request_body, size_t request_size, int& out_status_code, json::StringSink& out_json);
+		void build_connection_state_response_json(const char* request_body, size_t request_size, int& out_status_code, json::StringSink& out_json);
 		void maybe_broadcast_local_frame(const Clock::time_point now);
 		void maybe_broadcast_peer_frames(const Clock::time_point now);
 		void maybe_send_heartbeats(const Clock::time_point now);
@@ -1453,6 +1644,7 @@ namespace robotick
 		void handle_get_workloads_buffer_layout(const WebRequest& req, WebResponse& res);
 		void handle_get_workloads_buffer_raw(const WebRequest& req, WebResponse& res);
 		void handle_set_workload_input_fields_data(const WebRequest& req, WebResponse& res);
+		void handle_set_workload_input_connection_state(const WebRequest& req, WebResponse& res);
 	};
 
 	TelemetryServer::TelemetryServer()
@@ -1541,19 +1733,25 @@ namespace robotick
 					FixedString128 routed_suffix_uri;
 					if (try_parse_model_routed_uri(req.uri.c_str(), routed_model_id, routed_suffix_uri))
 					{
-						set_json_response(res,
-							WebResponseCode::NotFound,
-							[&](auto& writer)
-							{
-								writer.start_object();
-								writer.key("error");
-								writer.string("telemetry_rest_data_plane_removed");
-								writer.key("model_id");
-								writer.string(routed_model_id.c_str());
-								writer.key("path");
-								writer.string(routed_suffix_uri.c_str());
-								writer.end_object();
-							});
+						const int peer_index = impl->find_telemetry_peer_index_by_model_id(routed_model_id.c_str());
+						if (peer_index < 0)
+						{
+							set_json_response(res,
+								WebResponseCode::NotFound,
+								[&](auto& writer)
+								{
+									writer.start_object();
+									writer.key("error");
+									writer.string("telemetry_peer_not_found");
+									writer.key("model_id");
+									writer.string(routed_model_id.c_str());
+									writer.end_object();
+								});
+							return true;
+						}
+
+						impl->handle_forwarded_telemetry_request(
+							req, res, impl->telemetry_peers[static_cast<size_t>(peer_index)], routed_suffix_uri.c_str());
 						return true;
 					}
 				}
@@ -2196,8 +2394,7 @@ namespace robotick
 			send_ws_error(client.connection, "telemetry_forward_failed");
 			return;
 		}
-		if (!client.connection.send_frame(
-				0x1,
+		if (!client.connection.send_frame(0x1,
 				peer.peer_ws_latest_layout_size > 0 ? reinterpret_cast<const void*>(peer.peer_ws_latest_layout.data()) : "{}",
 				peer.peer_ws_latest_layout_size))
 		{
@@ -2461,10 +2658,10 @@ namespace robotick
 			{
 				const WsClient& client = clients[i];
 				const bool metadata_ok = client.connection.send_text(metadata.c_str());
-				const bool frame_ok = metadata_ok &&
-					client.connection.send_binary(
-						peer.peer_ws_latest_raw.size() > 0 ? reinterpret_cast<const void*>(peer.peer_ws_latest_raw.data()) : nullptr,
-						peer.peer_ws_latest_raw.size());
+				const bool frame_ok =
+					metadata_ok && client.connection.send_binary(
+									   peer.peer_ws_latest_raw.size() > 0 ? reinterpret_cast<const void*>(peer.peer_ws_latest_raw.data()) : nullptr,
+									   peer.peer_ws_latest_raw.size());
 				if (!frame_ok)
 				{
 					unregister_ws_client(client.connection);
@@ -2579,8 +2776,7 @@ namespace robotick
 			return true;
 		}
 
-		const bool sent = connection.send_frame(
-			0x1,
+		const bool sent = connection.send_frame(0x1,
 			peer.peer_ws_write_response_size > 0 ? reinterpret_cast<const void*>(peer.peer_ws_write_response.data()) : "",
 			peer.peer_ws_write_response_size);
 		if (!sent)
@@ -2603,6 +2799,29 @@ namespace robotick
 			{
 				res.set_status_code(WebResponseCode::OK);
 				res.set_body(nullptr, 0);
+				return true;
+			}
+			if (uri_equals(effective_uri, "/api/telemetry/workloads_buffer/layout"))
+			{
+				handle_get_workloads_buffer_layout(req, res);
+				return true;
+			}
+			if (uri_equals(effective_uri, "/api/telemetry/workloads_buffer/raw"))
+			{
+				handle_get_workloads_buffer_raw(req, res);
+				return true;
+			}
+		}
+		else if (req.method.equals("POST"))
+		{
+			if (uri_equals(effective_uri, "/api/telemetry/set_workload_input_fields_data"))
+			{
+				handle_set_workload_input_fields_data(req, res);
+				return true;
+			}
+			if (uri_equals(effective_uri, "/api/telemetry/set_workload_input_connection_state"))
+			{
+				handle_set_workload_input_connection_state(req, res);
 				return true;
 			}
 		}
@@ -2672,6 +2891,7 @@ namespace robotick
 		const bool is_layout_request = is_get && StringView(suffix_uri).equals("/workloads_buffer/layout");
 		const bool is_raw_request = is_get && StringView(suffix_uri).equals("/workloads_buffer/raw");
 		const bool is_write_request = is_post && StringView(suffix_uri).equals("/set_workload_input_fields_data");
+		const bool is_connection_state_request = is_post && StringView(suffix_uri).equals("/set_workload_input_connection_state");
 
 		auto forward_or_error = [&](ForwardHttpResult& out_result) -> bool
 		{
@@ -2781,7 +3001,7 @@ namespace robotick
 			return;
 		}
 
-		if (is_write_request)
+		if (is_write_request || is_connection_state_request)
 		{
 			LockGuard lock(const_cast<Mutex&>(peer.forwarded_write_mutex));
 			if (!forward_or_error(forwarded))
@@ -2842,8 +3062,6 @@ namespace robotick
 
 		WorkloadsBuffer& workloads_buffer = engine->get_workloads_buffer();
 		const auto& instances = engine->get_all_instance_info();
-		const auto& incoming_connections = engine->get_all_data_connections();
-
 		const auto for_each_writable_input_leaf = [&](auto&& on_leaf)
 		{
 			for (const WorkloadInstanceInfo& workload_instance_info : instances)
@@ -2923,12 +3141,9 @@ namespace robotick
 						{
 							continue;
 						}
-						if (has_incoming_connection_overlap(incoming_connections, field_ptr, field_type->size))
-						{
-							continue;
-						}
+						DataConnectionInputHandle* input_handle = engine->find_data_connection_input_handle_by_overlap(field_ptr, field_type->size);
 
-						on_leaf_ref(field_path, field_type, field_ptr);
+						on_leaf_ref(field_path, field_type, field_ptr, input_handle);
 					}
 				};
 
@@ -2938,7 +3153,7 @@ namespace robotick
 
 		size_t writable_count = 0;
 		for_each_writable_input_leaf(
-			[&](const FixedString512&, const TypeDescriptor*, void*)
+			[&](const FixedString512&, const TypeDescriptor*, void*, DataConnectionInputHandle*)
 			{
 				++writable_count;
 			});
@@ -2959,7 +3174,7 @@ namespace robotick
 
 		size_t write_index = 0;
 		for_each_writable_input_leaf(
-			[&](const FixedString512& field_path, const TypeDescriptor* field_type, void* field_ptr)
+			[&](const FixedString512& field_path, const TypeDescriptor* field_type, void* field_ptr, DataConnectionInputHandle* input_handle)
 			{
 				if (write_index >= writable_count)
 				{
@@ -2972,6 +3187,7 @@ namespace robotick
 				writable.type_desc = field_type;
 				writable.target_ptr = field_ptr;
 				writable.value_size = static_cast<uint16_t>(field_type ? field_type->size : 0);
+				writable.incoming_connection_handle = input_handle;
 				pending_input_writes[write_index] = PendingInputWrite{};
 				++write_index;
 			});
@@ -3213,11 +3429,167 @@ namespace robotick
 		writer.flush();
 	}
 
+	void TelemetryServer::Impl::build_connection_state_response_json(
+		const char* request_body, const size_t request_size, int& out_status_code, json::StringSink& out_json)
+	{
+		struct UpdateResult
+		{
+			uint16_t field_handle = 0;
+			FixedString512 field_path;
+			uint16_t connection_handle = 0;
+			bool enabled = true;
+			const char* status = "";
+		};
+
+		auto write_error = [&](const int status, const char* error_text)
+		{
+			out_status_code = status;
+			json::Writer<json::StringSink> writer(out_json);
+			writer.start_object();
+			writer.key("error");
+			writer.string(error_text ? error_text : "unknown_error");
+			writer.end_object();
+			writer.flush();
+		};
+
+		if (!engine)
+		{
+			write_error(WebResponseCode::ServiceUnavailable, "engine_not_available");
+			return;
+		}
+
+		TelemetryConnectionStateRequestPayload payload;
+		JsonCursor cursor(request_body, request_size);
+		if (!cursor.parse_connection_state_request(payload))
+		{
+			write_error(WebResponseCode::BadRequest, "invalid_json");
+			return;
+		}
+
+		const bool session_matches = !payload.has_engine_session_id || StringView(session_id.c_str()).equals(payload.engine_session_id.c_str());
+		if (!payload.has_updates || payload.update_count == 0)
+		{
+			write_error(WebResponseCode::BadRequest, "missing_updates");
+			return;
+		}
+
+		HeapVector<UpdateResult> results;
+		results.initialize(payload.update_count);
+
+		for (size_t update_payload_index = 0; update_payload_index < payload.update_count; ++update_payload_index)
+		{
+			const TelemetryConnectionStateRequestEntry& update_payload = payload.updates[update_payload_index];
+			if (!session_matches && !update_payload.has_field_path)
+			{
+				write_error(WebResponseCode::PreconditionFailed, "field_path_required_for_stale_session_write");
+				return;
+			}
+
+			int writable_index = -1;
+			uint16_t writable_handle = 0;
+			FixedString512 requested_path;
+
+			if (update_payload.has_field_handle)
+			{
+				writable_handle = update_payload.field_handle;
+				writable_index = find_writable_input_index_by_handle(writable_handle);
+			}
+
+			if (update_payload.has_field_path)
+			{
+				requested_path = update_payload.field_path.c_str();
+				const int path_index = find_writable_input_index_by_path(requested_path.c_str());
+				if (path_index >= 0)
+				{
+					if (writable_index >= 0 && static_cast<size_t>(writable_index) != static_cast<size_t>(path_index))
+					{
+						write_error(WebResponseCode::BadRequest, "field_handle_path_mismatch");
+						return;
+					}
+					writable_index = path_index;
+					writable_handle = writable_input_fields[static_cast<size_t>(writable_index)].handle;
+				}
+			}
+
+			if (writable_index < 0)
+			{
+				write_error(WebResponseCode::NotFound, "writable_input_not_found");
+				return;
+			}
+
+			if (!update_payload.has_enabled)
+			{
+				write_error(WebResponseCode::BadRequest, "missing_enabled");
+				return;
+			}
+
+			WritableInputField& writable = writable_input_fields[static_cast<size_t>(writable_index)];
+			if (!writable.incoming_connection_handle)
+			{
+				write_error(WebResponseCode::Conflict, "writable_input_has_no_incoming_connection");
+				return;
+			}
+
+			writable.incoming_connection_handle->set_enabled(update_payload.enabled);
+
+			UpdateResult& result = results[update_payload_index];
+			result.field_handle = writable_handle;
+			result.field_path = writable.path.c_str();
+			result.connection_handle = writable.incoming_connection_handle->handle_id;
+			result.enabled = writable.incoming_connection_handle->is_enabled();
+			result.status = "accepted";
+		}
+
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
+		rebuild_layout_cache();
+#endif
+
+		out_status_code = WebResponseCode::OK;
+		json::Writer<json::StringSink> writer(out_json);
+		writer.start_object();
+		writer.key("status");
+		writer.string("processed");
+		writer.key("engine_session_id");
+		writer.string(session_id.c_str());
+		writer.key("updates");
+		writer.start_array();
+		for (size_t i = 0; i < payload.update_count; ++i)
+		{
+			const UpdateResult& result = results[i];
+			writer.start_object();
+			writer.key("field_handle");
+			writer.uint64(result.field_handle);
+			writer.key("field_path");
+			writer.string(result.field_path);
+			writer.key("incoming_connection_handle");
+			writer.uint64(result.connection_handle);
+			writer.key("incoming_connection_enabled");
+			writer.boolean(result.enabled);
+			writer.key("status");
+			writer.string(result.status);
+			writer.end_object();
+		}
+		writer.end_array();
+		writer.end_object();
+		writer.flush();
+	}
+
 	void TelemetryServer::Impl::handle_set_workload_input_fields_data(const WebRequest& req, WebResponse& res)
 	{
 		json::StringSink response_body;
 		int status_code = WebResponseCode::InternalServerError;
 		build_write_response_json(reinterpret_cast<const char*>(req.body.data()), req.body.size(), status_code, response_body);
+
+		res.set_status_code(status_code);
+		res.set_content_type("application/json");
+		res.set_body(response_body.c_str(), response_body.size());
+	}
+
+	void TelemetryServer::Impl::handle_set_workload_input_connection_state(const WebRequest& req, WebResponse& res)
+	{
+		json::StringSink response_body;
+		int status_code = WebResponseCode::InternalServerError;
+		build_connection_state_response_json(reinterpret_cast<const char*>(req.body.data()), req.body.size(), status_code, response_body);
 
 		res.set_status_code(status_code);
 		res.set_content_type("application/json");
@@ -3538,6 +3910,15 @@ namespace robotick
 			writer.string(writable.type_desc ? writable.type_desc->name.c_str() : "unknown");
 			writer.key("size");
 			writer.uint64(static_cast<uint64_t>(writable.value_size));
+			if (writable.incoming_connection_handle)
+			{
+				writer.key("incoming_connection_handle");
+				writer.uint64(static_cast<uint64_t>(writable.incoming_connection_handle->handle_id));
+				writer.key("incoming_connection_path");
+				writer.string(writable.incoming_connection_handle->path.c_str());
+				writer.key("incoming_connection_enabled");
+				writer.boolean(writable.incoming_connection_handle->is_enabled());
+			}
 			writer.end_object();
 		}
 		writer.end_array();

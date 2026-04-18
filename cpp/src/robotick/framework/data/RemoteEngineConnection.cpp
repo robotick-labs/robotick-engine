@@ -4,6 +4,7 @@
 #include "robotick/framework/data/RemoteEngineConnection.h"
 #include "robotick/api.h"
 #include "robotick/framework/concurrency/Thread.h"
+#include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/math/IsFinite.h"
 
 #include <arpa/inet.h>
@@ -1284,21 +1285,28 @@ namespace robotick
 				while (cursor < len && field_receive_state.field_index < field_count)
 				{
 					auto& field = fields[field_receive_state.field_index];
-					if (!field.recv_ptr)
+					if (!field.input_handle)
 					{
-						ROBOTICK_FATAL_EXIT("Receiver field '%s' has null recv_ptr", field.path.c_str());
+						ROBOTICK_FATAL_EXIT("Receiver field '%s' has null input_handle", field.path.c_str());
 					}
 
-					const size_t remaining_in_field = field.size - field_receive_state.offset_in_field;
+					const size_t field_size = field.input_handle->size;
+					if (field.type_desc)
+					{
+						ROBOTICK_ASSERT(field.size == field.input_handle->size);
+						ROBOTICK_ASSERT(TypeRegistry::get().find_by_id(field.input_handle->type) == field.type_desc);
+					}
+
+					const size_t remaining_in_field = field_size - field_receive_state.offset_in_field;
 					const size_t take = rtk_min(remaining_in_field, len - cursor);
 
-					::memcpy(static_cast<uint8_t*>(field.recv_ptr) + field_receive_state.offset_in_field, data + cursor, take);
+					field.input_handle->do_copy_data_partial(data + cursor, field_receive_state.offset_in_field, take);
 
 					cursor += take;
 					field_receive_state.offset_in_field += take;
 					field_receive_state.total_bytes_received += take;
 
-					if (field_receive_state.offset_in_field == field.size)
+					if (field_receive_state.offset_in_field == field_size)
 					{
 						field_receive_state.field_index++;
 						field_receive_state.offset_in_field = 0;

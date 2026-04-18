@@ -498,11 +498,7 @@ namespace robotick::test
 			return false;
 		}
 
-		bool wait_for_ws_frame_metadata_and_payload(
-			WsTestClient& client,
-			json::Document& metadata_doc,
-			size_t& payload_size,
-			int max_frames = 48)
+		bool wait_for_ws_frame_metadata_and_payload(WsTestClient& client, json::Document& metadata_doc, size_t& payload_size, int max_frames = 48)
 		{
 			WsFrame frame;
 			HeapVector<char> text;
@@ -1446,22 +1442,25 @@ namespace robotick::test
 			char url[256];
 			::snprintf(url, sizeof(url), "http://127.0.0.1:%u/api/telemetry/workloads_buffer/layout", static_cast<unsigned int>(gateway_port));
 			const HttpResponse local_layout = http_request(url);
-			REQUIRE(local_layout.status_code == 404);
+			REQUIRE(local_layout.status_code == 200);
+			REQUIRE(contains_text(local_layout.body.data, "\"writable_inputs\""));
 
 			::snprintf(url,
 				sizeof(url),
 				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/workloads_buffer/layout",
 				static_cast<unsigned int>(gateway_port));
 			const HttpResponse peer_layout = http_request(url);
-			REQUIRE(peer_layout.status_code == 404);
+			REQUIRE(peer_layout.status_code == 200);
+			REQUIRE(contains_text(peer_layout.body.data, "\"writable_inputs\""));
 
 			::snprintf(url,
 				sizeof(url),
 				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/set_workload_input_fields_data",
 				static_cast<unsigned int>(gateway_port));
-			const HttpResponse peer_write = http_request(
-				url, "POST", "{\"engine_session_id\":\"x\",\"writes\":[{\"field_handle\":1,\"value\":1.0}]}");
-			REQUIRE(peer_write.status_code == 404);
+			const HttpResponse peer_write =
+				http_request(url, "POST", "{\"engine_session_id\":\"x\",\"writes\":[{\"field_handle\":1,\"value\":1.0}]}");
+			REQUIRE(peer_write.status_code == 412);
+			REQUIRE(contains_text(peer_write.body.data, "\"field_path_required_for_stale_session_write\""));
 
 			gateway_stop.set();
 			peer_stop.set();

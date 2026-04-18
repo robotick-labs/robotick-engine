@@ -173,6 +173,32 @@ namespace robotick::test
 			REQUIRE(b->inputs.y == Catch::Approx(3.14));
 		}
 
+		SECTION("Shared input handle suppresses and re-enables destination writes")
+		{
+			int source_value = 17;
+			int dest_value = 3;
+
+			DataConnectionInputHandle input_handle;
+			input_handle.dest_ptr = &dest_value;
+			input_handle.size = sizeof(dest_value);
+			input_handle.type = GET_TYPE_ID(int);
+			input_handle.set_enabled(false);
+
+			DataConnectionInfo connection;
+			connection.source_ptr = &source_value;
+			connection.dest_ptr = &dest_value;
+			connection.dest_handle = &input_handle;
+			connection.size = sizeof(source_value);
+			connection.type = GET_TYPE_ID(int);
+
+			connection.do_data_copy();
+			REQUIRE(dest_value == 3);
+
+			input_handle.set_enabled(true);
+			connection.do_data_copy();
+			REQUIRE(dest_value == 17);
+		}
+
 		SECTION("Resolves non-blackboard to blackboard")
 		{
 			Model model;

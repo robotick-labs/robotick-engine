@@ -14,6 +14,7 @@
 
 namespace robotick
 {
+	struct DataConnectionInputHandle;
 	struct TickInfo;
 	struct TypeDescriptor;
 
@@ -58,9 +59,9 @@ namespace robotick
 		{
 			FixedString512 path;
 			const void* send_ptr = nullptr;
-			void* recv_ptr = nullptr;
 			size_t size = 0;
 			const TypeDescriptor* type_desc = nullptr;
+			DataConnectionInputHandle* input_handle = nullptr;
 		};
 
 		using BinderCallback = Function<bool(const char* path, Field& out_field)>;
