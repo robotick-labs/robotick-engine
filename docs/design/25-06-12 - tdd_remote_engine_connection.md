@@ -2,6 +2,13 @@
 *Status: Draft – 2025-06-11*  
 *Author: Paul Connor*
 
+> Historical note:
+> This document is an early design sketch and should be read as historical
+> context rather than as the authoritative description of the current REC
+> implementation. The main body below is preserved intentionally. For the
+> current implementation note, see
+> `robotick/robotick-engine/docs/design/25-10-23 - white_paper_remote_engine_connection.md`.
+
 ---
 
 ## Overview
@@ -147,3 +154,60 @@ private:
 
 This design supports a symmetric, extensible, and field-targeted connection mechanism that allows any engine to stream its outputs and receive inputs from remote models. It centers authority on the **brain**, keeping the **spine passive**, yet enables rich future upgrades.
 
+---
+
+## Addendum: 2026-04-18 Corrections
+
+The text above is preserved as an early design note. The points below capture
+the main ways the current implementation differs or has become clearer.
+
+### What changed materially
+
+- The current REC protocol is not JSON-based.
+- The current wire protocol uses a binary `MessageHeader` with magic `RBIN`,
+  versioning, payload length, and binary message types.
+- The current message set is:
+  - `Subscribe`
+  - `FieldsRequest`
+  - `Fields`
+- The handshake payload is currently:
+  - sender tick rate as a 4-byte float encoded through network-order `uint32_t`
+  - newline-separated field paths
+- Field data is currently transmitted as raw concatenated bytes in registered
+  field order, not as JSON objects.
+
+### What the current architecture actually looks like
+
+- `RemoteEngineConnection` remains the 1-to-1 transport unit.
+- `RemoteEngineConnections` owns the engine-side orchestration for multiple
+  remote peers.
+- `RemoteEngineDiscoverer` provides multicast discovery and unicast reply
+  bootstrapping.
+- `InProgressMessage` provides non-blocking framed send/receive progress.
+
+That layered picture is much closer to the current implementation than the API
+sketch in the original draft.
+
+### Role framing that should now be read loosely
+
+- The original "brain/spine proactive/passive" framing is still useful as an
+  intuition, but the current code uses explicit `Sender` and `Receiver` roles.
+- Discovery and orchestration are now more central to the real implementation
+  than the original draft suggests.
+
+### Transport scope
+
+- `RemoteModelSeed::Mode` still exposes `IP`, `UART`, and `Local`.
+- In the reviewed current orchestration path, `IP` and `Local` are the
+  implemented practical modes.
+- `Local` currently resolves to loopback discovery / connection bootstrap.
+- `UART` remains an enum-level direction rather than a reviewed implemented path
+  in `RemoteEngineConnections`.
+
+### What is still conceptually right
+
+- REC is still a field-targeted link between live engines rather than a generic
+  message bus.
+- The pacing model is still explicit and cooperative.
+- Separate engine instances still exchange declared workload field data through
+  a deterministic transport path.

@@ -1,181 +1,382 @@
+<!--
+Copyright Robotick contributors
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Robotick Remote Engine Communication Layer (REC)
 
-**Author:** Robotick Labs (Paul Connor)
-**Date:** October 2025
-**License:** Apache 2.0
+Status: current implementation note  
+Originally written: 2025-10-23  
+Last reviewed: 2026-04-18  
+Reviewed against:
+- `cpp/src/robotick/framework/data/RemoteEngineConnection.cpp`
+- `cpp/src/robotick/framework/data/RemoteEngineConnections.cpp`
+- `cpp/src/robotick/framework/data/RemoteEngineDiscoverer.cpp`
+- `cpp/src/robotick/framework/data/InProgressMessage.cpp`
+- `cpp/tests/framework/data/RemoteEngineConnection.test.cpp`
+- `cpp/tests/framework/data/RemoteEngineConnections.test.cpp`
+- `cpp/tests/framework/data/RemoteEngineDiscoverer.test.cpp`
 
----
+## 1. What REC Is
 
-## 1. Executive Summary
+REC is the current transport stack Robotick uses to move declared workload field
+data between separate engine instances.
 
-The **Robotick Remote Engine Communication Layer (REC)** provides a deterministic, real-time TCP data link between Robotick engine instances — typically between an embedded controller (ESP32, Pi, or MCU) and a higher-level host (Linux or desktop).
+Today it is composed of four layers:
 
-The goal is to synchronise structured workload data (inputs, outputs, and telemetry) across heterogeneous tick-rates **without buffering, flooding, or latency drift**. REC achieves this using a minimal token-based protocol with explicit pacing and cooperative rate negotiation, designed to operate comfortably at sub-millisecond tick intervals.
+| Layer | Component | Responsibility |
+| --- | --- | --- |
+| L4 | `RemoteEngineDiscoverer` | UDP multicast discovery and reply handling |
+| L3 | `RemoteEngineConnections` | Engine-owned orchestration for all remote peers |
+| L2 | `RemoteEngineConnection` | One TCP sender/receiver link with handshake, pacing, reconnect, and field exchange |
+| L1 | `InProgressMessage` | Incremental framed message send/receive over non-blocking sockets |
 
-Unlike ROS2, DDS, or MQTT-based systems, REC treats both endpoints as _live engines_ with their own simulation or control loops, coordinating through mutual pacing rather than pub/sub semantics. The result is a link that feels more like a synchronous bridge between two real-time loops than a message bus.
+This document is intended to describe how the current implementation works, not
+the earlier aspirational design language.
 
----
+## 2. Current Scope and Boundaries
 
-## 2. Layered Architecture Overview
+### What `robotick-engine` owns
 
-The communication layer is composed of four cooperating components:
+- remote-model declaration via `RemoteModelSeed`
+- discovery and pairing
+- field binding from model-declared remote edges
+- framed TCP exchange
+- reconnect and health-state logging
+- integration into the engine tick loop
 
-| Layer | Component                        | Responsibility                                                                                                          |
-| ----- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| L4    | **RemoteEngineDiscoverer**       | Multicast-based discovery and pairing of active engines. Handles peer announcements and automatic connection bootstrap. |
-| L3    | **RemoteEngineConnections**      | Manages multiple REC instances. Provides lifecycle, reconnection, and per-peer routing.                                 |
-| L2    | **RemoteEngineConnection (REC)** | Implements the 1-to-1 protocol: handshake, pacing, and data exchange.                                                   |
-| L1    | **InProgressMessage**            | Framed message send/receive abstraction with non-blocking TCP I/O.                                                      |
+### What the model provides
 
-### 2.1 Overview Diagram
+- which remote model names exist
+- which local fields are sent to which remote fields
+- transport mode and channel metadata
 
-```
-┌───────────────────────────────┐
-│  RemoteEngineDiscoverer       │   ← UDP broadcast discovery
-└───────────────┬───────────────┘
-                │ 1:N
-┌───────────────▼────────────────┐
-│  RemoteEngineConnections       │   ← Manages all active peers
-└───────────────┬────────────────┘
-                │ 1:1
-┌───────────────▼────────────────┐
-│  RemoteEngineConnection (REC)  │   ← Handshake, pacing, data transfer
-└───────────────┬────────────────┘
-                │ framed I/O
-┌───────────────▼────────────────┐
-│  InProgressMessage             │   ← Non-blocking send/receive
-└────────────────────────────────┘
-```
+### What REC does not currently try to be
 
-Each layer builds strictly upon the one below, maintaining clean separation: no global state, no hidden threads, and deterministic progression via the caller’s tick loop.
+- a generic pub/sub middleware
+- a buffered message bus
+- an RPC layer
+- a schema compiler / IDL system
 
----
+It is a deterministic field-link between live engines.
 
-## 3. The Protocol: A Token-Based Real-Time Exchange
+## 3. Current Data Model
 
-REC’s protocol is intentionally simple but expressive enough to support deterministic field updates. It is **not** a pub/sub or RPC layer; rather, it’s a half-duplex token-driven data pipe.
+Remote links are declared through `RemoteModelSeed` plus remote
+`DataConnectionSeed` entries.
 
-### 3.1 Message Types
+The current transport enum is:
 
-| Message Type    | Direction         | Purpose                                                                                         |
-| --------------- | ----------------- | ----------------------------------------------------------------------------------------------- |
-| `Subscribe`     | Sender → Receiver | Handshake: announces tick-rate and field list.                                                  |
-| `FieldsRequest` | Receiver → Sender | READY token signalling receiver’s readiness to accept next field(s). Includes mutual tick-rate. |
-| `Fields`        | Sender → Receiver | Transmits binary field data blob, in fixed order established at handshake.                      |
+- `IP`
+- `UART`
+- `Local`
 
-### 3.2 Pacing Overview
+Important current-truth note:
 
-```
-Sender (500 Hz)                        Receiver (30 Hz)
-───────────────────────────────────────────────────────────────
-Subscribe ───────────────────────────▶ Handshake (tick rate negotiation)
-◀──────────────────────────────────── READY (FieldsRequest, 30 Hz)
-FIELDS [n..n+k] ─────────────────────▶
-◀──────────────────────────────────── READY
-FIELDS [n+k..n+2k] ─────────────────▶
-```
+- `RemoteModelSeed::Mode` includes `UART`, but the reviewed orchestration path in
+  `RemoteEngineConnections` currently implements `IP` and `Local` behaviour.
+- `Local` currently resolves discovery target address to `127.0.0.1`.
+- `IP` currently uses `comms_channel` as an IPv4 target, optionally prefixed by
+  `ip:`.
 
-Only the **receiver** emits READY tokens. The sender may transmit one or several FIELD frames after each READY but must pause once the mutual pacing window expires.
+## 4. Architecture Overview
 
-This creates an elegant, self-balancing dynamic: a 500 Hz sender and 30 Hz receiver converge automatically on a 30 Hz effective exchange rate without buffer overflow or wasted packets.
+### 4.1 `RemoteEngineDiscoverer`
 
----
+`RemoteEngineDiscoverer` is a tick-driven UDP discovery helper.
 
-## 4. Connection Lifecycle
+Current protocol:
 
-### 4.1 Handshake Sequence
+- multicast group: `239.10.77.42`
+- port: `49777`
+- sender discovery packet: `DISCOVER_PEER <target_model> <source_model> <reply_port>`
+- receiver reply packet: `PEER_HERE <model_id> <rec_port> <telemetry_port> <is_gateway>`
 
-1. **Sender connects (TCP)** → enters `ReadyForHandshake`.
-2. **Sender → Receiver:** `Subscribe` message containing:
+Current behaviour:
 
-   - local tick-rate (float, 4 bytes, network-endian)
-   - newline-delimited field paths.
+- sender mode broadcasts at 10 Hz until a peer is discovered
+- receiver mode listens for multicast discovery and replies via unicast
+- receiver can ask a callback to provide the dynamic TCP port that the sender
+  should connect to
+- reply packets also carry telemetry routing metadata
 
-3. **Receiver:** binds field paths via user-provided `FieldBinder` callback.
-4. **Receiver:** computes `mutual_tick_rate = min(sender, receiver)`.
-5. **Receiver → Sender:** first `FieldsRequest` containing mutual rate.
-6. **Both sides:** transition to `ReadyForFields` and begin exchange.
+### 4.2 `RemoteEngineConnections`
 
-### 4.2 Rate-Limited Field Streaming
+`RemoteEngineConnections` is the engine-owned orchestration layer.
 
-Each `tick()` call represents one local simulation or control iteration. The sender:
+Current behaviour:
 
-- Tracks `ticks_until_next_send = ceil(local_rate / mutual_rate)`.
-- Sends field packets immediately upon READY or countdown expiry.
+- owns one discovery receiver for incoming remote senders
+- owns one `RemoteEngineConnection` sender per declared `RemoteModelSeed`
+- creates dynamic receiver-side `RemoteEngineConnection` objects on discovery
+  request
+- binds local fields for both sending and receiving using
+  `DataConnectionUtils::find_field_info(...)`
+- updates telemetry peer routes when discovery replies include telemetry port and
+  gateway metadata
 
-The receiver:
+`Engine::load()` calls `RemoteEngineConnections::setup(...)`, and the engine run
+loop calls `RemoteEngineConnections::tick(...)` every tick.
 
-- Consumes all queued FIELD messages (burst-safe).
-- Emits a new READY once all have been processed.
+### 4.3 `RemoteEngineConnection`
 
----
+`RemoteEngineConnection` is the 1-to-1 binary field transport.
 
-## 5. Discoverer and RECs Coordination
+One instance is always in one of two roles:
 
-While a single REC forms the fundamental link, **RemoteEngineConnections (RECs)** and **RemoteEngineDiscoverer** provide the orchestration layer:
+- `Sender`
+- `Receiver`
 
-### 5.1 RemoteEngineConnections
+Current state machine:
 
-- Maintains multiple active REC instances.
-- Performs health monitoring and disconnection recovery.
-- Provides per-peer tick propagation into the Robotick engine model.
+- `Disconnected`
+- `ReadyForHandshake`
+- `ReadyForFields`
 
-### 5.2 RemoteEngineDiscoverer
+The connection is fully caller-driven: there are no hidden worker threads in the
+REC path itself. Progress happens only when the owner calls `tick(...)`.
 
-- Uses UDP multicast to broadcast engine presence (`DISCOVER` and `HELLO` packets).
-- Enables zero-config peer discovery in local networks.
-- Passes connection parameters upward to RECs for automatic pairing.
+### 4.4 `InProgressMessage`
 
-Together, these layers provide a zero-configuration distributed runtime, where each Robotick engine can auto-discover, handshake, and synchronise with peers at runtime — ideal for separating _brain_ (host) and _body_ (MCU) executables.
+`InProgressMessage` is the framing and partial-I/O helper.
 
----
+Current behaviour:
 
-## 6. Key Design Decisions and Rationale
+- uses a binary header with magic `RBIN`
+- versioned framing (`version = 1`)
+- 12-byte fixed header
+- supports staged payload receive and streamed payload receive
+- supports non-blocking partial header/payload progress across ticks
+- caps payload size at 1 MiB
 
-| Principle                     | Explanation                                                                                                                               |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Deterministic pacing**      | We rely on explicit READY tokens rather than TCP flow control to ensure the link’s timing behaviour matches the engines’ real-time loops. |
-| **Static schema**             | Field paths are bound once at startup — no runtime allocation or dynamic lookup. Predictable, cache-friendly, MCU-safe.                   |
-| **Endianness-neutral floats** | Floats are transmitted as `uint32_t` network order (big-endian) for cross-platform consistency.                                           |
-| **One connection per peer**   | Simpler lifecycle and routing; avoids multiplexing logic.                                                                                 |
-| **Symmetric roles**           | Both sides share identical state machine logic, differing only by initiation role.                                                        |
+This is the key reason the protocol remains deterministic without blocking the
+engine loop.
 
----
+## 5. Current Wire Protocol
 
-## 7. Original Contributions
+### 5.1 Message framing
 
-1. **Token-based mutual pacing** — The READY/FIELD exchange forms a distributed flow-control mechanism that’s both minimal and deterministic. Unlike DDS QoS or TCP congestion control, this ensures real-time sync between heterogeneous loops.
-2. **Negotiated tick-rate synchronisation** — Using the `min(sender, receiver)` rule establishes a shared ground truth frequency without central arbitration.
-3. **Field-path schema binding** — A human-readable yet deterministic schema exchange avoids complex reflection or IDL generation.
-4. **Cooperative non-blocking I/O model** — REC advances through `tick()` calls only, avoiding threads or blocking waits. Behaviour remains identical on MCU or desktop.
-5. **Hybrid discovery model** — Combining UDP multicast for discovery and TCP for payloads is unusual in embedded robotics, offering both simplicity and determinism.
+Every REC message is framed as:
 
----
+1. `MessageHeader`
+2. payload
 
-## 8. Performance and Reliability Characteristics
+Current `MessageHeader` layout:
 
-- **Latency:** Sub-millisecond on LAN; deterministic jitter under 1 ms typical.
-- **CPU usage:** < 1% on ESP32-S3 at 500 Hz link.
-- **Fault tolerance:** Automatic reconnection with exponential retry.
-- **Safety:** No heap allocations during tick; all vectors pre-allocated post-handshake.
-- **Compatibility:** Any platform with BSD sockets and C++17.
+- `magic[4]`
+- `version`
+- `type`
+- `reserved`
+- `payload_len`
 
----
+The header is serialized in network byte order where relevant.
 
-## 9. Future Work
+### 5.2 Current message types
 
-- **Frame IDs / sequence validation:** to enable packet loss or skip detection.
-- **Timestamped data frames:** optional temporal alignment for logs.
-- **Compression or delta encoding:** to reduce bandwidth for large structs.
-- **WebSocket transport:** for seamless integration with Robotick Hub web interface.
-- **TLS or CRC framing:** lightweight integrity or encryption layers for WAN scenarios.
+| Type | Value | Direction | Purpose |
+| --- | --- | --- | --- |
+| `Subscribe` | `1` | Sender -> Receiver | Announces sender tick rate and newline-separated field paths |
+| `FieldsRequest` | `2` | Receiver -> Sender | READY token carrying mutual tick rate |
+| `Fields` | `3` | Sender -> Receiver | Raw concatenated field bytes in registered order |
 
----
+This is the current protocol. It is not JSON-based.
 
-## 10. Conclusion
+## 6. Handshake
 
-The Remote Engine Communication Layer represents a clean, MCU-safe bridge between two live, real-time systems. Its design emphasises **determinism, simplicity, and expressive clarity** over generality. By replacing the complexity of middleware stacks with an explicit, rate-negotiated protocol, REC allows Robotick engines to communicate as if they were one continuous control loop — no buffering, no surprises.
+### 6.1 Sender side
 
-We believe this approach offers a foundation not just for internal use, but as a reusable open-source communication substrate for expressive and embodied robotics systems.
+When a sender reaches `ReadyForHandshake`, it:
 
----
+1. verifies that at least one field has been registered
+2. computes handshake payload capacity
+3. sends a `Subscribe` message containing:
+   - 4 bytes: sender tick rate as float encoded through network-order `uint32_t`
+   - remaining bytes: newline-separated field paths
+
+After the handshake message completes, the sender transitions to
+`ReadyForFields` and immediately tries to emit the first `Fields` message.
+
+### 6.2 Receiver side
+
+When a receiver reaches `ReadyForHandshake`, it:
+
+1. begins streamed payload receive for the `Subscribe` payload
+2. reads the first 4 bytes as sender tick rate
+3. parses the remaining bytes as newline-separated field paths
+4. calls the binder callback once per path
+5. converts successfully bound fields into its exact-sized receive field array
+6. computes:
+   - `mutual_tick_rate_hz = min(sender_tick_rate_hz, local_receiver_tick_rate_hz)`
+7. transitions to `ReadyForFields`
+8. immediately sends the first `FieldsRequest`
+
+Current failure rules:
+
+- invalid sender tick rate is fatal
+- any failed field bind is fatal
+- oversized field path is fatal
+
+## 7. Field Exchange and Pacing
+
+### 7.1 Receiver-driven pacing
+
+The current pacing model is receiver-driven.
+
+In `ReadyForFields`:
+
+- receiver sends `FieldsRequest` messages
+- sender receives `FieldsRequest`
+- sender updates `mutual_tick_rate_hz` from the request payload
+- sender emits `Fields` messages
+- receiver consumes all pending `Fields` messages before issuing the next
+  `FieldsRequest`
+
+### 7.2 Mutual tick rate
+
+Current rule:
+
+- sender announces its local tick rate in the handshake
+- receiver computes `min(sender_tick_rate_hz, receiver_tick_rate_hz)`
+- receiver returns that mutual rate in each `FieldsRequest`
+- sender uses that value to compute `ticks_until_next_send`
+
+Current sender scheduling rule:
+
+- `ticks_until_next_send = max(1, floor(local_tick_rate / mutual_tick_rate))`
+
+This allows a fast sender to pace itself down to the slower receiver without
+explicit buffering logic.
+
+### 7.3 Current field payload format
+
+The `Fields` payload is just the concatenated raw bytes of the sender's
+registered fields, in registration order.
+
+Current implications:
+
+- there is no field name or per-field header in a `Fields` packet
+- sender and receiver must agree on path order and field sizes at handshake
+- receiver writes incoming bytes directly into bound destination pointers
+
+## 8. Connection Lifecycle
+
+### 8.1 Sender lifecycle
+
+Current sender flow:
+
+1. configured with:
+   - `my_model_name`
+   - `target_model_name`
+   - `remote_ip`
+   - `remote_port`
+2. in `Disconnected`, creates a non-blocking TCP socket and attempts connect
+3. transitions to `ReadyForHandshake`
+4. sends `Subscribe`
+5. enters `ReadyForFields`
+6. alternates between receiving `FieldsRequest` and sending `Fields`
+7. on failure, disconnects and schedules reconnect backoff
+
+### 8.2 Receiver lifecycle
+
+Current receiver flow:
+
+1. configured with `my_model_name`
+2. in `Disconnected`, binds a non-blocking TCP listening socket on port `0`
+3. records the assigned ephemeral listen port
+4. accepts one incoming TCP connection
+5. transitions to `ReadyForHandshake`
+6. receives `Subscribe`
+7. enters `ReadyForFields`
+8. alternates between receiving `Fields` and sending `FieldsRequest`
+9. on failure, disconnects, clears bound fields, and returns to listening
+
+## 9. Reconnect and Health Behaviour
+
+The current implementation includes explicit reconnect and health-state
+behaviour.
+
+### 9.1 Backoff
+
+Current constants:
+
+- short retry cadence while still disconnected: `0.05 s`
+- backoff min: `0.10 s`
+- backoff max: `2.00 s`
+- multiplier: `2.0`
+
+### 9.2 Health logging
+
+Current behaviour:
+
+- logs when connection attempt starts
+- logs when a connection becomes healthy
+- logs when a previously healthy connection becomes unhealthy
+- suppresses repeated spam for the same unhealthy period using a bounded shared
+  log-state table
+
+### 9.3 Disconnect semantics
+
+`disconnect()` currently:
+
+- tries to drain partially in-progress send/receive messages for up to 500 ms
+- vacates both half-duplex `InProgressMessage` instances
+- closes the socket
+- schedules reconnect timing
+- clears receiver-side bound fields so the next handshake starts cleanly
+
+That drain-before-close behaviour is there to avoid leaving peers desynchronized
+ by half-written framed payloads.
+
+## 10. Current Integration with Engine and Telemetry
+
+`RemoteEngineConnections::setup(...)` currently:
+
+- initializes a discovery receiver for the local model
+- configures incoming receiver connections on demand
+- for outgoing remote models:
+  - creates one discoverer sender
+  - creates one sender `RemoteEngineConnection`
+  - binds local source fields for each declared remote edge
+
+When a peer is discovered:
+
+- telemetry peer routing is updated through `TelemetryServer::update_peer_route(...)`
+- the sender-side `RemoteEngineConnection` is configured with peer IP and REC
+  port
+
+This is why the REC and telemetry systems are related but still separate:
+
+- REC moves bound field data
+- telemetry uses discovered peer metadata to expose gateway and peer routes
+
+## 11. Current Guarantees and Non-Guarantees
+
+### What the current implementation guarantees
+
+- non-blocking progress through caller-owned `tick(...)`
+- binary framed protocol with version and payload-length validation
+- deterministic field ordering once handshake succeeds
+- receiver-driven pacing
+- reconnect after disconnect
+- engine ownership via `RemoteEngineConnections`
+
+### What is not currently implemented as a reviewed truth
+
+- UART transport in the reviewed orchestration path
+- authentication or encryption
+- per-frame sequence IDs
+- compression or delta encoding
+- generic multiplexing over one socket
+- arbitrary dynamic schema negotiation beyond path-list handshake
+
+## 12. Practical Reading Order
+
+For the current implementation, read in this order:
+
+1. `cpp/src/robotick/framework/data/RemoteEngineConnections.cpp`
+2. `cpp/src/robotick/framework/data/RemoteEngineDiscoverer.cpp`
+3. `cpp/src/robotick/framework/data/RemoteEngineConnection.cpp`
+4. `cpp/src/robotick/framework/data/InProgressMessage.cpp`
+5. `cpp/tests/framework/data/RemoteEngineConnection.test.cpp`
+
+That path goes from orchestration to transport to framing to executable proof.
