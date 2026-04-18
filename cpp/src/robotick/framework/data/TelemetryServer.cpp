@@ -1598,11 +1598,13 @@ namespace robotick
 		Thread ws_broadcast_thread;
 		uint32_t ws_last_local_frame_seq = 0;
 		HeapVector<uint32_t> ws_last_peer_frame_seq;
+		size_t last_known_writable_connection_handle_count = 0;
 		static constexpr uint32_t ws_heartbeat_interval_ms = 1000;
 		static constexpr uint32_t ws_broadcast_tick_ms = 10;
 
 		void rebuild_writable_input_registry();
-		void refresh_writable_input_connection_handles();
+		bool refresh_writable_input_connection_handles();
+		size_t count_writable_input_connection_handles() const;
 		int find_writable_input_index_by_handle(uint16_t handle) const;
 		int find_writable_input_index_by_path(const char* path) const;
 		int find_telemetry_peer_index_by_model_id(const char* model_id) const;
@@ -1621,6 +1623,7 @@ namespace robotick
 		bool handle_ws_message(const WsRoute& route, const WebSocketConnection& connection, const WebSocketMessage& message);
 		void build_write_response_json(const char* request_body, size_t request_size, int& out_status_code, json::StringSink& out_json);
 		void build_connection_state_response_json(const char* request_body, size_t request_size, int& out_status_code, json::StringSink& out_json);
+		void maybe_broadcast_local_layout_update();
 		void maybe_broadcast_local_frame(const Clock::time_point now);
 		void maybe_broadcast_peer_frames(const Clock::time_point now);
 		void maybe_send_heartbeats(const Clock::time_point now);
@@ -2358,7 +2361,13 @@ namespace robotick
 
 		if (client.route.is_local)
 		{
+			const bool refreshed = refresh_writable_input_connection_handles();
+			last_known_writable_connection_handle_count = count_writable_input_connection_handles();
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
+			if (refreshed)
+			{
+				rebuild_layout_cache();
+			}
 			LockGuard lock(layout_cache_mutex);
 			if (!has_cached_layout_body)
 			{
@@ -2370,6 +2379,7 @@ namespace robotick
 				unregister_ws_client(client.connection);
 			}
 #else
+			(void)refreshed;
 			json::StringSink layout_sink;
 			json::Writer<json::StringSink> writer(layout_sink);
 			write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
@@ -2525,10 +2535,51 @@ namespace robotick
 		while (!ws_broadcast_stop.is_set())
 		{
 			const Clock::time_point now = Clock::now();
+			maybe_broadcast_local_layout_update();
 			maybe_broadcast_local_frame(now);
 			maybe_broadcast_peer_frames(now);
 			maybe_send_heartbeats(now);
 			Thread::sleep_ms(ws_broadcast_tick_ms);
+		}
+	}
+
+	void TelemetryServer::Impl::maybe_broadcast_local_layout_update()
+	{
+		if (!engine)
+		{
+			return;
+		}
+
+		const bool refreshed = refresh_writable_input_connection_handles();
+		const size_t current_count = count_writable_input_connection_handles();
+		if (!refreshed && current_count == last_known_writable_connection_handle_count)
+		{
+			return;
+		}
+
+		last_known_writable_connection_handle_count = current_count;
+
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
+		rebuild_layout_cache();
+#endif
+
+		FixedVector<WsClient, ws_max_clients> clients;
+		{
+			LockGuard lock(ws_clients_mutex);
+			for (size_t i = 0; i < ws_clients.size(); ++i)
+			{
+				const WsClient& client = ws_clients[i];
+				if (!client.active || !client.ready || !client.route.is_local)
+				{
+					continue;
+				}
+				clients.add(client);
+			}
+		}
+
+		for (size_t i = 0; i < clients.size(); ++i)
+		{
+			send_ws_layout(clients[i]);
 		}
 	}
 
@@ -3196,15 +3247,31 @@ namespace robotick
 				pending_input_writes[write_index] = PendingInputWrite{};
 				++write_index;
 			});
+
+		last_known_writable_connection_handle_count = count_writable_input_connection_handles();
 	}
 
-	void TelemetryServer::Impl::refresh_writable_input_connection_handles()
+	size_t TelemetryServer::Impl::count_writable_input_connection_handles() const
+	{
+		size_t count = 0;
+		for (size_t i = 0; i < writable_input_fields.size(); ++i)
+		{
+			if (writable_input_fields[i].incoming_connection_handle)
+			{
+				++count;
+			}
+		}
+		return count;
+	}
+
+	bool TelemetryServer::Impl::refresh_writable_input_connection_handles()
 	{
 		if (!engine)
 		{
-			return;
+			return false;
 		}
 
+		bool changed = false;
 		for (size_t i = 0; i < writable_input_fields.size(); ++i)
 		{
 			WritableInputField& writable = writable_input_fields[i];
@@ -3218,8 +3285,14 @@ namespace robotick
 			{
 				input_handle = engine->find_data_connection_input_handle_by_overlap(writable.target_ptr, writable.value_size);
 			}
-			writable.incoming_connection_handle = input_handle;
+			if (writable.incoming_connection_handle != input_handle)
+			{
+				writable.incoming_connection_handle = input_handle;
+				changed = true;
+			}
 		}
+
+		return changed;
 	}
 
 	void TelemetryServer::Impl::build_write_response_json(
@@ -4024,6 +4097,11 @@ namespace robotick
 		res.set_content_type("application/json");
 
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
+		if (refresh_writable_input_connection_handles())
+		{
+			last_known_writable_connection_handle_count = count_writable_input_connection_handles();
+			rebuild_layout_cache();
+		}
 		LockGuard lock(layout_cache_mutex);
 		if (!has_cached_layout_body)
 		{
@@ -4043,6 +4121,7 @@ namespace robotick
 		res.set_body(cached_layout_body, cached_layout_body_size);
 #else
 		refresh_writable_input_connection_handles();
+		last_known_writable_connection_handle_count = count_writable_input_connection_handles();
 		json::StringSink sink;
 		json::Writer<json::StringSink> writer(sink);
 		write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
