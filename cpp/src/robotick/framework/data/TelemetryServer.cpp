@@ -1602,6 +1602,7 @@ namespace robotick
 		static constexpr uint32_t ws_broadcast_tick_ms = 10;
 
 		void rebuild_writable_input_registry();
+		void refresh_writable_input_connection_handles();
 		int find_writable_input_index_by_handle(uint16_t handle) const;
 		int find_writable_input_index_by_path(const char* path) const;
 		int find_telemetry_peer_index_by_model_id(const char* model_id) const;
@@ -3141,7 +3142,11 @@ namespace robotick
 						{
 							continue;
 						}
-						DataConnectionInputHandle* input_handle = engine->find_data_connection_input_handle_by_overlap(field_ptr, field_type->size);
+						DataConnectionInputHandle* input_handle = engine->find_data_connection_input_handle_by_path(field_path.c_str());
+						if (!input_handle)
+						{
+							input_handle = engine->find_data_connection_input_handle_by_overlap(field_ptr, field_type->size);
+						}
 
 						on_leaf_ref(field_path, field_type, field_ptr, input_handle);
 					}
@@ -3191,6 +3196,30 @@ namespace robotick
 				pending_input_writes[write_index] = PendingInputWrite{};
 				++write_index;
 			});
+	}
+
+	void TelemetryServer::Impl::refresh_writable_input_connection_handles()
+	{
+		if (!engine)
+		{
+			return;
+		}
+
+		for (size_t i = 0; i < writable_input_fields.size(); ++i)
+		{
+			WritableInputField& writable = writable_input_fields[i];
+			if (writable.incoming_connection_handle)
+			{
+				continue;
+			}
+
+			DataConnectionInputHandle* input_handle = engine->find_data_connection_input_handle_by_path(writable.path.c_str());
+			if (!input_handle && writable.target_ptr && writable.value_size > 0)
+			{
+				input_handle = engine->find_data_connection_input_handle_by_overlap(writable.target_ptr, writable.value_size);
+			}
+			writable.incoming_connection_handle = input_handle;
+		}
 	}
 
 	void TelemetryServer::Impl::build_write_response_json(
@@ -3457,6 +3486,8 @@ namespace robotick
 			write_error(WebResponseCode::ServiceUnavailable, "engine_not_available");
 			return;
 		}
+
+		refresh_writable_input_connection_handles();
 
 		TelemetryConnectionStateRequestPayload payload;
 		JsonCursor cursor(request_body, request_size);
@@ -4011,6 +4042,7 @@ namespace robotick
 		}
 		res.set_body(cached_layout_body, cached_layout_body_size);
 #else
+		refresh_writable_input_connection_handles();
 		json::StringSink sink;
 		json::Writer<json::StringSink> writer(sink);
 		write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);

@@ -11,6 +11,7 @@
 
 #include <arpa/inet.h>
 #include <catch2/catch_all.hpp>
+#include <curl/curl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -24,6 +25,77 @@ namespace robotick::test
 			Engine* engine = nullptr;
 			AtomicFlag* stop_flag = nullptr;
 		};
+
+		struct HttpTextBuffer
+		{
+			char data[65536] = {};
+			size_t len = 0;
+
+			void append(const char* src, size_t count)
+			{
+				if (!src || count == 0)
+					return;
+				const size_t cap = sizeof(data) - 1;
+				const size_t room = len < cap ? cap - len : 0;
+				const size_t to_copy = room < count ? room : count;
+				if (to_copy > 0)
+				{
+					::memcpy(data + len, src, to_copy);
+					len += to_copy;
+					data[len] = '\0';
+				}
+			}
+		};
+
+		struct HttpResponse
+		{
+			long status_code = 0;
+			HttpTextBuffer body;
+		};
+
+		size_t curl_write_to_text(char* ptr, size_t size, size_t nmemb, void* userdata)
+		{
+			auto& out = *static_cast<HttpTextBuffer*>(userdata);
+			const size_t bytes = size * nmemb;
+			out.append(ptr, bytes);
+			return bytes;
+		}
+
+		HttpResponse http_request(const char* url, const char* method = "GET", const char* body = nullptr)
+		{
+			CURL* curl = curl_easy_init();
+			REQUIRE(curl != nullptr);
+
+			HttpResponse response;
+			curl_easy_setopt(curl, CURLOPT_URL, url);
+			curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_to_text);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response.body);
+			if (::strcmp(method, "POST") == 0)
+			{
+				curl_easy_setopt(curl, CURLOPT_POST, 1L);
+				curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body ? body : "");
+				curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, body ? static_cast<long>(::strlen(body)) : 0L);
+				struct curl_slist* headers = nullptr;
+				headers = curl_slist_append(headers, "Content-Type: application/json");
+				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+				curl_easy_perform(curl);
+				curl_slist_free_all(headers);
+			}
+			else
+			{
+				curl_easy_perform(curl);
+			}
+
+			curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.status_code);
+			curl_easy_cleanup(curl);
+			return response;
+		}
+
+		bool contains_text(const char* haystack, const char* needle)
+		{
+			return haystack && needle && ::strstr(haystack, needle) != nullptr;
+		}
 
 		constexpr long long kRemoteEngineConnectionTimeoutNs = 3'000'000'000LL;
 
@@ -209,6 +281,65 @@ namespace robotick::test
 			Thread::sleep_ms(10);
 		}
 
+		REQUIRE(success_flag.is_set());
+
+		{
+			char layout_url[256];
+			::snprintf(
+				layout_url,
+				sizeof(layout_url),
+				"http://127.0.0.1:%u/api/telemetry/workloads_buffer/layout",
+				static_cast<unsigned int>(receiver_telemetry_port));
+			const HttpResponse layout = http_request(layout_url);
+			REQUIRE(layout.status_code == 200);
+			REQUIRE(contains_text(layout.body.data, "\"field_path\":\"receiver_workload.inputs.remote_x\""));
+			REQUIRE(contains_text(layout.body.data, "\"incoming_connection_handle\":"));
+			REQUIRE(contains_text(layout.body.data, "\"incoming_connection_enabled\":true"));
+		}
+
+		{
+			char state_url[256];
+			::snprintf(
+				state_url,
+				sizeof(state_url),
+				"http://127.0.0.1:%u/api/telemetry/set_workload_input_connection_state",
+				static_cast<unsigned int>(receiver_telemetry_port));
+			const HttpResponse suppress = http_request(
+				state_url,
+				"POST",
+				"{\"updates\":[{\"field_path\":\"receiver_workload.inputs.remote_x\",\"enabled\":false}]}");
+			REQUIRE(suppress.status_code == 200);
+			REQUIRE(contains_text(suppress.body.data, "\"incoming_connection_enabled\":false"));
+
+			sender_workload->outputs.local_x = 456;
+			for (int i = 0; i < 40; ++i)
+			{
+				if (receiver_workload->inputs.remote_x != VALUE_TO_TRANSMIT)
+				{
+					break;
+				}
+				Thread::sleep_ms(10);
+			}
+			REQUIRE(receiver_workload->inputs.remote_x == VALUE_TO_TRANSMIT);
+
+			const HttpResponse reenable = http_request(
+				state_url,
+				"POST",
+				"{\"updates\":[{\"field_path\":\"receiver_workload.inputs.remote_x\",\"enabled\":true}]}");
+			REQUIRE(reenable.status_code == 200);
+			REQUIRE(contains_text(reenable.body.data, "\"incoming_connection_enabled\":true"));
+
+			for (int i = 0; i < 80; ++i)
+			{
+				if (receiver_workload->inputs.remote_x == 456)
+				{
+					break;
+				}
+				Thread::sleep_ms(10);
+			}
+			REQUIRE(receiver_workload->inputs.remote_x == 456);
+		}
+
 		stop_flag.set();
 
 		if (sender_thread.is_joining_supported())
@@ -216,8 +347,8 @@ namespace robotick::test
 		if (receiver_thread.is_joining_supported())
 			receiver_thread.join();
 
-		REQUIRE(sender_workload->outputs.local_x == VALUE_TO_TRANSMIT);
-		REQUIRE(receiver_workload->inputs.remote_x == VALUE_TO_TRANSMIT);
+		REQUIRE(sender_workload->outputs.local_x == 456);
+		REQUIRE(receiver_workload->inputs.remote_x == 456);
 
 		REQUIRE(success_flag.is_set());
 	}
