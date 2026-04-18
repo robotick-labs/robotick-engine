@@ -1545,6 +1545,7 @@ namespace robotick
 			HeapVector<char> peer_ws_latest_layout;
 			size_t peer_ws_latest_layout_size = 0;
 			bool peer_ws_has_latest_layout = false;
+			uint32_t peer_ws_latest_layout_seq = 0;
 			HeapVector<char> peer_ws_write_response;
 			size_t peer_ws_write_response_size = 0;
 			bool peer_ws_has_write_response = false;
@@ -1598,7 +1599,9 @@ namespace robotick
 		Thread ws_broadcast_thread;
 		uint32_t ws_last_local_frame_seq = 0;
 		HeapVector<uint32_t> ws_last_peer_frame_seq;
+		HeapVector<uint32_t> ws_last_peer_layout_seq;
 		size_t last_known_writable_connection_handle_count = 0;
+		AtomicFlag ws_layout_dirty{false};
 		static constexpr uint32_t ws_heartbeat_interval_ms = 1000;
 		static constexpr uint32_t ws_broadcast_tick_ms = 10;
 
@@ -1932,12 +1935,21 @@ namespace robotick
 		{
 			ws_last_peer_frame_seq.initialize(telemetry_peers.size());
 		}
+		if (!telemetry_peers.empty() && ws_last_peer_layout_seq.empty())
+		{
+			ws_last_peer_layout_seq.initialize(telemetry_peers.size());
+		}
 		for (size_t i = 0; i < ws_last_peer_frame_seq.size(); ++i)
 		{
 			ws_last_peer_frame_seq[i] = 0;
 		}
+		for (size_t i = 0; i < ws_last_peer_layout_seq.size(); ++i)
+		{
+			ws_last_peer_layout_seq[i] = 0;
+		}
 
 		ws_last_local_frame_seq = 0;
+		ws_layout_dirty.clear();
 		ws_broadcast_stop.clear();
 	}
 
@@ -1964,6 +1976,7 @@ namespace robotick
 		peer.peer_ws_latest_layout.reset();
 		peer.peer_ws_latest_layout_size = 0;
 		peer.peer_ws_has_latest_layout = false;
+		peer.peer_ws_latest_layout_seq = 0;
 		peer.peer_ws_write_response.reset();
 		peer.peer_ws_write_response_size = 0;
 		peer.peer_ws_has_write_response = false;
@@ -2091,6 +2104,7 @@ namespace robotick
 					peer.peer_ws_latest_layout[payload_size] = '\0';
 					peer.peer_ws_latest_layout_size = payload_size;
 					peer.peer_ws_has_latest_layout = true;
+					++peer.peer_ws_latest_layout_seq;
 					continue;
 				}
 				if (::strstr(body, "\"accepted_count\"") || ::strstr(body, "\"ignored_stale_count\"") || ::strstr(body, "\"error\""))
@@ -2552,12 +2566,17 @@ namespace robotick
 
 		const bool refreshed = refresh_writable_input_connection_handles();
 		const size_t current_count = count_writable_input_connection_handles();
-		if (!refreshed && current_count == last_known_writable_connection_handle_count)
+		const bool layout_dirty = ws_layout_dirty.is_set();
+		if (!refreshed && current_count == last_known_writable_connection_handle_count && !layout_dirty)
 		{
 			return;
 		}
 
 		last_known_writable_connection_handle_count = current_count;
+		if (layout_dirty)
+		{
+			ws_layout_dirty.clear();
+		}
 
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
 		rebuild_layout_cache();
@@ -2681,6 +2700,21 @@ namespace robotick
 				if (!pump_peer_ws_messages(peer, 8, 0))
 				{
 					continue;
+				}
+				if (peer.peer_ws_has_latest_layout && !ws_last_peer_layout_seq.empty() && peer_index < ws_last_peer_layout_seq.size() &&
+					ws_last_peer_layout_seq[peer_index] != peer.peer_ws_latest_layout_seq)
+				{
+					for (size_t i = 0; i < clients.size(); ++i)
+					{
+						const WsClient& client = clients[i];
+						if (!client.connection.send_frame(0x1,
+								peer.peer_ws_latest_layout_size > 0 ? reinterpret_cast<const void*>(peer.peer_ws_latest_layout.data()) : "{}",
+								peer.peer_ws_latest_layout_size))
+						{
+							unregister_ws_client(client.connection);
+						}
+					}
+					ws_last_peer_layout_seq[peer_index] = peer.peer_ws_latest_layout_seq;
 				}
 				if (!peer.peer_ws_has_latest_raw)
 				{
@@ -3634,7 +3668,12 @@ namespace robotick
 				return;
 			}
 
+			const bool was_enabled = writable.incoming_connection_handle->is_enabled();
 			writable.incoming_connection_handle->set_enabled(update_payload.enabled);
+			if (was_enabled != update_payload.enabled)
+			{
+				ws_layout_dirty.set();
+			}
 
 			UpdateResult& result = results[update_payload_index];
 			result.field_handle = writable_handle;
