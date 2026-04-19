@@ -3761,6 +3761,102 @@ namespace robotick
 		return type_name;
 	}
 
+	static bool type_name_requires_instance_shape(const TypeDescriptor& type_desc, void* data_ptr, uint32_t depth = 0)
+	{
+		if (depth > 16)
+		{
+			return false;
+		}
+
+		if (type_desc.get_dynamic_struct_desc())
+		{
+			return true;
+		}
+
+		const StructDescriptor* struct_desc = type_desc.get_struct_desc();
+		if (!struct_desc)
+		{
+			return false;
+		}
+
+		for (const FieldDescriptor& field : struct_desc->fields)
+		{
+			const TypeDescriptor* field_type = field.find_type_descriptor();
+			if (!field_type)
+			{
+				continue;
+			}
+
+			if (field_type->get_dynamic_struct_desc())
+			{
+				return true;
+			}
+
+			if (field_type->get_struct_desc())
+			{
+				void* field_data_ptr = field.get_data_ptr(data_ptr);
+				if (type_name_requires_instance_shape(*field_type, field_data_ptr, depth + 1))
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	static void update_instance_type_hash(Hash32& hash, const TypeDescriptor& type_desc, void* data_ptr, uint32_t depth = 0)
+	{
+		if (depth > 16)
+		{
+			return;
+		}
+
+		hash.update_cstring(type_desc.name.c_str());
+		hash.update(type_desc.id.value);
+		hash.update(type_desc.size);
+		hash.update(static_cast<uint32_t>(type_desc.type_category));
+
+		const DynamicStructDescriptor* dynamic_struct_desc = type_desc.get_dynamic_struct_desc();
+		const StructDescriptor* struct_desc =
+			dynamic_struct_desc ? dynamic_struct_desc->get_struct_descriptor(data_ptr) : type_desc.get_struct_desc();
+		if (!struct_desc)
+		{
+			return;
+		}
+
+		for (const FieldDescriptor& field : struct_desc->fields)
+		{
+			hash.update_cstring(field.name.c_str());
+			hash.update(field.type_id.value);
+			hash.update(field.offset_within_container);
+			hash.update(field.element_count);
+
+			const TypeDescriptor* field_type = field.find_type_descriptor();
+			if (!field_type)
+			{
+				continue;
+			}
+
+			void* field_data_ptr = field.get_data_ptr(data_ptr);
+			if (field_type->get_dynamic_struct_desc() || field_type->get_struct_desc())
+			{
+				update_instance_type_hash(hash, *field_type, field_data_ptr, depth + 1);
+			}
+		}
+	}
+
+	static FixedString64 make_instance_struct_type_name(const TypeDescriptor& type_desc, void* data_ptr)
+	{
+		robotick::Hash32 hash;
+		update_instance_type_hash(hash, type_desc, data_ptr);
+
+		FixedString64 type_name;
+		const char* base_name = type_desc.name.empty() ? "Struct" : type_desc.name.c_str();
+		type_name.format("%s_%08X", base_name, static_cast<unsigned int>(hash.final()));
+		return type_name;
+	}
+
 	static FixedString256 get_type_name(const TypeDescriptor& type_desc, void* data_ptr)
 	{
 		const DynamicStructDescriptor* dynamic_struct_desc = type_desc.get_dynamic_struct_desc();
@@ -3769,6 +3865,14 @@ namespace robotick
 			const FixedString64 blackboard_name = make_dynamic_struct_type_name(type_desc, *dynamic_struct_desc, data_ptr);
 			FixedString256 type_name;
 			type_name = blackboard_name.c_str();
+			return type_name;
+		}
+
+		if (type_desc.get_struct_desc() && type_name_requires_instance_shape(type_desc, data_ptr))
+		{
+			const FixedString64 instance_struct_name = make_instance_struct_type_name(type_desc, data_ptr);
+			FixedString256 type_name;
+			type_name = instance_struct_name.c_str();
 			return type_name;
 		}
 
@@ -3813,11 +3917,20 @@ namespace robotick
 
 	static size_t get_process_memory_used();
 
-	template <typename Writer> static void write_json_struct_ref(Writer& writer, const char* type_name, const size_t offset_within_container)
+	template <typename Writer>
+	static void write_json_struct_ref(Writer& writer, const TypeDescriptor* type_desc, void* data_ptr, const size_t offset_within_container)
 	{
 		writer.start_object();
 		writer.key("type");
-		writer.string(type_name ? type_name : "null");
+		if (type_desc)
+		{
+			const FixedString256 type_name = get_type_name(*type_desc, data_ptr);
+			writer.string(type_name.c_str());
+		}
+		else
+		{
+			writer.string("null");
+		}
 		writer.key("offset_within_container");
 		writer.int32(static_cast<int>(offset_within_container));
 		writer.end_object();
@@ -3980,17 +4093,17 @@ namespace robotick
 			if (desc->config_desc && workload_ptr)
 			{
 				writer.key("config");
-				write_json_struct_ref(writer, desc->config_desc->name.c_str(), desc->config_offset);
+				write_json_struct_ref(writer, desc->config_desc, (uint8_t*)workload_ptr + desc->config_offset, desc->config_offset);
 			}
 			if (desc->inputs_desc && workload_ptr)
 			{
 				writer.key("inputs");
-				write_json_struct_ref(writer, desc->inputs_desc->name.c_str(), desc->inputs_offset);
+				write_json_struct_ref(writer, desc->inputs_desc, (uint8_t*)workload_ptr + desc->inputs_offset, desc->inputs_offset);
 			}
 			if (desc->outputs_desc && workload_ptr)
 			{
 				writer.key("outputs");
-				write_json_struct_ref(writer, desc->outputs_desc->name.c_str(), desc->outputs_offset);
+				write_json_struct_ref(writer, desc->outputs_desc, (uint8_t*)workload_ptr + desc->outputs_offset, desc->outputs_offset);
 			}
 
 			writer.key("stats_offset_within_container");
