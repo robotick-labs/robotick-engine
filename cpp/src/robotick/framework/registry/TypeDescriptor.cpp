@@ -303,6 +303,10 @@ namespace robotick
 		{
 			return ::sscanf(input, "%d", reinterpret_cast<int*>(out_value)) == 1;
 		}
+		if (name == "int32_t")
+		{
+			return ::sscanf(input, "%d", reinterpret_cast<int32_t*>(out_value)) == 1;
+		}
 		if (name == "uint16_t")
 		{
 			return ::sscanf(input, "%hu", reinterpret_cast<uint16_t*>(out_value)) == 1;
@@ -429,6 +433,18 @@ namespace robotick
 		{
 			const int v = *reinterpret_cast<const int*>(value);
 			const int written = ::snprintf(output_buffer, output_buffer_size, "%d", v);
+			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
+			{
+				::memset(output_buffer, 0, output_buffer_size);
+				return false;
+			}
+			return true;
+		}
+
+		if (name == "int32_t")
+		{
+			const int32_t v = *reinterpret_cast<const int32_t*>(value);
+			const int written = ::snprintf(output_buffer, output_buffer_size, "%d", static_cast<int>(v));
 			if (written < 0 || static_cast<size_t>(written) >= output_buffer_size)
 			{
 				::memset(output_buffer, 0, output_buffer_size);
