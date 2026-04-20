@@ -175,4 +175,3 @@ If a control is about autonomous robot behavior, prefer:
 
 That keeps the robot model honest: it defines behavior, while Studio defines the
 operator surface used to puppeteer or adjust that behavior live.
-
