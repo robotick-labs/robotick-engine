@@ -1523,15 +1523,11 @@ namespace robotick
 #if defined(ROBOTICK_PLATFORM_LINUX) || defined(ROBOTICK_PLATFORM_DESKTOP)
 			Mutex forwarded_request_mutex;
 			Mutex forwarded_raw_mutex;
-			Mutex forwarded_layout_mutex;
 			Mutex forwarded_write_mutex;
 			ForwardHttpResult cached_raw;
-			ForwardHttpResult cached_layout;
 			Clock::time_point cached_raw_at{};
 			bool has_cached_raw = false;
-			bool has_cached_layout = false;
 			FixedString64 last_seen_session_id;
-			FixedString64 cached_layout_session_id;
 			int peer_ws_fd = -1;
 			Clock::time_point peer_ws_last_connect_attempt{};
 			bool peer_ws_has_pending_frame_meta = false;
@@ -2993,12 +2989,6 @@ namespace robotick
 
 		if (is_layout_request)
 		{
-			LockGuard lock(const_cast<Mutex&>(peer.forwarded_layout_mutex));
-			if (peer.has_cached_layout)
-			{
-				apply_forward_http_result_to_response(peer.cached_layout, res);
-				return;
-			}
 			if (!forward_or_error(forwarded))
 			{
 				set_json_response(res,
@@ -3017,9 +3007,6 @@ namespace robotick
 				return;
 			}
 
-			copy_forward_http_result(forwarded, const_cast<ForwardHttpResult&>(peer.cached_layout));
-			const_cast<TelemetryPeerRoute&>(peer).has_cached_layout = true;
-			const_cast<TelemetryPeerRoute&>(peer).cached_layout_session_id = peer.last_seen_session_id;
 			apply_forward_http_result_to_response(forwarded, res);
 			return;
 		}
@@ -3071,24 +3058,11 @@ namespace robotick
 			TelemetryPeerRoute& mutable_peer = const_cast<TelemetryPeerRoute&>(peer);
 			if (!forwarded.session_header.empty())
 			{
-				if (!mutable_peer.last_seen_session_id.empty() && mutable_peer.last_seen_session_id != forwarded.session_header)
-				{
-					reset_forward_http_result(mutable_peer.cached_layout);
-					mutable_peer.has_cached_layout = false;
-					mutable_peer.cached_layout_session_id.clear();
-				}
 				mutable_peer.last_seen_session_id = forwarded.session_header;
 			}
 			copy_forward_http_result(forwarded, mutable_peer.cached_raw);
 			mutable_peer.cached_raw_at = now;
 			mutable_peer.has_cached_raw = true;
-			if (!mutable_peer.cached_layout_session_id.empty() && !mutable_peer.last_seen_session_id.empty() &&
-				mutable_peer.cached_layout_session_id != mutable_peer.last_seen_session_id)
-			{
-				reset_forward_http_result(mutable_peer.cached_layout);
-				mutable_peer.has_cached_layout = false;
-				mutable_peer.cached_layout_session_id.clear();
-			}
 			apply_forward_http_result_to_response(forwarded, res);
 			return;
 		}
@@ -3112,14 +3086,6 @@ namespace robotick
 						writer.end_object();
 					});
 				return;
-			}
-			if (is_connection_state_request && forwarded.status_code == WebResponseCode::OK)
-			{
-				TelemetryPeerRoute& mutable_peer = const_cast<TelemetryPeerRoute&>(peer);
-				LockGuard layout_lock(mutable_peer.forwarded_layout_mutex);
-				reset_forward_http_result(mutable_peer.cached_layout);
-				mutable_peer.has_cached_layout = false;
-				mutable_peer.cached_layout_session_id.clear();
 			}
 			apply_forward_http_result_to_response(forwarded, res);
 			return;

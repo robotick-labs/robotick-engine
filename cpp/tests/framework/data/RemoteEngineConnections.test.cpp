@@ -33,17 +33,23 @@ namespace robotick::test
 			Thread* sender_thread = nullptr;
 			Thread* receiver_thread = nullptr;
 
+			EngineRunThreadsGuard() = default;
+			EngineRunThreadsGuard(const EngineRunThreadsGuard&) = delete;
+			EngineRunThreadsGuard& operator=(const EngineRunThreadsGuard&) = delete;
+			EngineRunThreadsGuard(EngineRunThreadsGuard&&) = delete;
+			EngineRunThreadsGuard& operator=(EngineRunThreadsGuard&&) = delete;
+
 			~EngineRunThreadsGuard()
 			{
 				if (stop_flag)
 				{
 					stop_flag->set();
 				}
-				if (sender_thread && sender_thread->is_joining_supported())
+				if (sender_thread && sender_thread->is_joining_supported() && sender_thread->is_joinable())
 				{
 					sender_thread->join();
 				}
-				if (receiver_thread && receiver_thread->is_joining_supported())
+				if (receiver_thread && receiver_thread->is_joining_supported() && receiver_thread->is_joinable())
 				{
 					receiver_thread->join();
 				}
@@ -141,6 +147,20 @@ namespace robotick::test
 			for (int i = 0; i < attempts; ++i)
 			{
 				if (telemetry_raw_int_equals(telemetry_port, offset, expected))
+				{
+					return true;
+				}
+				Thread::sleep_ms(10);
+			}
+			return false;
+		}
+
+		bool wait_for_http_status(const char* url, long expected_status, int attempts)
+		{
+			for (int i = 0; i < attempts; ++i)
+			{
+				const HttpResponse response = http_request(url);
+				if (response.status_code == expected_status)
 				{
 					return true;
 				}
@@ -316,10 +336,23 @@ namespace robotick::test
 		AtomicFlag stop_flag(false);
 		AtomicFlag success_flag(false);
 
+		char receiver_layout_url[256];
+		::snprintf(receiver_layout_url,
+			sizeof(receiver_layout_url),
+			"http://127.0.0.1:%u/api/telemetry/workloads_buffer/layout",
+			static_cast<unsigned int>(receiver_telemetry_port));
+
 		// --- Threaded run
-		Thread sender_thread(engine_run_entry, new EngineRunContext{&sender, &stop_flag});
+		Thread sender_thread;
 		Thread receiver_thread(engine_run_entry, new EngineRunContext{&receiver, &stop_flag});
-		EngineRunThreadsGuard thread_guard{&stop_flag, &sender_thread, &receiver_thread};
+		EngineRunThreadsGuard thread_guard;
+		thread_guard.stop_flag = &stop_flag;
+		thread_guard.receiver_thread = &receiver_thread;
+
+		REQUIRE(wait_for_http_status(receiver_layout_url, 200, 100));
+
+		sender_thread = Thread(engine_run_entry, new EngineRunContext{&sender, &stop_flag});
+		thread_guard.sender_thread = &sender_thread;
 
 		// --- Watch for success or timeout
 		const auto start = Clock::now();
@@ -342,13 +375,7 @@ namespace robotick::test
 		REQUIRE(success_flag.is_set());
 
 		{
-			char layout_url[256];
-			::snprintf(
-				layout_url,
-				sizeof(layout_url),
-				"http://127.0.0.1:%u/api/telemetry/workloads_buffer/layout",
-				static_cast<unsigned int>(receiver_telemetry_port));
-			const HttpResponse layout = http_request(layout_url);
+			const HttpResponse layout = http_request(receiver_layout_url);
 			REQUIRE(layout.status_code == 200);
 			REQUIRE(contains_text(layout.body.data, "\"field_path\":\"receiver_workload.inputs.remote_x\""));
 			REQUIRE(contains_text(layout.body.data, "\"incoming_connection_handle\":"));

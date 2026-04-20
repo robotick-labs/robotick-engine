@@ -1295,10 +1295,14 @@ namespace robotick
 						field_receive_state.current_field_enabled = field.input_handle->is_enabled();
 					}
 
-					const size_t field_size = field.input_handle->size;
+					const size_t field_size = field.size;
+					if (field.input_handle->size != field_size)
+					{
+						ROBOTICK_FATAL_EXIT(
+							"Receiver field '%s' handle size mismatch (%zu != %zu)", field.path.c_str(), field.input_handle->size, field_size);
+					}
 					if (field.type_desc)
 					{
-						ROBOTICK_ASSERT(field.size == field.input_handle->size);
 						ROBOTICK_ASSERT(TypeRegistry::get().find_by_id(field.input_handle->type) == field.type_desc);
 					}
 
