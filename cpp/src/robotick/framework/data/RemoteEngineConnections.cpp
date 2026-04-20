@@ -70,9 +70,8 @@ namespace robotick
 							ROBOTICK_FATAL_EXIT("[REC::receiver] Receiver field has no descriptor: %s", path);
 						}
 						out.path = path;
-						out.input_handle = engine ? engine->find_or_create_data_connection_input_handle(
-														path, field_info.ptr, field_info.size, field_info.descriptor->type_id)
-												  : nullptr;
+						out.input_handle = engine->find_or_create_data_connection_input_handle(
+							path, field_info.ptr, field_info.size, field_info.descriptor->type_id);
 						out.size = field_info.size;
 						out.type_desc = field_info.descriptor->find_type_descriptor();
 						ROBOTICK_ASSERT(out.type_desc != nullptr);
