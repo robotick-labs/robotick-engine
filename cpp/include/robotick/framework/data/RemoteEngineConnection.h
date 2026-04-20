@@ -187,6 +187,7 @@ namespace robotick
 			size_t field_index = 0;
 			size_t offset_in_field = 0;
 			size_t total_bytes_received = 0;
+			bool current_field_enabled = false;
 		} field_receive_state;
 
 		// Capture mutual tick-rate bytes from FieldsRequest across partial reads

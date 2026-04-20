@@ -1,11 +1,12 @@
 // Copyright Robotick contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include "robotick/framework/data/RemoteEngineConnections.h"
 #include "robotick/framework/Engine.h"
 #include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Thread.h"
+#include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/model/DataConnectionSeed.h"
-#include "robotick/framework/data/RemoteEngineConnections.h"
 #include "robotick/framework/model/RemoteModelSeed.h"
 #include "robotick/framework/time/Clock.h"
 
@@ -24,6 +25,29 @@ namespace robotick::test
 		{
 			Engine* engine = nullptr;
 			AtomicFlag* stop_flag = nullptr;
+		};
+
+		struct EngineRunThreadsGuard
+		{
+			AtomicFlag* stop_flag = nullptr;
+			Thread* sender_thread = nullptr;
+			Thread* receiver_thread = nullptr;
+
+			~EngineRunThreadsGuard()
+			{
+				if (stop_flag)
+				{
+					stop_flag->set();
+				}
+				if (sender_thread && sender_thread->is_joining_supported())
+				{
+					sender_thread->join();
+				}
+				if (receiver_thread && receiver_thread->is_joining_supported())
+				{
+					receiver_thread->join();
+				}
+			}
 		};
 
 		struct HttpTextBuffer
@@ -95,6 +119,34 @@ namespace robotick::test
 		bool contains_text(const char* haystack, const char* needle)
 		{
 			return haystack && needle && ::strstr(haystack, needle) != nullptr;
+		}
+
+		bool telemetry_raw_int_equals(uint16_t telemetry_port, size_t offset, int expected)
+		{
+			char raw_url[256];
+			::snprintf(raw_url, sizeof(raw_url), "http://127.0.0.1:%u/api/telemetry/workloads_buffer/raw", static_cast<unsigned int>(telemetry_port));
+			const HttpResponse raw = http_request(raw_url);
+			if (raw.status_code != 200 || raw.body.len < offset + sizeof(int))
+			{
+				return false;
+			}
+
+			int actual = 0;
+			::memcpy(&actual, raw.body.data + offset, sizeof(actual));
+			return actual == expected;
+		}
+
+		bool wait_for_telemetry_raw_int(uint16_t telemetry_port, size_t offset, int expected, int attempts)
+		{
+			for (int i = 0; i < attempts; ++i)
+			{
+				if (telemetry_raw_int_equals(telemetry_port, offset, expected))
+				{
+					return true;
+				}
+				Thread::sleep_ms(10);
+			}
+			return false;
 		}
 
 		constexpr long long kRemoteEngineConnectionTimeoutNs = 3'000'000'000LL;
@@ -171,9 +223,11 @@ namespace robotick::test
 	struct RemoteInputs
 	{
 		int remote_x = 0;
+		int local_x = VALUE_TO_TRANSMIT;
 	};
 	ROBOTICK_REGISTER_STRUCT_BEGIN(RemoteInputs)
 	ROBOTICK_STRUCT_FIELD(RemoteInputs, int, remote_x)
+	ROBOTICK_STRUCT_FIELD(RemoteInputs, int, local_x)
 	ROBOTICK_REGISTER_STRUCT_END(RemoteInputs)
 
 	struct RemoteOutputs
@@ -189,7 +243,7 @@ namespace robotick::test
 		RemoteInputs inputs;
 		RemoteOutputs outputs;
 
-		void tick(const TickInfo&) {}
+		void tick(const TickInfo&) { outputs.local_x = inputs.local_x; }
 	};
 	ROBOTICK_REGISTER_WORKLOAD(TestRemoteWorkload, void, RemoteInputs, RemoteOutputs)
 
@@ -253,22 +307,26 @@ namespace robotick::test
 		sender.load(sender_model);
 		receiver.load(receiver_model);
 
+		auto* receiver_workload = receiver.find_instance<TestRemoteWorkload>("receiver_workload");
+		REQUIRE(receiver_workload != nullptr);
+		const uint8_t* receiver_buffer_base = receiver.get_workloads_buffer().raw_ptr();
+		const size_t receiver_remote_x_offset =
+			static_cast<size_t>(reinterpret_cast<const uint8_t*>(&receiver_workload->inputs.remote_x) - receiver_buffer_base);
+
 		AtomicFlag stop_flag(false);
 		AtomicFlag success_flag(false);
 
 		// --- Threaded run
 		Thread sender_thread(engine_run_entry, new EngineRunContext{&sender, &stop_flag});
 		Thread receiver_thread(engine_run_entry, new EngineRunContext{&receiver, &stop_flag});
+		EngineRunThreadsGuard thread_guard{&stop_flag, &sender_thread, &receiver_thread};
 
 		// --- Watch for success or timeout
-		auto* sender_workload = sender.find_instance<TestRemoteWorkload>("sender_workload");
-		auto* receiver_workload = receiver.find_instance<TestRemoteWorkload>("receiver_workload");
-
 		const auto start = Clock::now();
 
 		while (!stop_flag.is_set())
 		{
-			if (receiver_workload && sender_workload && receiver_workload->inputs.remote_x == sender_workload->outputs.local_x)
+			if (telemetry_raw_int_equals(receiver_telemetry_port, receiver_remote_x_offset, VALUE_TO_TRANSMIT))
 			{
 				success_flag.set();
 				break;
@@ -311,16 +369,21 @@ namespace robotick::test
 			REQUIRE(suppress.status_code == 200);
 			REQUIRE(contains_text(suppress.body.data, "\"incoming_connection_enabled\":false"));
 
-			sender_workload->outputs.local_x = 456;
-			for (int i = 0; i < 40; ++i)
+			char sender_write_url[256];
+			::snprintf(sender_write_url,
+				sizeof(sender_write_url),
+				"http://127.0.0.1:%u/api/telemetry/set_workload_input_fields_data",
+				static_cast<unsigned int>(sender_telemetry_port));
+			const HttpResponse sender_write =
+				http_request(sender_write_url, "POST", "{\"writes\":[{\"field_path\":\"sender_workload.inputs.local_x\",\"value\":456}]}");
+			REQUIRE(sender_write.status_code == 200);
+
+			for (int i = 0; i < 40 && !telemetry_raw_int_equals(receiver_telemetry_port, receiver_remote_x_offset, 456); ++i)
 			{
-				if (receiver_workload->inputs.remote_x != VALUE_TO_TRANSMIT)
-				{
-					break;
-				}
 				Thread::sleep_ms(10);
 			}
-			REQUIRE(receiver_workload->inputs.remote_x == VALUE_TO_TRANSMIT);
+			REQUIRE_FALSE(telemetry_raw_int_equals(receiver_telemetry_port, receiver_remote_x_offset, 456));
+			REQUIRE(telemetry_raw_int_equals(receiver_telemetry_port, receiver_remote_x_offset, VALUE_TO_TRANSMIT));
 
 			const HttpResponse reenable = http_request(
 				state_url,
@@ -329,26 +392,8 @@ namespace robotick::test
 			REQUIRE(reenable.status_code == 200);
 			REQUIRE(contains_text(reenable.body.data, "\"incoming_connection_enabled\":true"));
 
-			for (int i = 0; i < 80; ++i)
-			{
-				if (receiver_workload->inputs.remote_x == 456)
-				{
-					break;
-				}
-				Thread::sleep_ms(10);
-			}
-			REQUIRE(receiver_workload->inputs.remote_x == 456);
+			REQUIRE(wait_for_telemetry_raw_int(receiver_telemetry_port, receiver_remote_x_offset, 456, 80));
 		}
-
-		stop_flag.set();
-
-		if (sender_thread.is_joining_supported())
-			sender_thread.join();
-		if (receiver_thread.is_joining_supported())
-			receiver_thread.join();
-
-		REQUIRE(sender_workload->outputs.local_x == 456);
-		REQUIRE(receiver_workload->inputs.remote_x == 456);
 
 		REQUIRE(success_flag.is_set());
 	}

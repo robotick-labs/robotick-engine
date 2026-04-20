@@ -1290,6 +1290,11 @@ namespace robotick
 						ROBOTICK_FATAL_EXIT("Receiver field '%s' has null input_handle", field.path.c_str());
 					}
 
+					if (field_receive_state.offset_in_field == 0)
+					{
+						field_receive_state.current_field_enabled = field.input_handle->is_enabled();
+					}
+
 					const size_t field_size = field.input_handle->size;
 					if (field.type_desc)
 					{
@@ -1300,7 +1305,10 @@ namespace robotick
 					const size_t remaining_in_field = field_size - field_receive_state.offset_in_field;
 					const size_t take = rtk_min(remaining_in_field, len - cursor);
 
-					field.input_handle->do_copy_data_partial(data + cursor, field_receive_state.offset_in_field, take);
+					if (field_receive_state.current_field_enabled)
+					{
+						field.input_handle->do_copy_data_partial_unchecked(data + cursor, field_receive_state.offset_in_field, take);
+					}
 
 					cursor += take;
 					field_receive_state.offset_in_field += take;
@@ -1310,6 +1318,7 @@ namespace robotick
 					{
 						field_receive_state.field_index++;
 						field_receive_state.offset_in_field = 0;
+						field_receive_state.current_field_enabled = false;
 					}
 				}
 

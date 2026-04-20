@@ -69,6 +69,19 @@ namespace robotick
 
 			::memcpy(static_cast<uint8_t*>(dest_ptr) + offset, src_ptr, bytes);
 		}
+
+		void do_copy_data_partial_unchecked(const void* src_ptr, size_t offset, size_t bytes) const noexcept
+		{
+			ROBOTICK_ASSERT(src_ptr != nullptr && dest_ptr != nullptr);
+			ROBOTICK_ASSERT(offset <= size);
+			ROBOTICK_ASSERT(bytes <= size - offset);
+			if (bytes == 0)
+			{
+				return;
+			}
+
+			::memcpy(static_cast<uint8_t*>(dest_ptr) + offset, src_ptr, bytes);
+		}
 	};
 
 	struct DataConnectionInfo

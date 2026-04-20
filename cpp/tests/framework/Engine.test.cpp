@@ -1501,7 +1501,7 @@ namespace robotick::test
 			peer_stop.set();
 		}
 
-		SECTION("Telemetry REST data-plane endpoints are removed")
+		SECTION("Telemetry REST layout endpoints remain available and stale gateway writes are rejected")
 		{
 			const uint16_t peer_port = choose_telemetry_port();
 			const uint16_t gateway_port = choose_telemetry_port();

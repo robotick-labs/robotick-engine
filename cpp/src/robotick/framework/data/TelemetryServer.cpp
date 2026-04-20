@@ -1574,6 +1574,7 @@ namespace robotick
 		FixedString64 session_id;
 		HeapVector<WritableInputField> writable_input_fields;
 		HeapVector<PendingInputWrite> pending_input_writes;
+		Mutex writable_input_fields_mutex;
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
 		Mutex layout_cache_mutex;
 		static constexpr size_t layout_cache_capacity = 16384;
@@ -1608,6 +1609,7 @@ namespace robotick
 		void rebuild_writable_input_registry();
 		bool refresh_writable_input_connection_handles();
 		size_t count_writable_input_connection_handles() const;
+		size_t count_writable_input_connection_handles_unlocked() const;
 		int find_writable_input_index_by_handle(uint16_t handle) const;
 		int find_writable_input_index_by_path(const char* path) const;
 		int find_telemetry_peer_index_by_model_id(const char* model_id) const;
@@ -1794,7 +1796,8 @@ namespace robotick
 			return;
 		}
 
-		LockGuard lock(impl->pending_input_writes_mutex);
+		LockGuard writable_lock(impl->writable_input_fields_mutex);
+		LockGuard pending_lock(impl->pending_input_writes_mutex);
 		const size_t writable_count = impl->writable_input_fields.size();
 		const size_t pending_count = impl->pending_input_writes.size();
 		const size_t count = min(writable_count, pending_count);
@@ -2396,8 +2399,11 @@ namespace robotick
 			(void)refreshed;
 			json::StringSink layout_sink;
 			json::Writer<json::StringSink> writer(layout_sink);
-			write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
-			writer.flush();
+			{
+				LockGuard writable_lock(writable_input_fields_mutex);
+				write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
+				writer.flush();
+			}
 			if (!client.connection.send_frame(0x1, layout_sink.c_str(), layout_sink.size()))
 			{
 				unregister_ws_client(client.connection);
@@ -3107,6 +3113,14 @@ namespace robotick
 					});
 				return;
 			}
+			if (is_connection_state_request && forwarded.status_code == WebResponseCode::OK)
+			{
+				TelemetryPeerRoute& mutable_peer = const_cast<TelemetryPeerRoute&>(peer);
+				LockGuard layout_lock(mutable_peer.forwarded_layout_mutex);
+				reset_forward_http_result(mutable_peer.cached_layout);
+				mutable_peer.has_cached_layout = false;
+				mutable_peer.cached_layout_session_id.clear();
+			}
 			apply_forward_http_result_to_response(forwarded, res);
 			return;
 		}
@@ -3139,6 +3153,9 @@ namespace robotick
 
 	void TelemetryServer::Impl::rebuild_writable_input_registry()
 	{
+		LockGuard writable_lock(writable_input_fields_mutex);
+		LockGuard pending_lock(pending_input_writes_mutex);
+
 		write_seq_counter = 0;
 
 		if (!engine)
@@ -3282,10 +3299,10 @@ namespace robotick
 				++write_index;
 			});
 
-		last_known_writable_connection_handle_count = count_writable_input_connection_handles();
+		last_known_writable_connection_handle_count = count_writable_input_connection_handles_unlocked();
 	}
 
-	size_t TelemetryServer::Impl::count_writable_input_connection_handles() const
+	size_t TelemetryServer::Impl::count_writable_input_connection_handles_unlocked() const
 	{
 		size_t count = 0;
 		for (size_t i = 0; i < writable_input_fields.size(); ++i)
@@ -3298,6 +3315,12 @@ namespace robotick
 		return count;
 	}
 
+	size_t TelemetryServer::Impl::count_writable_input_connection_handles() const
+	{
+		LockGuard lock(const_cast<Mutex&>(writable_input_fields_mutex));
+		return count_writable_input_connection_handles_unlocked();
+	}
+
 	bool TelemetryServer::Impl::refresh_writable_input_connection_handles()
 	{
 		if (!engine)
@@ -3305,6 +3328,7 @@ namespace robotick
 			return false;
 		}
 
+		LockGuard lock(writable_input_fields_mutex);
 		bool changed = false;
 		for (size_t i = 0; i < writable_input_fields.size(); ++i)
 		{
@@ -3370,6 +3394,8 @@ namespace robotick
 			write_error(WebResponseCode::BadRequest, "missing_writes");
 			return;
 		}
+
+		LockGuard writable_lock(writable_input_fields_mutex);
 
 		HeapVector<ParsedWrite> parsed_writes;
 		parsed_writes.initialize(payload.write_count);
@@ -3489,7 +3515,7 @@ namespace robotick
 		size_t ignored_stale_count = 0;
 
 		{
-			LockGuard lock(pending_input_writes_mutex);
+			LockGuard pending_lock(pending_input_writes_mutex);
 			for (size_t i = 0; i < parsed_count; ++i)
 			{
 				ParsedWrite& parsed = parsed_writes[i];
@@ -3614,77 +3640,87 @@ namespace robotick
 		HeapVector<UpdateResult> results;
 		results.initialize(payload.update_count);
 
-		for (size_t update_payload_index = 0; update_payload_index < payload.update_count; ++update_payload_index)
+		bool layout_cache_needs_rebuild = false;
 		{
-			const TelemetryConnectionStateRequestEntry& update_payload = payload.updates[update_payload_index];
-			if (!session_matches && !update_payload.has_field_path)
+			LockGuard writable_lock(writable_input_fields_mutex);
+			for (size_t update_payload_index = 0; update_payload_index < payload.update_count; ++update_payload_index)
 			{
-				write_error(WebResponseCode::PreconditionFailed, "field_path_required_for_stale_session_write");
-				return;
-			}
-
-			int writable_index = -1;
-			uint16_t writable_handle = 0;
-			FixedString512 requested_path;
-
-			if (update_payload.has_field_handle)
-			{
-				writable_handle = update_payload.field_handle;
-				writable_index = find_writable_input_index_by_handle(writable_handle);
-			}
-
-			if (update_payload.has_field_path)
-			{
-				requested_path = update_payload.field_path.c_str();
-				const int path_index = find_writable_input_index_by_path(requested_path.c_str());
-				if (path_index >= 0)
+				const TelemetryConnectionStateRequestEntry& update_payload = payload.updates[update_payload_index];
+				if (!session_matches && !update_payload.has_field_path)
 				{
-					if (writable_index >= 0 && static_cast<size_t>(writable_index) != static_cast<size_t>(path_index))
-					{
-						write_error(WebResponseCode::BadRequest, "field_handle_path_mismatch");
-						return;
-					}
-					writable_index = path_index;
-					writable_handle = writable_input_fields[static_cast<size_t>(writable_index)].handle;
+					write_error(WebResponseCode::PreconditionFailed, "field_path_required_for_stale_session_write");
+					return;
 				}
-			}
 
-			if (writable_index < 0)
-			{
-				write_error(WebResponseCode::NotFound, "writable_input_not_found");
-				return;
-			}
+				int writable_index = -1;
+				uint16_t writable_handle = 0;
+				FixedString512 requested_path;
 
-			if (!update_payload.has_enabled)
-			{
-				write_error(WebResponseCode::BadRequest, "missing_enabled");
-				return;
-			}
+				if (update_payload.has_field_handle)
+				{
+					writable_handle = update_payload.field_handle;
+					writable_index = find_writable_input_index_by_handle(writable_handle);
+				}
 
-			WritableInputField& writable = writable_input_fields[static_cast<size_t>(writable_index)];
-			if (!writable.incoming_connection_handle)
-			{
-				write_error(WebResponseCode::Conflict, "writable_input_has_no_incoming_connection");
-				return;
-			}
+				if (update_payload.has_field_path)
+				{
+					requested_path = update_payload.field_path.c_str();
+					const int path_index = find_writable_input_index_by_path(requested_path.c_str());
+					if (path_index >= 0)
+					{
+						if (writable_index >= 0 && static_cast<size_t>(writable_index) != static_cast<size_t>(path_index))
+						{
+							write_error(WebResponseCode::BadRequest, "field_handle_path_mismatch");
+							return;
+						}
+						writable_index = path_index;
+						writable_handle = writable_input_fields[static_cast<size_t>(writable_index)].handle;
+					}
+				}
 
-			const bool was_enabled = writable.incoming_connection_handle->is_enabled();
-			writable.incoming_connection_handle->set_enabled(update_payload.enabled);
-			if (was_enabled != update_payload.enabled)
-			{
-				ws_layout_dirty.set();
-			}
+				if (writable_index < 0)
+				{
+					write_error(WebResponseCode::NotFound, "writable_input_not_found");
+					return;
+				}
 
-			UpdateResult& result = results[update_payload_index];
-			result.field_handle = writable_handle;
-			result.field_path = writable.path.c_str();
-			result.connection_handle = writable.incoming_connection_handle->handle_id;
-			result.enabled = writable.incoming_connection_handle->is_enabled();
-			result.status = "accepted";
+				if (!update_payload.has_enabled)
+				{
+					write_error(WebResponseCode::BadRequest, "missing_enabled");
+					return;
+				}
+
+				WritableInputField& writable = writable_input_fields[static_cast<size_t>(writable_index)];
+				if (!writable.incoming_connection_handle)
+				{
+					write_error(WebResponseCode::Conflict, "writable_input_has_no_incoming_connection");
+					return;
+				}
+
+				const bool was_enabled = writable.incoming_connection_handle->is_enabled();
+				writable.incoming_connection_handle->set_enabled(update_payload.enabled);
+				if (was_enabled != update_payload.enabled)
+				{
+					ws_layout_dirty.set();
+					layout_cache_needs_rebuild = true;
+				}
+
+				UpdateResult& result = results[update_payload_index];
+				result.field_handle = writable_handle;
+				result.field_path = writable.path.c_str();
+				result.connection_handle = writable.incoming_connection_handle->handle_id;
+				result.enabled = writable.incoming_connection_handle->is_enabled();
+				result.status = "accepted";
+			}
 		}
 
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
-		rebuild_layout_cache();
+		if (layout_cache_needs_rebuild)
+		{
+			rebuild_layout_cache();
+		}
+#else
+		(void)layout_cache_needs_rebuild;
 #endif
 
 		out_status_code = WebResponseCode::OK;
@@ -4218,8 +4254,11 @@ namespace robotick
 		char new_cached_layout_body[layout_cache_capacity] = {};
 		json::FixedBufferSink sink(new_cached_layout_body, layout_cache_capacity);
 		json::Writer<json::FixedBufferSink> writer(sink);
-		write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
-		writer.flush();
+		{
+			LockGuard writable_lock(writable_input_fields_mutex);
+			write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
+			writer.flush();
+		}
 
 		if (!sink.is_ok())
 		{
@@ -4276,8 +4315,11 @@ namespace robotick
 		last_known_writable_connection_handle_count = count_writable_input_connection_handles();
 		json::StringSink sink;
 		json::Writer<json::StringSink> writer(sink);
-		write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
-		writer.flush();
+		{
+			LockGuard writable_lock(writable_input_fields_mutex);
+			write_layout_json_stream(writer, *engine, session_id.c_str(), writable_input_fields);
+			writer.flush();
+		}
 		res.set_body(sink.c_str(), sink.size());
 #endif
 	}

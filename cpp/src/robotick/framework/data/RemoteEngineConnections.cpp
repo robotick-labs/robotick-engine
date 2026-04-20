@@ -49,14 +49,14 @@ namespace robotick
 
 		discoverer_receiver.initialize_receiver(my_model_name, model.get_telemetry_port(), model.get_telemetry_is_gateway());
 		discoverer_receiver.set_on_incoming_connection_requested(
-			[this, &model](const char* source_model_id, uint16_t& rec_port_out)
+			[this, &model, log_verbose](const char* source_model_id, uint16_t& rec_port_out)
 			{
 				ROBOTICK_INFO_IF(log_verbose, "[REC::receiver] Incoming discovery request from model '%s'", source_model_id);
 				RemoteEngineConnection& conn = dynamic_receivers.push_back();
 				conn.configure_receiver(model.get_model_name());
 
 				conn.set_field_binder(
-					[this](const char* path, RemoteEngineConnection::Field& out)
+					[this, log_verbose](const char* path, RemoteEngineConnection::Field& out)
 					{
 						ROBOTICK_INFO_IF(log_verbose, "[REC::receiver] Binding field '%s'", path);
 
