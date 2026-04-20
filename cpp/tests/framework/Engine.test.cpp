@@ -498,11 +498,7 @@ namespace robotick::test
 			return false;
 		}
 
-		bool wait_for_ws_frame_metadata_and_payload(
-			WsTestClient& client,
-			json::Document& metadata_doc,
-			size_t& payload_size,
-			int max_frames = 48)
+		bool wait_for_ws_frame_metadata_and_payload(WsTestClient& client, json::Document& metadata_doc, size_t& payload_size, int max_frames = 48)
 		{
 			WsFrame frame;
 			HeapVector<char> text;
@@ -1019,6 +1015,108 @@ namespace robotick::test
 			stop_flag.set();
 		}
 
+		SECTION("Telemetry layout gives repeated dynamic struct instances distinct output types")
+		{
+			Model model;
+			const uint16_t telemetry_port = choose_telemetry_port();
+			model.set_telemetry_port(telemetry_port);
+			static const FieldConfigEntry config[] = {{"max_output_bytes", "64"}};
+			static const WorkloadSeed first_seed{TypeId("LargeDynamicWorkload"), StringView("first_dynamic"), 30.0f, {}, config, {}};
+			static const WorkloadSeed second_seed{TypeId("LargeDynamicWorkload"), StringView("second_dynamic"), 30.0f, {}, config, {}};
+			static const WorkloadSeed root_seed{TypeId("TickCounterWorkload"), StringView("dynamic_layout_root"), 30.0f, {}, {}, {}};
+			static const WorkloadSeed* const workloads[] = {&first_seed, &second_seed, &root_seed};
+			model.use_workload_seeds(workloads);
+			model.set_root_workload(root_seed);
+
+			Engine engine;
+			engine.load(model);
+			AtomicFlag stop_flag{false};
+			EngineRunThread runner(engine, stop_flag);
+			Thread::sleep_ms(100);
+
+			char url[256];
+			::snprintf(url, sizeof(url), "http://127.0.0.1:%u/api/telemetry/workloads_buffer/layout", static_cast<unsigned int>(telemetry_port));
+			const HttpResponse layout_response = http_request(url);
+			REQUIRE(layout_response.status_code == 200);
+
+			json::Document layout_document;
+			REQUIRE(layout_document.parse(layout_response.body.data));
+			const json::Value layout = layout_document.root();
+			REQUIRE(layout.contains("workloads"));
+			REQUIRE(layout.contains("types"));
+
+			auto find_named = [](const json::Value& array_value, const char* name)
+			{
+				json::Value found;
+				array_value.for_each_array(
+					[&](const json::Value item)
+					{
+						if (!found.is_valid() && item.contains("name") && item["name"].equals(name))
+						{
+							found = item;
+						}
+					});
+				return found;
+			};
+
+			auto find_field = [](const json::Value& type_value, const char* name)
+			{
+				json::Value found;
+				if (!type_value.contains("fields"))
+				{
+					return found;
+				}
+
+				type_value["fields"].for_each_array(
+					[&](const json::Value item)
+					{
+						if (!found.is_valid() && item.contains("name") && item["name"].equals(name))
+						{
+							found = item;
+						}
+					});
+				return found;
+			};
+
+			const json::Value first_workload = find_named(layout["workloads"], "first_dynamic");
+			const json::Value second_workload = find_named(layout["workloads"], "second_dynamic");
+			REQUIRE(first_workload.is_valid());
+			REQUIRE(second_workload.is_valid());
+			REQUIRE(first_workload.contains("outputs"));
+			REQUIRE(second_workload.contains("outputs"));
+			const char* first_outputs_type_name = first_workload["outputs"]["type"].get_c_string();
+			const char* second_outputs_type_name = second_workload["outputs"]["type"].get_c_string();
+			REQUIRE(first_outputs_type_name != nullptr);
+			REQUIRE(second_outputs_type_name != nullptr);
+			CHECK(!StringView(first_outputs_type_name).equals(second_outputs_type_name));
+
+			const json::Value first_outputs_type = find_named(layout["types"], first_outputs_type_name);
+			const json::Value second_outputs_type = find_named(layout["types"], second_outputs_type_name);
+			REQUIRE(first_outputs_type.is_valid());
+			REQUIRE(second_outputs_type.is_valid());
+			const json::Value first_bytes_field = find_field(first_outputs_type, "bytes");
+			const json::Value second_bytes_field = find_field(second_outputs_type, "bytes");
+			REQUIRE(first_bytes_field.is_valid());
+			REQUIRE(second_bytes_field.is_valid());
+			const char* first_dynamic_type_name = first_bytes_field["type"].get_c_string();
+			const char* second_dynamic_type_name = second_bytes_field["type"].get_c_string();
+			REQUIRE(first_dynamic_type_name != nullptr);
+			REQUIRE(second_dynamic_type_name != nullptr);
+			CHECK(!StringView(first_dynamic_type_name).equals(second_dynamic_type_name));
+
+			const json::Value first_dynamic_type = find_named(layout["types"], first_dynamic_type_name);
+			const json::Value second_dynamic_type = find_named(layout["types"], second_dynamic_type_name);
+			REQUIRE(first_dynamic_type.is_valid());
+			REQUIRE(second_dynamic_type.is_valid());
+			const json::Value first_data_buffer = find_field(first_dynamic_type, "data_buffer");
+			const json::Value second_data_buffer = find_field(second_dynamic_type, "data_buffer");
+			REQUIRE(first_data_buffer.is_valid());
+			REQUIRE(second_data_buffer.is_valid());
+			CHECK(first_data_buffer["offset_within_container"].get_int64() != second_data_buffer["offset_within_container"].get_int64());
+
+			stop_flag.set();
+		}
+
 		SECTION("WorkloadsBuffer is exact-sized after dynamic-struct preflight")
 		{
 			Model model;
@@ -1403,7 +1501,7 @@ namespace robotick::test
 			peer_stop.set();
 		}
 
-		SECTION("Telemetry REST data-plane endpoints are removed")
+		SECTION("Telemetry REST layout endpoints remain available and stale gateway writes are rejected")
 		{
 			const uint16_t peer_port = choose_telemetry_port();
 			const uint16_t gateway_port = choose_telemetry_port();
@@ -1446,22 +1544,25 @@ namespace robotick::test
 			char url[256];
 			::snprintf(url, sizeof(url), "http://127.0.0.1:%u/api/telemetry/workloads_buffer/layout", static_cast<unsigned int>(gateway_port));
 			const HttpResponse local_layout = http_request(url);
-			REQUIRE(local_layout.status_code == 404);
+			REQUIRE(local_layout.status_code == 200);
+			REQUIRE(contains_text(local_layout.body.data, "\"writable_inputs\""));
 
 			::snprintf(url,
 				sizeof(url),
 				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/workloads_buffer/layout",
 				static_cast<unsigned int>(gateway_port));
 			const HttpResponse peer_layout = http_request(url);
-			REQUIRE(peer_layout.status_code == 404);
+			REQUIRE(peer_layout.status_code == 200);
+			REQUIRE(contains_text(peer_layout.body.data, "\"writable_inputs\""));
 
 			::snprintf(url,
 				sizeof(url),
 				"http://127.0.0.1:%u/api/telemetry-gateway/peer-model/set_workload_input_fields_data",
 				static_cast<unsigned int>(gateway_port));
-			const HttpResponse peer_write = http_request(
-				url, "POST", "{\"engine_session_id\":\"x\",\"writes\":[{\"field_handle\":1,\"value\":1.0}]}");
-			REQUIRE(peer_write.status_code == 404);
+			const HttpResponse peer_write =
+				http_request(url, "POST", "{\"engine_session_id\":\"x\",\"writes\":[{\"field_handle\":1,\"value\":1.0}]}");
+			REQUIRE(peer_write.status_code == 412);
+			REQUIRE(contains_text(peer_write.body.data, "\"field_path_required_for_stale_session_write\""));
 
 			gateway_stop.set();
 			peer_stop.set();

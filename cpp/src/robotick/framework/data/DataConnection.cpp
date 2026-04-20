@@ -298,8 +298,16 @@ namespace robotick
 			if (has_connection_to_field(out_connections, dst.ptr))
 				ROBOTICK_FATAL_EXIT("Duplicate connection to field: %s", seed.dest_field_path.c_str());
 
-			out_connections[connection_index] =
-				DataConnectionInfo{&seed, src.ptr, const_cast<void*>(dst.ptr), src.workload, dst.workload, src.size, src.type};
+			DataConnectionInfo resolved_connection;
+			resolved_connection.seed = &seed;
+			resolved_connection.source_ptr = src.ptr;
+			resolved_connection.dest_ptr = const_cast<void*>(dst.ptr);
+			resolved_connection.source_workload = src.workload;
+			resolved_connection.dest_workload = dst.workload;
+			resolved_connection.size = src.size;
+			resolved_connection.type = src.type;
+
+			out_connections[connection_index] = resolved_connection;
 
 			connection_index++;
 		}

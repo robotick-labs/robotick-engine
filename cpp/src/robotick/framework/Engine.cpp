@@ -6,6 +6,7 @@
 #include "robotick/api.h"
 #include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Thread.h"
+#include "robotick/framework/containers/List.h"
 #include "robotick/framework/data/Blackboard.h"
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/data/RemoteEngineConnections.h"
@@ -19,6 +20,7 @@
 #include "robotick/framework/utils/TypeId.h"
 
 #include <cstddef>
+#include <cstdint>
 
 namespace robotick
 {
@@ -36,6 +38,11 @@ namespace robotick
 		Map<const char*, WorkloadInstanceInfo*> instances_by_unique_name;
 		HeapVector<DataConnectionInfo> data_connections_all;
 		HeapVector<DataConnectionInfo*> data_connections_acquired;
+		List<DataConnectionInputHandle> data_connection_input_handles;
+		Map<const char*, DataConnectionInputHandle*, 128> data_connection_input_handles_by_path;
+		Map<uintptr_t, DataConnectionInputHandle*, 128> data_connection_input_handles_by_dest_ptr;
+		Map<uint16_t, DataConnectionInputHandle*, 128> data_connection_input_handles_by_id;
+		uint16_t next_data_connection_input_handle_id = 1;
 
 		RemoteEngineConnections remote_engine_connections;
 	};
@@ -288,6 +295,12 @@ namespace robotick
 		DataConnectionUtils::create(
 			state->data_connections_all, state->workloads_buffer, model.get_data_connection_seeds(), state->instances_by_unique_name);
 
+		for (DataConnectionInfo& conn : state->data_connections_all)
+		{
+			conn.dest_handle = find_or_create_data_connection_input_handle(
+				conn.seed ? conn.seed->dest_field_path.c_str() : nullptr, conn.dest_ptr, conn.size, conn.type);
+		}
+
 		const WorkloadInstanceInfo* root_instance = find_instance_info(model.get_root_workload()->unique_name.c_str());
 		ROBOTICK_ASSERT(root_instance != nullptr);
 
@@ -514,6 +527,109 @@ namespace robotick
 		return state->data_connections_all;
 	}
 
+	DataConnectionInputHandle* Engine::find_data_connection_input_handle_by_path(const char* path) const
+	{
+		if (!path)
+		{
+			return nullptr;
+		}
+		DataConnectionInputHandle** found = state->data_connection_input_handles_by_path.find(path);
+		return found ? *found : nullptr;
+	}
+
+	DataConnectionInputHandle* Engine::find_data_connection_input_handle_by_dest_ptr(const void* dest_ptr) const
+	{
+		if (!dest_ptr)
+		{
+			return nullptr;
+		}
+		DataConnectionInputHandle** found = state->data_connection_input_handles_by_dest_ptr.find(reinterpret_cast<uintptr_t>(dest_ptr));
+		return found ? *found : nullptr;
+	}
+
+	DataConnectionInputHandle* Engine::find_data_connection_input_handle_by_handle_id(uint16_t handle_id) const
+	{
+		if (handle_id == 0)
+		{
+			return nullptr;
+		}
+		DataConnectionInputHandle** found = state->data_connection_input_handles_by_id.find(handle_id);
+		return found ? *found : nullptr;
+	}
+
+	DataConnectionInputHandle* Engine::find_data_connection_input_handle_by_overlap(const void* dest_ptr, size_t size) const
+	{
+		if (!dest_ptr || size == 0)
+		{
+			return nullptr;
+		}
+
+		const uintptr_t target_begin = reinterpret_cast<uintptr_t>(dest_ptr);
+		const uintptr_t target_end = target_begin + size;
+		for (const DataConnectionInputHandle& handle : state->data_connection_input_handles)
+		{
+			if (!handle.dest_ptr || handle.size == 0)
+			{
+				continue;
+			}
+
+			const uintptr_t handle_begin = reinterpret_cast<uintptr_t>(handle.dest_ptr);
+			const uintptr_t handle_end = handle_begin + handle.size;
+			if (target_begin < handle_end && handle_begin < target_end)
+			{
+				return const_cast<DataConnectionInputHandle*>(&handle);
+			}
+		}
+
+		return nullptr;
+	}
+
+	DataConnectionInputHandle* Engine::find_or_create_data_connection_input_handle(const char* path, void* dest_ptr, size_t size, TypeId type)
+	{
+		if (!path || !dest_ptr || size == 0)
+		{
+			return nullptr;
+		}
+
+		if (DataConnectionInputHandle* existing_by_path = find_data_connection_input_handle_by_path(path))
+		{
+			ROBOTICK_ASSERT(existing_by_path->dest_ptr == dest_ptr);
+			ROBOTICK_ASSERT(existing_by_path->size == size);
+			ROBOTICK_ASSERT(existing_by_path->type == type);
+			return existing_by_path;
+		}
+
+		if (DataConnectionInputHandle* existing_by_ptr = find_data_connection_input_handle_by_dest_ptr(dest_ptr))
+		{
+			ROBOTICK_ASSERT(existing_by_ptr->size == size);
+			ROBOTICK_ASSERT(existing_by_ptr->type == type);
+			if (existing_by_ptr->path.empty())
+			{
+				existing_by_ptr->path = path;
+				state->data_connection_input_handles_by_path.insert(existing_by_ptr->path.c_str(), existing_by_ptr);
+			}
+			return existing_by_ptr;
+		}
+
+		if (state->next_data_connection_input_handle_id == 0)
+		{
+			ROBOTICK_FATAL_EXIT("DataConnectionInputHandle id overflow");
+		}
+
+		DataConnectionInputHandle& created = state->data_connection_input_handles.push_back();
+		created.handle_id = state->next_data_connection_input_handle_id++;
+		created.path = path;
+		created.dest_ptr = dest_ptr;
+		created.size = size;
+		created.type = type;
+		created.set_enabled(true);
+
+		state->data_connection_input_handles_by_path.insert(created.path.c_str(), &created);
+		state->data_connection_input_handles_by_dest_ptr.insert(reinterpret_cast<uintptr_t>(created.dest_ptr), &created);
+		state->data_connection_input_handles_by_id.insert(created.handle_id, &created);
+		return &created;
+	}
+
 	WorkloadsBuffer& Engine::get_workloads_buffer() const
 	{
 		return state->workloads_buffer;
@@ -662,6 +778,11 @@ namespace robotick
 		state->instances_by_unique_name.clear();
 		state->data_connections_all.reset();
 		state->data_connections_acquired.reset();
+		state->data_connection_input_handles.clear();
+		state->data_connection_input_handles_by_path.clear();
+		state->data_connection_input_handles_by_dest_ptr.clear();
+		state->data_connection_input_handles_by_id.clear();
+		state->next_data_connection_input_handle_id = 1;
 		state->instances.reset();
 		state->workloads_buffer = WorkloadsBuffer();
 	}

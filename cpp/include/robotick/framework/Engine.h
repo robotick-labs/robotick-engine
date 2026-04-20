@@ -15,6 +15,7 @@ namespace robotick
 	class TelemetryServer;
 	class WorkloadsBuffer;
 	struct DataConnectionInfo;
+	struct DataConnectionInputHandle;
 	struct StructDescriptor;
 	struct TickInfo;
 	struct WorkloadInstanceInfo;
@@ -53,6 +54,11 @@ namespace robotick
 		const Map<const char*, WorkloadInstanceInfo*>& get_all_instance_info_map() const;
 
 		const HeapVector<DataConnectionInfo>& get_all_data_connections() const;
+		DataConnectionInputHandle* find_data_connection_input_handle_by_path(const char* path) const;
+		DataConnectionInputHandle* find_data_connection_input_handle_by_dest_ptr(const void* dest_ptr) const;
+		DataConnectionInputHandle* find_data_connection_input_handle_by_handle_id(uint16_t handle_id) const;
+		DataConnectionInputHandle* find_data_connection_input_handle_by_overlap(const void* dest_ptr, size_t size) const;
+		DataConnectionInputHandle* find_or_create_data_connection_input_handle(const char* path, void* dest_ptr, size_t size, TypeId type);
 
 		WorkloadsBuffer& get_workloads_buffer() const;
 		TelemetryServer& get_telemetry_server() const;

@@ -49,14 +49,14 @@ namespace robotick
 
 		discoverer_receiver.initialize_receiver(my_model_name, model.get_telemetry_port(), model.get_telemetry_is_gateway());
 		discoverer_receiver.set_on_incoming_connection_requested(
-			[this, &model](const char* source_model_id, uint16_t& rec_port_out)
+			[this, &model, log_verbose](const char* source_model_id, uint16_t& rec_port_out)
 			{
 				ROBOTICK_INFO_IF(log_verbose, "[REC::receiver] Incoming discovery request from model '%s'", source_model_id);
 				RemoteEngineConnection& conn = dynamic_receivers.push_back();
 				conn.configure_receiver(model.get_model_name());
 
 				conn.set_field_binder(
-					[this](const char* path, RemoteEngineConnection::Field& out)
+					[this, log_verbose](const char* path, RemoteEngineConnection::Field& out)
 					{
 						ROBOTICK_INFO_IF(log_verbose, "[REC::receiver] Binding field '%s'", path);
 
@@ -65,12 +65,20 @@ namespace robotick
 						{
 							ROBOTICK_FATAL_EXIT("[REC::receiver] Receiver failed to bind field: %s", path);
 						}
+						if (!field_info.descriptor)
+						{
+							ROBOTICK_FATAL_EXIT("[REC::receiver] Receiver field has no descriptor: %s", path);
+						}
 						out.path = path;
-						out.recv_ptr = field_info.ptr;
+						out.input_handle = engine->find_or_create_data_connection_input_handle(
+							path, field_info.ptr, field_info.size, field_info.descriptor->type_id);
 						out.size = field_info.size;
-						ROBOTICK_ASSERT(field_info.descriptor != nullptr);
 						out.type_desc = field_info.descriptor->find_type_descriptor();
 						ROBOTICK_ASSERT(out.type_desc != nullptr);
+						ROBOTICK_ASSERT(out.input_handle != nullptr);
+						ROBOTICK_ASSERT(out.input_handle->dest_ptr == field_info.ptr);
+						ROBOTICK_ASSERT(out.input_handle->size == out.size);
+						ROBOTICK_ASSERT(out.input_handle->type == field_info.descriptor->type_id);
 						return true;
 					});
 
