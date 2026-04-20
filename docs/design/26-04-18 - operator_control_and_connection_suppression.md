@@ -118,6 +118,10 @@ This keeps config readable if the robot implementation changes.
 
 ## Launcher Semantics
 
+Connection suppression depends on the same generated model metadata and writable
+input layout that Studio exposes for operator control, so launcher behavior needs
+to keep those artifacts in step with the running model process.
+
 The launcher should treat per-model play/restart consistently with the main
 launcher controls.
 
