@@ -49,6 +49,7 @@ namespace robotick::test
 	};
 
 	static const int i_val = 42;
+	static const int32_t i32_val = -17;
 	static const float f_val = 3.14f;
 	static const double d_val = 2.718;
 	static const bool b_val = true;
@@ -63,6 +64,7 @@ namespace robotick::test
 
 	static const ExpectedType expected_primitive_types[] = {
 		{"int", GET_TYPE_ID(int), sizeof(int), &i_val},
+		{"int32_t", GET_TYPE_ID(int32_t), sizeof(int32_t), &i32_val},
 		{"float", GET_TYPE_ID(float), sizeof(float), &f_val},
 		{"double", GET_TYPE_ID(double), sizeof(double), &d_val},
 		{"bool", GET_TYPE_ID(bool), sizeof(bool), &b_val},
