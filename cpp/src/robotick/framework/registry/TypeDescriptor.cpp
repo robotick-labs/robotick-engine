@@ -10,6 +10,7 @@
 #include "robotick/framework/registry/TypeRegistry.h"
 #include "robotick/framework/strings/StringUtils.h"
 
+#include <cinttypes>
 #include <cstring>
 #include <limits>
 
@@ -305,7 +306,7 @@ namespace robotick
 		}
 		if (name == "int32_t")
 		{
-			return ::sscanf(input, "%d", reinterpret_cast<int32_t*>(out_value)) == 1;
+			return ::sscanf(input, "%" SCNd32, reinterpret_cast<int32_t*>(out_value)) == 1;
 		}
 		if (name == "uint16_t")
 		{
@@ -313,14 +314,7 @@ namespace robotick
 		}
 		if (name == "uint32_t")
 		{
-			unsigned long parsed = 0;
-			const int read = ::sscanf(input, "%lu", &parsed);
-			if (read == 1)
-			{
-				*reinterpret_cast<uint32_t*>(out_value) = static_cast<uint32_t>(parsed);
-				return true;
-			}
-			return false;
+			return ::sscanf(input, "%" SCNu32, reinterpret_cast<uint32_t*>(out_value)) == 1;
 		}
 		const EnumDescriptor* enum_desc = get_enum_desc();
 		if (enum_desc)
