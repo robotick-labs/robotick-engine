@@ -100,8 +100,11 @@ namespace robotick
 		taskYIELD(); // explicit, zero-latency yield
 	}
 
-	inline void Thread::hybrid_sleep_until(Clock::time_point target_time)
+	inline void Thread::hybrid_sleep_until(Clock::time_point target_time, HybridSleepMode mode, HybridSleepStats* out_stats)
 	{
+		(void)mode;
+		(void)out_stats;
+
 		constexpr auto coarse_threshold_us = 2000; // 2 ms
 		constexpr int watchdog_yield_interval = 500;
 		int spin_counter = 0;

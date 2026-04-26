@@ -455,7 +455,10 @@ namespace robotick
 			state->workloads_buffer.mark_frame_write_end();
 
 			next_tick_time += child_tick_interval;
-			Thread::hybrid_sleep_until(next_tick_time);
+
+			const HybridSleepMode sleep_mode = HybridSleepMode::Normal; // use this default until we can plumb into engine settings
+			HybridSleepStats sleep_stats; // populate a temporary stack-object for now, until we can plumb this into telemetry
+			Thread::hybrid_sleep_until(next_tick_time, sleep_mode, &sleep_stats);
 
 		} while (!stop_after_next_tick_flag.is_set() && !should_exit_application());
 

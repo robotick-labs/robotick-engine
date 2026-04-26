@@ -5,10 +5,39 @@
 
 #include "robotick/api_base.h"
 #include "robotick/framework/time/Clock.h"
+#include <cstdint>
 #include <thread>
 
 namespace robotick
 {
+	enum class HybridSleepMode
+	{
+		// Lowest CPU overhead. Suitable for workloads where a little wake lateness is acceptable,
+		// such as robot models doing background perception, mapping, or other non-tight-loop work.
+		Eco,
+		// Balanced default. Good for most desktop robot models where we want stable pacing
+		// without burning CPU in a long busy-wait near the deadline.
+		Normal,
+		// Highest timing precision. Intended for workloads where the last part of the frame budget
+		// matters enough to justify a short final spin, such as tightly paced simulation/control loops.
+		Accurate
+	};
+
+	struct HybridSleepStats
+	{
+		HybridSleepMode mode = HybridSleepMode::Normal;
+
+		uint64_t requested_wait_ns = 0;
+		uint64_t coarse_sleep_ns = 0;
+		uint64_t yield_phase_ns = 0;
+		uint64_t spin_phase_ns = 0;
+		uint64_t total_wait_ns = 0;
+		uint64_t wake_lateness_ns = 0;
+
+		uint32_t yield_iterations = 0;
+		uint32_t spin_iterations = 0;
+	};
+
 	class Thread
 	{
 	  public:
@@ -34,7 +63,7 @@ namespace robotick
 		static uint32_t get_hardware_concurrency();
 		static void yield();
 		static void sleep_ms(uint32_t ms);
-		static void hybrid_sleep_until(Clock::time_point target_time);
+		static void hybrid_sleep_until(Clock::time_point target_time, HybridSleepMode mode, HybridSleepStats* out_stats = nullptr);
 
 	  protected:
 		static void set_name(const char* name);
