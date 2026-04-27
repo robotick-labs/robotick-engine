@@ -4,6 +4,7 @@
 #include "robotick/framework/Engine.h"
 
 #include "robotick/api.h"
+#include "robotick/framework/EngineInfo.h"
 #include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Thread.h"
 #include "robotick/framework/containers/List.h"
@@ -30,6 +31,8 @@ namespace robotick
 		bool is_running = false;
 
 		WorkloadsBuffer workloads_buffer;
+		EngineInfo* engine_info = nullptr;
+		size_t engine_info_offset_in_workloads_buffer = OFFSET_UNBOUND;
 
 		TelemetryServer telemetry_server;
 
@@ -76,6 +79,7 @@ namespace robotick
 	extern "C" void robotick_force_register_quat_types();
 	extern "C" void robotick_force_register_pose_types();
 	extern "C" void robotick_force_register_transform_types();
+	extern "C" void robotick_force_register_engine_info_types();
 
 	// Prevent integer overflow while sizing contiguous chunks so layout stays deterministic even near SIZE_MAX.
 	// The workloads buffer is preallocated once, so a bad descriptor must be rejected rather than silently wrapping.
@@ -168,6 +172,7 @@ namespace robotick
 		robotick_force_register_quat_types();
 		robotick_force_register_pose_types();
 		robotick_force_register_transform_types();
+		robotick_force_register_engine_info_types();
 		TypeRegistry::get().seal();
 
 		if (!model.get_root_workload())
@@ -423,6 +428,15 @@ namespace robotick
 			// Open the seqlock window before mutating workload memory so telemetry readers can detect "write in progress" (odd seq).
 			state->workloads_buffer.mark_frame_write_begin();
 
+			if (state->engine_info != nullptr)
+			{
+				state->engine_info->clock.time_now = tick_info.time_now;
+				state->engine_info->clock.time_now_ns = tick_info.time_now_ns;
+				state->engine_info->clock.tick_count = tick_info.tick_count;
+				state->engine_info->clock.tick_rate_hz = tick_info.tick_rate_hz;
+				state->engine_info->clock.dt_seconds_last = tick_info.delta_time;
+			}
+
 			// update remote data-connections
 			state->remote_engine_connections.tick(tick_info);
 
@@ -640,6 +654,16 @@ namespace robotick
 		return state->workloads_buffer;
 	}
 
+	const EngineInfo* Engine::get_engine_info() const
+	{
+		return state->engine_info;
+	}
+
+	size_t Engine::get_engine_info_offset_in_workloads_buffer() const
+	{
+		return state->engine_info_offset_in_workloads_buffer;
+	}
+
 	TelemetryServer& Engine::get_telemetry_server() const
 	{
 		return state->telemetry_server;
@@ -652,9 +676,16 @@ namespace robotick
 
 		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
 		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
+		const auto* engine_info_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(EngineInfo));
+		ROBOTICK_ASSERT_MSG(engine_info_type, "Type 'EngineInfo' not registered - this should never happen");
 
 		const auto& seeds = state->model->get_workload_seeds();
 		size_t total_size = 0;
+		if (!align_workloads_cursor_for_type(*engine_info_type, total_size))
+			ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while sizing engine type '%s'", engine_info_type->name.c_str());
+		if (!increment_workloads_cursor_for_type(*engine_info_type, total_size))
+			ROBOTICK_FATAL_EXIT("Workloads buffer overflow while sizing engine type '%s'", engine_info_type->name.c_str());
+
 		for (const WorkloadSeed* seed : seeds)
 		{
 			const auto* workload_type = TypeRegistry::get().find_by_id(seed->type_id);
@@ -681,11 +712,22 @@ namespace robotick
 
 		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
 		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
+		const auto* engine_info_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(EngineInfo));
+		ROBOTICK_ASSERT_MSG(engine_info_type, "Type 'EngineInfo' not registered - this should never happen");
 
 		const auto& seeds = state->model->get_workload_seeds();
 		size_t workloads_cursor = 0;
 		uint8_t* buffer_ptr = state->workloads_buffer.raw_ptr();
 		state->instances.initialize(seeds.size());
+
+		if (!align_workloads_cursor_for_type(*engine_info_type, workloads_cursor))
+			ROBOTICK_FATAL_EXIT("Workloads buffer alignment overflow while laying-out engine type '%s'", engine_info_type->name.c_str());
+		state->engine_info_offset_in_workloads_buffer = workloads_cursor;
+		if (!increment_workloads_cursor_for_type(*engine_info_type, workloads_cursor))
+			ROBOTICK_FATAL_EXIT("Workloads buffer overflow while laying-out engine type '%s'", engine_info_type->name.c_str());
+
+		uint8_t* engine_info_ptr = buffer_ptr + state->engine_info_offset_in_workloads_buffer;
+		state->engine_info = new (static_cast<void*>(engine_info_ptr)) EngineInfo{};
 
 		for (size_t i = 0; i < seeds.size(); ++i)
 		{
@@ -789,6 +831,8 @@ namespace robotick
 		state->data_connection_input_handles_by_id.clear();
 		state->next_data_connection_input_handle_id = 1;
 		state->instances.reset();
+		state->engine_info = nullptr;
+		state->engine_info_offset_in_workloads_buffer = OFFSET_UNBOUND;
 		state->workloads_buffer = WorkloadsBuffer();
 	}
 

@@ -5,6 +5,7 @@
 
 #include "robotick/api.h"
 #include "robotick/framework/Engine.h"
+#include "robotick/framework/EngineInfo.h"
 #include "robotick/framework/concurrency/Atomic.h"
 #include "robotick/framework/concurrency/Sync.h"
 #include "robotick/framework/concurrency/Thread.h"
@@ -4058,12 +4059,21 @@ namespace robotick
 		const auto& instances = engine.get_all_instance_info();
 		const auto* workload_stats_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(WorkloadInstanceStats));
 		ROBOTICK_ASSERT_MSG(workload_stats_type, "Type 'WorkloadInstanceStats' not registered - this should never happen");
+		const auto* engine_info_type = TypeRegistry::get().find_by_id(GET_TYPE_ID(EngineInfo));
+		ROBOTICK_ASSERT_MSG(engine_info_type, "Type 'EngineInfo' not registered - this should never happen");
+		const EngineInfo* engine_info = engine.get_engine_info();
 
 		writer.start_object();
 		writer.key("workloads_buffer_size_used");
 		writer.uint64(static_cast<uint64_t>(workloads_buffer.get_size_used()));
 		writer.key("process_memory_used");
 		writer.uint64(static_cast<uint64_t>(get_process_memory_used()));
+		if (engine_info != nullptr)
+		{
+			writer.key("engine");
+			write_json_struct_ref(
+				writer, engine_info_type, const_cast<EngineInfo*>(engine_info), engine.get_engine_info_offset_in_workloads_buffer());
+		}
 
 		writer.key("workloads");
 		writer.start_array();
@@ -4119,6 +4129,10 @@ namespace robotick
 
 		writer.key("types");
 		writer.start_array();
+		if (engine_info != nullptr)
+		{
+			emit_type_info_stream(writer, workloads_buffer, const_cast<EngineInfo*>(engine_info), engine_info_type, emitted_type_names);
+		}
 		for (const WorkloadInstanceInfo& workload_instance_info : instances)
 		{
 			if (workload_instance_info.seed == nullptr || workload_instance_info.type == nullptr)

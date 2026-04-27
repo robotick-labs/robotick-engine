@@ -16,6 +16,7 @@ namespace robotick
 	class WorkloadsBuffer;
 	struct DataConnectionInfo;
 	struct DataConnectionInputHandle;
+	struct EngineInfo;
 	struct StructDescriptor;
 	struct TickInfo;
 	struct WorkloadInstanceInfo;
@@ -61,6 +62,8 @@ namespace robotick
 		DataConnectionInputHandle* find_or_create_data_connection_input_handle(const char* path, void* dest_ptr, size_t size, TypeId type);
 
 		WorkloadsBuffer& get_workloads_buffer() const;
+		const EngineInfo* get_engine_info() const;
+		size_t get_engine_info_offset_in_workloads_buffer() const;
 		TelemetryServer& get_telemetry_server() const;
 
 	  private:
