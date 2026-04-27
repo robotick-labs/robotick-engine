@@ -6,22 +6,22 @@ IMAGE="${ROBOTICK_NATIVE_LINUX_IMAGE:-ghcr.io/robotick-labs/robotick-ubuntu24.04
 CONFIG_PRESET="robotick-engine-tests-linux-debug"
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "[build_linux_debug] docker command not found." >&2
+  echo "[build_run_tests_linux] docker command not found." >&2
   exit 1
 fi
 
 if [[ "${IMAGE}" == *":latest" ]]; then
-  echo "[build_linux_debug] Refreshing Docker image ${IMAGE}..."
+  echo "[build_run_tests_linux] Refreshing Docker image ${IMAGE}..."
   docker pull "${IMAGE}"
 elif ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
-  echo "[build_linux_debug] Pulling Docker image ${IMAGE}..."
+  echo "[build_run_tests_linux] Pulling Docker image ${IMAGE}..."
   docker pull "${IMAGE}"
 fi
 
-echo "[build_linux_debug] Configuring, building, and testing preset '${CONFIG_PRESET}' inside ${IMAGE}..."
+echo "[build_run_tests_linux] Configuring, building, and running tests for preset '${CONFIG_PRESET}' inside ${IMAGE}..."
 
 if [[ -e "build/${CONFIG_PRESET}" ]]; then
-  echo "[build_linux_debug] Repairing ownership of existing build/${CONFIG_PRESET}..."
+  echo "[build_run_tests_linux] Repairing ownership of existing build/${CONFIG_PRESET}..."
   docker run --rm --init \
     -v "${ROOT_DIR}:/workspace" \
     -w /workspace \
@@ -47,4 +47,4 @@ docker run --rm --init \
     ctest --test-dir build/${CONFIG_PRESET}/cpp/tests --output-on-failure --timeout 5 --fail-if-no-tests -j\$(nproc)
   "
 
-echo "[build_linux_debug] ✅ Linux debug build + tests complete."
+echo "[build_run_tests_linux] ✅ Linux build + tests complete."

@@ -19,6 +19,19 @@ elif ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
 fi
 
 echo "[build_linux_arm64] Configuring and building preset '${CONFIG_PRESET}'..."
+
+if [[ -e "build/${CONFIG_PRESET}" ]]; then
+  echo "[build_linux_arm64] Repairing ownership of existing build/${CONFIG_PRESET}..."
+  docker run --rm --init \
+    -v "${ROOT_DIR}:/workspace" \
+    -w /workspace \
+    "${IMAGE}" \
+    bash -lc "
+      set -Eeuo pipefail
+      chown -R $(id -u):$(id -g) build/${CONFIG_PRESET}
+    "
+fi
+
 docker run --rm --init \
   --user "$(id -u):$(id -g)" \
   -e HOME=/tmp \
