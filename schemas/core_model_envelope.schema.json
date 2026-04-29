@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "https://robotick.dev/schemas/core-model-envelope.schema.json",
+  "title": "Robotick Core Model Envelope",
+  "type": "object",
+  "properties": {
+    "name": { "type": "string" },
+    "root": { "type": ["string", "object"] },
+    "telemetry": {
+      "type": "object",
+      "properties": {
+        "port": { "type": "integer", "minimum": 0, "maximum": 65535 }
+      },
+      "additionalProperties": true
+    },
+    "connections": {
+      "type": "array"
+    },
+    "remote_models": {
+      "type": "array"
+    },
+    "workloads": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "tick_rate_hz": { "type": ["number", "integer"] },
+          "config": { "type": "object" },
+          "inputs": { "type": "object" },
+          "outputs": { "type": "object" }
+        },
+        "required": ["type"],
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
