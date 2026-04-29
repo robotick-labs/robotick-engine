@@ -84,7 +84,7 @@
     },
     "workloadEntry": {
       "type": "object",
-      "required": ["name", "type"],
+      "required": ["type"],
       "properties": {
         "name": { "type": "string" },
         "type": { "type": "string" },
