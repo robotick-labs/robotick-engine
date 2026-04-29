@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "https://robotick.dev/schemas/workloads-layout.schema.json",
+  "title": "Robotick Workloads Layout",
+  "type": "object",
+  "required": ["workloads", "types", "writable_inputs"],
+  "properties": {
+    "project": { "type": "string" },
+    "target": { "type": "string" },
+    "workloads_buffer_size_used": { "type": "integer", "minimum": 0 },
+    "process_memory_used": { "type": "integer", "minimum": 0 },
+    "engine_session_id": { "type": "string" },
+    "engine": { "$ref": "#/definitions/structRefRuntime" },
+    "workloads": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/workloadEntry" }
+    },
+    "types": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/typeEntry" }
+    },
+    "writable_inputs": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/writableInput" }
+    }
+  },
+  "allOf": [
+    {
+      "oneOf": [
+        { "$ref": "#/definitions/designTimeShape" },
+        { "$ref": "#/definitions/runtimeShape" }
+      ]
+    }
+  ],
+  "additionalProperties": true,
+  "definitions": {
+    "fieldEntry": {
+      "type": "object",
+      "required": ["name", "type", "element_count"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "element_count": { "type": "integer", "minimum": 1 },
+        "default_value": {}
+      },
+      "additionalProperties": true
+    },
+    "typeEntry": {
+      "type": "object",
+      "required": ["name", "type_category"],
+      "properties": {
+        "name": { "type": "string" },
+        "type_category": { "type": ["string", "integer"] },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/fieldEntry" }
+        },
+        "enum_values": { "type": "array" },
+        "primitive_kind": { "type": "string" },
+        "mime_type": { "type": "string" },
+        "format": { "type": "string" },
+        "capacity": { "type": ["string", "integer"] },
+        "size": { "type": "integer", "minimum": 0 },
+        "alignment": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "structRefDesign": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "structRefRuntime": {
+      "type": "object",
+      "required": ["type", "offset_within_container"],
+      "properties": {
+        "type": { "type": "string" },
+        "offset_within_container": { "type": "integer" }
+      },
+      "additionalProperties": true
+    },
+    "workloadEntry": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "offset_within_container": { "type": "integer" },
+        "stats_offset_within_container": { "type": "integer" },
+        "config": {
+          "oneOf": [
+            { "$ref": "#/definitions/structRefDesign" },
+            { "$ref": "#/definitions/structRefRuntime" }
+          ]
+        },
+        "inputs": {
+          "oneOf": [
+            { "$ref": "#/definitions/structRefDesign" },
+            { "$ref": "#/definitions/structRefRuntime" }
+          ]
+        },
+        "outputs": {
+          "oneOf": [
+            { "$ref": "#/definitions/structRefDesign" },
+            { "$ref": "#/definitions/structRefRuntime" }
+          ]
+        },
+        "state": {
+          "oneOf": [
+            { "$ref": "#/definitions/structRefDesign" },
+            { "$ref": "#/definitions/structRefRuntime" }
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "writableInput": {
+      "type": "object",
+      "required": ["field_path", "type"],
+      "properties": {
+        "field_handle": { "type": "integer", "minimum": 0 },
+        "field_path": { "type": "string" },
+        "type": { "type": "string" },
+        "size": { "type": "integer", "minimum": 0 },
+        "incoming_connection_handle": { "type": "integer", "minimum": 0 },
+        "incoming_connection_path": { "type": "string" },
+        "incoming_connection_enabled": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "designTimeShape": {
+      "type": "object",
+      "required": ["project", "target"],
+      "not": {
+        "anyOf": [
+          { "required": ["workloads_buffer_size_used"] },
+          { "required": ["process_memory_used"] },
+          { "required": ["engine_session_id"] }
+        ]
+      }
+    },
+    "runtimeShape": {
+      "type": "object",
+      "required": [
+        "workloads_buffer_size_used",
+        "process_memory_used",
+        "engine_session_id"
+      ]
+    }
+  }
+}

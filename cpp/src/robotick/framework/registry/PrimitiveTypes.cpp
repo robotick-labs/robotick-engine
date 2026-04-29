@@ -27,20 +27,20 @@ namespace robotick
 		return {name, TypeId(name), sizeof(FS), alignof(FS), TypeCategory::Primitive, {}, "text/plain"};
 	}
 
-#define REGISTER_FIXED_STRING(N)                                                                                                                     \
+#define ROBOTICK_REGISTER_FIXED_STRING(N)                                                                                                            \
 	static constexpr TypeDescriptor s_fixed_string_##N##_desc = make_fixed_string_desc<N>("FixedString" #N);                                         \
 	static const AutoRegisterType s_register_fixed_string_##N(s_fixed_string_##N##_desc);
 
-	REGISTER_FIXED_STRING(8)
-	REGISTER_FIXED_STRING(16)
-	REGISTER_FIXED_STRING(32)
-	REGISTER_FIXED_STRING(64)
-	REGISTER_FIXED_STRING(128)
-	REGISTER_FIXED_STRING(256)
-	REGISTER_FIXED_STRING(512)
-	REGISTER_FIXED_STRING(1024)
+	ROBOTICK_REGISTER_FIXED_STRING(8)
+	ROBOTICK_REGISTER_FIXED_STRING(16)
+	ROBOTICK_REGISTER_FIXED_STRING(32)
+	ROBOTICK_REGISTER_FIXED_STRING(64)
+	ROBOTICK_REGISTER_FIXED_STRING(128)
+	ROBOTICK_REGISTER_FIXED_STRING(256)
+	ROBOTICK_REGISTER_FIXED_STRING(512)
+	ROBOTICK_REGISTER_FIXED_STRING(1024)
 
-#undef REGISTER_FIXED_STRING
+#undef ROBOTICK_REGISTER_FIXED_STRING
 
 	extern "C" void robotick_force_register_primitives()
 	{
