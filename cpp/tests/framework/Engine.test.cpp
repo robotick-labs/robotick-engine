@@ -20,7 +20,7 @@
 #include <chrono>
 #include <curl/curl.h>
 #include <cstdio>
-#include <filesystem>
+#include <cstring>
 #include <netinet/in.h>
 #include <rapidjson/error/en.h>
 #include <rapidjson/filereadstream.h>
@@ -96,19 +96,32 @@ namespace robotick::test
 
 		const char* resolve_layout_schema_path()
 		{
-			static std::string resolved_path;
-			if (!resolved_path.empty())
-				return resolved_path.c_str();
-
-			namespace fs = std::filesystem;
-			const fs::path this_file = fs::path(__FILE__);
-			const fs::path repo_root = this_file.parent_path().parent_path().parent_path().parent_path();
-			const fs::path schema_path = repo_root / "schemas" / "workloads_layout.schema.json";
-
-			if (fs::exists(schema_path) && fs::is_regular_file(schema_path))
+			static char resolved_path[1024] = {};
+			if (resolved_path[0] != '\0')
 			{
-				resolved_path = schema_path.string();
-				return resolved_path.c_str();
+				return resolved_path;
+			}
+
+			char repo_root[1024] = {};
+			::snprintf(repo_root, sizeof(repo_root), "%s", __FILE__);
+
+			// Starting from .../cpp/tests/framework/Engine.test.cpp, walk up to repo root.
+			for (int i = 0; i < 4; ++i)
+			{
+				char* slash = ::strrchr(repo_root, '/');
+				if (slash == nullptr)
+				{
+					return nullptr;
+				}
+				*slash = '\0';
+			}
+
+			::snprintf(resolved_path, sizeof(resolved_path), "%s/schemas/workloads_layout.schema.json", repo_root);
+			FILE* file = ::fopen(resolved_path, "rb");
+			if (file)
+			{
+				::fclose(file);
+				return resolved_path;
 			}
 			return nullptr;
 		}
