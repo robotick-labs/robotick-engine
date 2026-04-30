@@ -12,6 +12,8 @@
 #include "robotick/framework/strings/StringUtils.h"
 
 #include <catch2/catch_all.hpp>
+#include <netinet/tcp.h>
+#include <sys/socket.h>
 
 using namespace robotick;
 
@@ -101,6 +103,108 @@ TEST_CASE("Integration/Framework/Data/RemoteEngineConnection")
 		}
 
 		REQUIRE(recv_value == target_value);
+	}
+
+	SECTION("Accepted receiver socket has TCP_NODELAY enabled", "[RemoteEngineConnection]")
+	{
+		int recv_value = 0;
+		int send_value = 42;
+		DataConnectionInputHandle recv_handle;
+		init_input_handle(recv_handle, &recv_value, sizeof(recv_value), GET_TYPE_ID(int));
+
+		RemoteEngineConnection receiver;
+		RemoteEngineConnection sender;
+
+		receiver.configure_receiver("test-receiver");
+		receiver.set_field_binder(
+			[&](const char* path, RemoteEngineConnection::Field& out)
+			{
+				if (string_equals(path, "x"))
+				{
+					bind_receiver_field(out, path, recv_handle, TypeRegistry::get().find_by_name("int"));
+					return true;
+				}
+				return false;
+			});
+
+		const int receiver_listen_port = wait_for_listen_port(receiver);
+		REQUIRE(receiver_listen_port > 0);
+
+		sender.configure_sender("test-sender", "test-receiver", "127.0.0.1", receiver_listen_port);
+		sender.register_field(make_sender_field("x", &send_value, sizeof(int)));
+
+		for (int i = 0; i < 50; ++i)
+		{
+			sender.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			Thread::sleep_ms(10);
+
+			if (receiver.test_socket_fd() >= 0 && recv_value == send_value)
+			{
+				break;
+			}
+		}
+
+		REQUIRE(receiver.test_socket_fd() >= 0);
+
+		int no_delay = 0;
+		socklen_t no_delay_len = sizeof(no_delay);
+		REQUIRE(getsockopt(receiver.test_socket_fd(), IPPROTO_TCP, TCP_NODELAY, &no_delay, &no_delay_len) == 0);
+		REQUIRE(no_delay == 1);
+	}
+
+	SECTION("Field payload carries source frame metadata through to receiver apply", "[RemoteEngineConnection]")
+	{
+		int recv_value = 0;
+		int send_value = 21;
+		DataConnectionInputHandle recv_handle;
+		init_input_handle(recv_handle, &recv_value, sizeof(recv_value), GET_TYPE_ID(int));
+
+		RemoteEngineConnection receiver;
+		RemoteEngineConnection sender;
+
+		receiver.configure_receiver("test-receiver");
+		receiver.set_field_binder(
+			[&](const char* path, RemoteEngineConnection::Field& out)
+			{
+				if (string_equals(path, "x"))
+				{
+					bind_receiver_field(out, path, recv_handle, TypeRegistry::get().find_by_name("int"));
+					return true;
+				}
+				return false;
+			});
+
+		const int receiver_listen_port = wait_for_listen_port(receiver);
+		REQUIRE(receiver_listen_port > 0);
+
+		sender.configure_sender("test-sender", "test-receiver", "127.0.0.1", receiver_listen_port);
+		sender.register_field(make_sender_field("x", &send_value, sizeof(int)));
+
+		TickInfo sender_tick_info = robotick::TICK_INFO_FIRST_10MS_100HZ;
+		sender_tick_info.tick_count = 17;
+		sender_tick_info.time_now = 0.17f;
+		sender_tick_info.time_now_ns = 170'000'000ULL;
+
+		for (int i = 0; i < 50; ++i)
+		{
+			sender.tick(sender_tick_info);
+			receiver.tick(robotick::TICK_INFO_FIRST_10MS_100HZ);
+			Thread::sleep_ms(10);
+
+			if (recv_value == send_value)
+			{
+				break;
+			}
+		}
+
+		REQUIRE(recv_value == send_value);
+		REQUIRE(sender.test_last_sender_snapshot_metadata().source_tick_count == sender_tick_info.tick_count);
+		REQUIRE(sender.test_last_sender_snapshot_metadata().source_time_now_ns == sender_tick_info.time_now_ns);
+		REQUIRE(receiver.test_last_received_frame_metadata().source_tick_count == sender_tick_info.tick_count);
+		REQUIRE(receiver.test_last_received_frame_metadata().source_time_now_ns == sender_tick_info.time_now_ns);
+		REQUIRE(receiver.test_last_applied_frame_metadata().source_tick_count == sender_tick_info.tick_count);
+		REQUIRE(receiver.test_last_applied_frame_metadata().source_time_now_ns == sender_tick_info.time_now_ns);
 	}
 
 	SECTION("Receiver input handle suppresses remote writes until re-enabled", "[RemoteEngineConnection]")

@@ -29,4 +29,14 @@ bash /workspace/tools/make_esp32_symlinks.sh
 ./2_idf_build.sh
 '
 
+echo "[build_esp32s3] Restoring workspace ownership..."
+docker run --rm --init \
+  -v "${ROOT_DIR}:/workspace" \
+  -w /workspace \
+  "${IMAGE}" \
+  bash -lc "
+    set -Eeuo pipefail
+    chown -R $(id -u):$(id -g) build tools/esp32-compile-check || true
+  "
+
 echo "[build_esp32s3] ✅ ESP32-S3 build finished successfully."

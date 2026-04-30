@@ -66,25 +66,116 @@ namespace robotick
 		std_approved::this_thread::yield();
 	}
 
-	inline void Thread::hybrid_sleep_until(Clock::time_point target_time)
+	inline uint64_t to_non_negative_ns(Clock::duration value)
 	{
-		using namespace std_approved::chrono_literals;
-		constexpr auto coarse_margin = 2ms;
-		constexpr auto coarse_step = 500us;
-		constexpr int fine_spin_iters = 20;
+		const int64_t ns = Clock::to_nanoseconds(value).count();
+		return (ns > 0) ? static_cast<uint64_t>(ns) : 0;
+	}
 
-		auto now = Clock::now();
-		while (now + coarse_margin < target_time)
+	inline void Thread::hybrid_sleep_until(Clock::time_point target_time, HybridSleepMode mode, HybridSleepStats* out_stats)
+	{
+		const Clock::time_point now = Clock::now();
+
+		if (out_stats != nullptr)
 		{
-			std_approved::this_thread::sleep_for(coarse_step);
-			now = Clock::now();
+			*out_stats = HybridSleepStats{};
+			out_stats->mode = mode;
+			out_stats->requested_wait_ns = to_non_negative_ns(target_time - now);
 		}
 
-		while (Clock::now() < target_time)
+		if (target_time <= now)
+			return;
+
+		if (mode == HybridSleepMode::Eco)
 		{
-			for (volatile int i = 0; i < fine_spin_iters; ++i)
+			// cheap and direct, but scheduler/timer wake latency / granularity can still be hundreds of microseconds or worse.
+			const Clock::time_point coarse_phase_start = (out_stats != nullptr) ? Clock::now() : now;
+
+			std_approved::this_thread::sleep_until(target_time);
+
+			if (out_stats != nullptr)
 			{
+				const Clock::time_point coarse_phase_end = Clock::now();
+				out_stats->coarse_sleep_ns += to_non_negative_ns(coarse_phase_end - coarse_phase_start);
+				out_stats->total_wait_ns = to_non_negative_ns(coarse_phase_end - now);
+				out_stats->wake_lateness_ns = to_non_negative_ns(coarse_phase_end - target_time);
 			}
+			return;
+		}
+
+		constexpr std_approved::chrono::milliseconds coarse_sleep_margin(2);
+		constexpr std_approved::chrono::microseconds spin_margin(50);
+		constexpr int fine_spin_iters = 20;
+
+		// Stage 1 (coarse sleep): hand off most of the wait budget to the OS.
+		if (target_time - now > coarse_sleep_margin)
+		{
+			const Clock::time_point sleep_deadline = target_time - coarse_sleep_margin;
+			const Clock::time_point current_time = Clock::now();
+			if (sleep_deadline > current_time)
+			{
+				const Clock::time_point coarse_phase_start = (out_stats != nullptr) ? current_time : now;
+				std_approved::this_thread::sleep_for(sleep_deadline - current_time);
+				if (out_stats != nullptr)
+				{
+					const Clock::time_point coarse_phase_end = Clock::now();
+					out_stats->coarse_sleep_ns += to_non_negative_ns(coarse_phase_end - coarse_phase_start);
+				}
+			}
+		}
+
+		Clock::time_point yield_deadline = target_time;
+		if (mode == HybridSleepMode::Accurate)
+		{
+			yield_deadline = target_time - spin_margin;
+		}
+
+		// Stage 2 (yield): Normal yields to the deadline; Accurate yields until the final spin slice.
+		const Clock::time_point yield_phase_start = (out_stats != nullptr) ? Clock::now() : now;
+		while (Clock::now() < yield_deadline)
+		{
+			if (out_stats != nullptr)
+			{
+				out_stats->yield_iterations++;
+			}
+			std_approved::this_thread::yield();
+		}
+		if (out_stats != nullptr)
+		{
+			const Clock::time_point yield_phase_end = Clock::now();
+			out_stats->yield_phase_ns += to_non_negative_ns(yield_phase_end - yield_phase_start);
+		}
+
+		if (mode == HybridSleepMode::Accurate)
+		{
+			// Stage 3 (spin, Accurate only): hold the final micro-window for tighter wake control.
+			// Accurate spends only the last small slice in a tight loop to reduce wake lateness.
+			// This gives finer deadline control than yield(): a yield asks the scheduler to run
+			// something else and can resume unpredictably later, while this loop keeps ownership
+			// of the final micro-window and exits as soon as target_time is reached.
+			const Clock::time_point spin_phase_start = (out_stats != nullptr) ? Clock::now() : now;
+			while (Clock::now() < target_time)
+			{
+				if (out_stats != nullptr)
+				{
+					out_stats->spin_iterations++;
+				}
+				for (volatile int i = 0; i < fine_spin_iters; ++i)
+				{
+				}
+			}
+			if (out_stats != nullptr)
+			{
+				const Clock::time_point spin_phase_end = Clock::now();
+				out_stats->spin_phase_ns += to_non_negative_ns(spin_phase_end - spin_phase_start);
+			}
+		}
+
+		if (out_stats != nullptr)
+		{
+			const Clock::time_point finish_time = Clock::now();
+			out_stats->total_wait_ns = to_non_negative_ns(finish_time - now);
+			out_stats->wake_lateness_ns = to_non_negative_ns(finish_time - target_time);
 		}
 	}
 

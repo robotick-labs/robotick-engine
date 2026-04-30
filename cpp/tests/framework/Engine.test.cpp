@@ -19,7 +19,14 @@
 #include <catch2/catch_all.hpp>
 #include <chrono>
 #include <curl/curl.h>
+#include <cstdio>
+#include <cstring>
 #include <netinet/in.h>
+#include <rapidjson/error/en.h>
+#include <rapidjson/filereadstream.h>
+#include <rapidjson/schema.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -85,6 +92,114 @@ namespace robotick::test
 		bool contains_text(const char* haystack, const char* needle)
 		{
 			return haystack && needle && ::strstr(haystack, needle) != nullptr;
+		}
+
+		const char* resolve_layout_schema_path()
+		{
+			static char resolved_path[1024] = {};
+			if (resolved_path[0] != '\0')
+			{
+				return resolved_path;
+			}
+
+			char repo_root[1024] = {};
+			::snprintf(repo_root, sizeof(repo_root), "%s", __FILE__);
+
+			// Starting from .../cpp/tests/framework/Engine.test.cpp, walk up to repo root.
+			for (int i = 0; i < 4; ++i)
+			{
+				char* slash = ::strrchr(repo_root, '/');
+				if (slash == nullptr)
+				{
+					return nullptr;
+				}
+				*slash = '\0';
+			}
+
+			static const char* schema_rel_path = "/schemas/workloads_layout.schema.json";
+			const size_t root_len = ::strlen(repo_root);
+			const size_t rel_len = ::strlen(schema_rel_path);
+			if (root_len + rel_len + 1 > sizeof(resolved_path))
+			{
+				return nullptr;
+			}
+			::memcpy(resolved_path, repo_root, root_len);
+			::memcpy(resolved_path + root_len, schema_rel_path, rel_len + 1);
+			FILE* file = ::fopen(resolved_path, "rb");
+			if (file)
+			{
+				::fclose(file);
+				return resolved_path;
+			}
+			return nullptr;
+		}
+
+		bool validate_json_against_schema(const char* schema_path, const char* instance_json, char* out_error, const size_t out_error_size)
+		{
+			if (!schema_path || !instance_json || !out_error || out_error_size == 0)
+			{
+				return false;
+			}
+			out_error[0] = '\0';
+
+			FILE* schema_file = ::fopen(schema_path, "rb");
+			if (!schema_file)
+			{
+				::snprintf(out_error, out_error_size, "cannot open schema file");
+				return false;
+			}
+
+			char schema_read_buffer[65536];
+			rapidjson::FileReadStream schema_stream(schema_file, schema_read_buffer, sizeof(schema_read_buffer));
+			rapidjson::Document schema_doc;
+			schema_doc.ParseStream(schema_stream);
+			::fclose(schema_file);
+			if (schema_doc.HasParseError())
+			{
+				::snprintf(out_error,
+					out_error_size,
+					"schema parse error: %s at offset %llu",
+					rapidjson::GetParseError_En(schema_doc.GetParseError()),
+					static_cast<unsigned long long>(schema_doc.GetErrorOffset()));
+				return false;
+			}
+
+			rapidjson::SchemaDocument schema(schema_doc);
+			if (!schema.GetError().ObjectEmpty())
+			{
+				::snprintf(out_error, out_error_size, "schema compile error");
+				return false;
+			}
+
+			rapidjson::Document instance_doc;
+			instance_doc.Parse(instance_json);
+			if (instance_doc.HasParseError())
+			{
+				::snprintf(out_error,
+					out_error_size,
+					"instance parse error: %s at offset %llu",
+					rapidjson::GetParseError_En(instance_doc.GetParseError()),
+					static_cast<unsigned long long>(instance_doc.GetErrorOffset()));
+				return false;
+			}
+
+			rapidjson::SchemaValidator validator(schema);
+			if (!instance_doc.Accept(validator))
+			{
+				rapidjson::StringBuffer sb_instance;
+				validator.GetInvalidDocumentPointer().StringifyUriFragment(sb_instance);
+				rapidjson::StringBuffer sb_schema;
+				validator.GetInvalidSchemaPointer().StringifyUriFragment(sb_schema);
+				::snprintf(out_error,
+					out_error_size,
+					"schema validation failed: instance=%s schema=%s keyword=%s",
+					sb_instance.GetString(),
+					sb_schema.GetString(),
+					validator.GetInvalidSchemaKeyword());
+				return false;
+			}
+
+			return true;
 		}
 
 		HttpResponse http_request(const char* url, const char* method = "GET", const char* body = nullptr)
@@ -1554,6 +1669,14 @@ namespace robotick::test
 			const HttpResponse peer_layout = http_request(url);
 			REQUIRE(peer_layout.status_code == 200);
 			REQUIRE(contains_text(peer_layout.body.data, "\"writable_inputs\""));
+
+			const char* schema_path = resolve_layout_schema_path();
+			REQUIRE(schema_path != nullptr);
+			char validation_error[256] = {};
+			INFO(validation_error);
+			CHECK(validate_json_against_schema(schema_path, local_layout.body.data, validation_error, sizeof(validation_error)));
+			INFO(validation_error);
+			CHECK(validate_json_against_schema(schema_path, peer_layout.body.data, validation_error, sizeof(validation_error)));
 
 			::snprintf(url,
 				sizeof(url),

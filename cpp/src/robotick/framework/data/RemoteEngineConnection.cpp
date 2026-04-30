@@ -144,6 +144,8 @@ namespace robotick
 			return (a > b) ? a : b;
 		}
 
+		constexpr size_t FIELDS_FRAME_METADATA_SIZE = sizeof(uint64_t) + sizeof(uint64_t);
+
 		bool is_network_stack_ready()
 		{
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
@@ -153,6 +155,52 @@ namespace robotick
 			// Assume true on platforms like desktop
 			return true;
 #endif
+		}
+
+		bool set_socket_no_delay(int fd)
+		{
+			int opt = 1;
+			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0)
+			{
+				ROBOTICK_REC_DEV_WARNING("Failed to set TCP_NODELAY on socket: errno=%d (%s)", errno, strerror(errno));
+				return false;
+			}
+
+			return true;
+		}
+
+		bool set_socket_non_blocking(int fd)
+		{
+			int flags = fcntl(fd, F_GETFL, 0);
+			if (flags < 0)
+			{
+				ROBOTICK_REC_DEV_WARNING("Failed to get socket flags for O_NONBLOCK: errno=%d (%s)", errno, strerror(errno));
+				return false;
+			}
+			if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
+			{
+				ROBOTICK_REC_DEV_WARNING("Failed to set O_NONBLOCK on socket: errno=%d (%s)", errno, strerror(errno));
+				return false;
+			}
+			return true;
+		}
+
+		void write_u64_be(uint64_t value, uint8_t* dst)
+		{
+			for (int i = 7; i >= 0; --i)
+			{
+				dst[7 - i] = static_cast<uint8_t>((value >> (i * 8)) & 0xFFU);
+			}
+		}
+
+		uint64_t read_u64_be(const uint8_t* src)
+		{
+			uint64_t value = 0;
+			for (int i = 0; i < 8; ++i)
+			{
+				value = (value << 8) | static_cast<uint64_t>(src[i]);
+			}
+			return value;
 		}
 
 		int create_tcp_socket()
@@ -186,21 +234,18 @@ namespace robotick
 			}
 
 			// Disable Nagle's algorithm (batches up messages) — send every message immediately (essential for real-time control)
-			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) < 0)
+			if (!set_socket_no_delay(fd))
 			{
-				const int set_opt_error = errno;
 				close(fd);
-#if ROBOTICK_REC_DEV_DIAGNOSTICS
-				ROBOTICK_REC_DEV_WARNING("Failed to set TCP_NODELAY on socket: errno=%d (%s)", set_opt_error, strerror(set_opt_error));
-#else
-				(void)set_opt_error;
-#endif
 				return -1;
 			}
 
 			// Set non-blocking
-			int flags = fcntl(fd, F_GETFL, 0);
-			fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+			if (!set_socket_non_blocking(fd))
+			{
+				close(fd);
+				return -1;
+			}
 
 			return fd;
 		}
@@ -426,6 +471,17 @@ namespace robotick
 		target_model_name = in_target_model_name;
 		remote_ip = in_remote_ip;
 		remote_port = in_remote_port;
+		sender_snapshot_buffer.reset();
+		receiver_frame_buffer.reset();
+		sender_snapshot_metadata = {};
+		pending_received_frame_metadata = {};
+		applied_received_frame_metadata = {};
+		has_pending_received_frame = false;
+#if defined(ROBOTICK_TEST_MODE)
+		last_sender_snapshot_metadata_ = {};
+		last_received_frame_metadata_ = {};
+		last_applied_frame_metadata_ = {};
+#endif
 		reset_reconnect_backoff();
 		connection_attempt_logged_for_current_outage = false;
 
@@ -441,6 +497,17 @@ namespace robotick
 		handshake_path_total_length = 0;
 		handshake_payload_capacity = sizeof(uint32_t);
 		field_payload_capacity = 0;
+		sender_snapshot_buffer.reset();
+		receiver_frame_buffer.reset();
+		sender_snapshot_metadata = {};
+		pending_received_frame_metadata = {};
+		applied_received_frame_metadata = {};
+		has_pending_received_frame = false;
+#if defined(ROBOTICK_TEST_MODE)
+		last_sender_snapshot_metadata_ = {};
+		last_received_frame_metadata_ = {};
+		last_applied_frame_metadata_ = {};
+#endif
 		my_model_name = in_my_model_name;
 		target_model_name = ""; // receivers don't target
 		listen_port = 0;		// we'll bind(0) and discover the port
@@ -470,6 +537,11 @@ namespace robotick
 
 	void RemoteEngineConnection::tick(const TickInfo& tick_info)
 	{
+		if (mode == Mode::Sender && field_count > 0)
+		{
+			snapshot_sender_fields(tick_info);
+		}
+
 		if (state == State::Disconnected)
 		{
 			if (time_sec_to_reconnect > 0.0F)
@@ -556,6 +628,11 @@ namespace robotick
 					tick_send_fields_request(false);
 				}
 			}
+		}
+
+		if (mode == Mode::Receiver)
+		{
+			apply_received_frame_to_inputs();
 		}
 	}
 
@@ -676,8 +753,17 @@ namespace robotick
 			return;
 		}
 
-		int flags = fcntl(client_fd, F_GETFL, 0);
-		fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
+		if (!set_socket_no_delay(client_fd))
+		{
+			close(client_fd);
+			return;
+		}
+
+		if (!set_socket_non_blocking(client_fd))
+		{
+			close(client_fd);
+			return;
+		}
 
 		close(socket_fd);
 		socket_fd = client_fd;
@@ -807,36 +893,117 @@ namespace robotick
 
 	size_t RemoteEngineConnection::write_fields_payload(size_t offset, uint8_t* dst, size_t max_len) const
 	{
+		uint8_t local_metadata_bytes[FIELDS_FRAME_METADATA_SIZE];
+		write_u64_be(sender_snapshot_metadata.source_tick_count, local_metadata_bytes);
+		write_u64_be(sender_snapshot_metadata.source_time_now_ns, local_metadata_bytes + sizeof(uint64_t));
+
 		size_t written = 0;
 		size_t skip = offset;
 
-		for (size_t i = 0; i < field_count; ++i)
+		if (skip < FIELDS_FRAME_METADATA_SIZE)
 		{
-			const auto& field = fields[i];
-			const uint8_t* src = reinterpret_cast<const uint8_t*>(field.send_ptr);
-			if (skip >= field.size)
-			{
-				skip -= field.size;
-				continue;
-			}
-
-			const size_t take = rtk_min(field.size - skip, max_len - written);
-			if (src)
-			{
-				memcpy(dst + written, src + skip, take);
-			}
-			else
-			{
-				memset(dst + written, 0, take);
-			}
+			const size_t take = rtk_min(FIELDS_FRAME_METADATA_SIZE - skip, max_len - written);
+			memcpy(dst + written, local_metadata_bytes + skip, take);
 			written += take;
 			skip = 0;
-
 			if (written >= max_len)
-				break;
+			{
+				return written;
+			}
+		}
+		else
+		{
+			skip -= FIELDS_FRAME_METADATA_SIZE;
+		}
+
+		const size_t snapshot_size = sender_snapshot_buffer.size();
+		if (snapshot_size > 0 && written < max_len && skip < snapshot_size)
+		{
+			const size_t take = rtk_min(snapshot_size - skip, max_len - written);
+			memcpy(dst + written, sender_snapshot_buffer.data() + skip, take);
+			written += take;
 		}
 
 		return written;
+	}
+
+	void RemoteEngineConnection::snapshot_sender_fields(const TickInfo& tick_info)
+	{
+		if (sender_snapshot_buffer.empty() && field_payload_capacity > 0)
+		{
+			sender_snapshot_buffer.initialize(field_payload_capacity);
+		}
+
+		size_t offset = 0;
+		for (size_t i = 0; i < field_count; ++i)
+		{
+			const auto& field = fields[i];
+			uint8_t* dst = sender_snapshot_buffer.data() + offset;
+			if (field.send_ptr)
+			{
+				memcpy(dst, field.send_ptr, field.size);
+			}
+			else
+			{
+				memset(dst, 0, field.size);
+			}
+
+			offset += field.size;
+		}
+
+		sender_snapshot_metadata.source_tick_count = tick_info.tick_count;
+		sender_snapshot_metadata.source_time_now_ns = tick_info.time_now_ns;
+#if defined(ROBOTICK_TEST_MODE)
+		last_sender_snapshot_metadata_ = sender_snapshot_metadata;
+#endif
+	}
+
+	void RemoteEngineConnection::apply_received_frame_to_inputs()
+	{
+		if (!has_pending_received_frame)
+		{
+			return;
+		}
+
+		if (receiver_frame_buffer.size() != field_payload_capacity)
+		{
+			ROBOTICK_FATAL_EXIT("Receiver frame buffer size mismatch (%zu != %zu)", receiver_frame_buffer.size(), field_payload_capacity);
+		}
+
+		size_t offset = 0;
+		for (size_t i = 0; i < field_count; ++i)
+		{
+			const auto& field = fields[i];
+			if (!field.input_handle)
+			{
+				ROBOTICK_FATAL_EXIT("Receiver field '%s' has null input_handle", field.path.c_str());
+			}
+			if (field.input_handle->size != field.size)
+			{
+				ROBOTICK_FATAL_EXIT("Receiver field '%s' handle size mismatch (%zu != %zu)",
+					field.path.c_str(),
+					field.input_handle->size,
+					field.size);
+			}
+			if (field.type_desc)
+			{
+				ROBOTICK_ASSERT(TypeRegistry::get().find_by_id(field.input_handle->type) == field.type_desc);
+			}
+
+			field.input_handle->do_copy_data(receiver_frame_buffer.data() + offset);
+			offset += field.size;
+		}
+
+		applied_received_frame_metadata = pending_received_frame_metadata;
+		has_pending_received_frame = false;
+#if defined(ROBOTICK_TEST_MODE)
+		last_applied_frame_metadata_ = applied_received_frame_metadata;
+#endif
+	}
+
+	size_t RemoteEngineConnection::get_fields_message_payload_capacity() const
+	{
+		return FIELDS_FRAME_METADATA_SIZE + field_payload_capacity;
 	}
 
 	void RemoteEngineConnection::tick_sender_send_handshake(const TickInfo& tick_info)
@@ -1245,7 +1412,7 @@ namespace robotick
 				return write_fields_payload(offset, dst, max_len);
 			};
 
-			in_progress_message_out.begin_send((uint8_t)MessageType::Fields, field_payload_capacity, writer);
+			in_progress_message_out.begin_send((uint8_t)MessageType::Fields, get_fields_message_payload_capacity(), writer);
 		}
 
 		while (in_progress_message_out.is_occupied() && !in_progress_message_out.is_completed())
@@ -1276,60 +1443,45 @@ namespace robotick
 
 		if (in_progress_message_in.is_vacant())
 		{
-			field_receive_state = {};
-
 			auto reader = [this](const uint8_t* data, size_t len)
 			{
-				size_t cursor = 0;
-
-				while (cursor < len && field_receive_state.field_index < field_count)
+				if (len < FIELDS_FRAME_METADATA_SIZE)
 				{
-					auto& field = fields[field_receive_state.field_index];
-					if (!field.input_handle)
-					{
-						ROBOTICK_FATAL_EXIT("Receiver field '%s' has null input_handle", field.path.c_str());
-					}
-
-					if (field_receive_state.offset_in_field == 0)
-					{
-						field_receive_state.current_field_enabled = field.input_handle->is_enabled();
-					}
-
-					const size_t field_size = field.size;
-					if (field.input_handle->size != field_size)
-					{
-						ROBOTICK_FATAL_EXIT(
-							"Receiver field '%s' handle size mismatch (%zu != %zu)", field.path.c_str(), field.input_handle->size, field_size);
-					}
-					if (field.type_desc)
-					{
-						ROBOTICK_ASSERT(TypeRegistry::get().find_by_id(field.input_handle->type) == field.type_desc);
-					}
-
-					const size_t remaining_in_field = field_size - field_receive_state.offset_in_field;
-					const size_t take = rtk_min(remaining_in_field, len - cursor);
-
-					if (field_receive_state.current_field_enabled)
-					{
-						field.input_handle->do_copy_data_partial_unchecked(data + cursor, field_receive_state.offset_in_field, take);
-					}
-
-					cursor += take;
-					field_receive_state.offset_in_field += take;
-					field_receive_state.total_bytes_received += take;
-
-					if (field_receive_state.offset_in_field == field_size)
-					{
-						field_receive_state.field_index++;
-						field_receive_state.offset_in_field = 0;
-						field_receive_state.current_field_enabled = false;
-					}
+					ROBOTICK_FATAL_EXIT("RemoteEngineConnection::tick_receive_fields_as_message() - payload too small for frame metadata");
 				}
 
-				if (cursor < len)
+				const size_t expected_field_bytes = field_payload_capacity;
+				const size_t received_field_bytes = len - FIELDS_FRAME_METADATA_SIZE;
+				if (received_field_bytes != expected_field_bytes)
 				{
-					ROBOTICK_FATAL_EXIT("RemoteEngineConnection::tick_receive_fields_as_message() - received more data than expected");
+					ROBOTICK_FATAL_EXIT("RemoteEngineConnection::tick_receive_fields_as_message() - payload field bytes %zu but expected %zu",
+						received_field_bytes,
+						expected_field_bytes);
 				}
+
+				if (receiver_frame_buffer.empty() && expected_field_bytes > 0)
+				{
+					receiver_frame_buffer.initialize(expected_field_bytes);
+				}
+				if (receiver_frame_buffer.size() != expected_field_bytes)
+				{
+					ROBOTICK_FATAL_EXIT(
+						"RemoteEngineConnection::tick_receive_fields_as_message() - receiver frame buffer size mismatch (%zu != %zu)",
+						receiver_frame_buffer.size(),
+						expected_field_bytes);
+				}
+
+				pending_received_frame_metadata.source_tick_count = read_u64_be(data);
+				pending_received_frame_metadata.source_time_now_ns = read_u64_be(data + sizeof(uint64_t));
+				if (received_field_bytes > 0)
+				{
+					memcpy(receiver_frame_buffer.data(), data + FIELDS_FRAME_METADATA_SIZE, received_field_bytes);
+				}
+
+				has_pending_received_frame = true;
+#if defined(ROBOTICK_TEST_MODE)
+				last_received_frame_metadata_ = pending_received_frame_metadata;
+#endif
 			};
 
 			in_progress_message_in.begin_receive(reader);
@@ -1357,7 +1509,7 @@ namespace robotick
 		}
 
 		// validate sizes
-		const size_t expected_bytes = field_payload_capacity;
+		const size_t expected_bytes = get_fields_message_payload_capacity();
 		const size_t reported_bytes = in_progress_message_in.payload_length();
 
 		if (reported_bytes != expected_bytes)
@@ -1367,19 +1519,16 @@ namespace robotick
 				expected_bytes);
 		}
 
-		if (field_receive_state.total_bytes_received != expected_bytes)
-		{
-			ROBOTICK_FATAL_EXIT("RemoteEngineConnection::tick_receive_fields_as_message() - received %zu bytes but expected %zu",
-				field_receive_state.total_bytes_received,
-				expected_bytes);
-		}
-
 		in_progress_message_in.vacate(); // vacate ready for next user
 		return true;
 	}
 
 	void RemoteEngineConnection::disconnect()
 	{
+		has_pending_received_frame = false;
+		pending_received_frame_metadata = {};
+		applied_received_frame_metadata = {};
+
 		// Drain any partially sent/received packets before closing the socket.  This guarantees that both sides either see a
 		// fully framed message or a disconnect — never a half-written payload that could desynchronize the protocol.
 		InProgressMessage* in_progress_messages[] = {&in_progress_message_in, &in_progress_message_out};

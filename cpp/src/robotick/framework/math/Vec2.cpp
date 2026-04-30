@@ -20,3 +20,8 @@ ROBOTICK_REGISTER_STRUCT_BEGIN(Vec2d)
 ROBOTICK_STRUCT_FIELD(Vec2d, double, x)
 ROBOTICK_STRUCT_FIELD(Vec2d, double, y)
 ROBOTICK_REGISTER_STRUCT_END(Vec2d)
+
+extern "C" void robotick_force_register_vec2_types()
+{
+	// This function exists solely to force this TU to be retained
+}

@@ -64,6 +64,12 @@ namespace robotick
 			DataConnectionInputHandle* input_handle = nullptr;
 		};
 
+		struct FrameMetadata
+		{
+			uint64_t source_tick_count = 0;
+			uint64_t source_time_now_ns = 0;
+		};
+
 		using BinderCallback = Function<bool(const char* path, Field& out_field)>;
 
 		RemoteEngineConnection() = default;
@@ -98,6 +104,10 @@ namespace robotick
 		};
 
 		[[nodiscard]] const TestHealthLifecycleStats& test_health_lifecycle_stats() const { return test_health_lifecycle_stats_; }
+		[[nodiscard]] const FrameMetadata& test_last_sender_snapshot_metadata() const { return last_sender_snapshot_metadata_; }
+		[[nodiscard]] const FrameMetadata& test_last_received_frame_metadata() const { return last_received_frame_metadata_; }
+		[[nodiscard]] const FrameMetadata& test_last_applied_frame_metadata() const { return last_applied_frame_metadata_; }
+		[[nodiscard]] int test_socket_fd() const { return socket_fd; }
 #endif
 
 	  private:
@@ -106,6 +116,9 @@ namespace robotick
 
 		size_t write_handshake_payload(uint32_t tick_rate_net, size_t offset, uint8_t* dst, size_t max_len) const;
 		size_t write_fields_payload(size_t offset, uint8_t* dst, size_t max_len) const;
+		void snapshot_sender_fields(const TickInfo& tick_info);
+		void apply_received_frame_to_inputs();
+		[[nodiscard]] size_t get_fields_message_payload_capacity() const;
 
 		void tick_disconnected_sender();
 		void tick_disconnected_receiver();
@@ -151,7 +164,13 @@ namespace robotick
 		size_t field_count = 0;
 		size_t handshake_path_total_length = 0;
 		size_t handshake_payload_capacity = sizeof(uint32_t);
-		size_t field_payload_capacity = 0;
+		size_t field_payload_capacity = 0; // raw field bytes only
+		HeapVector<uint8_t> sender_snapshot_buffer;
+		HeapVector<uint8_t> receiver_frame_buffer;
+		FrameMetadata sender_snapshot_metadata;
+		FrameMetadata pending_received_frame_metadata;
+		FrameMetadata applied_received_frame_metadata;
+		bool has_pending_received_frame = false;
 
 		// runtime values:
 		State state = State::Disconnected;
@@ -181,15 +200,6 @@ namespace robotick
 			size_t failed_count = 0;
 		} handshake_receive_state;
 
-		// Track streamed field payload placement across ticks while receiving field data
-		struct FieldReceiveState
-		{
-			size_t field_index = 0;
-			size_t offset_in_field = 0;
-			size_t total_bytes_received = 0;
-			bool current_field_enabled = false;
-		} field_receive_state;
-
 		// Capture mutual tick-rate bytes from FieldsRequest across partial reads
 		struct TickRateReceiveState
 		{
@@ -200,6 +210,9 @@ namespace robotick
 
 #if defined(ROBOTICK_TEST_MODE)
 		TestHealthLifecycleStats test_health_lifecycle_stats_;
+		FrameMetadata last_sender_snapshot_metadata_;
+		FrameMetadata last_received_frame_metadata_;
+		FrameMetadata last_applied_frame_metadata_;
 #endif
 	};
 

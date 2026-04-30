@@ -1,0 +1,200 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "https://robotick.dev/schemas/core-model-envelope.schema.json",
+  "title": "Robotick Core Model Envelope",
+  "type": "object",
+  "required": [
+    "id",
+    "root",
+    "workloads"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string"
+    },
+    "comment": {
+      "type": "string"
+    },
+    "root": {
+      "$ref": "#/definitions/workloadRef"
+    },
+    "telemetry": {
+      "type": "object",
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      },
+      "additionalProperties": true
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/localConnection"
+      }
+    },
+    "remote_models": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/remoteModel"
+      }
+    },
+    "workloads": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "tick_rate_hz": {
+            "type": [
+              "number",
+              "integer"
+            ]
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/workloadRef"
+            }
+          },
+          "config": {
+            "type": "object"
+          },
+          "inputs": {
+            "type": "object"
+          },
+          "outputs": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "type"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "runtime": {
+      "type": "object"
+    }
+  },
+  "definitions": {
+    "workloadRef": {
+      "type": "object",
+      "required": [
+        "workload_id"
+      ],
+      "properties": {
+        "workload_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "localConnection": {
+      "type": "object",
+      "required": [
+        "from",
+        "to"
+      ],
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "remoteConnection": {
+      "type": "object",
+      "properties": {
+        "from_local": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to_remote": {
+          "type": "string",
+          "minLength": 1
+        },
+        "from_remote": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to_local": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "from_local",
+            "to_remote"
+          ]
+        },
+        {
+          "required": [
+            "from_remote",
+            "to_local"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "remoteModel": {
+      "type": "object",
+      "required": [
+        "model_id"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "comment": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "comms_channel": {
+          "type": "string"
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/remoteConnection"
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
