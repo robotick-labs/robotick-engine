@@ -1463,6 +1463,13 @@ namespace robotick
 				{
 					receiver_frame_buffer.initialize(expected_field_bytes);
 				}
+				if (receiver_frame_buffer.size() != expected_field_bytes)
+				{
+					ROBOTICK_FATAL_EXIT(
+						"RemoteEngineConnection::tick_receive_fields_as_message() - receiver frame buffer size mismatch (%zu != %zu)",
+						receiver_frame_buffer.size(),
+						expected_field_bytes);
+				}
 
 				pending_received_frame_metadata.source_tick_count = read_u64_be(data);
 				pending_received_frame_metadata.source_time_now_ns = read_u64_be(data + sizeof(uint64_t));
