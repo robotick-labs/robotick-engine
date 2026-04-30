@@ -75,8 +75,6 @@ namespace robotick
 	inline void Thread::hybrid_sleep_until(Clock::time_point target_time, HybridSleepMode mode, HybridSleepStats* out_stats)
 	{
 		const Clock::time_point now = Clock::now();
-		if (target_time <= now)
-			return;
 
 		if (out_stats != nullptr)
 		{
@@ -84,6 +82,9 @@ namespace robotick
 			out_stats->mode = mode;
 			out_stats->requested_wait_ns = to_non_negative_ns(target_time - now);
 		}
+
+		if (target_time <= now)
+			return;
 
 		if (mode == HybridSleepMode::Eco)
 		{

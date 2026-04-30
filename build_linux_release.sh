@@ -20,7 +20,7 @@ fi
 
 echo "[build_linux_release] Configuring and building preset '${CONFIG_PRESET}' inside ${IMAGE}..."
 
-if [[ -e "build/${CONFIG_PRESET}" ]]; then
+if [[ -e "${ROOT_DIR}/build/${CONFIG_PRESET}" ]]; then
   echo "[build_linux_release] Repairing ownership of existing build/${CONFIG_PRESET}..."
   docker run --rm --init \
     -v "${ROOT_DIR}:/workspace" \

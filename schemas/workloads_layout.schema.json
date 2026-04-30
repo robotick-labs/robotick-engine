@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "https://robotick.dev/schemas/workloads-layout.schema.json",
+  "id": "https://robotick.dev/schemas/workloads_layout.schema.json",
   "title": "Robotick Workloads Layout",
   "type": "object",
   "required": ["workloads", "types", "writable_inputs"],

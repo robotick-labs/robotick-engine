@@ -63,7 +63,8 @@ namespace robotick
 		static uint32_t get_hardware_concurrency();
 		static void yield();
 		static void sleep_ms(uint32_t ms);
-		static void hybrid_sleep_until(Clock::time_point target_time, HybridSleepMode mode, HybridSleepStats* out_stats = nullptr);
+		static void hybrid_sleep_until(
+			Clock::time_point target_time, HybridSleepMode mode = HybridSleepMode::Normal, HybridSleepStats* out_stats = nullptr);
 
 	  protected:
 		static void set_name(const char* name);

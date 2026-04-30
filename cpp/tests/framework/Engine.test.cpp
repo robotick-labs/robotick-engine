@@ -20,6 +20,7 @@
 #include <chrono>
 #include <curl/curl.h>
 #include <cstdio>
+#include <filesystem>
 #include <netinet/in.h>
 #include <rapidjson/error/en.h>
 #include <rapidjson/filereadstream.h>
@@ -95,20 +96,19 @@ namespace robotick::test
 
 		const char* resolve_layout_schema_path()
 		{
-			static const char* const candidates[] = {
-				"../../../../schemas/workloads_layout.schema.json",
-				"/workspace/schemas/workloads_layout.schema.json",
-				"schemas/workloads_layout.schema.json",
-			};
+			static std::string resolved_path;
+			if (!resolved_path.empty())
+				return resolved_path.c_str();
 
-			for (const char* candidate : candidates)
+			namespace fs = std::filesystem;
+			const fs::path this_file = fs::path(__FILE__);
+			const fs::path repo_root = this_file.parent_path().parent_path().parent_path().parent_path();
+			const fs::path schema_path = repo_root / "schemas" / "workloads_layout.schema.json";
+
+			if (fs::exists(schema_path) && fs::is_regular_file(schema_path))
 			{
-				FILE* file = ::fopen(candidate, "rb");
-				if (file)
-				{
-					::fclose(file);
-					return candidate;
-				}
+				resolved_path = schema_path.string();
+				return resolved_path.c_str();
 			}
 			return nullptr;
 		}
@@ -1652,10 +1652,10 @@ namespace robotick::test
 			const char* schema_path = resolve_layout_schema_path();
 			REQUIRE(schema_path != nullptr);
 			char validation_error[256] = {};
+			INFO(validation_error);
 			CHECK(validate_json_against_schema(schema_path, local_layout.body.data, validation_error, sizeof(validation_error)));
 			INFO(validation_error);
 			CHECK(validate_json_against_schema(schema_path, peer_layout.body.data, validation_error, sizeof(validation_error)));
-			INFO(validation_error);
 
 			::snprintf(url,
 				sizeof(url),

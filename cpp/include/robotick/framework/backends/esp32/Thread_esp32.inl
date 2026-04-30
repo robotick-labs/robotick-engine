@@ -102,8 +102,14 @@ namespace robotick
 
 	inline void Thread::hybrid_sleep_until(Clock::time_point target_time, HybridSleepMode mode, HybridSleepStats* out_stats)
 	{
-		(void)mode;
-		(void)out_stats;
+		if (out_stats != nullptr)
+		{
+			*out_stats = HybridSleepStats{};
+			out_stats->mode = mode;
+			const Clock::time_point now = Clock::now();
+			const int64_t requested_wait_ns = Clock::to_nanoseconds(target_time - now).count();
+			out_stats->requested_wait_ns = (requested_wait_ns > 0) ? static_cast<uint64_t>(requested_wait_ns) : 0;
+		}
 
 		constexpr auto coarse_threshold_us = 2000; // 2 ms
 		constexpr int watchdog_yield_interval = 500;

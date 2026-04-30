@@ -20,7 +20,7 @@ fi
 
 echo "[build_linux_arm64] Configuring and building preset '${CONFIG_PRESET}'..."
 
-if [[ -e "build/${CONFIG_PRESET}" ]]; then
+if [[ -e "${ROOT_DIR}/build/${CONFIG_PRESET}" ]]; then
   echo "[build_linux_arm64] Repairing ownership of existing build/${CONFIG_PRESET}..."
   docker run --rm --init \
     -v "${ROOT_DIR}:/workspace" \

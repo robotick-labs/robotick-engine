@@ -169,10 +169,20 @@ namespace robotick
 			return true;
 		}
 
-		void set_socket_non_blocking(int fd)
+		bool set_socket_non_blocking(int fd)
 		{
 			int flags = fcntl(fd, F_GETFL, 0);
-			fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+			if (flags < 0)
+			{
+				ROBOTICK_REC_DEV_WARNING("Failed to get socket flags for O_NONBLOCK: errno=%d (%s)", errno, strerror(errno));
+				return false;
+			}
+			if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
+			{
+				ROBOTICK_REC_DEV_WARNING("Failed to set O_NONBLOCK on socket: errno=%d (%s)", errno, strerror(errno));
+				return false;
+			}
+			return true;
 		}
 
 		void write_u64_be(uint64_t value, uint8_t* dst)
@@ -231,7 +241,11 @@ namespace robotick
 			}
 
 			// Set non-blocking
-			set_socket_non_blocking(fd);
+			if (!set_socket_non_blocking(fd))
+			{
+				close(fd);
+				return -1;
+			}
 
 			return fd;
 		}
@@ -745,7 +759,11 @@ namespace robotick
 			return;
 		}
 
-		set_socket_non_blocking(client_fd);
+		if (!set_socket_non_blocking(client_fd))
+		{
+			close(client_fd);
+			return;
+		}
 
 		close(socket_fd);
 		socket_fd = client_fd;
