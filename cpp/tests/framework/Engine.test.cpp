@@ -116,7 +116,15 @@ namespace robotick::test
 				*slash = '\0';
 			}
 
-			::snprintf(resolved_path, sizeof(resolved_path), "%s/schemas/workloads_layout.schema.json", repo_root);
+			static const char* schema_rel_path = "/schemas/workloads_layout.schema.json";
+			const size_t root_len = ::strlen(repo_root);
+			const size_t rel_len = ::strlen(schema_rel_path);
+			if (root_len + rel_len + 1 > sizeof(resolved_path))
+			{
+				return nullptr;
+			}
+			::memcpy(resolved_path, repo_root, root_len);
+			::memcpy(resolved_path + root_len, schema_rel_path, rel_len + 1);
 			FILE* file = ::fopen(resolved_path, "rb");
 			if (file)
 			{
