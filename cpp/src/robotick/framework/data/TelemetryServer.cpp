@@ -96,6 +96,11 @@ namespace robotick
 				return false;
 			}
 
+			if (type_desc->type_category == TypeCategory::Primitive)
+			{
+				return true;
+			}
+
 			if (type_desc->get_enum_desc() != nullptr)
 			{
 				return true;
@@ -106,8 +111,7 @@ namespace robotick
 				return true;
 			}
 
-			const StringView& name = type_desc->name;
-			return name == "bool" || name == "int" || name == "float" || name == "double" || name == "uint16_t" || name == "uint32_t";
+			return false;
 		}
 
 		static const StructDescriptor* try_get_struct_descriptor(const TypeDescriptor* type_desc, const void* instance_ptr)
