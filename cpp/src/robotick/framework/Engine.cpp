@@ -821,6 +821,7 @@ namespace robotick
 	{
 		ROBOTICK_ASSERT(state != nullptr);
 
+		state->telemetry_server.clear_registered_services();
 		state->root_instance = nullptr;
 		state->instances_by_unique_name.clear();
 		state->data_connections_all.reset();

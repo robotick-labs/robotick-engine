@@ -157,6 +157,51 @@ namespace robotick
 			return text_len >= suffix_len && ::strncmp(text + (text_len - suffix_len), suffix, suffix_len) == 0;
 		}
 
+		static bool try_parse_service_uri(
+			const char* uri, const char* prefix, bool& out_is_collection, FixedString64& out_service_id, FixedString128& out_relative_uri)
+		{
+			out_is_collection = false;
+			out_service_id.clear();
+			out_relative_uri.clear();
+
+			const char* rest = skip_prefix(uri, prefix);
+			if (!rest)
+			{
+				return false;
+			}
+			if (*rest == '\0')
+			{
+				out_is_collection = true;
+				return true;
+			}
+			if (*rest != '/')
+			{
+				return false;
+			}
+			++rest;
+			if (*rest == '\0')
+			{
+				out_is_collection = true;
+				return true;
+			}
+
+			const char* service_start = rest;
+			while (*rest != '\0' && *rest != '/')
+			{
+				++rest;
+			}
+			out_service_id.assign(service_start, static_cast<size_t>(rest - service_start));
+			if (out_service_id.empty())
+			{
+				return false;
+			}
+			if (*rest != '\0')
+			{
+				out_relative_uri = rest;
+			}
+			return true;
+		}
+
 		struct TelemetryWriteRequestEntry
 		{
 			bool has_field_handle = false;
@@ -1570,6 +1615,12 @@ namespace robotick
 			Clock::time_point last_heartbeat_at{};
 		};
 
+		struct RegisteredService
+		{
+			TelemetryServiceDescriptor descriptor;
+			TelemetryServiceRequestHandler handler = nullptr;
+		};
+
 		WebServer web_server;
 		const Engine* engine = nullptr;
 		FixedString64 session_id;
@@ -1590,6 +1641,7 @@ namespace robotick
 		bool is_setup = false;
 		bool is_gateway = false;
 		HeapVector<TelemetryPeerRoute> telemetry_peers;
+		FixedVector<RegisteredService, 16> registered_services;
 		Mutex ws_clients_mutex;
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
 		static constexpr size_t ws_max_clients = 1;
@@ -1648,6 +1700,10 @@ namespace robotick
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
 		void rebuild_layout_cache();
 #endif
+		int find_registered_service_index(const char* service_id) const;
+		bool handle_registered_services_request(const WebRequest& req, WebResponse& res, const char* effective_uri);
+		void handle_get_registered_services(WebResponse& res);
+		bool handle_registered_service_request(const WebRequest& req, WebResponse& res, const char* effective_uri);
 		bool handle_local_telemetry_request(const WebRequest& req, WebResponse& res, const char* effective_uri);
 		void handle_get_gateway_models(WebResponse& res);
 		void handle_forwarded_telemetry_request(const WebRequest& req, WebResponse& res, const TelemetryPeerRoute& peer, const char* suffix_uri);
@@ -1674,6 +1730,42 @@ namespace robotick
 		return impl ? impl->session_id.c_str() : "";
 	}
 
+	void TelemetryServer::clear_registered_services()
+	{
+		if (!impl)
+		{
+			return;
+		}
+		impl->registered_services.clear();
+	}
+
+	bool TelemetryServer::register_service(const TelemetryServiceDescriptor& descriptor, TelemetryServiceRequestHandler handler)
+	{
+		if (!impl || descriptor.service_id.empty() || descriptor.service_type.empty() || !handler)
+		{
+			return false;
+		}
+
+		const int existing_index = impl->find_registered_service_index(descriptor.service_id.c_str());
+		if (existing_index >= 0)
+		{
+			Impl::RegisteredService& existing = impl->registered_services[static_cast<size_t>(existing_index)];
+			existing.descriptor = descriptor;
+			existing.handler = handler;
+			return true;
+		}
+
+		Impl::RegisteredService added;
+		added.descriptor = descriptor;
+		added.handler = handler;
+		if (impl->registered_services.full())
+		{
+			return false;
+		}
+		impl->registered_services.add(added);
+		return true;
+	}
+
 	static void build_session_id(const char* model_name, FixedString64& session_id)
 	{
 #if defined(ROBOTICK_PLATFORM_ESP32S3)
@@ -1689,14 +1781,17 @@ namespace robotick
 
 	void TelemetryServer::setup(const Engine& engine_in)
 	{
+		FixedVector<Impl::RegisteredService, 16> preserved_services;
 		if (impl)
 		{
+			preserved_services = impl->registered_services;
 			impl->stop_ws_broadcast_loop();
 			impl->web_server.stop();
 			delete impl;
 			impl = nullptr;
 		}
 		impl = new Impl();
+		impl->registered_services = preserved_services;
 		impl->engine = &engine_in;
 		impl->is_gateway = engine_in.get_model().get_telemetry_is_gateway();
 		build_session_id(engine_in.get_model_name(), impl->session_id);
@@ -2884,8 +2979,113 @@ namespace robotick
 #endif
 	}
 
+	int TelemetryServer::Impl::find_registered_service_index(const char* service_id) const
+	{
+		if (!service_id || service_id[0] == '\0')
+		{
+			return -1;
+		}
+		for (size_t i = 0; i < registered_services.size(); ++i)
+		{
+			if (registered_services[i].descriptor.service_id == service_id)
+			{
+				return static_cast<int>(i);
+			}
+		}
+		return -1;
+	}
+
+	bool TelemetryServer::Impl::handle_registered_services_request(const WebRequest& req, WebResponse& res, const char* effective_uri)
+	{
+		if (!req.method.equals("GET"))
+		{
+			return false;
+		}
+
+		if (uri_equals(effective_uri, "/api/telemetry/services") || uri_equals(effective_uri, "/api/services"))
+		{
+			handle_get_registered_services(res);
+			return true;
+		}
+
+		if (starts_with(effective_uri, "/api/telemetry/services/") || starts_with(effective_uri, "/api/services/"))
+		{
+			return handle_registered_service_request(req, res, effective_uri);
+		}
+
+		return false;
+	}
+
+	void TelemetryServer::Impl::handle_get_registered_services(WebResponse& res)
+	{
+		set_json_response(res,
+			WebResponseCode::OK,
+			[&](auto& writer)
+			{
+				writer.start_object();
+				writer.key("services");
+				writer.start_array();
+				for (const RegisteredService& service : registered_services)
+				{
+					writer.start_object();
+					writer.key("service_id");
+					writer.string(service.descriptor.service_id);
+					writer.key("service_type");
+					writer.string(service.descriptor.service_type);
+					writer.key("display_name");
+					writer.string(service.descriptor.display_name);
+					writer.key("capabilities");
+					writer.start_array();
+					for (size_t i = 0; i < service.descriptor.capabilities.size(); ++i)
+					{
+						writer.string(service.descriptor.capabilities[i]);
+					}
+					writer.end_array();
+					writer.end_object();
+				}
+				writer.end_array();
+				writer.end_object();
+			});
+	}
+
+	bool TelemetryServer::Impl::handle_registered_service_request(const WebRequest& req, WebResponse& res, const char* effective_uri)
+	{
+		bool is_collection = false;
+		FixedString64 service_id;
+		FixedString128 relative_uri;
+		bool parsed = try_parse_service_uri(effective_uri, "/api/telemetry/services", is_collection, service_id, relative_uri);
+		if (!parsed)
+		{
+			parsed = try_parse_service_uri(effective_uri, "/api/services", is_collection, service_id, relative_uri);
+		}
+		if (!parsed || is_collection)
+		{
+			return false;
+		}
+
+		const int service_index = find_registered_service_index(service_id.c_str());
+		if (service_index < 0)
+		{
+			set_error_response(res, WebResponseCode::NotFound, "service_not_found");
+			return true;
+		}
+
+		const RegisteredService& service = registered_services[static_cast<size_t>(service_index)];
+		if (!service.handler)
+		{
+			set_error_response(res, WebResponseCode::InternalServerError, "service_handler_not_available");
+			return true;
+		}
+		return service.handler(req, res, relative_uri.empty() ? "" : relative_uri.c_str());
+	}
+
 	bool TelemetryServer::Impl::handle_local_telemetry_request(const WebRequest& req, WebResponse& res, const char* effective_uri)
 	{
+		if (handle_registered_services_request(req, res, effective_uri))
+		{
+			return true;
+		}
+
 		if (req.method.equals("GET"))
 		{
 			if (uri_equals(effective_uri, "/api/telemetry/health") || uri_equals(effective_uri, "/health"))
