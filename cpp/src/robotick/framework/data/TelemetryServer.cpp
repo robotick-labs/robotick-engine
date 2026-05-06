@@ -2997,13 +2997,13 @@ namespace robotick
 
 	bool TelemetryServer::Impl::handle_registered_services_request(const WebRequest& req, WebResponse& res, const char* effective_uri)
 	{
-		if (!req.method.equals("GET"))
-		{
-			return false;
-		}
-
 		if (uri_equals(effective_uri, "/api/telemetry/services") || uri_equals(effective_uri, "/api/services"))
 		{
+			if (!req.method.equals("GET"))
+			{
+				set_error_response(res, WebResponseCode::MethodNotAllowed, "method_not_allowed");
+				return true;
+			}
 			handle_get_registered_services(res);
 			return true;
 		}
