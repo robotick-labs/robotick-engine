@@ -15,7 +15,11 @@
 
 namespace robotick
 {
+#if defined(ROBOTICK_PLATFORM_ESP32S3)
 	using WebRequestBodyBuffer = FixedVector1k;
+#else
+	using WebRequestBodyBuffer = FixedVector64k;
+#endif
 
 	struct WebRequest
 	{
@@ -122,9 +126,9 @@ namespace robotick
 	class WebSocketConnection
 	{
 	  public:
-		void* conn = nullptr; // platform-specific (mg_connection* or httpd_req_t*)
+		void* conn = nullptr;	// platform-specific (mg_connection* or httpd_req_t*)
 		void* server = nullptr; // platform-specific (httpd_handle_t, unused on desktop)
-		int socket_fd = -1; // used by platforms that identify sockets by fd
+		int socket_fd = -1;		// used by platforms that identify sockets by fd
 
 		bool is_valid() const { return conn != nullptr || (server != nullptr && socket_fd >= 0); }
 

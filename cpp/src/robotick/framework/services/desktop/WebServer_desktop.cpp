@@ -25,8 +25,7 @@ namespace robotick
 		}
 		struct mg_connection* ws_conn = static_cast<struct mg_connection*>(conn);
 		mg_lock_connection(ws_conn);
-		const int written = mg_websocket_write(
-			ws_conn, opcode, static_cast<const char*>(data), size);
+		const int written = mg_websocket_write(ws_conn, opcode, static_cast<const char*>(data), size);
 		mg_unlock_connection(ws_conn);
 		return written >= 0;
 	}
@@ -291,11 +290,27 @@ namespace robotick
 		if (info->query_string)
 			parse_query_string(info->query_string, req);
 
-		// Read body if present
-		char buffer[1024];
-		int len = mg_read(c, buffer, sizeof(buffer));
-		if (len > 0)
-			req.body.set_bytes(buffer, len);
+		// Read the full body. Larger editor payloads such as sample-range writes
+		// can easily exceed 1 KB, so single-read truncation is not acceptable.
+		char buffer[4096];
+		req.body.set_size(0);
+		while (!req.body.full())
+		{
+			const size_t remaining_capacity = req.body.capacity() - req.body.size();
+			const size_t read_capacity = (remaining_capacity < sizeof(buffer)) ? remaining_capacity : sizeof(buffer);
+			const int len = mg_read(c, buffer, read_capacity);
+			if (len <= 0)
+			{
+				break;
+			}
+			const size_t old_size = req.body.size();
+			req.body.set_size(old_size + static_cast<size_t>(len));
+			::memcpy(req.body.data() + old_size, buffer, static_cast<size_t>(len));
+			if (static_cast<size_t>(len) < read_capacity)
+			{
+				break;
+			}
+		}
 
 		// File passthrough
 		{
@@ -329,8 +344,7 @@ namespace robotick
 		return 0;
 	}
 
-	static const WebSocketEndpoint* find_websocket_endpoint(
-		const WebServer* server, const char* uri)
+	static const WebSocketEndpoint* find_websocket_endpoint(const WebServer* server, const char* uri)
 	{
 		if (!server || !uri)
 		{
@@ -390,8 +404,7 @@ namespace robotick
 			return;
 		}
 		const mg_request_info* info = mg_get_request_info(c);
-		const WebSocketEndpoint* endpoint = find_websocket_endpoint(
-			self, info ? info->local_uri : nullptr);
+		const WebSocketEndpoint* endpoint = find_websocket_endpoint(self, info ? info->local_uri : nullptr);
 		if (!endpoint || !endpoint->handler.on_ready)
 		{
 			return;
@@ -401,12 +414,7 @@ namespace robotick
 		endpoint->handler.on_ready(ws_conn);
 	}
 
-	static int websocket_data_callback(
-		struct mg_connection* c,
-		int bits,
-		char* data,
-		size_t data_len,
-		void* userdata)
+	static int websocket_data_callback(struct mg_connection* c, int bits, char* data, size_t data_len, void* userdata)
 	{
 		WebServer* self = static_cast<WebServer*>(userdata);
 		if (!self)
@@ -414,8 +422,7 @@ namespace robotick
 			return 0;
 		}
 		const mg_request_info* info = mg_get_request_info(c);
-		const WebSocketEndpoint* endpoint = find_websocket_endpoint(
-			self, info ? info->local_uri : nullptr);
+		const WebSocketEndpoint* endpoint = find_websocket_endpoint(self, info ? info->local_uri : nullptr);
 		if (!endpoint || !endpoint->handler.on_message)
 		{
 			return 1;
@@ -430,8 +437,7 @@ namespace robotick
 		return keep_open ? 1 : 0;
 	}
 
-	static void websocket_close_callback(
-		const struct mg_connection* c, void* userdata)
+	static void websocket_close_callback(const struct mg_connection* c, void* userdata)
 	{
 		WebServer* self = static_cast<WebServer*>(userdata);
 		if (!self)
@@ -439,8 +445,7 @@ namespace robotick
 			return;
 		}
 		const mg_request_info* info = mg_get_request_info(c);
-		const WebSocketEndpoint* endpoint = find_websocket_endpoint(
-			self, info ? info->local_uri : nullptr);
+		const WebSocketEndpoint* endpoint = find_websocket_endpoint(self, info ? info->local_uri : nullptr);
 		if (!endpoint || !endpoint->handler.on_close)
 		{
 			return;
@@ -501,8 +506,7 @@ namespace robotick
 		mg_set_request_handler(s->ctx, "/", callback, this);
 		for (const auto& endpoint : websocket_endpoints)
 		{
-			mg_set_websocket_handler(
-				s->ctx,
+			mg_set_websocket_handler(s->ctx,
 				endpoint.uri.c_str(),
 				websocket_connect_callback,
 				websocket_ready_callback,
