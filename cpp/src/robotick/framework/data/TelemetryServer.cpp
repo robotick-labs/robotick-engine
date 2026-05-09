@@ -22,11 +22,11 @@
 #include "robotick/framework/time/Clock.h"
 #include "robotick/framework/utility/Algorithm.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <cmath>
 #include <strings.h>
 #include <unistd.h>
 
@@ -1670,6 +1670,7 @@ namespace robotick
 		uint64_t main_local_frame_tick_counter = 0;
 		uint64_t main_last_published_local_frame_tick_counter = 0;
 		bool has_published_local_frame = false;
+		bool has_logged_first_local_frame_publish = false;
 		uint64_t ws_last_local_frame_sent_at_ns = 0;
 		float telemetry_push_configured_hz = 20.0f;
 		float telemetry_push_goal_hz = 20.0f;
@@ -1827,8 +1828,7 @@ namespace robotick
 		impl->telemetry_source_tick_rate_hz = root_tick_rate_hz > 0.0f ? root_tick_rate_hz : 0.0f;
 		if (impl->telemetry_source_tick_rate_hz > 0.0f)
 		{
-			const double ratio = static_cast<double>(impl->telemetry_source_tick_rate_hz)
-				/ static_cast<double>(impl->telemetry_push_configured_hz);
+			const double ratio = static_cast<double>(impl->telemetry_source_tick_rate_hz) / static_cast<double>(impl->telemetry_push_configured_hz);
 			const uint32_t every_n_ticks = static_cast<uint32_t>(::ceil(ratio));
 			impl->telemetry_push_every_n_ticks = every_n_ticks > 0u ? every_n_ticks : 1u;
 			impl->telemetry_push_goal_hz = impl->telemetry_source_tick_rate_hz / static_cast<float>(impl->telemetry_push_every_n_ticks);
@@ -1913,6 +1913,15 @@ namespace robotick
 
 				return impl->handle_local_telemetry_request(req, res, req.uri.c_str());
 			});
+		ROBOTICK_INFO("[telemetry] model '%s' listening on http://127.0.0.1:%u/api/telemetry (requested port %u, ws /api/telemetry/ws, configured "
+					  "%.1f Hz, goal %.1f Hz, every %u ticks @ %.1f Hz)",
+			engine_in.get_model_name(),
+			static_cast<unsigned int>(impl->web_server.get_bound_port()),
+			static_cast<unsigned int>(telemetry_port),
+			static_cast<double>(impl->telemetry_push_configured_hz),
+			static_cast<double>(impl->telemetry_push_goal_hz),
+			static_cast<unsigned int>(impl->telemetry_push_every_n_ticks),
+			static_cast<double>(impl->telemetry_source_tick_rate_hz));
 		impl->start_ws_broadcast_loop();
 	}
 
@@ -1931,6 +1940,7 @@ namespace robotick
 		}
 #endif
 		impl->web_server.stop();
+		ROBOTICK_INFO("[telemetry] stopped for model '%s'", impl->engine ? impl->engine->get_model_name() : "unknown");
 		impl->engine = nullptr;
 		impl->clear_ws_clients();
 	}
@@ -1985,6 +1995,15 @@ namespace robotick
 			impl->main_last_published_local_frame_tick_counter = impl->main_local_frame_tick_counter;
 			impl->has_published_local_frame = true;
 			impl->ws_local_frame_signal_count.fetch_add(1);
+			if (!impl->has_logged_first_local_frame_publish)
+			{
+				ROBOTICK_INFO("[telemetry] model '%s' published first local snapshot (size=%zu bytes, frame_seq=%u, slot=%d)",
+					impl->engine ? impl->engine->get_model_name() : "unknown",
+					slot.buffer.get_size_used(),
+					static_cast<unsigned int>(slot.frame_seq),
+					target_slot_index);
+				impl->has_logged_first_local_frame_publish = true;
+			}
 		}
 		impl->ws_broadcast_wait_cv.notify_all();
 	}
@@ -2657,8 +2676,15 @@ namespace robotick
 			int index = -1;
 			if (!register_ws_client(route, connection, index))
 			{
+				ROBOTICK_WARNING("[telemetry] websocket connect rejected for model '%s' on route '%s' (no free client slots)",
+					engine ? engine->get_model_name() : "unknown",
+					req.uri.c_str());
 				return false;
 			}
+			ROBOTICK_INFO("[telemetry] websocket connected for model '%s' on route '%s' [%s]",
+				engine ? engine->get_model_name() : "unknown",
+				req.uri.c_str(),
+				route.is_local ? "local" : route.model_id.c_str());
 			(void)index;
 			return true;
 		};
@@ -2689,6 +2715,9 @@ namespace robotick
 					return;
 				}
 				live_client.ready = true;
+				ROBOTICK_INFO("[telemetry] websocket ready for model '%s' [%s]",
+					engine ? engine->get_model_name() : "unknown",
+					live_client.route.is_local ? "local" : live_client.route.model_id.c_str());
 			}
 		};
 		handler.on_message = [this](WebSocketConnection& connection, const WebSocketMessage& message)
@@ -2707,6 +2736,20 @@ namespace robotick
 		};
 		handler.on_close = [this](const WebSocketConnection& connection)
 		{
+			WsRoute route;
+			bool found_client = false;
+			{
+				LockGuard lock(ws_clients_mutex);
+				const int index = find_ws_client_index_unlocked(connection);
+				if (index >= 0)
+				{
+					route = ws_clients[static_cast<size_t>(index)].route;
+					found_client = true;
+				}
+			}
+			ROBOTICK_INFO("[telemetry] websocket closed for model '%s' [%s]",
+				engine ? engine->get_model_name() : "unknown",
+				found_client ? (route.is_local ? "local" : route.model_id.c_str()) : "unknown");
 			unregister_ws_client(connection);
 		};
 
@@ -2908,9 +2951,8 @@ namespace robotick
 			telemetry_push_last_duration_ms = static_cast<float>(push_duration_ns) / 1000000.0f;
 			telemetry_push_last_period_ms = static_cast<float>(push_period_ns) / 1000000.0f;
 			telemetry_push_actual_hz = push_period_ns > 0 ? (1000000000.0f / static_cast<float>(push_period_ns)) : 0.0f;
-			telemetry_push_cost_pct = push_period_ns > 0
-				? (100.0f * static_cast<float>(push_duration_ns) / static_cast<float>(push_period_ns))
-				: 0.0f;
+			telemetry_push_cost_pct =
+				push_period_ns > 0 ? (100.0f * static_cast<float>(push_duration_ns) / static_cast<float>(push_period_ns)) : 0.0f;
 		}
 
 		ws_last_local_frame_sent_at_ns = timestamp_ns;
