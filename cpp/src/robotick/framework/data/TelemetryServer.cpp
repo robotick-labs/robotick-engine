@@ -14,6 +14,7 @@
 #include "robotick/framework/data/DataConnection.h"
 #include "robotick/framework/data/WorkloadsBuffer.h"
 #include "robotick/framework/json/Json.h"
+#include "robotick/framework/model/WorkloadSeed.h"
 #include "robotick/framework/registry/TypeDescriptor.h"
 #include "robotick/framework/services/WebServer.h"
 #include "robotick/framework/strings/FixedString.h"
@@ -25,6 +26,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <strings.h>
 #include <unistd.h>
 
@@ -1621,6 +1623,13 @@ namespace robotick
 			TelemetryServiceRequestHandler handler = nullptr;
 		};
 
+		struct PublishedLocalFrameSlot
+		{
+			WorkloadsBuffer buffer;
+			uint32_t frame_seq = 0;
+			uint64_t timestamp_ns = 0;
+		};
+
 		WebServer web_server;
 		const Engine* engine = nullptr;
 		FixedString64 session_id;
@@ -1651,14 +1660,31 @@ namespace robotick
 		HeapVector<WsClient> ws_clients;
 		AtomicFlag ws_broadcast_stop{false};
 		Thread ws_broadcast_thread;
-		uint32_t ws_last_local_frame_seq = 0;
+		Mutex ws_broadcast_wait_mutex;
+		ConditionVariable ws_broadcast_wait_cv;
+		AtomicValue<uint64_t> ws_local_frame_signal_count{0};
+		static constexpr size_t local_frame_snapshot_slot_count = 3;
+		PublishedLocalFrameSlot local_frame_snapshot_slots[local_frame_snapshot_slot_count];
+		int published_local_frame_slot_index = -1;
+		int sending_local_frame_slot_index = -1;
+		uint64_t main_local_frame_tick_counter = 0;
+		uint64_t main_last_published_local_frame_tick_counter = 0;
+		bool has_published_local_frame = false;
+		uint64_t ws_last_local_frame_sent_at_ns = 0;
+		float telemetry_push_configured_hz = 20.0f;
+		float telemetry_push_goal_hz = 20.0f;
+		float telemetry_source_tick_rate_hz = 0.0f;
+		uint32_t telemetry_push_every_n_ticks = 1;
+		float telemetry_push_actual_hz = 0.0f;
+		float telemetry_push_last_duration_ms = 0.0f;
+		float telemetry_push_last_period_ms = 0.0f;
+		float telemetry_push_cost_pct = 0.0f;
+		Mutex telemetry_push_stats_mutex;
 		HeapVector<uint32_t> ws_last_peer_frame_seq;
 		HeapVector<uint32_t> ws_last_peer_layout_seq;
 		size_t last_known_writable_connection_handle_count = 0;
 		AtomicFlag ws_layout_dirty{false};
 		static constexpr uint32_t ws_heartbeat_interval_ms = 1000;
-		static constexpr uint32_t ws_broadcast_tick_ms = 10;
-
 		void rebuild_writable_input_registry();
 		bool refresh_writable_input_connection_handles();
 		size_t count_writable_input_connection_handles() const;
@@ -1682,7 +1708,7 @@ namespace robotick
 		void build_write_response_json(const char* request_body, size_t request_size, int& out_status_code, json::StringSink& out_json);
 		void build_connection_state_response_json(const char* request_body, size_t request_size, int& out_status_code, json::StringSink& out_json);
 		void maybe_broadcast_local_layout_update();
-		void maybe_broadcast_local_frame(const Clock::time_point now);
+		void send_published_local_frame(const Clock::time_point now);
 		void maybe_broadcast_peer_frames(const Clock::time_point now);
 		void maybe_send_heartbeats(const Clock::time_point now);
 		void start_ws_broadcast_loop();
@@ -1794,6 +1820,30 @@ namespace robotick
 		impl->registered_services = preserved_services;
 		impl->engine = &engine_in;
 		impl->is_gateway = engine_in.get_model().get_telemetry_is_gateway();
+		const float telemetry_push_rate_hz = engine_in.get_model().get_telemetry_push_rate_hz();
+		impl->telemetry_push_configured_hz = telemetry_push_rate_hz > 0.0f ? telemetry_push_rate_hz : 20.0f;
+		const WorkloadSeed* root_workload = engine_in.get_model().get_root_workload();
+		const float root_tick_rate_hz = root_workload ? root_workload->tick_rate_hz : 0.0f;
+		impl->telemetry_source_tick_rate_hz = root_tick_rate_hz > 0.0f ? root_tick_rate_hz : 0.0f;
+		if (impl->telemetry_source_tick_rate_hz > 0.0f)
+		{
+			const double ratio = static_cast<double>(impl->telemetry_source_tick_rate_hz)
+				/ static_cast<double>(impl->telemetry_push_configured_hz);
+			const uint32_t every_n_ticks = static_cast<uint32_t>(::ceil(ratio));
+			impl->telemetry_push_every_n_ticks = every_n_ticks > 0u ? every_n_ticks : 1u;
+			impl->telemetry_push_goal_hz = impl->telemetry_source_tick_rate_hz / static_cast<float>(impl->telemetry_push_every_n_ticks);
+		}
+		else
+		{
+			impl->telemetry_push_every_n_ticks = 1u;
+			impl->telemetry_push_goal_hz = impl->telemetry_push_configured_hz;
+		}
+		const WorkloadsBuffer& workloads_buffer = engine_in.get_workloads_buffer();
+		for (size_t slot_index = 0; slot_index < Impl::local_frame_snapshot_slot_count; ++slot_index)
+		{
+			impl->local_frame_snapshot_slots[slot_index].buffer.create_mirror_from(workloads_buffer);
+			impl->local_frame_snapshot_slots[slot_index].buffer.set_size_used(workloads_buffer.get_size_used());
+		}
 		build_session_id(engine_in.get_model_name(), impl->session_id);
 		impl->rebuild_writable_input_registry();
 		impl->rebuild_telemetry_peer_registry();
@@ -1883,6 +1933,60 @@ namespace robotick
 		impl->web_server.stop();
 		impl->engine = nullptr;
 		impl->clear_ws_clients();
+	}
+
+	void TelemetryServer::publish_local_frame_if_due()
+	{
+		if (!impl || !impl->engine)
+		{
+			return;
+		}
+
+		const WorkloadsBuffer& workloads_buffer = impl->engine->get_workloads_buffer();
+		impl->main_local_frame_tick_counter += 1;
+		const uint32_t frame_seq = workloads_buffer.get_telemetry_frame_seq();
+
+		if (impl->has_published_local_frame)
+		{
+			const uint64_t tick_delta = impl->main_local_frame_tick_counter - impl->main_last_published_local_frame_tick_counter;
+			if (tick_delta < impl->telemetry_push_every_n_ticks)
+			{
+				return;
+			}
+		}
+
+		const uint64_t timestamp_ns = static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count());
+		{
+			LockGuard lock(impl->ws_broadcast_wait_mutex);
+			int target_slot_index = -1;
+			for (size_t slot_index = 0; slot_index < Impl::local_frame_snapshot_slot_count; ++slot_index)
+			{
+				const int candidate_slot_index = static_cast<int>(slot_index);
+				if (candidate_slot_index == impl->published_local_frame_slot_index || candidate_slot_index == impl->sending_local_frame_slot_index)
+				{
+					continue;
+				}
+				target_slot_index = candidate_slot_index;
+				break;
+			}
+
+			if (target_slot_index < 0)
+			{
+				ROBOTICK_FATAL_EXIT("TelemetryServer: no free local frame snapshot slot available");
+			}
+
+			Impl::PublishedLocalFrameSlot& slot = impl->local_frame_snapshot_slots[static_cast<size_t>(target_slot_index)];
+			slot.buffer.update_mirror_from(workloads_buffer);
+			slot.buffer.set_size_used(workloads_buffer.get_size_used());
+			slot.frame_seq = frame_seq;
+			slot.timestamp_ns = timestamp_ns;
+
+			impl->published_local_frame_slot_index = target_slot_index;
+			impl->main_last_published_local_frame_tick_counter = impl->main_local_frame_tick_counter;
+			impl->has_published_local_frame = true;
+			impl->ws_local_frame_signal_count.fetch_add(1);
+		}
+		impl->ws_broadcast_wait_cv.notify_all();
 	}
 
 	void TelemetryServer::apply_pending_input_writes()
@@ -2047,7 +2151,13 @@ namespace robotick
 			ws_last_peer_layout_seq[i] = 0;
 		}
 
-		ws_last_local_frame_seq = 0;
+		ws_local_frame_signal_count.store(0);
+		published_local_frame_slot_index = -1;
+		sending_local_frame_slot_index = -1;
+		main_local_frame_tick_counter = 0;
+		main_last_published_local_frame_tick_counter = 0;
+		has_published_local_frame = false;
+		ws_last_local_frame_sent_at_ns = 0;
 		ws_layout_dirty.clear();
 		ws_broadcast_stop.clear();
 	}
@@ -2631,6 +2741,7 @@ namespace robotick
 	void TelemetryServer::Impl::stop_ws_broadcast_loop()
 	{
 		ws_broadcast_stop.set();
+		ws_broadcast_wait_cv.notify_all();
 		if (ws_broadcast_thread.is_joining_supported() && ws_broadcast_thread.is_joinable())
 		{
 			ws_broadcast_thread.join();
@@ -2648,14 +2759,24 @@ namespace robotick
 
 	void TelemetryServer::Impl::ws_broadcast_loop()
 	{
+		uint64_t observed_signal_count = 0;
 		while (!ws_broadcast_stop.is_set())
 		{
+			{
+				UniqueLock wait_lock(ws_broadcast_wait_mutex);
+				ws_broadcast_wait_cv.wait(wait_lock,
+					[&]()
+					{
+						return ws_broadcast_stop.is_set() || ws_local_frame_signal_count.load() > observed_signal_count;
+					});
+				observed_signal_count = ws_local_frame_signal_count.load();
+			}
+
 			const Clock::time_point now = Clock::now();
 			maybe_broadcast_local_layout_update();
-			maybe_broadcast_local_frame(now);
+			send_published_local_frame(now);
 			maybe_broadcast_peer_frames(now);
 			maybe_send_heartbeats(now);
-			Thread::sleep_ms(ws_broadcast_tick_ms);
 		}
 	}
 
@@ -2704,17 +2825,10 @@ namespace robotick
 		}
 	}
 
-	void TelemetryServer::Impl::maybe_broadcast_local_frame(const Clock::time_point now)
+	void TelemetryServer::Impl::send_published_local_frame(const Clock::time_point now)
 	{
 		(void)now;
 		if (!engine)
-		{
-			return;
-		}
-
-		const WorkloadsBuffer& workloads_buffer = engine->get_workloads_buffer();
-		const uint32_t frame_seq = workloads_buffer.get_telemetry_frame_seq();
-		if ((frame_seq & 1u) != 0u || frame_seq == ws_last_local_frame_seq)
 		{
 			return;
 		}
@@ -2735,30 +2849,71 @@ namespace robotick
 
 		if (clients.empty())
 		{
-			ws_last_local_frame_seq = frame_seq;
 			return;
 		}
 
-		const uint64_t timestamp_ns = static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count());
+		int slot_index = -1;
+		const uint8_t* payload_ptr = nullptr;
+		size_t payload_size = 0;
+		uint32_t frame_seq = 0;
+		uint64_t timestamp_ns = 0;
+		{
+			LockGuard lock(ws_broadcast_wait_mutex);
+			if (published_local_frame_slot_index < 0)
+			{
+				return;
+			}
+			slot_index = published_local_frame_slot_index;
+			sending_local_frame_slot_index = slot_index;
+			const PublishedLocalFrameSlot& slot = local_frame_snapshot_slots[static_cast<size_t>(slot_index)];
+			payload_ptr = slot.buffer.raw_ptr();
+			payload_size = slot.buffer.get_size_used();
+			frame_seq = slot.frame_seq;
+			timestamp_ns = slot.timestamp_ns;
+		}
+
+		const uint64_t previous_send_ns = ws_last_local_frame_sent_at_ns;
+		const uint64_t push_start_ns = static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count());
 		FixedString512 metadata;
 		metadata.format("{\"type\":\"frame\",\"engine_session_id\":\"%s\",\"frame_seq\":%u,\"timestamp_ns\":%llu,\"payload_size\":%u}",
 			session_id.c_str(),
 			static_cast<unsigned>(frame_seq),
 			static_cast<unsigned long long>(timestamp_ns),
-			static_cast<unsigned>(workloads_buffer.get_size_used()));
+			static_cast<unsigned>(payload_size));
 
 		for (size_t i = 0; i < clients.size(); ++i)
 		{
 			const WsClient& client = clients[i];
 			const bool metadata_ok = client.connection.send_text(metadata.c_str());
-			const bool frame_ok = metadata_ok && client.connection.send_binary(workloads_buffer.raw_ptr(), workloads_buffer.get_size_used());
+			const bool frame_ok = metadata_ok && client.connection.send_binary(payload_ptr, payload_size);
 			if (!frame_ok)
 			{
 				unregister_ws_client(client.connection);
 			}
 		}
 
-		ws_last_local_frame_seq = frame_seq;
+		{
+			LockGuard lock(ws_broadcast_wait_mutex);
+			if (sending_local_frame_slot_index == slot_index)
+			{
+				sending_local_frame_slot_index = -1;
+			}
+		}
+
+		const uint64_t push_end_ns = static_cast<uint64_t>(Clock::to_nanoseconds(Clock::now().time_since_epoch()).count());
+		const uint64_t push_duration_ns = push_end_ns >= push_start_ns ? (push_end_ns - push_start_ns) : 0;
+		const uint64_t push_period_ns = previous_send_ns > 0 && timestamp_ns > previous_send_ns ? (timestamp_ns - previous_send_ns) : 0;
+		{
+			LockGuard push_stats_lock(telemetry_push_stats_mutex);
+			telemetry_push_last_duration_ms = static_cast<float>(push_duration_ns) / 1000000.0f;
+			telemetry_push_last_period_ms = static_cast<float>(push_period_ns) / 1000000.0f;
+			telemetry_push_actual_hz = push_period_ns > 0 ? (1000000000.0f / static_cast<float>(push_period_ns)) : 0.0f;
+			telemetry_push_cost_pct = push_period_ns > 0
+				? (100.0f * static_cast<float>(push_duration_ns) / static_cast<float>(push_period_ns))
+				: 0.0f;
+		}
+
+		ws_last_local_frame_sent_at_ns = timestamp_ns;
 	}
 
 	void TelemetryServer::Impl::maybe_broadcast_peer_frames(const Clock::time_point now)
@@ -3102,6 +3257,34 @@ namespace robotick
 			if (uri_equals(effective_uri, "/api/telemetry/workloads_buffer/raw"))
 			{
 				handle_get_workloads_buffer_raw(req, res);
+				return true;
+			}
+			if (uri_equals(effective_uri, "/api/telemetry/push_stats"))
+			{
+				LockGuard push_stats_lock(telemetry_push_stats_mutex);
+				set_json_response(res,
+					WebResponseCode::OK,
+					[&](auto& writer)
+					{
+						writer.start_object();
+						writer.key("configured_push_rate_hz");
+						writer.real(telemetry_push_configured_hz);
+						writer.key("goal_push_rate_hz");
+						writer.real(telemetry_push_goal_hz);
+						writer.key("source_tick_rate_hz");
+						writer.real(telemetry_source_tick_rate_hz);
+						writer.key("push_every_n_ticks");
+						writer.uint64(static_cast<uint64_t>(telemetry_push_every_n_ticks));
+						writer.key("actual_push_rate_hz");
+						writer.real(telemetry_push_actual_hz);
+						writer.key("last_push_duration_ms");
+						writer.real(telemetry_push_last_duration_ms);
+						writer.key("last_push_period_ms");
+						writer.real(telemetry_push_last_period_ms);
+						writer.key("last_push_cost_pct_of_period");
+						writer.real(telemetry_push_cost_pct);
+						writer.end_object();
+					});
 				return true;
 			}
 		}

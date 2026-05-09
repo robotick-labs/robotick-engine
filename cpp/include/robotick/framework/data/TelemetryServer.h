@@ -41,6 +41,7 @@ namespace robotick
 		void start(const Engine& engine, const uint16_t telemetry_port);
 		void stop();
 		void apply_pending_input_writes();
+		void publish_local_frame_if_due();
 		void update_peer_route(const char* model_id, const char* host, uint16_t telemetry_port, bool is_gateway);
 
 		const char* get_session_id() const;

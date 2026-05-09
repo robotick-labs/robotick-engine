@@ -47,6 +47,7 @@ namespace robotick
 
 		void set_telemetry_port(const uint16_t in_telemetry_port);
 		void set_telemetry_is_gateway(const bool in_is_gateway) { telemetry_is_gateway = in_is_gateway; }
+		void set_telemetry_push_rate_hz(const float in_telemetry_push_rate_hz);
 
 		// general-purpose finalise function (bakes and validates as needed):
 		void finalize();
@@ -62,6 +63,7 @@ namespace robotick
 		const WorkloadSeed* get_root_workload() const { return root_workload; }
 		uint16_t get_telemetry_port() const { return telemetry_port; };
 		bool get_telemetry_is_gateway() const { return telemetry_is_gateway; }
+		float get_telemetry_push_rate_hz() const { return telemetry_push_rate_hz; }
 
 	  private:
 		StringView model_name;
@@ -75,6 +77,7 @@ namespace robotick
 
 		uint16_t telemetry_port = 7090;
 		bool telemetry_is_gateway = false;
+		float telemetry_push_rate_hz = 20.0f;
 	};
 
 } // namespace robotick

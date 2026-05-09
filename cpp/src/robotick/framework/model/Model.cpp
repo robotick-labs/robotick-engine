@@ -8,6 +8,7 @@
 #include "robotick/framework/model/RemoteModelSeed.h"
 #include "robotick/framework/model/TelemetryPeerSeed.h"
 #include "robotick/framework/model/WorkloadSeed.h"
+#include "robotick/framework/math/IsFinite.h"
 #include "robotick/framework/strings/StringUtils.h"
 
 namespace robotick
@@ -73,6 +74,16 @@ namespace robotick
 	void Model::set_telemetry_port(const uint16_t in_telemetry_port)
 	{
 		telemetry_port = in_telemetry_port;
+	}
+
+	void Model::set_telemetry_push_rate_hz(const float in_telemetry_push_rate_hz)
+	{
+		if (!isfinite(in_telemetry_push_rate_hz) || in_telemetry_push_rate_hz <= 0.0f)
+		{
+			telemetry_push_rate_hz = 20.0f;
+			return;
+		}
+		telemetry_push_rate_hz = in_telemetry_push_rate_hz;
 	}
 
 	void Model::finalize()

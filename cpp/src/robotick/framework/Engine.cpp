@@ -467,6 +467,7 @@ namespace robotick
 
 			// Close the seqlock window after all tick writes so telemetry readers can treat this frame as stable (even seq).
 			state->workloads_buffer.mark_frame_write_end();
+			state->telemetry_server.publish_local_frame_if_due();
 
 			next_tick_time += child_tick_interval;
 

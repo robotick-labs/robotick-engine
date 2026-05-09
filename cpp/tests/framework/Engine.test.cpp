@@ -1408,6 +1408,90 @@ namespace robotick::test
 			stop_flag.set();
 		}
 
+		SECTION("Telemetry websocket respects model telemetry push rate cap")
+		{
+			const uint16_t telemetry_port = choose_telemetry_port();
+			REQUIRE(telemetry_port != 0);
+
+			Model model;
+			model.set_model_name("ws-rate-capped-model");
+			model.set_telemetry_port(telemetry_port);
+			model.set_telemetry_push_rate_hz(5.0f);
+			static const WorkloadSeed root_seed{
+				TypeId("TickCounterWorkload"),
+				StringView("ws_rate_root"),
+				60.0f,
+				{},
+				{},
+				{},
+			};
+			static const WorkloadSeed* const workloads[] = {&root_seed};
+			model.use_workload_seeds(workloads);
+			model.set_root_workload(root_seed);
+
+			Engine engine;
+			engine.load(model);
+
+			AtomicFlag stop_flag{false};
+			EngineRunThread runner(engine, stop_flag);
+			Thread::sleep_ms(100);
+
+			WsTestClient ws_client;
+			REQUIRE(ws_client.connect("127.0.0.1", telemetry_port, "/api/telemetry/ws"));
+
+			HeapVector<char> hello_text;
+			REQUIRE(wait_for_ws_text_message(ws_client, hello_text));
+
+			HeapVector<char> layout_text;
+			REQUIRE(wait_for_ws_text_message(ws_client, layout_text));
+
+			char push_stats_url[256];
+			::snprintf(push_stats_url, sizeof(push_stats_url), "http://127.0.0.1:%u/api/telemetry/push_stats", telemetry_port);
+			const HttpResponse push_stats_response = http_request(push_stats_url);
+			REQUIRE(push_stats_response.status_code == 200);
+			json::Document push_stats_doc;
+			REQUIRE(push_stats_doc.parse(push_stats_response.body.data));
+			const json::Value push_stats_root = push_stats_doc.root();
+			REQUIRE(push_stats_root.is_object());
+			REQUIRE(push_stats_root.contains("configured_push_rate_hz"));
+			REQUIRE(push_stats_root.contains("goal_push_rate_hz"));
+			REQUIRE(push_stats_root.contains("source_tick_rate_hz"));
+			REQUIRE(push_stats_root.contains("push_every_n_ticks"));
+			CHECK(push_stats_root["configured_push_rate_hz"].get_double() == Catch::Approx(5.0));
+			CHECK(push_stats_root["source_tick_rate_hz"].get_double() == Catch::Approx(60.0));
+			CHECK(push_stats_root["push_every_n_ticks"].get_uint64() == 12ULL);
+			CHECK(push_stats_root["goal_push_rate_hz"].get_double() == Catch::Approx(5.0).margin(0.01));
+
+			FixedVector<uint64_t, 6> frame_timestamps_ns;
+			for (size_t i = 0; i < 6; ++i)
+			{
+				json::Document frame_metadata_document;
+				size_t frame_payload_size = 0;
+				REQUIRE(wait_for_ws_frame_metadata_and_payload(ws_client, frame_metadata_document, frame_payload_size));
+				const json::Value frame_metadata = frame_metadata_document.root();
+				REQUIRE(frame_metadata.is_object());
+				REQUIRE(frame_metadata.contains("timestamp_ns"));
+				const uint64_t timestamp_ns = frame_metadata["timestamp_ns"].get_uint64();
+				REQUIRE(timestamp_ns > 0);
+				frame_timestamps_ns.add(timestamp_ns);
+			}
+
+			REQUIRE(frame_timestamps_ns.size() >= 2);
+			size_t capped_interval_count = 0;
+			for (size_t i = 1; i < frame_timestamps_ns.size(); ++i)
+			{
+				const uint64_t dt_ms = (frame_timestamps_ns[i] - frame_timestamps_ns[i - 1]) / 1000000ULL;
+				if (dt_ms >= 170ULL)
+				{
+					++capped_interval_count;
+				}
+			}
+			// 5 Hz => 200ms nominal period. Require most observed intervals to obey cap with jitter allowance.
+			CHECK(capped_interval_count >= 4);
+
+			stop_flag.set();
+		}
+
 		SECTION("Telemetry gateway websocket forwards peer layout, frame, and writes")
 		{
 			const uint16_t peer_port = choose_telemetry_port();
